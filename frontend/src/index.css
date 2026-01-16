@@ -1,0 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- VARIABLES DE ENTORNO (Soporte básico) --- */
+:root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+}
+
+/* --- ESTILOS GLOBALES BASE --- */
+body {
+    @apply bg-black text-zinc-200 font-sans;
+    overscroll-behavior-y: none;
+    /* Evita rebote en iOS */
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+    height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- ÁREAS SEGURAS (AJUSTE AGRESIVO MANUAL) --- */
+
+/* HEADER: Forzamos 50px. Esto baja el header para que NO toque la hora/batería. */
+.safe-top {
+    padding-top: max(50px, var(--sat)) !important;
+}
+
+/* FOOTER: Forzamos 15px (muy poco). Esto PEGA los iconos abajo, eliminando el hueco negro grande. */
+.safe-bottom {
+    padding-bottom: 0px !important;
+}
+
+/* PADDING CONTENIDO: Para que el footer no tape el final de la lista al hacer scroll */
+.pb-safe-content {
+    padding-bottom: 100px !important;
+}
+
+/* --- FIX ZOOM INPUTS IOS --- */
+@media screen and (max-width: 768px) {
+
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* --- SCROLLBAR PERSONALIZADA --- */
+@layer utilities {
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        @apply bg-black;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        @apply bg-zinc-800 rounded-[10px];
+        border: 1px solid transparent;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        @apply bg-yellow-500;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+}
+
+.animate-in {
+    animation-duration: 0.3s;
+    animation-fill-mode: forwards;
+}
+
+@layer base {
+
+    input,
+    select,
+    textarea {
+        @apply bg-zinc-950 border border-zinc-800 text-white;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+        @apply border-yellow-500 outline-none;
+    }
+}
+
+.custom-scrollbar {
+    -webkit-overflow-scrolling: touch;
+}
+
+.select-none {
+    -webkit-user-select: none;
+    user-select: none;
+}

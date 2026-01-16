@@ -1,0 +1,150 @@
+.mascot-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    /* Click a través del dragón */
+    z-index: 50;
+    /* ¡Muy alto para que se vea ENCIMA de todo! */
+    overflow: visible;
+    /* Permitir que se salga un poco si salta alto */
+}
+
+.mascot-character {
+    /* --- TAMAÑO Y SPRITE --- */
+    /* Asumiendo que cada cuadro es aprox 96x96px. Si se ve mal, avísame */
+    width: 96px;
+    height: 96px;
+
+    background-repeat: no-repeat;
+    /* La imagen tiene 3 columnas (96*3 = 288 width) y 4 filas (96*4 = 384 height) */
+    background-size: 288px 384px;
+
+    /* Seleccionamos la 2ª Fila (Caminar derecha) para empezar */
+    /* Offset Y: -96px */
+    background-position: 0px -96px;
+
+    position: absolute;
+
+    /* Filtro para que RESALTE sobre el fondo oscuro */
+    filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.8)) brightness(1.2);
+
+    /* --- ANIMACIONES --- */
+    animation:
+        dragonBehavior 12s linear infinite,
+        /* Rutina de movimiento por la pantalla */
+        spriteWalk 0.6s steps(3) infinite;
+    /* Animación de las patas/alas */
+}
+
+/* --- RUTINA COMPLEJA (Zona Verde -> Zona Roja) --- */
+@keyframes dragonBehavior {
+    /* === FASE 1: ZONA VERDE (Idle / Andar poco) === */
+    /* Empieza entre la barra XP y Monedas (aprox 50% - 60% de la pantalla) */
+
+    0% {
+        left: 55%;
+        top: 15px;
+        /* Altura del suelo del header */
+        transform: scaleX(-1);
+        /* Mirando a la Izquierda (hacia el nombre) */
+    }
+
+    15% {
+        left: 52%;
+        /* Anda un poquito a la izquierda */
+        top: 15px;
+        transform: scaleX(-1);
+    }
+
+    25% {
+        left: 55%;
+        /* Vuelve un poquito a la derecha */
+        top: 15px;
+        transform: scaleX(1);
+        /* Mira a la derecha un momento */
+    }
+
+    29% {
+        transform: scaleX(-1);
+        /* Se prepara para saltar a la izquierda */
+    }
+
+    /* === FASE 2: EL SALTO A ZONA ROJA === */
+    30% {
+        left: 55%;
+        top: 15px;
+    }
+
+    35% {
+        left: 20%;
+        /* Zona Roja (sobre el nombre) */
+        top: -10px;
+        /* ¡Salta HACIA ARRIBA! (Valor negativo sube) */
+    }
+
+    /* === FASE 3: VOLAR EN ZONA ROJA === */
+    /* Aquí añadimos translateY para simular flotar/volar */
+
+    40% {
+        left: 15%;
+        top: -10px;
+        transform: scaleX(-1) translateY(0px);
+    }
+
+    50% {
+        left: 25%;
+        top: -10px;
+        transform: scaleX(1) translateY(-5px);
+        /* Flota arriba */
+    }
+
+    60% {
+        left: 10%;
+        top: -10px;
+        transform: scaleX(-1) translateY(0px);
+    }
+
+    70% {
+        left: 20%;
+        top: -10px;
+        transform: scaleX(1) translateY(-5px);
+        /* Flota arriba */
+    }
+
+    /* === FASE 4: VUELTA A CASA === */
+    85% {
+        left: 20%;
+        top: -10px;
+        transform: scaleX(1);
+    }
+
+    90% {
+        left: 55%;
+        /* Aterriza en zona verde */
+        top: 15px;
+        transform: scaleX(1);
+    }
+
+    100% {
+        left: 55%;
+        top: 15px;
+        transform: scaleX(-1);
+        /* Reset */
+    }
+}
+
+/* Animación de caminar (Frames) */
+@keyframes spriteWalk {
+    from {
+        background-position-x: 0px;
+    }
+
+    to {
+        background-position-x: -288px;
+    }
+
+    /* Ancho total de 3 frames */
+}
