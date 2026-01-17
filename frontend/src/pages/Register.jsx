@@ -1,55 +1,34 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, UserPlus, Gamepad2 } from 'lucide-react'; // Iconos
-import api from '../services/api'; // Tu conexión configurada con Axios
+import { Eye, EyeOff, UserPlus, User, Mail, Lock, ArrowRight } from 'lucide-react';
+import api from '../services/api';
 
 export default function Register() {
     const navigate = useNavigate();
 
-    // Estados del formulario
-    const [formData, setFormData] = useState({
-        username: '',
-        email: '',
-        password: ''
-    });
+    const [formData, setFormData] = useState({ username: '', email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
-
-    // Estados de UI
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Manejar cambios en inputs
     const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
-        // Limpiamos error si el usuario empieza a escribir de nuevo
+        setFormData({ ...formData, [e.target.name]: e.target.value });
         if (error) setError(null);
     };
 
-    // Enviar formulario
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
         try {
-            // 1. Petición al Backend
             const response = await api.post('/auth/register', formData);
 
-            console.log('Registro exitoso:', response.data);
-
-            // 2. Guardar Token (Auto-login)
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data));
 
-            // 3. Redirigir al Home (Dashboard)
-            navigate('/home');
-
+            navigate('/home', { replace: true });
         } catch (err) {
-            console.error(err);
-            // Extraemos el mensaje de error del backend si existe
             const msg = err.response?.data?.message || 'Error al conectar con el servidor';
             setError(msg);
         } finally {
@@ -58,107 +37,113 @@ export default function Register() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-950">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
 
-            {/* Cabecera RPG */}
-            <div className="text-center mb-8">
-                <div className="bg-blue-600 p-4 rounded-full inline-block mb-4 shadow-lg shadow-blue-500/30">
-                    <Gamepad2 size={40} className="text-white" />
+            {/* Fondo Decorativo (Azul/Cyan para registro) */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-600 via-blue-500 to-cyan-600 z-20"></div>
+            <div className="absolute -top-20 -left-20 w-80 h-80 bg-blue-600/10 rounded-full blur-[80px] pointer-events-none"></div>
+
+            <div className="w-full max-w-sm relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+                <div className="text-center mb-8">
+                    <h1 className="text-4xl font-black italic text-white tracking-tighter mb-1">
+                        NUEVO RECLUTA
+                    </h1>
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">
+                        Crear Expediente
+                    </p>
                 </div>
-                <h1 className="text-3xl font-bold text-white tracking-tight">NoteGymk</h1>
-                <p className="text-gray-400 text-sm mt-1">Comienza tu aventura</p>
-            </div>
 
-            {/* Tarjeta de Registro */}
-            <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
-                <h2 className="text-xl font-semibold text-white mb-6 text-center">Crear Personaje</h2>
+                <div className="bg-zinc-950 border border-white/10 rounded-[32px] p-6 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-blue-500 blur-sm"></div>
 
-                {error && (
-                    <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-200 text-sm rounded-lg text-center">
-                        {error}
-                    </div>
-                )}
+                    <h2 className="text-xl font-black text-white uppercase italic mb-6 flex items-center gap-2">
+                        <UserPlus size={20} className="text-blue-500" /> Registro
+                    </h2>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-
-                    {/* Username */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Nombre de Usuario</label>
-                        <input
-                            type="text"
-                            name="username"
-                            placeholder="Ej. GuerreroX"
-                            value={formData.username}
-                            onChange={handleChange}
-                            required
-                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                        />
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Correo Electrónico</label>
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="tu@email.com"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                        />
-                    </div>
-
-                    {/* Password con Ojo */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Contraseña</label>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                placeholder="••••••••"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-3.5 text-gray-500 hover:text-white transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
+                    {error && (
+                        <div className="mb-6 p-3 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-xs font-bold text-center animate-pulse">
+                            {error}
                         </div>
-                    </div>
+                    )}
 
-                    {/* Botón Submit */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-blue-900/20 mt-2 flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                Creando...
-                            </span>
-                        ) : (
-                            <>
-                                <UserPlus size={20} />
-                                Registrarse
-                            </>
-                        )}
-                    </button>
-                </form>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Usuario */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Alias / Usuario</label>
+                            <div className="relative group">
+                                <User className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input
+                                    type="text"
+                                    name="username"
+                                    placeholder="Guerrero01"
+                                    value={formData.username}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                            </div>
+                        </div>
 
-                {/* Footer Link */}
-                <p className="mt-8 text-center text-gray-500 text-sm">
-                    ¿Ya tienes cuenta?{' '}
-                    <Link to="/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                        Inicia Sesión
+                        {/* Email */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Correo</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input
+                                    type="email"
+                                    name="email"
+                                    placeholder="tu@email.com"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Password */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-12 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-3.5 text-zinc-600 hover:text-white transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl mt-6 uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {loading ? "Creando..." : "CONFIRMAR"}
+                        </button>
+                    </form>
+                </div>
+
+                <div className="mt-8 text-center">
+                    <p className="text-zinc-500 text-xs font-medium">
+                        ¿Ya tienes cuenta?
+                    </p>
+                    <Link to="/login" className="text-blue-400 text-xs font-black uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1 mt-2 group">
+                        Inicia Sesión <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
-                </p>
+                </div>
             </div>
         </div>
     );

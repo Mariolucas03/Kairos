@@ -1,6 +1,6 @@
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\config\db.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\config\db.js ---
 
 const mongoose = require('mongoose');
 
@@ -19,10 +19,10 @@ const connectDB = async () => {
 
 module.exports = connectDB;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\config\db.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\config\db.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\authController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\authController.js ---
 
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
@@ -117,10 +117,10 @@ const loginUser = async (req, res) => {
 
 module.exports = { registerUser, loginUser };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\authController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\authController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\challengeController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\challengeController.js ---
 
 const asyncHandler = require('express-async-handler');
 const Challenge = require('../models/Challenge'); // <--- CORREGIDO AQUÍ (Coincide con tu archivo real)
@@ -261,10 +261,10 @@ module.exports = {
     respondChallenge // <--- Asegúrate de exportar esto
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\challengeController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\challengeController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\clanController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\clanController.js ---
 
 const asyncHandler = require('express-async-handler');
 const Clan = require('../models/Clan');
@@ -626,10 +626,10 @@ module.exports = {
     getClanDetails, previewClan
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\clanController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\clanController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\dailyController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\dailyController.js ---
 
 const asyncHandler = require('express-async-handler');
 const DailyLog = require('../models/DailyLog');
@@ -796,10 +796,10 @@ module.exports = {
     getWeightHistory
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\dailyController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\dailyController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\eventController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\eventController.js ---
 
 const UserEventProgress = require('../models/UserEventProgress');
 const moment = require('moment'); // ⚠️ RECUERDA: npm install moment en la carpeta backend
@@ -917,10 +917,10 @@ exports.claimReward = async (req, res) => {
     }
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\eventController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\eventController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\foodController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\foodController.js ---
 
 const Food = require('../models/Food');
 const NutritionLog = require('../models/NutritionLog');
@@ -1292,10 +1292,10 @@ module.exports = {
     analyzeFoodText
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\foodController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\foodController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\gymController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\gymController.js ---
 
 const Routine = require('../models/Routine');
 const Exercise = require('../models/Exercise');
@@ -1931,10 +1931,10 @@ module.exports = {
     chatRoutineGenerator
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\gymController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\gymController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\missionController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\missionController.js ---
 
 const asyncHandler = require('express-async-handler');
 const Mission = require('../models/Mission');
@@ -2256,10 +2256,10 @@ module.exports = {
     respondMissionInvite
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\missionController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\missionController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\pushController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\pushController.js ---
 
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
@@ -2310,10 +2310,10 @@ const sendPushToUser = async (user, payload) => {
 
 module.exports = { subscribeToPush, sendPushToUser };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\pushController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\pushController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\shopController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\shopController.js ---
 
 const ShopItem = require('../models/ShopItem');
 const User = require('../models/User');
@@ -2660,10 +2660,10 @@ const seedShop = async (req, res) => {
 
 module.exports = { getShopItems, createCustomReward, buyItem, useItem, seedShop, exchangeCurrency };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\shopController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\shopController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\socialController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\socialController.js ---
 
 const User = require('../models/User');
 const DailyLog = require('../models/DailyLog');
@@ -2877,10 +2877,10 @@ module.exports = {
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\socialController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\socialController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\userController.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\userController.js ---
 
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
@@ -3143,10 +3143,10 @@ module.exports = {
     forceNightlyMaintenance
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\controllers\userController.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\userController.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\fix_db.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\fix_db.js ---
 
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -3172,79 +3172,10 @@ const fixDB = async () => {
 
 fixDB();
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\fix_db.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\fix_db.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\index.js ---
-
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./config/db');
-const { initScheduledJobs } = require('./utils/scheduler');
-const { errorHandler } = require('./middleware/errorMiddleware');
-const mongoSanitize = require('express-mongo-sanitize');
-
-// --- 1. IMPORTACIÓN DE RUTAS ---
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const dailyRoutes = require('./routes/daily');
-const gymRoutes = require('./routes/gym');
-const foodRoutes = require('./routes/food');
-const socialRoutes = require('./routes/social');
-const missionRoutes = require('./routes/missions');
-const shopRoutes = require('./routes/shop');
-const clanRoutes = require('./routes/clans');
-const challengeRoutes = require('./routes/challenges');
-const pushRoutes = require('./routes/push');
-const eventRoutes = require('./routes/eventRoutes');
-
-connectDB();
-
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-
-// Seguridad: Prevenir inyección NoSQL
-app.use(mongoSanitize());
-
-// --- 2. DEFINICIÓN DE ENDPOINTS (CONECTANDO LOS CABLES) ---
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);        // Corrige el 404 de /api/users/claim-daily
-app.use('/api/daily', dailyRoutes);       // Corrige el 404 de /api/daily
-app.use('/api/gym', gymRoutes);           // Corrige el 404 de /api/gym/routines
-app.use('/api/food', foodRoutes);         // Corrige el 404 de /api/food/log
-app.use('/api/social', socialRoutes);     // Corrige el 404 de /api/social/friends
-app.use('/api/missions', missionRoutes);  // Corrige el 404 de /api/missions
-app.use('/api/shop', shopRoutes);
-app.use('/api/clans', clanRoutes);        // Corrige el 404 de /api/clans/me
-app.use('/api/challenges', challengeRoutes);
-app.use('/api/push', pushRoutes);
-app.use('/api/events', eventRoutes);
-
-// Inicializar Cron Jobs (Mantenimiento nocturno y recordatorios)
-initScheduledJobs();
-
-app.get('/', (req, res) => res.send('API NoteGymk funcionando 🚀'));
-
-// Middleware de manejo de errores (SIEMPRE AL FINAL)
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 5000;
-
-// Escuchar en 0.0.0.0 para acceso desde móvil en red local
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ Servidor iniciado en puerto ${PORT}`));
-
-// index.js o server.js
-app.get('/ping', (req, res) => {
-    res.send('pong 🏓');
-});
-
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\index.js ---
-
-
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\authMiddleware.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\authMiddleware.js ---
 
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
@@ -3299,10 +3230,31 @@ const protect = asyncHandler(async (req, res, next) => {
 
 module.exports = protect;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\authMiddleware.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\authMiddleware.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\errorMiddleware.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\cronMiddleware.js ---
+
+const asyncHandler = require('express-async-handler');
+
+const protectCron = asyncHandler(async (req, res, next) => {
+    // Buscamos una clave secreta en la cabecera o query string
+    const secret = req.headers['x-cron-secret'] || req.query.secret;
+
+    // Esta clave la definirás tú en el panel de Render
+    if (secret !== process.env.CRON_SECRET) {
+        res.status(401);
+        throw new Error('No autorizado: Secreto de Cron inválido');
+    }
+    next();
+});
+
+module.exports = { protectCron };
+
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\cronMiddleware.js ---
+
+
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\errorMiddleware.js ---
 
 const errorHandler = (err, req, res, next) => {
     // Si el status code ya fue establecido (ej. 404), úsalo. Si es 200, cámbialo a 500.
@@ -3325,10 +3277,10 @@ module.exports = {
     errorHandler,
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\errorMiddleware.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\errorMiddleware.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\streakMiddleware.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\streakMiddleware.js ---
 
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
@@ -3370,10 +3322,10 @@ const checkStreak = asyncHandler(async (req, res, next) => {
 
 module.exports = { checkStreak };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\streakMiddleware.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\streakMiddleware.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\validate.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\validate.js ---
 
 const validate = (schema) => (req, res, next) => {
     // Validamos req.body contra el esquema definido
@@ -3404,10 +3356,10 @@ const validate = (schema) => (req, res, next) => {
 
 module.exports = validate;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\middleware\validate.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\middleware\validate.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\migrate_users.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\migrate_users.js ---
 
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -3479,10 +3431,10 @@ const migrateUsers = async () => {
 
 migrateUsers();
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\migrate_users.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\migrate_users.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Challenge.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Challenge.js ---
 
 const mongoose = require('mongoose');
 
@@ -3514,10 +3466,10 @@ const challengeSchema = new mongoose.Schema({
 
 module.exports = mongoose.model('Challenge', challengeSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Challenge.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Challenge.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Clan.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Clan.js ---
 
 const mongoose = require('mongoose');
 
@@ -3583,10 +3535,10 @@ clanSchema.index({ totalPower: -1 });
 
 module.exports = mongoose.model('Clan', clanSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Clan.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Clan.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\DailyLog.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\DailyLog.js ---
 
 const mongoose = require('mongoose');
 
@@ -3675,10 +3627,10 @@ dailyLogSchema.index({ user: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('DailyLog', dailyLogSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\DailyLog.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\DailyLog.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Exercise.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Exercise.js ---
 
 const mongoose = require('mongoose');
 
@@ -3714,10 +3666,10 @@ exerciseSchema.index({ name: 1, user: 1 });
 
 module.exports = mongoose.model('Exercise', exerciseSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Exercise.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Exercise.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Food.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Food.js ---
 
 const mongoose = require('mongoose');
 
@@ -3743,10 +3695,10 @@ foodSchema.index({ name: 'text' });
 
 module.exports = mongoose.model('Food', foodSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Food.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Food.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Mission.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Mission.js ---
 
 const mongoose = require('mongoose');
 
@@ -3819,10 +3771,10 @@ missionSchema.index({ participants: 1, frequency: 1, completed: 1 });
 
 module.exports = mongoose.model('Mission', missionSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Mission.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Mission.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\NutritionLog.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\NutritionLog.js ---
 
 const mongoose = require('mongoose');
 
@@ -3866,10 +3818,10 @@ nutritionLogSchema.index({ user: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('NutritionLog', nutritionLogSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\NutritionLog.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\NutritionLog.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Routine.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Routine.js ---
 
 const mongoose = require('mongoose');
 
@@ -3896,10 +3848,10 @@ const routineSchema = new mongoose.Schema({
 
 module.exports = mongoose.model('Routine', routineSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\Routine.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\Routine.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\ShopItem.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\ShopItem.js ---
 
 const mongoose = require('mongoose');
 
@@ -3938,10 +3890,10 @@ const shopItemSchema = new mongoose.Schema({
 
 module.exports = mongoose.model('ShopItem', shopItemSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\ShopItem.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\ShopItem.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\User.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\User.js ---
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs'); // Asegúrate de tener: npm install bcryptjs
@@ -4073,10 +4025,10 @@ userSchema.virtual('stats').get(function () {
 
 module.exports = mongoose.model('User', userSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\User.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\User.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\UserEventProgress.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\UserEventProgress.js ---
 
 // models/UserEventProgress.js
 const mongoose = require('mongoose');
@@ -4094,10 +4046,10 @@ userEventProgressSchema.index({ userId: 1, periodId: 1 }, { unique: true });
 
 module.exports = mongoose.model('UserEventProgress', userEventProgressSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\UserEventProgress.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\UserEventProgress.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\WorkoutLog.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\WorkoutLog.js ---
 
 const mongoose = require('mongoose');
 
@@ -4157,18 +4109,18 @@ workoutLogSchema.index({ user: 1, "exercises.name": 1, date: 1 });
 
 module.exports = mongoose.model('WorkoutLog', workoutLogSchema);
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\models\WorkoutLog.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\models\WorkoutLog.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\package.json ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\package.json ---
 
 {
   "name": "rpg-life-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -4192,11 +4144,10 @@ module.exports = mongoose.model('WorkoutLog', workoutLogSchema);
   }
 }
 
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\package.json ---
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\package.json ---
 
-
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\auth.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\auth.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4212,10 +4163,10 @@ router.post('/login', validate(loginSchema), loginUser);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\auth.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\auth.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\challenges.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\challenges.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4247,10 +4198,10 @@ router.route('/:id')
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\challenges.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\challenges.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\clans.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\clans.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4286,10 +4237,38 @@ router.put('/rank', protect, updateMemberRank);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\clans.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\clans.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\daily.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\cron.js ---
+
+const express = require('express');
+const router = express.Router();
+const { runNightlyMaintenance } = require('../utils/scheduler');
+const { protectCron } = require('../middleware/cronMiddleware');
+
+// Esta ruta despertará al servidor y ejecutará el castigo/mantenimiento
+// URL Final: https://tu-backend.onrender.com/api/cron/nightly-maintenance?secret=TU_CONTRASEÑA
+router.get('/nightly-maintenance', protectCron, async (req, res) => {
+    try {
+        console.log("🌙 [CRON EXTERNO] Forzando mantenimiento...");
+        const result = await runNightlyMaintenance();
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("❌ Error en Cron Externo:", error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Ruta simple para mantenerlo despierto si quieres (Ping)
+router.get('/ping', (req, res) => res.send('Pong! 🤖'));
+
+module.exports = router;
+
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\cron.js ---
+
+
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\daily.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4313,10 +4292,10 @@ router.get('/history', protect, getWeightHistory);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\daily.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\daily.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\eventRoutes.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\eventRoutes.js ---
 
 // routes/eventRoutes.js
 const express = require('express');
@@ -4331,10 +4310,10 @@ router.post('/add-points', eventController.addPoints);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\eventRoutes.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\eventRoutes.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\food.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\food.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4382,10 +4361,10 @@ router.post('/chat-macros', protect, chatMacroCalculator);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\food.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\food.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\gym.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\gym.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4442,10 +4421,10 @@ router.get('/exercise-history', protect, getExerciseHistory);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\gym.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\gym.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\missions.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\missions.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4471,10 +4450,10 @@ router.post('/respond', protect, respondMissionInvite);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\missions.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\missions.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\push.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\push.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4485,10 +4464,10 @@ router.post('/subscribe', protect, subscribeToPush);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\push.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\push.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\shop.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\shop.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4504,10 +4483,10 @@ router.post('/exchange', protect, exchangeCurrency); // <--- NUEVA RUTA
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\shop.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\shop.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\social.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\social.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4530,10 +4509,10 @@ router.get('/leaderboard', protect, getLeaderboard);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\social.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\social.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\users.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\users.js ---
 
 const express = require('express');
 const router = express.Router();
@@ -4572,10 +4551,10 @@ router.post('/debug/force-night', protect, forceNightlyMaintenance);
 
 module.exports = router;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\routes\users.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\routes\users.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\schemas\authSchemas.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\schemas\authSchemas.js ---
 
 const Joi = require('joi');
 
@@ -4599,10 +4578,10 @@ const loginSchema = Joi.object({
 
 module.exports = { registerSchema, loginSchema };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\schemas\authSchemas.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\schemas\authSchemas.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\schemas\gymSchemas.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\schemas\gymSchemas.js ---
 
 const Joi = require('joi');
 
@@ -4631,10 +4610,89 @@ const workoutLogSchema = Joi.object({
 
 module.exports = { workoutLogSchema };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\schemas\gymSchemas.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\schemas\gymSchemas.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\services\levelService.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\server.js ---
+
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const connectDB = require('./config/db');
+const { initScheduledJobs } = require('./utils/scheduler');
+const { errorHandler } = require('./middleware/errorMiddleware');
+const mongoSanitize = require('express-mongo-sanitize');
+
+// --- 1. IMPORTACIÓN DE RUTAS ---
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const dailyRoutes = require('./routes/daily');
+const gymRoutes = require('./routes/gym');
+const foodRoutes = require('./routes/food');
+const socialRoutes = require('./routes/social');
+const missionRoutes = require('./routes/missions');
+const shopRoutes = require('./routes/shop');
+const clanRoutes = require('./routes/clans');
+const challengeRoutes = require('./routes/challenges');
+const pushRoutes = require('./routes/push');
+const eventRoutes = require('./routes/eventRoutes');
+const cronRoutes = require('./routes/cron');
+
+connectDB();
+
+const app = express();
+
+// --- CONFIGURACIÓN CORS (MODIFICADO) ---
+// Usamos la opción "Permisiva Explícita" para evitar errores en el primer despliegue
+app.use(cors({
+    origin: '*', // Permite tráfico desde Vercel, Móvil y Cron-Job.org
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    // ¡CRÍTICO! Añadimos 'x-cron-secret' para que el Cron Job externo pueda autenticarse
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret']
+}));
+
+app.use(express.json());
+
+// Seguridad: Prevenir inyección NoSQL
+app.use(mongoSanitize());
+
+// --- 2. DEFINICIÓN DE ENDPOINTS ---
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/daily', dailyRoutes);
+app.use('/api/gym', gymRoutes);
+app.use('/api/food', foodRoutes);
+app.use('/api/social', socialRoutes);
+app.use('/api/missions', missionRoutes);
+app.use('/api/shop', shopRoutes);
+app.use('/api/clans', clanRoutes);
+app.use('/api/challenges', challengeRoutes);
+app.use('/api/push', pushRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/cron', cronRoutes);
+
+// Inicializar Cron Jobs Internos (Como respaldo o para tareas diurnas)
+initScheduledJobs();
+
+app.get('/', (req, res) => res.send('API NoteGymk funcionando 🚀'));
+
+// Middleware de manejo de errores (SIEMPRE AL FINAL)
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 5000;
+
+// Escuchar en 0.0.0.0 es correcto para Render y acceso red local
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Servidor iniciado en puerto ${PORT}`));
+
+// Endpoint de salud (Health Check)
+app.get('/ping', (req, res) => {
+    res.send('pong 🏓');
+});
+
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\server.js ---
+
+
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\services\levelService.js ---
 
 const User = require('../models/User');
 const Clan = require('../models/Clan'); // <--- IMPORTANTE: Importar modelo Clan
@@ -4729,10 +4787,10 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
 
 module.exports = { addRewards, ensureLevelConsistency };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\services\levelService.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\services\levelService.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\utils\dateHelpers.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\utils\dateHelpers.js ---
 
 // backend/utils/dateHelpers.js
 const getTodayDateString = () => {
@@ -4743,17 +4801,17 @@ const getTodayDateString = () => {
 
 module.exports = { getTodayDateString };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\utils\dateHelpers.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\utils\dateHelpers.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\utils\gamificationEngine.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\utils\gamificationEngine.js ---
 
 
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\utils\gamificationEngine.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\utils\gamificationEngine.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\utils\scheduler.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\utils\scheduler.js ---
 
 const cron = require('node-cron');
 const Mission = require('../models/Mission');
@@ -4978,44 +5036,54 @@ const initScheduledJobs = () => {
 
 module.exports = { initScheduledJobs, runNightlyMaintenance };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\backend\utils\scheduler.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\utils\scheduler.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\main.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\index.html ---
 
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import './index.css';
+<!DOCTYPE html>
+<html lang="es">
 
-// --- REGISTRO SERVICE WORKER (PWA + PUSH) ---
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then((registration) => {
-                console.log('✅ SW Registrado:', registration.scope);
-            })
-            .catch((error) => {
-                console.error('❌ Error SW:', error);
-            });
-    });
-}
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Kairos</title>
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>
-);
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="/assets/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\main.jsx ---
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Kairos">
+    <meta name="theme-color" content="#000000" />
+</head>
+
+<body>
+    <noscript>Necesitas habilitar JavaScript para correr esta app.</noscript>
+    <div id="root"></div>
+
+    <script type="module" src="src/main.jsx"></script>
+</body>
+
+</html>
+
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\index.html ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\package.json ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\package.json ---
 
 {
   "name": "rpg-life-frontend",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -5029,86 +5097,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     "react-calendar": "^6.0.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.10.1",
-    "react-scripts": "5.0.1",
     "react-swipeable-list": "^1.10.0",
     "recharts": "^3.6.0"
   },
-  "scripts": {
-    "start": "set PORT=3005 && react-scripts start",
-    "build": "react-scripts build",
-    "serve": "serve -s build"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
   "devDependencies": {
-    "autoprefixer": "^10.4.22",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17"
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "vite": "^5.2.0"
   }
 }
 
-
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\package.json ---
-
-
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\postcss.config.js ---
-
-module.exports = {
-    plugins: {
-        tailwindcss: {},
-        autoprefixer: {},
-    },
-}
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\package.json ---
 
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\postcss.config.js ---
-
-
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\public\index.html ---
-
-<!DOCTYPE html>
-
-<html lang="es">
-
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Kairos</title>
-
-    <link rel="manifest" href="/manifest.json" />
-
-    <link rel="icon" type="image/png" href="/assets/icons/icon-192x192.png" />
-
-    <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
-
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Kairos">
-
-    <meta name="theme-color" content="#000000" />
-</head>
-
-<body> <noscript>Necesitas habilitar JavaScript para correr esta app.</noscript>
-    <div id="root"></div>
-</body>
-
-</html>
-
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\public\index.html ---
-
-
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\public\manifest.json ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\public\manifest.json ---
 
 {
     "short_name": "Kairos",
@@ -5137,10 +5141,10 @@ module.exports = {
     "orientation": "portrait"
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\public\manifest.json ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\public\manifest.json ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\public\service-worker.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\public\service-worker.js ---
 
 self.addEventListener('push', function (event) {
     const data = event.data.json();
@@ -5167,10 +5171,10 @@ self.addEventListener('notificationclick', function (event) {
     );
 });
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\public\service-worker.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\public\service-worker.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\App.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\App.jsx ---
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
@@ -5230,10 +5234,10 @@ function App() {
 
 export default App;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\App.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\App.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\ChestModal.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\ChestModal.jsx ---
 
 import React, { useState, useEffect } from 'react';
 
@@ -5366,10 +5370,10 @@ export default function ChestModal({ isOpen, onClose, reward, chestType = 'wood'
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\ChestModal.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\ChestModal.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\IosInstallPrompt.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\IosInstallPrompt.jsx ---
 
 import { useState, useEffect } from 'react';
 import { Share, X } from 'lucide-react';
@@ -5432,10 +5436,10 @@ export default function IosInstallPrompt() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\IosInstallPrompt.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\IosInstallPrompt.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\Mascot.css ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\Mascot.css ---
 
 .mascot-container {
     position: absolute;
@@ -5588,10 +5592,10 @@ export default function IosInstallPrompt() {
     /* Ancho total de 3 frames */
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\Mascot.css ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\Mascot.css ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\Mascot.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\Mascot.jsx ---
 
 import React from 'react';
 
@@ -5624,10 +5628,10 @@ export default function Mascot({ petUrl }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\Mascot.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\Mascot.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\SortableWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\SortableWidget.jsx ---
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -5664,10 +5668,10 @@ export default function SortableWidget({ id, children, className = '' }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\SortableWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\SortableWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\Toast.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\Toast.jsx ---
 
 import { useEffect } from 'react';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
@@ -5708,10 +5712,10 @@ export default function Toast({ message, type = 'success', onClose }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\common\Toast.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\common\Toast.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\food\CreateFoodModal.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\food\CreateFoodModal.jsx ---
 
 import { useState } from 'react';
 import { X, Save, Flame, Beef, Wheat, Droplet, Leaf } from 'lucide-react';
@@ -5870,10 +5874,10 @@ export default function CreateFoodModal({ onClose, onFoodCreated }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\food\CreateFoodModal.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\food\CreateFoodModal.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\food\FoodSearchModal.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\food\FoodSearchModal.jsx ---
 
 import { useState, useRef, useEffect } from 'react';
 import { Search, Plus, X, Flame, Wheat, Droplet, Leaf, Sparkles, ScanBarcode, ArrowRight, Camera, Image as ImageIcon, Trash2, BrainCircuit, Save, Check } from 'lucide-react';
@@ -6165,10 +6169,10 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\food\FoodSearchModal.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\food\FoodSearchModal.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\gym\ActiveWorkout.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\gym\ActiveWorkout.jsx ---
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -6592,10 +6596,10 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\gym\ActiveWorkout.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\gym\ActiveWorkout.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\gym\CreateRoutineModal.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\gym\CreateRoutineModal.jsx ---
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -6828,10 +6832,10 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\gym\CreateRoutineModal.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\gym\CreateRoutineModal.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\gym\ExerciseSelector.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\gym\ExerciseSelector.jsx ---
 
 import { useState, useEffect } from 'react';
 import { Search, X, Dumbbell, Plus, CheckCircle2, Save } from 'lucide-react';
@@ -7010,10 +7014,10 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\gym\ExerciseSelector.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\gym\ExerciseSelector.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\home\HomeModals.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\home\HomeModals.jsx ---
 
 // frontend/src/components/home/HomeModals.jsx
 import { useState } from 'react';
@@ -7213,10 +7217,10 @@ export function MissionsHistoryModal({ stats, onClose }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\home\HomeModals.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\home\HomeModals.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Footer.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Footer.jsx ---
 
 import { NavLink } from 'react-router-dom';
 import { Home, ScrollText, Utensils, Dumbbell, Users } from 'lucide-react';
@@ -7281,10 +7285,10 @@ export default function Footer({ user }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Footer.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Footer.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Header.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Header.jsx ---
 
 import { Link } from 'react-router-dom';
 import HealthWidget from './HealthWidget';
@@ -7464,10 +7468,10 @@ export default function Header({ user, setUser }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Header.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Header.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\HealthWidget.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\HealthWidget.jsx ---
 
 import { useState, useRef, useEffect } from 'react';
 import { Save, Lock, Skull, Activity } from 'lucide-react';
@@ -7643,10 +7647,10 @@ export default function HealthWidget({ user, setUser }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\HealthWidget.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\HealthWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Layout.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Layout.jsx ---
 
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
@@ -7741,17 +7745,17 @@ export default function Layout() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Layout.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Layout.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Navbar.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Navbar.jsx ---
 
 
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\Navbar.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Navbar.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\RedemptionScreen.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\RedemptionScreen.jsx ---
 
 import { useState } from 'react';
 import { Skull, Lock, CheckCircle, RefreshCcw } from 'lucide-react';
@@ -7835,10 +7839,10 @@ export default function RedemptionScreen({ user, setUser }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\layout\RedemptionScreen.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\RedemptionScreen.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\profile\ProfileStats.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\profile\ProfileStats.jsx ---
 
 import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -8022,10 +8026,10 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\profile\ProfileStats.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\profile\ProfileStats.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\profile\RPGBody.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\profile\RPGBody.jsx ---
 
 import { useState, useEffect } from 'react';
 import { Activity, Zap, Maximize2 } from 'lucide-react';
@@ -8169,10 +8173,10 @@ export default function RPGBody({ mini = false, onClick }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\profile\RPGBody.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\profile\RPGBody.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\DailyRewardModal.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\DailyRewardModal.jsx ---
 
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -8313,10 +8317,10 @@ export default function DailyRewardModal({ data, onClose }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\DailyRewardModal.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\DailyRewardModal.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\FoodWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\FoodWidget.jsx ---
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -8534,10 +8538,10 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\FoodWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\FoodWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\GainsWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\GainsWidget.jsx ---
 
 import React from 'react';
 import { Trophy, Heart, Coins, Gamepad2, Zap } from 'lucide-react';
@@ -8637,10 +8641,10 @@ export default function LevelWidget({
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\GainsWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\GainsWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\KcalBalanceWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\KcalBalanceWidget.jsx ---
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -9009,10 +9013,10 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\KcalBalanceWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\KcalBalanceWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\MissionsWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\MissionsWidget.jsx ---
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -9202,10 +9206,10 @@ export default function MissionsWidget({
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\MissionsWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\MissionsWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\MoodWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\MoodWidget.jsx ---
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -9350,10 +9354,10 @@ export default function MoodWidget({ mood = null, onUpdate }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\MoodWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\MoodWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\SleepWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\SleepWidget.jsx ---
 
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
@@ -9491,10 +9495,10 @@ export default function SleepWidget({ hours = 0, onUpdate }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\SleepWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\SleepWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\SportWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\SportWidget.jsx ---
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -9738,10 +9742,10 @@ export default function SportWidget({
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\SportWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\SportWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\StepsWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\StepsWidget.jsx ---
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -9885,10 +9889,10 @@ export default function StepsWidget({ steps = 0, goal = 10000, onUpdate }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\StepsWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\StepsWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\StreakWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\StreakWidget.jsx ---
 
 import React from 'react';
 
@@ -9948,10 +9952,10 @@ export default function StreakWidget({ streak = 0 }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\StreakWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\StreakWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\TrainingWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\TrainingWidget.jsx ---
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -10159,10 +10163,10 @@ export default function TrainingWidget({ workouts = [] }) {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\TrainingWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\TrainingWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\WeeklyWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\WeeklyWidget.jsx ---
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -10360,10 +10364,10 @@ export default function WeeklyWidget() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\WeeklyWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\WeeklyWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\WeightWidget.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\WeightWidget.jsx ---
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -10599,24 +10603,21 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\components\widgets\WeightWidget.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\widgets\WeightWidget.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\config.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\config.js ---
 
 // frontend/src/config.js
 
-// ⚠️ CONFIRMA QUE ESTA ES TU IP ACTUAL DEL PC
-const MI_IP_LOCAL = '192.168.1.131';
+// En Vite, las variables de entorno se acceden con import.meta.env
+// Si VITE_API_URL existe (Producción), usa esa. Si no, usa localhost (Desarrollo).
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-export const API_BASE_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:5000'
-    : `http://${MI_IP_LOCAL}:5000`;
-
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\config.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\config.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\hooks\useDailyLog.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useDailyLog.js ---
 
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
@@ -10691,10 +10692,10 @@ export function useDailyLog(user) {
     };
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\hooks\useDailyLog.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useDailyLog.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\hooks\useDailyRewards.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useDailyRewards.js ---
 
 import { useState, useEffect } from 'react';
 import api from '../services/api';
@@ -10787,10 +10788,10 @@ export function useDailyRewards(user, setUser) {
     };
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\hooks\useDailyRewards.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useDailyRewards.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\index.css ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\index.css ---
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
 
@@ -10911,10 +10912,10 @@ body {
     user-select: none;
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\index.css ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\index.css ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\index.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\index.js ---
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -10943,10 +10944,39 @@ if ('serviceWorker' in navigator) {
     });
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\index.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\index.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Food.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\main.jsx ---
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+
+// --- REGISTRO SERVICE WORKER (PWA + PUSH) ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then((registration) => {
+                console.log('✅ SW Registrado:', registration.scope);
+            })
+            .catch((error) => {
+                console.error('❌ Error SW:', error);
+            });
+    });
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+        <App />
+    </React.StrictMode>
+);
+
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\main.jsx ---
+
+
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Food.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -11276,10 +11306,10 @@ export default function Food() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Food.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Food.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\BlackJack.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\BlackJack.jsx ---
 
 import { useState, useEffect } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
@@ -11837,10 +11867,10 @@ export default function BlackJack() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\BlackJack.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\BlackJack.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\DiceGame.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\DiceGame.jsx ---
 
 import { useState, useEffect } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
@@ -12188,10 +12218,10 @@ export default function Dice() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\DiceGame.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\DiceGame.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\FortuneWheel.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\FortuneWheel.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -12640,10 +12670,10 @@ export default function FortuneWheel() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\FortuneWheel.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\FortuneWheel.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\Roulette.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\Roulette.jsx ---
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
@@ -13059,10 +13089,10 @@ export default function Roulette() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\Roulette.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\Roulette.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\ScratchGame.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\ScratchGame.jsx ---
 
 import { useState, useEffect } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
@@ -13436,10 +13466,10 @@ export default function ScratchGame() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\ScratchGame.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\ScratchGame.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\Slots.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\Slots.jsx ---
 
 import { useState, useRef, useEffect } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
@@ -13793,10 +13823,10 @@ export default function Slots() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\games\Slots.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\Slots.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Games.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Games.jsx ---
 
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
 import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
@@ -13958,10 +13988,10 @@ export default function Games() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Games.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Games.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Gym.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Gym.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
@@ -14271,10 +14301,10 @@ export default function Gym() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Gym.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Gym.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Home.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Home.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -14692,10 +14722,10 @@ export default function Home() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Home.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Home.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Login.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Login.jsx ---
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14840,10 +14870,10 @@ export default function Login() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Login.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Login.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Missions.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Missions.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -15446,10 +15476,10 @@ export default function Missions() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Missions.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Missions.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Profile.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Profile.jsx ---
 
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -15964,10 +15994,10 @@ export default function Profile() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Profile.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Profile.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Register.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Register.jsx ---
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -16135,10 +16165,10 @@ export default function Register() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Register.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Register.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Shop.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Shop.jsx ---
 
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
@@ -16557,10 +16587,10 @@ export default function Shop() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Shop.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Shop.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Social.jsx ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Social.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
@@ -17546,10 +17576,10 @@ export default function Social() {
     );
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\pages\Social.jsx ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Social.jsx ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\services\api.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\services\api.js ---
 
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
@@ -17588,10 +17618,10 @@ api.interceptors.response.use(
 
 export default api;
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\services\api.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\services\api.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\utils\pushNotifications.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\utils\pushNotifications.js ---
 
 import api from '../services/api';
 
@@ -17641,10 +17671,10 @@ export const registerPush = async () => {
     }
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\utils\pushNotifications.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\utils\pushNotifications.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\utils\rewardsGenerator.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\utils\rewardsGenerator.js ---
 
 export const getRewardForDay = (day) => {
     return {
@@ -17656,92 +17686,33 @@ export const getRewardForDay = (day) => {
     };
 };
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\src\utils\rewardsGenerator.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\utils\rewardsGenerator.js ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\tailwind.config.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\vercel.json ---
 
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-    content: [
-        "./src/**/*.{js,jsx,ts,tsx}",
-    ],
-    theme: {
-        extend: {
-            colors: {
-                // --- BASE (ESTRUCTURA) ---
-                black: '#000000', // Negro Puro
-                'dark-bg': '#000000', // Alias para fondo
-
-                // Superficies (Tarjetas, Modales, Barras)
-                'dark-card': '#09090b', // Zinc 950 (Casi negro, para elevar)
-
-                // Bordes y líneas divisorias
-                'dark-border': '#27272a', // Zinc 800 (Sutil)
-
-                // --- TEXTOS ---
-                'silver-100': '#e4e4e7', // Principal (Blanco suave)
-                'silver-400': '#a1a1aa', // Secundario (Gris medio)
-                'silver-600': '#52525b', // Inactivo/Placeholder
-
-                // --- ACENTOS (RPG & INTERACCIÓN) ---
-                // DORADO (Marca principal, XP, Dinero)
-                gold: {
-                    400: '#facc15', // Brillo / Hover
-                    500: '#eab308', // Base
-                    600: '#ca8a04', // Sombra / Borde
-                    900: '#422006', // Fondos muy suaves de dorado
-                },
-
-                // ROJO (Salud, Peligro)
-                danger: {
-                    500: '#ef4444',
-                    900: '#450a0a',
-                },
-
-                // VERDE (Éxito, Stamina)
-                success: {
-                    500: '#22c55e',
-                    900: '#052e16',
-                },
-
-                // AZUL (Info, Mana)
-                info: {
-                    500: '#3b82f6',
-                    900: '#172554',
-                }
-            },
-            fontFamily: {
-                sans: ['Inter', 'sans-serif'],
-            },
-            backgroundImage: {
-                // Degradados sutiles para dar volumen sin ensuciar
-                'gradient-gold': 'linear-gradient(135deg, #EAB308 0%, #CA8A04 100%)',
-                'gradient-dark': 'linear-gradient(to bottom, #09090b 0%, #000000 100%)',
-            },
-            boxShadow: {
-                'glow-gold': '0 0 15px rgba(234, 179, 8, 0.2)',
-                'glow-red': '0 0 15px rgba(239, 68, 68, 0.2)',
-            }
-        },
-    },
-    plugins: [],
+{
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/"
+        }
+    ]
 }
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\tailwind.config.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\vercel.json ---
 
 
---- INICIO DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\vite.config.js ---
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\vite.config.js ---
 
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
+// https://vitejs.dev/config/
 export default defineConfig({
     plugins: [react()],
-    server: {
-        host: true, // 🔥 ESTO ES LA CLAVE: Permite acceso desde la red (IP)
-        port: 3000, // Fijamos el puerto para no volvernos locos
-    },
-});
+    // Esto ayuda a que Vite encuentre los archivos en Vercel
+    base: '/',
+})
 
---- FIN DE ARCHIVO: C:\Users\mario\Desktop\NoteGymk\frontend\vite.config.js ---
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\vite.config.js ---

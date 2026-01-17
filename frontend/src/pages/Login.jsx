@@ -1,17 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Gamepad2 } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Lock, Mail, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 
 export default function Login() {
     const navigate = useNavigate();
 
-    const [formData, setFormData] = useState({
-        email: '',
-        password: ''
-    });
+    const [formData, setFormData] = useState({ email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
-
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -26,22 +22,28 @@ export default function Login() {
         setError(null);
 
         try {
-            // 1. Petición al Backend
+            // 1. Limpieza preventiva
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+
+            // 2. Petición al Backend
             const response = await api.post('/auth/login', formData);
 
-            console.log('Login exitoso:', response.data);
+            if (response.data && response.data.token) {
+                // 3. Guardado CRÍTICO antes de navegar
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data));
 
-            // 2. Guardar Token y Datos del Usuario en LocalStorage
-            // Esto es CRUCIAL para que el Header sepa tu nivel y XP luego
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify(response.data));
-
-            // 3. Redirigir al Dashboard principal
-            navigate('/home');
+                // 4. Redirección forzada
+                // Usamos replace para que no puedan volver atrás al login
+                navigate('/home', { replace: true });
+            } else {
+                setError("El servidor no devolvió las credenciales correctas.");
+            }
 
         } catch (err) {
             console.error(err);
-            const msg = err.response?.data?.message || 'Error al iniciar sesión';
+            const msg = err.response?.data?.message || 'Error de conexión. Intenta de nuevo.';
             setError(msg);
         } finally {
             setLoading(false);
@@ -49,93 +51,108 @@ export default function Login() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-950">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
 
-            {/* Logo / Header */}
-            <div className="text-center mb-8">
-                <div className="bg-blue-600 p-4 rounded-full inline-block mb-4 shadow-lg shadow-blue-500/30">
-                    <Gamepad2 size={40} className="text-white" />
+            {/* Fondo Decorativo */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 z-20"></div>
+            <div className="absolute -top-20 -right-20 w-80 h-80 bg-yellow-600/10 rounded-full blur-[80px] pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/5 rounded-full blur-[80px] pointer-events-none"></div>
+
+            {/* Contenedor Principal */}
+            <div className="w-full max-w-sm relative z-10 animate-in fade-in zoom-in duration-500">
+
+                {/* Logo / Título */}
+                <div className="text-center mb-10">
+                    <h1 className="text-5xl font-black italic text-white tracking-tighter mb-1">
+                        KAIROS
+                    </h1>
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">
+                        Sistema de Acceso
+                    </p>
                 </div>
-                <h1 className="text-3xl font-bold text-white tracking-tight">NoteGymk</h1>
-                <p className="text-gray-400 text-sm mt-1">Continúa tu progreso</p>
-            </div>
 
-            {/* Tarjeta de Login */}
-            <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
-                <h2 className="text-xl font-semibold text-white mb-6 text-center">Iniciar Sesión</h2>
+                {/* Tarjeta de Formulario */}
+                <div className="bg-zinc-950 border border-white/10 rounded-[32px] p-6 shadow-2xl relative overflow-hidden">
 
-                {error && (
-                    <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-200 text-sm rounded-lg text-center">
-                        {error}
-                    </div>
-                )}
+                    {/* Brillo interior superior */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-yellow-500 blur-sm"></div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                    <h2 className="text-xl font-black text-white uppercase italic mb-6 flex items-center gap-2">
+                        <Lock size={20} className="text-yellow-500" /> Identificarse
+                    </h2>
 
-                    {/* Email */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Correo Electrónico</label>
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="tu@email.com"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                        />
-                    </div>
-
-                    {/* Password */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Contraseña</label>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                placeholder="••••••••"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-3.5 text-gray-500 hover:text-white transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
+                    {error && (
+                        <div className="mb-6 p-3 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-xs font-bold text-center animate-pulse">
+                            {error}
                         </div>
-                    </div>
+                    )}
 
-                    {/* Botón Login */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-blue-900/20 mt-2 flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                Entrando...
-                            </span>
-                        ) : (
-                            <>
-                                <LogIn size={20} />
-                                Entrar
-                            </>
-                        )}
-                    </button>
-                </form>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Email */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Correo</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-yellow-500 transition-colors" size={18} />
+                                <input
+                                    type="email"
+                                    name="email"
+                                    placeholder="agente@kairos.com"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Password */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-yellow-500 transition-colors" size={18} />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-12 text-white font-bold text-sm focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-3.5 text-zinc-600 hover:text-white transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Botón Action */}
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mt-6 uppercase tracking-widest shadow-lg shadow-yellow-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <span className="animate-pulse">Autenticando...</span>
+                            ) : (
+                                <>Entrar <LogIn size={20} /></>
+                            )}
+                        </button>
+                    </form>
+                </div>
 
                 {/* Footer Link */}
-                <p className="mt-8 text-center text-gray-500 text-sm">
-                    ¿No tienes cuenta?{' '}
-                    <Link to="/register" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                        Crea una aquí
+                <div className="mt-8 text-center">
+                    <p className="text-zinc-500 text-xs font-medium">
+                        ¿No tienes credenciales?
+                    </p>
+                    <Link to="/register" className="text-yellow-500 text-xs font-black uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1 mt-2 group">
+                        Solicitar Acceso <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
-                </p>
+                </div>
             </div>
         </div>
     );
