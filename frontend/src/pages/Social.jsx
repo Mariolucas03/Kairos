@@ -792,13 +792,38 @@ export default function Social() {
                             <div className="bg-zinc-900 border border-white/10 rounded-[32px] p-6 relative overflow-hidden shadow-2xl">
                                 <div className="absolute top-0 right-0 p-10 opacity-10 bg-purple-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
 
-                                <div className="flex justify-between items-start mb-6 relative z-10">
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-4xl bg-black w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner border border-zinc-800">{myClan.icon}</div>
-                                        <div>
-                                            <h2 className="text-2xl font-black text-white uppercase italic">{myClan.name}</h2>
+                                {/* HEADER DE TU CLAN (CORREGIDO) */}
+                                <div className="relative z-10 mb-6">
+                                    <div className="flex items-start gap-4 w-full">
+                                        {/* Icono */}
+                                        <div className="text-4xl bg-black w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner border border-zinc-800 shrink-0">
+                                            {myClan.icon}
+                                        </div>
 
-                                            {/* 🔥 PODER EN CÍRCULO CON RAYO (FIX 3) */}
+                                        {/* Columna de Texto + Botones */}
+                                        <div className="flex-1 min-w-0">
+
+                                            {/* --- BOTONES MOVIDOS AQUÍ --- */}
+                                            <div className="flex justify-end gap-2 mb-1">
+                                                {/* BOTÓN EDITAR (SOLO LÍDER) */}
+                                                {((myClan.leader?._id || myClan.leader) === currentUserId) && (
+                                                    <button onClick={openEditClan} className="bg-zinc-800 p-2 rounded-xl text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
+                                                        <Edit size={16} />
+                                                    </button>
+                                                )}
+
+                                                {/* BOTÓN SALIR (ROJO) */}
+                                                <button onClick={() => requestConfirm("¿Salir del clan?", handleLeaveClan)} className="bg-red-900/20 p-2 rounded-xl text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors">
+                                                    <LogOut size={16} />
+                                                </button>
+                                            </div>
+
+                                            {/* Nombre del Clan */}
+                                            <h2 className="text-2xl font-black text-white uppercase italic truncate break-words leading-tight">
+                                                {myClan.name}
+                                            </h2>
+
+                                            {/* Stats (Poder / Miembros) */}
                                             <div className="flex items-center gap-4 mt-2">
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 border border-purple-500/50 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
@@ -814,20 +839,6 @@ export default function Social() {
                                                 </span>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div className="absolute top-0 right-0 flex gap-2">
-                                        {/* BOTÓN EDITAR (SOLO LÍDER) - Flotando arriba derecha */}
-                                        {((myClan.leader?._id || myClan.leader) === currentUserId) && (
-                                            <button onClick={openEditClan} className="bg-zinc-800 p-2 rounded-xl text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
-                                                <Edit size={16} />
-                                            </button>
-                                        )}
-
-                                        {/* BOTÓN SALIR (ROJO) */}
-                                        <button onClick={() => requestConfirm("¿Salir del clan?", handleLeaveClan)} className="bg-red-900/20 p-2 rounded-xl text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors">
-                                            <LogOut size={16} />
-                                        </button>
                                     </div>
                                 </div>
 
