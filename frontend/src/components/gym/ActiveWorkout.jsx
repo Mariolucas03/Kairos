@@ -49,7 +49,7 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
     // --- EFECTOS ---
 
-    // 1. Cargar estado del descanso al montar (Recuperar tiempo si se salió de la app)
+    // 1. Cargar estado del descanso al montar (Recuperar tiempo si se recarga la página)
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
@@ -61,50 +61,59 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                     setIsResting(true);
                     setRestRemaining(diff);
                 } else {
-                    // El descanso ya terminó mientras estaba fuera
-                    setIsResting(false);
-                    // Actualizamos el storage para quitar el tiempo viejo
+                    // El descanso terminó mientras estaba fuera
                     const newState = { ...data, restEndTime: null };
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+                    setIsResting(false);
                 }
             }
         }
     }, [STORAGE_KEY]);
 
-    // 2. Cronómetro del Descanso (Cuenta regresiva real)
+    // 2. CRONÓMETRO DE DESCANSO (LÓGICA CORREGIDA PARA BACKGROUND)
     useEffect(() => {
         let interval = null;
         if (isResting) {
             interval = setInterval(() => {
-                setRestRemaining((prev) => {
-                    if (prev <= 1) {
-                        setIsResting(false);
-                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                // 🔥 CAMBIO CLAVE: Leer el tiempo objetivo del storage en cada tick
+                // Esto asegura que si sales de la app, al volver recalcula la diferencia real
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (!saved) return;
 
-                        // Limpiar timestamp del storage al terminar
-                        const saved = localStorage.getItem(STORAGE_KEY);
-                        if (saved) {
-                            const data = JSON.parse(saved);
-                            const newState = { ...data, restEndTime: null };
-                            localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-                        }
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
+                const data = JSON.parse(saved);
+                if (!data.restEndTime) {
+                    setIsResting(false);
+                    return;
+                }
+
+                const now = Date.now();
+                const diff = Math.ceil((data.restEndTime - now) / 1000);
+
+                if (diff <= 0) {
+                    // Terminó el tiempo
+                    setIsResting(false);
+                    setRestRemaining(0);
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+                    // Limpiar timestamp del storage
+                    const newState = { ...data, restEndTime: null };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+                } else {
+                    // Actualizar UI con el tiempo real restante
+                    setRestRemaining(diff);
+                }
+            }, 500); // Revisamos cada 0.5s para mayor precisión visual al volver
         }
         return () => clearInterval(interval);
     }, [isResting, STORAGE_KEY]);
 
-    // 3. Auto-save (Guardar todo, incluido el tiempo objetivo de descanso)
+    // 3. Auto-save General
     useEffect(() => {
-        // Obtenemos el estado actual para no sobrescribir incorrectamente
         const saved = localStorage.getItem(STORAGE_KEY);
         const prevData = saved ? JSON.parse(saved) : {};
 
         const state = {
-            ...prevData, // Mantenemos restEndTime si existe
+            ...prevData, // Mantenemos restEndTime si existe (importante no sobreescribirlo con null)
             startTime,
             exercises,
             intensity,
@@ -114,9 +123,11 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }, [exercises, intensity, startTime, routine._id, STORAGE_KEY, defaultRest]);
 
-    // 4. Cronómetro Global (Entreno)
+    // 4. Cronómetro Global (Entreno) - También corregido para ser preciso
     useEffect(() => {
         if (!startTime) return;
+        // El cronómetro global ya usaba la lógica correcta (Date.now - startTime)
+        // así que aunque se pause, al volver dará el tiempo correcto.
         const timer = setInterval(() => {
             const now = Date.now();
             setSeconds(Math.floor((now - startTime) / 1000));
@@ -136,7 +147,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
 
-                    // Solo precargar pesos si los inputs están vacíos
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
 
@@ -154,6 +164,32 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         };
         fetchHistory();
     }, []);
+
+    // --- VISIBILITY CHANGE LISTENER (DOBLE SEGURIDAD) ---
+    // Si el usuario vuelve a la app, forzamos una actualización inmediata del timer
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && isResting) {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data.restEndTime) {
+                        const diff = Math.ceil((data.restEndTime - Date.now()) / 1000);
+                        if (diff > 0) setRestRemaining(diff);
+                        else {
+                            setIsResting(false);
+                            const newState = { ...data, restEndTime: null };
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+                        }
+                    }
+                }
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [isResting, STORAGE_KEY]);
+
 
     // --- HANDLERS ---
 
@@ -175,7 +211,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         setIsResting(false);
         setRestRemaining(0);
 
-        // Limpiar storage
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             const data = JSON.parse(saved);
@@ -196,7 +231,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
             return newExercises;
         });
 
-        // Si marcamos como completado, iniciamos descanso
         if (!currentSet.completed) {
             startRest();
         }
@@ -232,8 +266,8 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         const num = parseInt(val);
         if (!isNaN(num)) {
             setDefaultRest(num);
-            // Si cambiamos el tiempo mientras descansamos, recalculamos el final
             if (isResting) {
+                // Si cambiamos el tiempo mientras descansamos, recalculamos el final
                 const endTime = Date.now() + (num * 1000);
                 setRestRemaining(num);
                 const saved = localStorage.getItem(STORAGE_KEY);
