@@ -62,7 +62,7 @@ const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-4 rounded
 // 1. COMPONENTES UI
 // ==========================================
 
-// BANNER PREMIOS MENSUALES (CORREGIDO: LAYOUT PIRÁMIDE)
+// BANNER PREMIOS MENSUALES
 const MonthlyRewardsBanner = () => (
     <div className="bg-zinc-900/80 border border-purple-500/20 rounded-[24px] p-4 mb-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-12 bg-purple-600/10 blur-3xl rounded-full -mr-6 -mt-6 pointer-events-none"></div>
@@ -819,7 +819,8 @@ export default function Social() {
                                             </div>
 
                                             {/* Nombre del Clan */}
-                                            <h2 className="text-2xl font-black text-white uppercase italic truncate break-words leading-tight">
+                                            {/* 🔥 FIX: break-words + leading-tight para que el nombre largo baje de línea */}
+                                            <h2 className="text-2xl font-black text-white uppercase italic break-words leading-tight">
                                                 {myClan.name}
                                             </h2>
 
@@ -882,7 +883,7 @@ export default function Social() {
                                         placeholder="Buscar alianza..."
                                         value={clanSearchText}
                                         onChange={(e) => setClanSearchText(e.target.value)}
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-[24px] p-4 pl-12 text-white focus:border-yellow-500/50 outline-none transition-all placeholder:text-zinc-700 font-bold text-sm"
+                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-[24px] p-4 pl-12 text-white focus:border-yellow-500/50 outline-none transition-all placeholder:text-zinc-700 font-bold text-sm"
                                     />
                                 </div>
 
