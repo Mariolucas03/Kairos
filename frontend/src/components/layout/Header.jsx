@@ -17,7 +17,6 @@ const customAnimationsStyle = `
 // --- HELPER: COLORES DE NIVEL ---
 const getLevelStyle = (level) => {
     // Nivel 100+ (Cromático Suave - Sin parpadeo)
-    // Usamos un gradiente largo y la clase personalizada para moverlo suavemente
     if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
 
     // Rangos normales
@@ -105,13 +104,13 @@ export default function Header({ user, setUser }) {
                             {userTitle}
                         </span>
 
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-white font-bold text-sm truncate leading-none">
+                        <div className="flex items-center gap-2 mb-1 overflow-hidden">
+                            <span className="text-white font-bold text-sm truncate leading-none shrink min-w-0">
                                 {username}
                             </span>
 
-                            {/* 🔥 CAJA DE NIVEL (Cromático Suave) */}
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide leading-none ${levelClass}`}>
+                            {/* 🔥 CAJA DE NIVEL BLINDADA: 'whitespace-nowrap' y 'shrink-0' evitan que se rompa */}
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide leading-none whitespace-nowrap shrink-0 ${levelClass}`}>
                                 Lvl {level}
                             </span>
                         </div>

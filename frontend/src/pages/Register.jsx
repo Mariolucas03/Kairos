@@ -77,6 +77,7 @@ export default function Register() {
                                     type="text"
                                     name="username"
                                     placeholder="Guerrero01"
+                                    maxLength={8}
                                     value={formData.username}
                                     onChange={handleChange}
                                     required

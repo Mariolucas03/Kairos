@@ -1,9 +1,10 @@
 const Joi = require('joi');
 
 const registerSchema = Joi.object({
-    username: Joi.string().min(3).max(20).trim().required().messages({
+    // CAMBIO AQUÍ: max(8) en lugar de max(20)
+    username: Joi.string().min(3).max(8).trim().required().messages({
         'string.min': 'El usuario debe tener al menos 3 caracteres',
-        'string.max': 'El usuario no puede exceder 20 caracteres'
+        'string.max': 'Máximo 8 caracteres para el usuario' // Mensaje personalizado
     }),
     email: Joi.string().email().required().messages({
         'string.email': 'Email inválido'
