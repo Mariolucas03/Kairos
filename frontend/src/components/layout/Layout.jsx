@@ -5,16 +5,14 @@ import Footer from './Footer';
 import api from '../../services/api';
 import RedemptionScreen from './RedemptionScreen';
 import IosInstallPrompt from '../common/IosInstallPrompt';
-// 🔥 IMPORTAR EL CONTEXTO
+// 🔥 IMPORTS DEL NUEVO SISTEMA DE ENTRENO
 import { WorkoutProvider, useWorkout } from '../../context/WorkoutContext';
-
-// 🔥 CORRECCIÓN AQUÍ: Ruta absoluta desde src para evitar errores
 import ActiveWorkout from '../../components/gym/ActiveWorkout';
 
-// Componente interno para poder usar el hook useWorkout
+// Componente interno para usar el hook useWorkout
 function LayoutContent() {
     const navigate = useNavigate();
-    const { activeRoutine, endWorkout } = useWorkout();
+    const { activeRoutine, endWorkout } = useWorkout(); // Leemos el estado global
 
     const [user, setUser] = useState(() => {
         try {
@@ -34,7 +32,7 @@ function LayoutContent() {
         });
     }, []);
 
-    // Sincronización inicial con Backend
+    // Sincronización con Backend
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -56,13 +54,17 @@ function LayoutContent() {
         if (localStorage.getItem('token')) fetchUserData();
     }, [navigate]);
 
-    // Manejador de fin de rutina
+    // 🔥 MANEJADOR DE FIN DE RUTINA GLOBAL
     const handleWorkoutFinish = (data) => {
-        // 1. Actualizamos el usuario con las nuevas monedas/XP ganadas
+        // 1. Actualizamos el usuario (monedas ganadas, xp)
         if (data.user) {
             handleUserUpdate(data.user);
         }
-        // 2. Si estamos en la página de Gym, forzamos recarga para ver el historial actualizado
+
+        // 2. Cerramos el estado global de entrenamiento
+        endWorkout();
+
+        // 3. Si estamos en la página de Gym, recargamos para ver el historial actualizado
         if (window.location.pathname === '/gym') {
             window.location.reload();
         }
@@ -78,7 +80,7 @@ function LayoutContent() {
                 <Outlet context={{ user, setUser: handleUserUpdate, setIsUiHidden }} />
             </main>
 
-            {/* 🔥 EL ENTRENO GLOBAL VIVE AQUÍ */}
+            {/* 🔥 EL ENTRENO GLOBAL SE RENDERIZA AQUÍ */}
             {activeRoutine && (
                 <ActiveWorkout
                     routine={activeRoutine}
@@ -92,7 +94,6 @@ function LayoutContent() {
     );
 }
 
-// 🔥 EXPORTACIÓN PRINCIPAL CON EL PROVIDER
 export default function Layout() {
     return (
         <WorkoutProvider>

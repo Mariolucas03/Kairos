@@ -9,7 +9,8 @@ import {
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
-// 🔥 IMPORTANTE: Ya no importamos ActiveWorkout aquí, lo maneja el Layout
+
+// 🔥 IMPORTAR CONTEXTO
 import { useWorkout } from '../context/WorkoutContext';
 
 // --- CONSTANTES DEPORTE ---
@@ -22,7 +23,7 @@ const SPORT_ACTIVITIES = [
     { id: 'Padel', icon: <Activity size={24} />, color: 'text-lime-400', bg: 'bg-lime-900/20 border-lime-500/30' },
 ];
 
-// 🔥 TEMAS VISUALES "WIDGET STYLE" (Colores Neón)
+// 🔥 TEMAS VISUALES "WIDGET STYLE"
 const COLOR_THEMES = {
     blue: { border: 'border-blue-500', shadow: 'rgba(59,130,246,0.4)', bgIcon: 'bg-blue-600', textIcon: 'text-white', play: 'bg-blue-500 text-white' },
     red: { border: 'border-red-500', shadow: 'rgba(239,68,68,0.4)', bgIcon: 'bg-red-600', textIcon: 'text-white', play: 'bg-red-500 text-white' },
@@ -58,27 +59,20 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
 
     return (
         <div className="relative w-full mb-4 select-none touch-pan-y">
-
-            {/* FONDO DE ACCIONES */}
             <div className="absolute inset-0 flex justify-between items-center px-6 rounded-3xl bg-zinc-900 border border-zinc-800">
                 <div className="flex items-center gap-2 text-blue-400 font-bold uppercase text-xs animate-in fade-in"><Edit size={20} /> Editar</div>
                 <div className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs animate-in fade-in">Borrar <Trash2 size={20} /></div>
             </div>
 
-            {/* TARJETA VISIBLE (WIDGET) */}
             <div
                 onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                 style={{
                     transform: `translateX(${offsetX}px)`,
                     transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                    boxShadow: `0 0 20px -5px ${theme.shadow}` // Sombra de neón basada en el color
+                    boxShadow: `0 0 20px -5px ${theme.shadow}`
                 }}
-                className={`
-                    relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 
-                    flex justify-between items-center z-10 h-24 overflow-hidden
-                `}
+                className={`relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 flex justify-between items-center z-10 h-24 overflow-hidden`}
             >
-                {/* Brillo sutil de fondo */}
                 <div className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${theme.bgIcon}`}></div>
 
                 <div className="flex items-center gap-5 pointer-events-none relative z-10">
@@ -93,11 +87,7 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
 
                 <button
                     onClick={(e) => { e.stopPropagation(); onPlay(); }}
-                    className={`
-                        w-12 h-12 rounded-full flex items-center justify-center shadow-lg 
-                        active:scale-90 transition-all z-20 hover:brightness-110
-                        ${theme.play}
-                    `}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
                 >
                     <Play size={20} fill="currentColor" className="ml-1" />
                 </button>
@@ -146,14 +136,14 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
 // --- PÁGINA PRINCIPAL ---
 export default function Gym() {
     const { user, setUser, setIsUiHidden } = useOutletContext();
-    const { startWorkout } = useWorkout(); // 🔥 USAMOS EL CONTEXTO GLOBAL
+    const { startWorkout } = useWorkout(); // 🔥 USAR CONTEXTO
 
     const [routines, setRoutines] = useState([]);
     const [todaySports, setTodaySports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
-    // Estados Locales
+    // Estados
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
     const [showSportModal, setShowSportModal] = useState(false);
@@ -181,10 +171,9 @@ export default function Gym() {
     };
     const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
-    // 🔥 MODIFICADO: AHORA LLAMA AL CONTEXTO
+    // 🔥 ACCIÓN PRINCIPAL: DISPARA EL CONTEXTO
     const openActiveWorkout = (r) => {
         startWorkout(r);
-        // No hace falta setIsUiHidden(true) porque ActiveWorkout se monta en el Layout por encima
     };
 
     // Acciones
@@ -219,7 +208,7 @@ export default function Gym() {
                 </div>
             </div>
 
-            {/* SECCIÓN 1: DEPORTE (CARDIO) - SIN EMOJIS */}
+            {/* SECCIÓN 1: DEPORTE (CARDIO) */}
             <div>
                 <h3 className="text-lime-500 text-xs font-bold uppercase tracking-widest mb-3 ml-2">Cardio & Actividades</h3>
 
@@ -237,7 +226,7 @@ export default function Gym() {
                 )}
             </div>
 
-            {/* SECCIÓN 2: PESAS (RUTINAS) - SIN EMOJIS */}
+            {/* SECCIÓN 2: PESAS (RUTINAS) */}
             <div>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-yellow-500 text-xs font-bold uppercase tracking-widest ml-2">Mis Rutinas</h3>
@@ -259,7 +248,7 @@ export default function Gym() {
             {/* MODAL CREAR RUTINA */}
             {showCreateModal && <CreateRoutineModal routineToEdit={routineToEdit} onClose={closeCreateRoutine} onRoutineCreated={() => { fetchRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }} />}
 
-            {/* MODAL REGISTRAR DEPORTE (FIXED FULLSCREEN Z-200) */}
+            {/* MODAL REGISTRAR DEPORTE */}
             {showSportModal && (
                 <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
                     <div className="bg-zinc-950 w-full max-w-sm rounded-[32px] border border-lime-500/20 p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95">

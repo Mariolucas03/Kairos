@@ -8,12 +8,13 @@ import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 
-export default function ActiveWorkout({ routine }) {
+export default function ActiveWorkout({ routine, onFinish }) {
+    // Usamos el contexto para minimizar/maximizar
     const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
 
     const STORAGE_KEY = `workout_active_${routine._id}`;
 
-    // --- ESTADOS (IGUAL QUE ANTES) ---
+    // --- ESTADOS ---
     const [startTime] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved).startTime : Date.now();
@@ -22,6 +23,7 @@ export default function ActiveWorkout({ routine }) {
     const [exercises, setExercises] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved).exercises;
+        // Si es nueva, inicializamos estructura
         return routine.exercises.map(ex => ({
             ...ex,
             setsData: Array.from({ length: ex.sets || 3 }, () => ({
@@ -36,7 +38,7 @@ export default function ActiveWorkout({ routine }) {
     const [intensity, setIntensity] = useState('Media');
     const [seconds, setSeconds] = useState(0);
 
-    // --- LÓGICA DE DESCANSO PERSISTENTE ---
+    // Descanso
     const [isResting, setIsResting] = useState(false);
     const [restRemaining, setRestRemaining] = useState(0);
     const [defaultRest, setDefaultRest] = useState(() => {
@@ -45,7 +47,7 @@ export default function ActiveWorkout({ routine }) {
     });
 
     // UI & Alertas
-    const [finishing, setFinishing] = useState(false);
+    const [finishing, setFinishing] = useState(false); // Bloqueo de botón
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
@@ -235,13 +237,10 @@ export default function ActiveWorkout({ routine }) {
             };
             const res = await api.post('/gym/log', logData);
             localStorage.removeItem(STORAGE_KEY);
-            // Usamos el endWorkout del contexto
-            endWorkout();
-            // Si el padre pasó onFinish (para actualizar UI local de Gym si estamos ahí), lo llamamos
-            // Pero como es global, quizás no hace falta, pero por si acaso.
-            if (window.location.pathname === '/gym') {
-                window.location.reload(); // Forma bruta pero efectiva de refrescar el gym
-            }
+
+            // Llamamos al callback que nos pasó el Layout para refrescar
+            if (onFinish) onFinish(res.data);
+
         } catch (error) {
             setToast({ message: 'Error al guardar', type: 'error' });
             setFinishing(false);

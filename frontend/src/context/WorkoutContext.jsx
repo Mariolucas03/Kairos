@@ -6,7 +6,7 @@ export function WorkoutProvider({ children }) {
     const [activeRoutine, setActiveRoutine] = useState(null);
     const [isMinimized, setIsMinimized] = useState(false);
 
-    // Recuperar sesión al cargar
+    // Recuperar sesión al cargar la página por si se refresca
     useEffect(() => {
         const keys = Object.keys(localStorage);
         const activeKey = keys.find(k => k.startsWith('workout_active_'));
@@ -20,6 +20,7 @@ export function WorkoutProvider({ children }) {
                         name: saved.routineName || 'Entrenamiento en curso',
                         exercises: saved.exercises || []
                     });
+                    // Si recuperamos sesión, la mostramos minimizada por defecto para no invadir
                     setIsMinimized(true);
                 }
             } catch (e) {
@@ -30,7 +31,7 @@ export function WorkoutProvider({ children }) {
 
     const startWorkout = (routine) => {
         setActiveRoutine(routine);
-        setIsMinimized(false);
+        setIsMinimized(false); // Al empezar, pantalla completa
     };
 
     const minimizeWorkout = () => setIsMinimized(true);
@@ -39,6 +40,7 @@ export function WorkoutProvider({ children }) {
     const endWorkout = () => {
         setActiveRoutine(null);
         setIsMinimized(false);
+        // Limpieza de localStorage
         const keys = Object.keys(localStorage);
         keys.forEach(k => {
             if (k.startsWith('workout_active_')) localStorage.removeItem(k);
