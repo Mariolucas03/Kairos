@@ -2,11 +2,13 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// 1. SESIÓN ETERNA (365 Días)
 const generateToken = (id) => {
     if (!process.env.JWT_SECRET) {
         throw new Error('FATAL: JWT_SECRET no definido en variables de entorno');
     }
-    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    // Cambiado de '30d' a '365d' para que no caduque en un año
+    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '365d' });
 };
 
 // @desc    Registrar nuevo usuario
@@ -15,24 +17,16 @@ const registerUser = async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
-        // 1. Validar duplicados
         const userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(400).json({ message: 'El usuario ya existe' });
-        }
+        if (userExists) return res.status(400).json({ message: 'El email ya existe' });
 
         const usernameExists = await User.findOne({ username });
-        if (usernameExists) {
-            return res.status(400).json({ message: 'El nombre de usuario ya está en uso' });
-        }
+        if (usernameExists) return res.status(400).json({ message: 'El usuario ya existe' });
 
-        // 2. Crear Usuario
-        // 🔥 CORRECCIÓN: Pasamos la contraseña "plana".
-        // El hook 'pre save' del modelo User.js se encargará de encriptarla automáticamente.
         const user = await User.create({
             username,
             email,
-            password, // <--- AQUÍ ESTABA EL ERROR (Antes enviabas hashedPassword)
+            password,
             coins: 0,
             gameCoins: 500,
             level: 1,
@@ -50,7 +44,7 @@ const registerUser = async (req, res) => {
                 token: generateToken(user._id)
             });
         } else {
-            res.status(400).json({ message: 'Datos inválidos al crear usuario' });
+            res.status(400).json({ message: 'Datos inválidos' });
         }
     } catch (error) {
         console.error(error);
@@ -58,16 +52,16 @@ const registerUser = async (req, res) => {
     }
 };
 
-// @desc    Login usuario
+// @desc    Login usuario (POR USERNAME)
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        // 2. RECIBIMOS USERNAME EN LUGAR DE EMAIL
+        const { username, password } = req.body;
 
-        // Buscamos usuario y solicitamos el password
-        const user = await User.findOne({ email }).select('+password');
+        // Buscamos por username
+        const user = await User.findOne({ username }).select('+password');
 
-        // bcrypt.compare encriptará 'password' una vez y lo comparará con el hash de la BD
         if (user && (await bcrypt.compare(password, user.password))) {
             const userResponse = user.toObject();
             delete userResponse.password;
