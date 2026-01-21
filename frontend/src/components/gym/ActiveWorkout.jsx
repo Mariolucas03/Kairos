@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2
+    SkipForward, Timer, Save, ChevronDown, Maximize2,
+    Flame, Zap, Layers
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 
 export default function ActiveWorkout({ routine, onFinish }) {
-    // Usamos el contexto para minimizar/maximizar
     const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
 
     const STORAGE_KEY = `workout_active_${routine._id}`;
@@ -23,13 +23,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [exercises, setExercises] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved).exercises;
-        // Si es nueva, inicializamos estructura
+
+        // Inicializamos con tipo 'N' (Normal) por defecto
         return routine.exercises.map(ex => ({
             ...ex,
             setsData: Array.from({ length: ex.sets || 3 }, () => ({
                 kg: '',
                 reps: '',
-                completed: false
+                completed: false,
+                type: 'N' // N=Normal, W=Warmup, F=Failure, D=Drop
             })),
             pr: null
         }));
@@ -47,73 +49,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
     });
 
     // UI & Alertas
-    const [finishing, setFinishing] = useState(false); // Bloqueo de botón
+    const [finishing, setFinishing] = useState(false);
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
 
     // --- EFECTOS ---
 
-    // 1. Cargar estado del descanso
+    // 1. Cronómetro Global
     useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const data = JSON.parse(saved);
-            if (data.restEndTime) {
-                const now = Date.now();
-                const diff = Math.ceil((data.restEndTime - now) / 1000);
-                if (diff > 0) {
-                    setIsResting(true);
-                    setRestRemaining(diff);
-                } else {
-                    const newState = { ...data, restEndTime: null };
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-                    setIsResting(false);
-                }
-            }
-        }
-    }, [STORAGE_KEY]);
-
-    // 2. Cronómetro del Descanso
-    useEffect(() => {
-        let interval = null;
-        if (isResting) {
-            interval = setInterval(() => {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (!saved) return;
-                const data = JSON.parse(saved);
-                if (!data.restEndTime) { setIsResting(false); return; }
-                const now = Date.now();
-                const diff = Math.ceil((data.restEndTime - now) / 1000);
-
-                if (diff <= 0) {
-                    setIsResting(false);
-                    setRestRemaining(0);
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    const newState = { ...data, restEndTime: null };
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-                } else {
-                    setRestRemaining(diff);
-                }
-            }, 500);
-        }
-        return () => clearInterval(interval);
-    }, [isResting, STORAGE_KEY]);
-
-    // 3. Auto-save
-    useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        const prevData = saved ? JSON.parse(saved) : {};
-        const state = {
-            ...prevData,
-            startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }, [exercises, intensity, startTime, routine._id, routine.name, STORAGE_KEY, defaultRest]);
-
-    // 4. Cronómetro Global
-    useEffect(() => {
-        if (!startTime) return;
         const timer = setInterval(() => {
             const now = Date.now();
             setSeconds(Math.floor((now - startTime) / 1000));
@@ -121,7 +65,27 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return () => clearInterval(timer);
     }, [startTime]);
 
-    // 5. Cargar Historial (Solo una vez)
+    // 2. Auto-save
+    useEffect(() => {
+        const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }, [exercises, intensity, startTime, routine._id, routine.name, defaultRest, STORAGE_KEY]);
+
+    // 3. Cronómetro Descanso
+    useEffect(() => {
+        let interval = null;
+        if (isResting && restRemaining > 0) {
+            interval = setInterval(() => {
+                setRestRemaining(prev => {
+                    if (prev <= 1) { setIsResting(false); if (navigator.vibrate) navigator.vibrate([200, 100, 200]); return 0; }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isResting, restRemaining]);
+
+    // 4. Cargar Historial
     useEffect(() => {
         const fetchHistory = async () => {
             try {
@@ -131,6 +95,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 setExercises(prev => prev.map(ex => {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
+                    // Solo rellenar si está vacío
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
                     if (isClean) {
@@ -148,7 +113,95 @@ export default function ActiveWorkout({ routine, onFinish }) {
         fetchHistory();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+
+    // --- LÓGICA HEVY (NUMERACIÓN INTELIGENTE) ---
+    // Esta función calcula qué número mostrar (1, 2, 2.1, W, etc.)
+    const getSetLabelInfo = (allSets, currentIndex) => {
+        const currentType = allSets[currentIndex].type;
+
+        if (currentType === 'W') return { label: 'C', color: 'text-orange-400 border-orange-500/50 bg-orange-900/20' };
+
+        // Contar series "normales" (N o F) anteriores para saber el número base
+        let normalCount = 0;
+        for (let i = 0; i <= currentIndex; i++) {
+            if (allSets[i].type === 'N' || allSets[i].type === 'F') normalCount++;
+        }
+
+        if (currentType === 'D') {
+            // Drop set: Busca el último "padre" normal
+            let dropDepth = 0;
+            // Retrocedemos buscando cuántos Drop sets hay pegados
+            for (let i = currentIndex; i >= 0; i--) {
+                if (allSets[i].type !== 'D') break;
+                dropDepth++;
+            }
+            return {
+                label: `${normalCount}.${dropDepth}`,
+                color: 'text-purple-400 border-purple-500/50 bg-purple-900/20'
+            };
+        }
+
+        if (currentType === 'F') return { label: normalCount, color: 'text-red-500 border-red-500/50 bg-red-900/20' };
+
+        // Normal
+        return { label: normalCount, color: 'text-zinc-500 border-zinc-800 bg-zinc-900' };
+    };
+
     // --- HANDLERS ---
+
+    // 🔥 CAMBIAR TIPO DE SERIE (CICLO: N -> W -> F -> D -> N)
+    const cycleSetType = (exIdx, setIdx) => {
+        const types = ['N', 'W', 'F', 'D'];
+        setExercises(prev => {
+            const newEx = [...prev];
+            const currentType = newEx[exIdx].setsData[setIdx].type || 'N';
+            const nextIndex = (types.indexOf(currentType) + 1) % types.length;
+            newEx[exIdx].setsData[setIdx].type = types[nextIndex];
+            return newEx;
+        });
+    };
+
+    const toggleSetComplete = (exIdx, setIdx) => {
+        const currentSet = exercises[exIdx].setsData[setIdx];
+        if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Faltan datos', type: 'error' });
+
+        setExercises(prev => {
+            const newExercises = [...prev];
+            newExercises[exIdx].setsData[setIdx].completed = !currentSet.completed;
+            return newExercises;
+        });
+
+        if (!currentSet.completed) {
+            // Si es Drop Set, reducimos el descanso o no lo ponemos (opcional, aquí lo dejamos normal)
+            startRest();
+        }
+    };
+
+    const handleInputChange = (exIdx, setIdx, field, val) => {
+        setExercises(prev => {
+            const newExercises = [...prev];
+            newExercises[exIdx].setsData[setIdx][field] = val;
+            return newExercises;
+        });
+    };
+
+    const handleAddSet = (exIdx) => {
+        setExercises(prev => {
+            const newExercises = [...prev];
+            const last = newExercises[exIdx].setsData[newExercises[exIdx].setsData.length - 1];
+            // Heredar tipo si el anterior era Drop Set, quizás queramos otro Drop
+            const nextType = last?.type === 'D' ? 'D' : 'N';
+
+            newExercises[exIdx].setsData.push({
+                kg: last?.kg || '',
+                reps: last?.reps || '',
+                completed: false,
+                type: nextType
+            });
+            return newExercises;
+        });
+    };
+
     const startRest = () => {
         const time = defaultRest === '' ? 60 : parseInt(defaultRest);
         const endTime = Date.now() + (time * 1000);
@@ -169,58 +222,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }
     };
 
-    const toggleSetComplete = (exIdx, setIdx) => {
-        const currentSet = exercises[exIdx].setsData[setIdx];
-        if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Faltan datos', type: 'error' });
-        setExercises(prev => {
-            const newExercises = [...prev];
-            const newSetsData = [...newExercises[exIdx].setsData];
-            newSetsData[setIdx] = { ...newSetsData[setIdx], completed: !newSetsData[setIdx].completed };
-            newExercises[exIdx] = { ...newExercises[exIdx], setsData: newSetsData };
-            return newExercises;
-        });
-        if (!currentSet.completed) startRest();
-    };
-
-    const handleInputChange = (exIdx, setIdx, field, val) => {
-        setExercises(prev => {
-            const newExercises = [...prev];
-            const newSetsData = [...newExercises[exIdx].setsData];
-            newSetsData[setIdx] = { ...newSetsData[setIdx], [field]: val };
-            newExercises[exIdx] = { ...newExercises[exIdx], setsData: newSetsData };
-            return newExercises;
-        });
-    };
-
-    const handleAddSet = (exIdx) => {
-        setExercises(prev => {
-            const newExercises = [...prev];
-            const currentSets = newExercises[exIdx].setsData;
-            const last = currentSets[currentSets.length - 1];
-            const newSet = { kg: last?.kg || '', reps: last?.reps || '', completed: false };
-            newExercises[exIdx] = { ...newExercises[exIdx], setsData: [...currentSets, newSet] };
-            return newExercises;
-        });
-    };
-
-    const handleRestInputChange = (e) => {
-        const val = e.target.value;
-        if (val === '') { setDefaultRest(''); return; }
-        const num = parseInt(val);
-        if (!isNaN(num)) {
-            setDefaultRest(num);
-            if (isResting) {
-                const endTime = Date.now() + (num * 1000);
-                setRestRemaining(num);
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: endTime }));
-                }
-            }
-        }
-    };
-
     const confirmFinish = async () => {
         if (finishing) return;
         setFinishing(true);
@@ -230,26 +231,25 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 routineName: routine.name,
                 duration: seconds,
                 intensity,
+                // Filtrar solo sets completados y añadir el TIPO
                 exercises: exercises.map(ex => ({
                     name: ex.name,
-                    sets: ex.setsData.filter(s => s.completed).map(s => ({ weight: parseFloat(s.kg), reps: parseFloat(s.reps) }))
+                    sets: ex.setsData.filter(s => s.completed).map(s => ({
+                        weight: parseFloat(s.kg),
+                        reps: parseFloat(s.reps),
+                        type: s.type // Enviamos el tipo al backend
+                    }))
                 })).filter(ex => ex.sets.length > 0)
             };
+
             const res = await api.post('/gym/log', logData);
             localStorage.removeItem(STORAGE_KEY);
-
-            // Llamamos al callback que nos pasó el Layout para refrescar
             if (onFinish) onFinish(res.data);
 
         } catch (error) {
             setToast({ message: 'Error al guardar', type: 'error' });
             setFinishing(false);
         }
-    };
-
-    const confirmExit = () => {
-        localStorage.removeItem(STORAGE_KEY);
-        endWorkout();
     };
 
     const formatTime = (total) => {
@@ -266,15 +266,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // --- RENDERIZADO ---
 
-    // 1. MODO MINIMIZADO (Barra Flotante "Spotify")
+    // 1. MINIMIZADO
     if (isMinimized) {
         return createPortal(
             <div
                 onClick={maximizeWorkout}
-                className="fixed bottom-[68px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10"
+                className="fixed bottom-[70px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10"
             >
                 <div className="flex items-center gap-3">
-                    {/* Indicador animado */}
                     <div className="relative w-10 h-10 flex items-center justify-center bg-black rounded-xl border border-yellow-500/20">
                         {isResting ? (
                             <span className="text-sm font-black text-blue-400 animate-pulse">{restRemaining}s</span>
@@ -282,25 +281,21 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             <div className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>
                         )}
                     </div>
-
                     <div className="flex flex-col">
                         <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">En curso</span>
                         <span className="text-sm font-black text-white truncate max-w-[150px]">{routine.name}</span>
                     </div>
                 </div>
-
                 <div className="flex items-center gap-3">
                     <span className="font-mono text-lg font-bold text-zinc-300 tabular-nums">{formatTime(seconds)}</span>
-                    <button className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400">
-                        <Maximize2 size={18} />
-                    </button>
+                    <button className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400"><Maximize2 size={18} /></button>
                 </div>
             </div>,
             document.body
         );
     }
 
-    // 2. MODO EXPANDIDO (Pantalla Completa)
+    // 2. EXPANDIDO
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-black flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -313,16 +308,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         {formatTime(seconds)}
                     </div>
                 </div>
-
                 <div className="flex gap-2">
-                    {/* Botón Minimizar */}
-                    <button onClick={minimizeWorkout} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95">
-                        <ChevronDown size={24} />
-                    </button>
-                    {/* Botón Cerrar */}
-                    <button onClick={() => setShowExitAlert(true)} className="bg-zinc-900 text-red-500 p-3 rounded-full hover:text-red-400 border border-red-900/30 transition-colors active:scale-95">
-                        <X size={24} />
-                    </button>
+                    <button onClick={minimizeWorkout} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95"><ChevronDown size={24} /></button>
+                    <button onClick={() => setShowExitAlert(true)} className="bg-zinc-900 text-red-500 p-3 rounded-full hover:text-red-400 border border-red-900/30 transition-colors active:scale-95"><X size={24} /></button>
                 </div>
             </div>
 
@@ -343,34 +331,49 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         </div>
 
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
-                            <div className="grid grid-cols-10 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
-                                <div className="col-span-1">#</div>
-                                <div className="col-span-3">Kg</div>
+                            {/* CABECERAS DE COLUMNAS */}
+                            <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
+                                <div className="col-span-2">Set</div>
+                                <div className="col-span-4">Kg</div>
                                 <div className="col-span-3">Reps</div>
-                                <div className="col-span-3">Hecho</div>
+                                <div className="col-span-3">Check</div>
                             </div>
 
                             <div className="space-y-1">
-                                {ex.setsData.map((set, sIdx) => (
-                                    <div key={sIdx} className={`grid grid-cols-10 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : 'bg-transparent'}`}>
-                                        <div className="col-span-1 flex justify-center">
-                                            <div className="w-6 h-6 rounded-full bg-zinc-900 text-zinc-500 flex items-center justify-center text-xs font-bold border border-zinc-800">
-                                                {sIdx + 1}
+                                {ex.setsData.map((set, sIdx) => {
+                                    // 🔥 CALCULAMOS EL LABEL INTELIGENTE (1, 2.1, C, etc.)
+                                    const { label, color } = getSetLabelInfo(ex.setsData, sIdx);
+                                    const isDrop = set.type === 'D';
+
+                                    return (
+                                        <div key={sIdx} className={`grid grid-cols-12 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
+
+                                            {/* BOTÓN NÚMERO DE SERIE (CAMBIA TIPO) */}
+                                            <div className="col-span-2 flex justify-center">
+                                                <button
+                                                    onClick={() => cycleSetType(exIdx, sIdx)}
+                                                    className={`
+                                                        w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black border transition-all active:scale-95
+                                                        ${color} ${isDrop ? 'ml-4' : ''} // Indentamos si es Drop
+                                                    `}
+                                                >
+                                                    {isDrop && <Layers size={10} className="mr-0.5" />}
+                                                    {label}
+                                                </button>
+                                            </div>
+
+                                            <div className="col-span-4">
+                                                <input type="number" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <input type="number" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+                                            </div>
+                                            <div className="col-span-3 flex justify-center">
+                                                <button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}><Check size={20} strokeWidth={4} /></button>
                                             </div>
                                         </div>
-                                        <div className="col-span-3">
-                                            <input type="number" inputMode="decimal" placeholder="-" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all ${set.completed ? 'text-green-500' : ''}`} />
-                                        </div>
-                                        <div className="col-span-3">
-                                            <input type="number" inputMode="decimal" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all ${set.completed ? 'text-green-500' : ''}`} />
-                                        </div>
-                                        <div className="col-span-3 flex justify-center">
-                                            <button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-zinc-800 text-zinc-600 hover:bg-zinc-700'}`}>
-                                                <Check size={20} strokeWidth={4} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <button onClick={() => handleAddSet(exIdx)} className="w-full mt-2 py-3 bg-black hover:bg-zinc-900 text-zinc-500 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border-t border-zinc-900"><Plus size={14} /> Añadir Serie</button>
                         </div>
@@ -391,7 +394,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             {/* MODAL DESCANSO */}
             {isResting && (
-                <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 animate-in slide-in-from-bottom-10 fade-in flex items-center justify-between ring-1 ring-white/10">
+                <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 flex items-center justify-between ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
                     <div className="flex items-center gap-4 pl-2">
                         <div className="flex flex-col items-center min-w-[60px]">
                             <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{restRemaining}</span>
@@ -400,10 +403,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         <div className="h-8 w-[1px] bg-zinc-700"></div>
                         <div className="flex flex-col">
                             <span className="text-[9px] text-zinc-400 font-bold uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Tiempo fijo</span>
-                            <input type="number" inputMode="decimal" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 focus:border-yellow-500 outline-none" />
+                            <input type="number" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 outline-none" />
                         </div>
                     </div>
-                    <button onClick={skipRest} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} fill="currentColor" /></button>
+                    <button onClick={skipRest} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} /></button>
                 </div>
             )}
 
