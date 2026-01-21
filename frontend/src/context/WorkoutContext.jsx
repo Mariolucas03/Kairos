@@ -6,7 +6,7 @@ export function WorkoutProvider({ children }) {
     const [activeRoutine, setActiveRoutine] = useState(null);
     const [isMinimized, setIsMinimized] = useState(false);
 
-    // Al cargar la app, miramos si había un entreno activo
+    // Recuperar sesión al cargar
     useEffect(() => {
         const keys = Object.keys(localStorage);
         const activeKey = keys.find(k => k.startsWith('workout_active_'));
@@ -20,7 +20,7 @@ export function WorkoutProvider({ children }) {
                         name: saved.routineName || 'Entrenamiento en curso',
                         exercises: saved.exercises || []
                     });
-                    setIsMinimized(true); // Restaurar minimizado
+                    setIsMinimized(true);
                 }
             } catch (e) {
                 console.error("Error recuperando sesión", e);

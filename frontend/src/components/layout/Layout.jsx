@@ -12,7 +12,7 @@ import ActiveWorkout from '../components/gym/ActiveWorkout';
 // Componente interno para poder usar el hook useWorkout
 function LayoutContent() {
     const navigate = useNavigate();
-    const { activeRoutine } = useWorkout(); // <--- ESTO NECESITA EL PROVIDER ARRIBA
+    const { activeRoutine, endWorkout } = useWorkout(); // <--- Traemos endWorkout también por si acaso
 
     const [user, setUser] = useState(() => {
         try {
@@ -23,6 +23,16 @@ function LayoutContent() {
 
     const [isUiHidden, setIsUiHidden] = useState(false);
 
+    // Función para actualizar datos del usuario (Monedas, XP, Nivel)
+    const handleUserUpdate = useCallback((newData) => {
+        setUser((prev) => {
+            const updated = { ...prev, ...newData };
+            localStorage.setItem('user', JSON.stringify(updated));
+            return updated;
+        });
+    }, []);
+
+    // Sincronización inicial con Backend
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -44,13 +54,19 @@ function LayoutContent() {
         if (localStorage.getItem('token')) fetchUserData();
     }, [navigate]);
 
-    const handleUserUpdate = useCallback((newData) => {
-        setUser((prev) => {
-            const updated = { ...prev, ...newData };
-            localStorage.setItem('user', JSON.stringify(updated));
-            return updated;
-        });
-    }, []);
+    // 🔥 MANEJADOR DE FIN DE RUTINA (LO QUE FALTABA)
+    const handleWorkoutFinish = (data) => {
+        // 1. Actualizamos el usuario con las nuevas monedas/XP ganadas
+        if (data.user) {
+            handleUserUpdate(data.user);
+        }
+        // 2. Si estamos en la página de Gym, forzamos recarga para ver el historial actualizado
+        if (window.location.pathname === '/gym') {
+            // Opcional: Podríamos usar un contexto para refrescar sin reload, 
+            // pero reload es más seguro para limpiar estados.
+            window.location.reload();
+        }
+    };
 
     if (user?.stats?.hp <= 0 || user?.hp <= 0) return <RedemptionScreen user={user} setUser={handleUserUpdate} />;
 
@@ -63,7 +79,13 @@ function LayoutContent() {
             </main>
 
             {/* 🔥 EL ENTRENO GLOBAL VIVE AQUÍ */}
-            {activeRoutine && <ActiveWorkout routine={activeRoutine} />}
+            {/* AÑADIDO: onFinish={handleWorkoutFinish} para evitar errores al terminar */}
+            {activeRoutine && (
+                <ActiveWorkout
+                    routine={activeRoutine}
+                    onFinish={handleWorkoutFinish}
+                />
+            )}
 
             {!isUiHidden && <Footer user={user} />}
             <IosInstallPrompt />
