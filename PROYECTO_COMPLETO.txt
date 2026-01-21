@@ -29,7 +29,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
-    // Asegurarse de que JWT_SECRET exista para evitar errores fatales silenciosos
     if (!process.env.JWT_SECRET) {
         throw new Error('FATAL: JWT_SECRET no definido en variables de entorno');
     }
@@ -40,10 +39,9 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
     try {
-        // YA NO NECESITAMOS VALIDAR MANUALMENTE (Joi lo hizo por nosotros)
         const { username, email, password } = req.body;
 
-        // 1. Validar duplicados (Lógica de negocio)
+        // 1. Validar duplicados
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json({ message: 'El usuario ya existe' });
@@ -54,17 +52,15 @@ const registerUser = async (req, res) => {
             return res.status(400).json({ message: 'El nombre de usuario ya está en uso' });
         }
 
-        // 2. Hash Password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        // 3. Crear Usuario (Estructura RPG inicializada)
+        // 2. Crear Usuario
+        // 🔥 CORRECCIÓN: Pasamos la contraseña "plana".
+        // El hook 'pre save' del modelo User.js se encargará de encriptarla automáticamente.
         const user = await User.create({
             username,
             email,
-            password: hashedPassword,
+            password, // <--- AQUÍ ESTABA EL ERROR (Antes enviabas hashedPassword)
             coins: 0,
-            gameCoins: 500, // Bono bienvenida
+            gameCoins: 500,
             level: 1,
             hp: 100,
             lives: 100,
@@ -73,7 +69,7 @@ const registerUser = async (req, res) => {
 
         if (user) {
             const userResponse = user.toObject();
-            delete userResponse.password; // Seguridad: no devolver el hash
+            delete userResponse.password;
 
             res.status(201).json({
                 ...userResponse,
@@ -92,12 +88,12 @@ const registerUser = async (req, res) => {
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
     try {
-        // Joi ya validó que email y password vienen en el body
         const { email, password } = req.body;
 
-        // Buscamos usuario y solicitamos el password (que suele estar oculto en el modelo con select: false)
+        // Buscamos usuario y solicitamos el password
         const user = await User.findOne({ email }).select('+password');
 
+        // bcrypt.compare encriptará 'password' una vez y lo comparará con el hash de la BD
         if (user && (await bcrypt.compare(password, user.password))) {
             const userResponse = user.toObject();
             delete userResponse.password;
@@ -4559,9 +4555,10 @@ module.exports = router;
 const Joi = require('joi');
 
 const registerSchema = Joi.object({
-    username: Joi.string().min(3).max(20).trim().required().messages({
+    // CAMBIO AQUÍ: max(8) en lugar de max(20)
+    username: Joi.string().min(3).max(8).trim().required().messages({
         'string.min': 'El usuario debe tener al menos 3 caracteres',
-        'string.max': 'El usuario no puede exceder 20 caracteres'
+        'string.max': 'Máximo 8 caracteres para el usuario' // Mensaje personalizado
     }),
     email: Joi.string().email().required().messages({
         'string.email': 'Email inválido'
@@ -6192,8 +6189,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
     const [exercises, setExercises] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved).exercises;
-
-        // Inicialización correcta con objetos independientes
         return routine.exercises.map(ex => ({
             ...ex,
             setsData: Array.from({ length: ex.sets || 3 }, () => ({
@@ -6208,9 +6203,11 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
     const [intensity, setIntensity] = useState('Media');
     const [seconds, setSeconds] = useState(0);
 
-    // Descanso
+    // --- LÓGICA DE DESCANSO PERSISTENTE ---
     const [isResting, setIsResting] = useState(false);
-    const [restTimer, setRestTimer] = useState(60);
+    const [restRemaining, setRestRemaining] = useState(0);
+
+    // Configuración del tiempo por defecto (guardado en local)
     const [defaultRest, setDefaultRest] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved && JSON.parse(saved).defaultRest ? JSON.parse(saved).defaultRest : 60;
@@ -6225,19 +6222,85 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
     // --- EFECTOS ---
 
-    // 1. Auto-cierre del Toast a los 2 segundos
+    // 1. Cargar estado del descanso al montar (Recuperar tiempo si se recarga la página)
     useEffect(() => {
-        if (toast) {
-            const timer = setTimeout(() => {
-                setToast(null);
-            }, 2000);
-            return () => clearTimeout(timer);
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const data = JSON.parse(saved);
+            if (data.restEndTime) {
+                const now = Date.now();
+                const diff = Math.ceil((data.restEndTime - now) / 1000);
+                if (diff > 0) {
+                    setIsResting(true);
+                    setRestRemaining(diff);
+                } else {
+                    // El descanso terminó mientras estaba fuera
+                    const newState = { ...data, restEndTime: null };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+                    setIsResting(false);
+                }
+            }
         }
-    }, [toast]);
+    }, [STORAGE_KEY]);
 
-    // 2. Cronómetro
+    // 2. CRONÓMETRO DE DESCANSO (LÓGICA CORREGIDA PARA BACKGROUND)
+    useEffect(() => {
+        let interval = null;
+        if (isResting) {
+            interval = setInterval(() => {
+                // 🔥 CAMBIO CLAVE: Leer el tiempo objetivo del storage en cada tick
+                // Esto asegura que si sales de la app, al volver recalcula la diferencia real
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (!saved) return;
+
+                const data = JSON.parse(saved);
+                if (!data.restEndTime) {
+                    setIsResting(false);
+                    return;
+                }
+
+                const now = Date.now();
+                const diff = Math.ceil((data.restEndTime - now) / 1000);
+
+                if (diff <= 0) {
+                    // Terminó el tiempo
+                    setIsResting(false);
+                    setRestRemaining(0);
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+                    // Limpiar timestamp del storage
+                    const newState = { ...data, restEndTime: null };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+                } else {
+                    // Actualizar UI con el tiempo real restante
+                    setRestRemaining(diff);
+                }
+            }, 500); // Revisamos cada 0.5s para mayor precisión visual al volver
+        }
+        return () => clearInterval(interval);
+    }, [isResting, STORAGE_KEY]);
+
+    // 3. Auto-save General
+    useEffect(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const prevData = saved ? JSON.parse(saved) : {};
+
+        const state = {
+            ...prevData, // Mantenemos restEndTime si existe (importante no sobreescribirlo con null)
+            startTime,
+            exercises,
+            intensity,
+            routineId: routine._id,
+            defaultRest
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }, [exercises, intensity, startTime, routine._id, STORAGE_KEY, defaultRest]);
+
+    // 4. Cronómetro Global (Entreno) - También corregido para ser preciso
     useEffect(() => {
         if (!startTime) return;
+        // El cronómetro global ya usaba la lógica correcta (Date.now - startTime)
+        // así que aunque se pause, al volver dará el tiempo correcto.
         const timer = setInterval(() => {
             const now = Date.now();
             setSeconds(Math.floor((now - startTime) / 1000));
@@ -6245,31 +6308,10 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         return () => clearInterval(timer);
     }, [startTime]);
 
-    // 3. Timer Descanso
-    useEffect(() => {
-        let interval = null;
-        if (isResting && restTimer > 0) {
-            interval = setInterval(() => setRestTimer(prev => prev - 1), 1000);
-        } else if (restTimer === 0 && isResting) {
-            setIsResting(false);
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-        }
-        return () => clearInterval(interval);
-    }, [isResting, restTimer]);
-
-    // 4. Auto-save
-    useEffect(() => {
-        const state = { startTime, exercises, intensity, routineId: routine._id, defaultRest };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }, [exercises, intensity, startTime, routine._id, STORAGE_KEY, defaultRest]);
-
     // 5. Cargar Historial
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const savedLocal = localStorage.getItem(STORAGE_KEY);
-                const isClean = exercises.every(ex => ex.setsData.every(s => s.kg === '' && s.reps === ''));
-
                 const exerciseNames = routine.exercises.map(e => e.name);
                 const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
                 const historyData = res.data;
@@ -6278,8 +6320,10 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
 
+                    const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
-                    if (isClean && !savedLocal) {
+
+                    if (isClean) {
                         newSetsData = ex.setsData.map((set, index) => {
                             if (stats.lastSets && stats.lastSets[index]) {
                                 return { ...set, kg: stats.lastSets[index].weight, reps: stats.lastSets[index].reps };
@@ -6287,7 +6331,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                             return set;
                         });
                     }
-
                     return { ...ex, setsData: newSetsData, pr: stats.bestSet };
                 }));
             } catch (e) { console.error(e); } finally { setLoadingHistory(false); }
@@ -6295,28 +6338,62 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         fetchHistory();
     }, []);
 
-    const formatTime = (total) => {
-        const m = Math.floor(total / 60).toString().padStart(2, '0');
-        const s = (total % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
+    // --- VISIBILITY CHANGE LISTENER (DOBLE SEGURIDAD) ---
+    // Si el usuario vuelve a la app, forzamos una actualización inmediata del timer
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && isResting) {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data.restEndTime) {
+                        const diff = Math.ceil((data.restEndTime - Date.now()) / 1000);
+                        if (diff > 0) setRestRemaining(diff);
+                        else {
+                            setIsResting(false);
+                            const newState = { ...data, restEndTime: null };
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+                        }
+                    }
+                }
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [isResting, STORAGE_KEY]);
+
 
     // --- HANDLERS ---
 
-    const handleInputChange = (exIdx, setIdx, field, val) => {
-        setExercises(prev => {
-            const newExercises = [...prev];
-            const newSetsData = [...newExercises[exIdx].setsData];
-            newSetsData[setIdx] = { ...newSetsData[setIdx], [field]: val };
-            newExercises[exIdx] = { ...newExercises[exIdx], setsData: newSetsData };
-            return newExercises;
-        });
+    const startRest = () => {
+        const time = defaultRest === '' ? 60 : parseInt(defaultRest);
+        const endTime = Date.now() + (time * 1000);
+
+        setRestRemaining(time);
+        setIsResting(true);
+
+        // Guardamos IMMEDIATAMENTE el tiempo de fin
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const data = saved ? JSON.parse(saved) : {};
+        const newState = { ...data, restEndTime: endTime };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+    };
+
+    const skipRest = () => {
+        setIsResting(false);
+        setRestRemaining(0);
+
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const data = JSON.parse(saved);
+            const newState = { ...data, restEndTime: null };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        }
     };
 
     const toggleSetComplete = (exIdx, setIdx) => {
-        const currentExercise = exercises[exIdx];
-        const currentSet = currentExercise.setsData[setIdx];
-
+        const currentSet = exercises[exIdx].setsData[setIdx];
         if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Faltan datos', type: 'error' });
 
         setExercises(prev => {
@@ -6328,9 +6405,18 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         });
 
         if (!currentSet.completed) {
-            setRestTimer(defaultRest === '' ? 60 : defaultRest);
-            setIsResting(true);
+            startRest();
         }
+    };
+
+    const handleInputChange = (exIdx, setIdx, field, val) => {
+        setExercises(prev => {
+            const newExercises = [...prev];
+            const newSetsData = [...newExercises[exIdx].setsData];
+            newSetsData[setIdx] = { ...newSetsData[setIdx], [field]: val };
+            newExercises[exIdx] = { ...newExercises[exIdx], setsData: newSetsData };
+            return newExercises;
+        });
     };
 
     const handleAddSet = (exIdx) => {
@@ -6338,13 +6424,8 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
             const newExercises = [...prev];
             const currentSets = newExercises[exIdx].setsData;
             const last = currentSets[currentSets.length - 1];
-
             const newSet = { kg: last?.kg || '', reps: last?.reps || '', completed: false };
-
-            newExercises[exIdx] = {
-                ...newExercises[exIdx],
-                setsData: [...currentSets, newSet]
-            };
+            newExercises[exIdx] = { ...newExercises[exIdx], setsData: [...currentSets, newSet] };
             return newExercises;
         });
     };
@@ -6358,22 +6439,21 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         const num = parseInt(val);
         if (!isNaN(num)) {
             setDefaultRest(num);
-            if (isResting) setRestTimer(num);
+            if (isResting) {
+                // Si cambiamos el tiempo mientras descansamos, recalculamos el final
+                const endTime = Date.now() + (num * 1000);
+                setRestRemaining(num);
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: endTime }));
+                }
+            }
         }
     };
-
-    const handleRestInputBlur = () => {
-        if (defaultRest === '' || defaultRest === 0) {
-            setDefaultRest(60);
-            if (isResting) setRestTimer(60);
-        }
-    };
-
-    // --- FINALIZAR ---
 
     const confirmFinish = async () => {
         setFinishing(true);
-        setShowFinishAlert(false);
         try {
             const logData = {
                 routineId: routine._id,
@@ -6400,16 +6480,22 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
     };
 
     const intensityOptions = [
-        { id: 'Baja', label: 'Fuerza', color: 'bg-blue-600', border: 'border-blue-500' },
-        { id: 'Media', label: 'Hipertrofia', color: 'bg-yellow-500', border: 'border-yellow-400' },
-        { id: 'Alta', label: 'Metabólico', color: 'bg-red-600', border: 'border-red-500' },
+        { id: 'Baja', label: 'Fuerza', color: 'bg-blue-600' },
+        { id: 'Media', label: 'Hipertrofia', color: 'bg-yellow-500' },
+        { id: 'Alta', label: 'Metabólico', color: 'bg-red-600' },
     ];
+
+    const formatTime = (total) => {
+        const m = Math.floor(total / 60).toString().padStart(2, '0');
+        const s = (total % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
 
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-black flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* 1. HEADER */}
+            {/* HEADER */}
             <div className="pt-6 pb-4 px-6 bg-black border-b border-zinc-900 flex justify-between items-end shrink-0 safe-top z-20">
                 <div>
                     <h2 className="text-zinc-500 font-bold text-[10px] uppercase tracking-widest mb-1">En curso</h2>
@@ -6422,11 +6508,10 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                 </button>
             </div>
 
-            {/* 2. LISTA DE EJERCICIOS */}
+            {/* LISTA EJERCICIOS */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar bg-black pb-40">
                 {exercises.map((ex, exIdx) => (
                     <div key={exIdx} className="space-y-3">
-                        {/* Título + PR */}
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-white font-black text-xl uppercase tracking-tight flex items-center gap-2 leading-tight max-w-[65%]">
                                 <span className="text-yellow-500 text-sm shrink-0">#{exIdx + 1}</span> {ex.name}
@@ -6439,7 +6524,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                             )}
                         </div>
 
-                        {/* Tabla Sets */}
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
                             <div className="grid grid-cols-10 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
                                 <div className="col-span-1">#</div>
@@ -6451,62 +6535,35 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                             <div className="space-y-1">
                                 {ex.setsData.map((set, sIdx) => (
                                     <div key={sIdx} className={`grid grid-cols-10 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : 'bg-transparent'}`}>
-
-                                        {/* Número */}
                                         <div className="col-span-1 flex justify-center">
                                             <div className="w-6 h-6 rounded-full bg-zinc-900 text-zinc-500 flex items-center justify-center text-xs font-bold border border-zinc-800">
                                                 {sIdx + 1}
                                             </div>
                                         </div>
-
-                                        {/* Inputs */}
                                         <div className="col-span-3">
-                                            <input
-                                                type="number"
-                                                inputMode="decimal"
-                                                placeholder={loadingHistory ? "..." : "-"}
-                                                value={set.kg}
-                                                onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)}
-                                                className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all placeholder:text-zinc-700 ${set.completed ? 'text-green-500' : ''}`}
-                                            />
+                                            <input type="number" inputMode="decimal" placeholder="-" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all ${set.completed ? 'text-green-500' : ''}`} />
                                         </div>
                                         <div className="col-span-3">
-                                            <input
-                                                type="number"
-                                                inputMode="decimal"
-                                                placeholder="-"
-                                                value={set.reps}
-                                                onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)}
-                                                className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all placeholder:text-zinc-700 ${set.completed ? 'text-green-500' : ''}`}
-                                            />
+                                            <input type="number" inputMode="decimal" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all ${set.completed ? 'text-green-500' : ''}`} />
                                         </div>
-
-                                        {/* Botón Check Cuadrado */}
                                         <div className="col-span-3 flex justify-center">
-                                            <button
-                                                onClick={() => toggleSetComplete(exIdx, sIdx)}
-                                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-zinc-800 text-zinc-600 hover:bg-zinc-700'}`}
-                                            >
+                                            <button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-zinc-800 text-zinc-600 hover:bg-zinc-700'}`}>
                                                 <Check size={20} strokeWidth={4} />
                                             </button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-
-                            <button onClick={() => handleAddSet(exIdx)} className="w-full mt-2 py-3 bg-black hover:bg-zinc-900 text-zinc-500 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border-t border-zinc-900">
-                                <Plus size={14} /> Añadir Serie
-                            </button>
+                            <button onClick={() => handleAddSet(exIdx)} className="w-full mt-2 py-3 bg-black hover:bg-zinc-900 text-zinc-500 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border-t border-zinc-900"><Plus size={14} /> Añadir Serie</button>
                         </div>
                     </div>
                 ))}
 
-                {/* Intensidad */}
                 <div className="pt-4 pb-2">
-                    <h3 className="text-[10px] font-black text-zinc-500 uppercase ml-2 mb-3 tracking-widest">Intensidad Percibida</h3>
+                    <h3 className="text-[10px] font-black text-zinc-500 uppercase ml-2 mb-3 tracking-widest">Intensidad</h3>
                     <div className="flex bg-zinc-900 p-1 rounded-2xl border border-zinc-800">
                         {intensityOptions.map((opt) => (
-                            <button key={opt.id} onClick={() => setIntensity(opt.id)} className={`flex-1 py-3 rounded-xl flex flex-col items-center justify-center transition-all ${intensity === opt.id ? `${opt.color} text-white shadow-lg` : 'text-zinc-500 hover:text-zinc-300'}`}>
+                            <button key={opt.id} onClick={() => setIntensity(opt.id)} className={`flex-1 py-3 rounded-xl flex flex-col items-center justify-center transition-all ${intensity === opt.id ? `${opt.color} text-white shadow-lg` : 'text-zinc-500'}`}>
                                 <span className="text-[10px] font-black uppercase">{opt.label}</span>
                             </button>
                         ))}
@@ -6514,61 +6571,41 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                 </div>
             </div>
 
-            {/* 3. MODAL DESCANSO */}
+            {/* MODAL DESCANSO */}
             {isResting && (
                 <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 animate-in slide-in-from-bottom-10 fade-in flex items-center justify-between ring-1 ring-white/10">
                     <div className="flex items-center gap-4 pl-2">
                         <div className="flex flex-col items-center min-w-[60px]">
-                            <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{restTimer}</span>
+                            <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{restRemaining}</span>
                             <span className="text-[8px] text-zinc-500 font-bold uppercase mt-0.5">Segundos</span>
                         </div>
                         <div className="h-8 w-[1px] bg-zinc-700"></div>
                         <div className="flex flex-col">
                             <span className="text-[9px] text-zinc-400 font-bold uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Tiempo fijo</span>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    inputMode="decimal"
-                                    value={defaultRest}
-                                    onChange={handleRestInputChange}
-                                    onBlur={handleRestInputBlur}
-                                    className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 focus:border-yellow-500 outline-none"
-                                />
-                            </div>
+                            <input type="number" inputMode="decimal" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 focus:border-yellow-500 outline-none" />
                         </div>
                     </div>
-                    <button onClick={() => setIsResting(false)} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">
-                        Saltar <SkipForward size={14} fill="currentColor" />
-                    </button>
+                    <button onClick={skipRest} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} fill="currentColor" /></button>
                 </div>
             )}
 
-            {/* 4. FOOTER */}
+            {/* FOOTER */}
             <div className="absolute bottom-0 left-0 right-0 p-6 bg-black border-t border-zinc-900 safe-bottom z-30">
-                <button
-                    onClick={() => setShowFinishAlert(true)}
-                    disabled={finishing}
-                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(234,179,8,0.3)] flex items-center justify-center gap-3 active:scale-95 transition-all text-lg uppercase tracking-widest border-b-4 border-yellow-600"
-                >
+                <button onClick={() => setShowFinishAlert(true)} disabled={finishing} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(234,179,8,0.3)] flex items-center justify-center gap-3 active:scale-95 transition-all text-lg uppercase tracking-widest border-b-4 border-yellow-600">
                     {finishing ? <Loader2 className="animate-spin" /> : <Save size={24} />}
                     {finishing ? 'GUARDANDO...' : 'TERMINAR SESIÓN'}
                 </button>
             </div>
 
-            {/* 5. ALERTAS */}
+            {/* ALERTAS */}
             {showExitAlert && (
                 <div className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
-                    <div className="bg-zinc-950 border border-red-900/50 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative">
-                        <div className="flex flex-col items-center text-center gap-4">
-                            <div className="bg-red-500/10 p-4 rounded-full text-red-500"><AlertTriangle size={32} /></div>
-                            <div>
-                                <h3 className="text-white font-black text-lg uppercase">¿Salir sin guardar?</h3>
-                                <p className="text-zinc-500 text-xs font-bold mt-1">Se perderá todo el progreso actual.</p>
-                            </div>
-                            <div className="flex gap-3 w-full mt-2">
-                                <button onClick={() => setShowExitAlert(false)} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-bold text-xs uppercase border border-zinc-800">Cancelar</button>
-                                <button onClick={confirmExit} className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold text-xs uppercase">Salir</button>
-                            </div>
+                    <div className="bg-zinc-950 border border-red-900/50 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative text-center">
+                        <div className="bg-red-500/10 p-4 rounded-full text-red-500 inline-block mb-4"><AlertTriangle size={32} /></div>
+                        <h3 className="text-white font-black text-lg uppercase">¿Salir sin guardar?</h3>
+                        <div className="flex gap-3 w-full mt-4">
+                            <button onClick={() => setShowExitAlert(false)} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-bold text-xs uppercase border border-zinc-800">Cancelar</button>
+                            <button onClick={confirmExit} className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold text-xs uppercase">Salir</button>
                         </div>
                     </div>
                 </div>
@@ -6576,17 +6613,12 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
             {showFinishAlert && (
                 <div className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
-                    <div className="bg-zinc-950 border border-yellow-500/30 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative">
-                        <div className="flex flex-col items-center text-center gap-4">
-                            <div className="bg-yellow-500/10 p-4 rounded-full text-yellow-500"><Trophy size={32} /></div>
-                            <div>
-                                <h3 className="text-white font-black text-lg uppercase">¿Terminar Sesión?</h3>
-                                <p className="text-zinc-500 text-xs font-bold mt-1">Buen trabajo. Vamos a guardar esto.</p>
-                            </div>
-                            <div className="flex gap-3 w-full mt-2">
-                                <button onClick={() => setShowFinishAlert(false)} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-bold text-xs uppercase border border-zinc-800">Seguir</button>
-                                <button onClick={confirmFinish} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-bold text-xs uppercase">Terminar</button>
-                            </div>
+                    <div className="bg-zinc-950 border border-yellow-500/30 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative text-center">
+                        <div className="bg-yellow-500/10 p-4 rounded-full text-yellow-500 inline-block mb-4"><Trophy size={32} /></div>
+                        <h3 className="text-white font-black text-lg uppercase">¿Terminar Sesión?</h3>
+                        <div className="flex gap-3 w-full mt-4">
+                            <button onClick={() => setShowFinishAlert(false)} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-bold text-xs uppercase border border-zinc-800">Seguir</button>
+                            <button onClick={confirmFinish} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-bold text-xs uppercase">Terminar</button>
                         </div>
                     </div>
                 </div>
@@ -7309,7 +7341,6 @@ const customAnimationsStyle = `
 // --- HELPER: COLORES DE NIVEL ---
 const getLevelStyle = (level) => {
     // Nivel 100+ (Cromático Suave - Sin parpadeo)
-    // Usamos un gradiente largo y la clase personalizada para moverlo suavemente
     if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
 
     // Rangos normales
@@ -7397,13 +7428,13 @@ export default function Header({ user, setUser }) {
                             {userTitle}
                         </span>
 
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-white font-bold text-sm truncate leading-none">
+                        <div className="flex items-center gap-2 mb-1 overflow-hidden">
+                            <span className="text-white font-bold text-sm truncate leading-none shrink min-w-0">
                                 {username}
                             </span>
 
-                            {/* 🔥 CAJA DE NIVEL (Cromático Suave) */}
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide leading-none ${levelClass}`}>
+                            {/* 🔥 CAJA DE NIVEL BLINDADA: 'whitespace-nowrap' y 'shrink-0' evitan que se rompa */}
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide leading-none whitespace-nowrap shrink-0 ${levelClass}`}>
                                 Lvl {level}
                             </span>
                         </div>
@@ -14729,18 +14760,14 @@ export default function Home() {
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Gamepad2 } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Lock, Mail, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 
 export default function Login() {
     const navigate = useNavigate();
 
-    const [formData, setFormData] = useState({
-        email: '',
-        password: ''
-    });
+    const [formData, setFormData] = useState({ email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
-
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -14755,22 +14782,28 @@ export default function Login() {
         setError(null);
 
         try {
-            // 1. Petición al Backend
+            // 1. Limpieza preventiva
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+
+            // 2. Petición al Backend
             const response = await api.post('/auth/login', formData);
 
-            console.log('Login exitoso:', response.data);
+            if (response.data && response.data.token) {
+                // 3. Guardado CRÍTICO antes de navegar
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data));
 
-            // 2. Guardar Token y Datos del Usuario en LocalStorage
-            // Esto es CRUCIAL para que el Header sepa tu nivel y XP luego
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify(response.data));
-
-            // 3. Redirigir al Dashboard principal
-            navigate('/home');
+                // 4. Redirección forzada
+                // Usamos replace para que no puedan volver atrás al login
+                navigate('/home', { replace: true });
+            } else {
+                setError("El servidor no devolvió las credenciales correctas.");
+            }
 
         } catch (err) {
             console.error(err);
-            const msg = err.response?.data?.message || 'Error al iniciar sesión';
+            const msg = err.response?.data?.message || 'Error de conexión. Intenta de nuevo.';
             setError(msg);
         } finally {
             setLoading(false);
@@ -14778,93 +14811,108 @@ export default function Login() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-950">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
 
-            {/* Logo / Header */}
-            <div className="text-center mb-8">
-                <div className="bg-blue-600 p-4 rounded-full inline-block mb-4 shadow-lg shadow-blue-500/30">
-                    <Gamepad2 size={40} className="text-white" />
+            {/* Fondo Decorativo */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 z-20"></div>
+            <div className="absolute -top-20 -right-20 w-80 h-80 bg-yellow-600/10 rounded-full blur-[80px] pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/5 rounded-full blur-[80px] pointer-events-none"></div>
+
+            {/* Contenedor Principal */}
+            <div className="w-full max-w-sm relative z-10 animate-in fade-in zoom-in duration-500">
+
+                {/* Logo / Título */}
+                <div className="text-center mb-10">
+                    <h1 className="text-5xl font-black italic text-white tracking-tighter mb-1">
+                        KAIROS
+                    </h1>
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">
+                        Sistema de Acceso
+                    </p>
                 </div>
-                <h1 className="text-3xl font-bold text-white tracking-tight">NoteGymk</h1>
-                <p className="text-gray-400 text-sm mt-1">Continúa tu progreso</p>
-            </div>
 
-            {/* Tarjeta de Login */}
-            <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
-                <h2 className="text-xl font-semibold text-white mb-6 text-center">Iniciar Sesión</h2>
+                {/* Tarjeta de Formulario */}
+                <div className="bg-zinc-950 border border-white/10 rounded-[32px] p-6 shadow-2xl relative overflow-hidden">
 
-                {error && (
-                    <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-200 text-sm rounded-lg text-center">
-                        {error}
-                    </div>
-                )}
+                    {/* Brillo interior superior */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-yellow-500 blur-sm"></div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                    <h2 className="text-xl font-black text-white uppercase italic mb-6 flex items-center gap-2">
+                        <Lock size={20} className="text-yellow-500" /> Identificarse
+                    </h2>
 
-                    {/* Email */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Correo Electrónico</label>
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="tu@email.com"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                        />
-                    </div>
-
-                    {/* Password */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Contraseña</label>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                placeholder="••••••••"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-3.5 text-gray-500 hover:text-white transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
+                    {error && (
+                        <div className="mb-6 p-3 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-xs font-bold text-center animate-pulse">
+                            {error}
                         </div>
-                    </div>
+                    )}
 
-                    {/* Botón Login */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-blue-900/20 mt-2 flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                Entrando...
-                            </span>
-                        ) : (
-                            <>
-                                <LogIn size={20} />
-                                Entrar
-                            </>
-                        )}
-                    </button>
-                </form>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Email */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Correo</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-yellow-500 transition-colors" size={18} />
+                                <input
+                                    type="email"
+                                    name="email"
+                                    placeholder="agente@kairos.com"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Password */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-yellow-500 transition-colors" size={18} />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-12 text-white font-bold text-sm focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-3.5 text-zinc-600 hover:text-white transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Botón Action */}
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mt-6 uppercase tracking-widest shadow-lg shadow-yellow-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <span className="animate-pulse">Autenticando...</span>
+                            ) : (
+                                <>Entrar <LogIn size={20} /></>
+                            )}
+                        </button>
+                    </form>
+                </div>
 
                 {/* Footer Link */}
-                <p className="mt-8 text-center text-gray-500 text-sm">
-                    ¿No tienes cuenta?{' '}
-                    <Link to="/register" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                        Crea una aquí
+                <div className="mt-8 text-center">
+                    <p className="text-zinc-500 text-xs font-medium">
+                        ¿No tienes credenciales?
+                    </p>
+                    <Link to="/register" className="text-yellow-500 text-xs font-black uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1 mt-2 group">
+                        Solicitar Acceso <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
-                </p>
+                </div>
             </div>
         </div>
     );
@@ -16001,56 +16049,35 @@ export default function Profile() {
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, UserPlus, Gamepad2 } from 'lucide-react'; // Iconos
-import api from '../services/api'; // Tu conexión configurada con Axios
+import { Eye, EyeOff, UserPlus, User, Mail, Lock, ArrowRight } from 'lucide-react';
+import api from '../services/api';
 
 export default function Register() {
     const navigate = useNavigate();
 
-    // Estados del formulario
-    const [formData, setFormData] = useState({
-        username: '',
-        email: '',
-        password: ''
-    });
+    const [formData, setFormData] = useState({ username: '', email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
-
-    // Estados de UI
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Manejar cambios en inputs
     const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
-        // Limpiamos error si el usuario empieza a escribir de nuevo
+        setFormData({ ...formData, [e.target.name]: e.target.value });
         if (error) setError(null);
     };
 
-    // Enviar formulario
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
         try {
-            // 1. Petición al Backend
             const response = await api.post('/auth/register', formData);
 
-            console.log('Registro exitoso:', response.data);
-
-            // 2. Guardar Token (Auto-login)
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data));
 
-            // 3. Redirigir al Home (Dashboard)
-            navigate('/home');
-
+            navigate('/home', { replace: true });
         } catch (err) {
-            console.error(err);
-            // Extraemos el mensaje de error del backend si existe
             const msg = err.response?.data?.message || 'Error al conectar con el servidor';
             setError(msg);
         } finally {
@@ -16059,107 +16086,114 @@ export default function Register() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-950">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
 
-            {/* Cabecera RPG */}
-            <div className="text-center mb-8">
-                <div className="bg-blue-600 p-4 rounded-full inline-block mb-4 shadow-lg shadow-blue-500/30">
-                    <Gamepad2 size={40} className="text-white" />
+            {/* Fondo Decorativo (Azul/Cyan para registro) */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-600 via-blue-500 to-cyan-600 z-20"></div>
+            <div className="absolute -top-20 -left-20 w-80 h-80 bg-blue-600/10 rounded-full blur-[80px] pointer-events-none"></div>
+
+            <div className="w-full max-w-sm relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+                <div className="text-center mb-8">
+                    <h1 className="text-4xl font-black italic text-white tracking-tighter mb-1">
+                        NUEVO RECLUTA
+                    </h1>
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">
+                        Crear Expediente
+                    </p>
                 </div>
-                <h1 className="text-3xl font-bold text-white tracking-tight">NoteGymk</h1>
-                <p className="text-gray-400 text-sm mt-1">Comienza tu aventura</p>
-            </div>
 
-            {/* Tarjeta de Registro */}
-            <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
-                <h2 className="text-xl font-semibold text-white mb-6 text-center">Crear Personaje</h2>
+                <div className="bg-zinc-950 border border-white/10 rounded-[32px] p-6 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-blue-500 blur-sm"></div>
 
-                {error && (
-                    <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-200 text-sm rounded-lg text-center">
-                        {error}
-                    </div>
-                )}
+                    <h2 className="text-xl font-black text-white uppercase italic mb-6 flex items-center gap-2">
+                        <UserPlus size={20} className="text-blue-500" /> Registro
+                    </h2>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-
-                    {/* Username */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Nombre de Usuario</label>
-                        <input
-                            type="text"
-                            name="username"
-                            placeholder="Ej. GuerreroX"
-                            value={formData.username}
-                            onChange={handleChange}
-                            required
-                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                        />
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Correo Electrónico</label>
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="tu@email.com"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                            className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                        />
-                    </div>
-
-                    {/* Password con Ojo */}
-                    <div>
-                        <label className="block text-gray-400 text-xs uppercase font-bold mb-1 ml-1">Contraseña</label>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                placeholder="••••••••"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                className="w-full bg-gray-800 text-white border border-gray-700 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-3.5 text-gray-500 hover:text-white transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
+                    {error && (
+                        <div className="mb-6 p-3 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-xs font-bold text-center animate-pulse">
+                            {error}
                         </div>
-                    </div>
+                    )}
 
-                    {/* Botón Submit */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-blue-900/20 mt-2 flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                Creando...
-                            </span>
-                        ) : (
-                            <>
-                                <UserPlus size={20} />
-                                Registrarse
-                            </>
-                        )}
-                    </button>
-                </form>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Usuario */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Alias / Usuario</label>
+                            <div className="relative group">
+                                <User className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input
+                                    type="text"
+                                    name="username"
+                                    placeholder="Guerrero01"
+                                    maxLength={8}
+                                    value={formData.username}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                            </div>
+                        </div>
 
-                {/* Footer Link */}
-                <p className="mt-8 text-center text-gray-500 text-sm">
-                    ¿Ya tienes cuenta?{' '}
-                    <Link to="/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                        Inicia Sesión
+                        {/* Email */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Correo</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input
+                                    type="email"
+                                    name="email"
+                                    placeholder="tu@email.com"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Password */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-12 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-3.5 text-zinc-600 hover:text-white transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl mt-6 uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {loading ? "Creando..." : "CONFIRMAR"}
+                        </button>
+                    </form>
+                </div>
+
+                <div className="mt-8 text-center">
+                    <p className="text-zinc-500 text-xs font-medium">
+                        ¿Ya tienes cuenta?
+                    </p>
+                    <Link to="/login" className="text-blue-400 text-xs font-black uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1 mt-2 group">
+                        Inicia Sesión <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
-                </p>
+                </div>
             </div>
         </div>
     );
@@ -17386,13 +17420,39 @@ export default function Social() {
                             <div className="bg-zinc-900 border border-white/10 rounded-[32px] p-6 relative overflow-hidden shadow-2xl">
                                 <div className="absolute top-0 right-0 p-10 opacity-10 bg-purple-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
 
-                                <div className="flex justify-between items-start mb-6 relative z-10">
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-4xl bg-black w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner border border-zinc-800">{myClan.icon}</div>
-                                        <div>
-                                            <h2 className="text-2xl font-black text-white uppercase italic">{myClan.name}</h2>
+                                {/* HEADER DE TU CLAN (CORREGIDO) */}
+                                <div className="relative z-10 mb-6">
+                                    <div className="flex items-start gap-4 w-full">
+                                        {/* Icono */}
+                                        <div className="text-4xl bg-black w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner border border-zinc-800 shrink-0">
+                                            {myClan.icon}
+                                        </div>
 
-                                            {/* 🔥 PODER EN CÍRCULO CON RAYO (FIX 3) */}
+                                        {/* Columna de Texto + Botones */}
+                                        <div className="flex-1 min-w-0">
+
+                                            {/* --- BOTONES MOVIDOS AQUÍ --- */}
+                                            <div className="flex justify-end gap-2 mb-1">
+                                                {/* BOTÓN EDITAR (SOLO LÍDER) */}
+                                                {((myClan.leader?._id || myClan.leader) === currentUserId) && (
+                                                    <button onClick={openEditClan} className="bg-zinc-800 p-2 rounded-xl text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
+                                                        <Edit size={16} />
+                                                    </button>
+                                                )}
+
+                                                {/* BOTÓN SALIR (ROJO) */}
+                                                <button onClick={() => requestConfirm("¿Salir del clan?", handleLeaveClan)} className="bg-red-900/20 p-2 rounded-xl text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors">
+                                                    <LogOut size={16} />
+                                                </button>
+                                            </div>
+
+                                            {/* Nombre del Clan */}
+                                            {/* 🔥 FIX: quitado 'truncate', mantiene 'break-words' y 'leading-tight' */}
+                                            <h2 className="text-2xl font-black text-white uppercase italic break-words leading-tight">
+                                                {myClan.name}
+                                            </h2>
+
+                                            {/* Stats (Poder / Miembros) */}
                                             <div className="flex items-center gap-4 mt-2">
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 border border-purple-500/50 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
@@ -17408,20 +17468,6 @@ export default function Social() {
                                                 </span>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div className="absolute top-0 right-0 flex gap-2">
-                                        {/* BOTÓN EDITAR (SOLO LÍDER) - Flotando arriba derecha */}
-                                        {((myClan.leader?._id || myClan.leader) === currentUserId) && (
-                                            <button onClick={openEditClan} className="bg-zinc-800 p-2 rounded-xl text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
-                                                <Edit size={16} />
-                                            </button>
-                                        )}
-
-                                        {/* BOTÓN SALIR (ROJO) */}
-                                        <button onClick={() => requestConfirm("¿Salir del clan?", handleLeaveClan)} className="bg-red-900/20 p-2 rounded-xl text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors">
-                                            <LogOut size={16} />
-                                        </button>
                                     </div>
                                 </div>
 

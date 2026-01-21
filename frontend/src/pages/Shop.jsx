@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-    Plus, X, ArrowLeft, RefreshCw, ArrowRightLeft,
+    Plus, X, ArrowLeft, ArrowRightLeft,
     Ticket, Heart, User, ScanFace, Palette, Package, PawPrint, Crown,
-    ShoppingBag, Backpack, Save, Loader2, Coins
+    ShoppingBag, Backpack, Save, Loader2
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -74,15 +74,6 @@ export default function Shop() {
 
     const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
-    const handleResetShop = async () => {
-        if (!window.confirm("¿Vaciar toda la tienda?")) return;
-        try {
-            await api.post('/shop/seed');
-            fetchShop();
-            showToast("Tienda reiniciada", "info");
-        } catch (error) { showToast("Error reset", "error"); }
-    };
-
     // LOGICA EXCHANGE
     const EXCHANGE_RATE = 100;
     const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
@@ -95,8 +86,11 @@ export default function Shop() {
         setIsExchanging(true);
         try {
             const res = await api.post('/shop/exchange', { amountGameCoins: parseInt(exchangeAmount) });
+
+            // 🔥 ACTUALIZACIÓN INMEDIATA DEL USUARIO
             setUser(res.data.user);
             localStorage.setItem('user', JSON.stringify(res.data.user));
+
             showToast(`¡Canje Exitoso!`, "success");
             setShowExchange(false);
             setExchangeAmount(100);
@@ -120,16 +114,18 @@ export default function Shop() {
         if (!selectedItem || isProcessing) return;
         setIsProcessing(true);
         try {
-            const endpoint = selectedItem.category === 'reward' ? '/shop/buy-reward' : '/shop/buy';
-            await api.post(endpoint, { itemId: selectedItem._id });
+            const res = await api.post('/shop/buy', { itemId: selectedItem._id });
 
-            const resUser = await api.get('/auth/me');
-            setUser(resUser.data);
+            // 🔥 ACTUALIZACIÓN CRÍTICA DEL SALDO
+            if (res.data.user) {
+                setUser(res.data.user);
+                localStorage.setItem('user', JSON.stringify(res.data.user));
+            }
 
             showToast("¡Comprado!", "success");
             setSelectedItem(null);
         } catch (error) {
-            showToast(error.response?.data?.message || "No tienes saldo", "error");
+            showToast(error.response?.data?.message || "Error en la compra", "error");
         } finally { setIsProcessing(false); }
     };
 
@@ -138,8 +134,13 @@ export default function Shop() {
         setIsProcessing(true);
         try {
             const res = await api.post('/shop/use', { itemId: selectedItem._id });
-            setUser(res.data.user);
-            localStorage.setItem('user', JSON.stringify(res.data.user));
+
+            // 🔥 ACTUALIZAR USUARIO
+            if (res.data.user) {
+                setUser(res.data.user);
+                localStorage.setItem('user', JSON.stringify(res.data.user));
+            }
+
             setSelectedItem(null);
 
             if (selectedItem.category === 'chest') {
@@ -160,7 +161,9 @@ export default function Shop() {
     const getFilteredItems = () => {
         if (!selectedCategory) return [];
         if (activeTab === 'shop') return shopItems.filter(item => item.category === selectedCategory);
-        return (user?.inventory || []).filter(slot => slot.item && slot.item.category === selectedCategory);
+        // Filtramos el inventario para mostrar items reales
+        return (user?.inventory || [])
+            .filter(slot => slot.item && slot.item.category === selectedCategory);
     };
 
     const itemsToShow = getFilteredItems();
@@ -169,18 +172,15 @@ export default function Shop() {
         <div className="animate-in fade-in pb-24 relative min-h-screen select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER PRO (NO STICKY) */}
+            {/* HEADER PRO (SIN BOTÓN RESET) */}
             <div className="flex justify-between items-end px-4 pt-6 pb-2 bg-black border-b border-zinc-900">
                 <div>
                     <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">MERCADO</h1>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Gasta tu fortuna</p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={handleResetShop} className="bg-zinc-900 p-2 rounded-full text-zinc-600 hover:text-red-500 border border-zinc-800 transition-colors"><RefreshCw size={18} /></button>
-                </div>
             </div>
 
-            {/* TABS FLOTANTES (AHORA SÍ SON STICKY) */}
+            {/* TABS FLOTANTES (STICKY) */}
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md pt-4 pb-4 px-4 border-b border-zinc-900/50">
                 <div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-zinc-800">
                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'inventory' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`} />
@@ -240,12 +240,24 @@ export default function Shop() {
 
                                 {/* LISTA DE ITEMS */}
                                 {itemsToShow.map(slotOrItem => {
+                                    // Normalizamos: En tienda es 'item', en inventario 'slot.item'
                                     const item = activeTab === 'shop' ? slotOrItem : slotOrItem.item;
-                                    const isOwned = user?.inventory?.some(s => s.item && s.item._id === item._id);
-                                    const isUnique = ['avatar', 'frame', 'theme', 'title', 'pet'].includes(item.category);
-                                    const purchased = activeTab === 'shop' && isOwned && isUnique;
-                                    const isReward = item.category === 'reward';
 
+                                    // 🔥 LÓGICA DE PROPIEDAD MEJORADA
+                                    // Buscamos si el usuario tiene este item en su inventario comparando IDs
+                                    const isOwned = user?.inventory?.some(s => {
+                                        // Manejo seguro por si s.item es un objeto o un ID string
+                                        const invItemId = s.item._id || s.item;
+                                        return invItemId === item._id;
+                                    });
+
+                                    // Categorías únicas
+                                    const isUnique = ['avatar', 'frame', 'theme', 'title', 'pet'].includes(item.category);
+
+                                    // ¿Está comprado y es único? (Solo aplica en modo tienda para bloquear)
+                                    const purchased = activeTab === 'shop' && isOwned && isUnique;
+
+                                    const isReward = item.category === 'reward';
                                     const iconPath = isReward ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png";
 
                                     return (
@@ -254,7 +266,7 @@ export default function Shop() {
                                             onClick={() => { if (!purchased) setSelectedItem(item); }}
                                             className={`
                                                 relative bg-zinc-950 border border-zinc-800 rounded-3xl p-4 flex flex-col items-center justify-between transition-all shadow-md min-h-[160px]
-                                                ${purchased ? 'opacity-50 grayscale cursor-default' : 'hover:border-yellow-500/30 cursor-pointer active:scale-95'}
+                                                ${purchased ? 'opacity-40 grayscale cursor-default' : 'hover:border-yellow-500/30 cursor-pointer active:scale-95'}
                                             `}
                                         >
                                             <div className="h-14 w-14 mb-2 flex items-center justify-center">
