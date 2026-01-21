@@ -13,9 +13,11 @@ const registerSchema = Joi.object({
     })
 });
 
-// 🔥 CAMBIO: LOGIN POR USERNAME
+// 🔥 ESTA ES LA PARTE IMPORTANTE QUE DEBES CAMBIAR
 const loginSchema = Joi.object({
-    username: Joi.string().required(), // Antes era email
+    // ANTES PONÍA: email: Joi.string().email().required()
+    // AHORA DEBE PONER:
+    username: Joi.string().required(),
     password: Joi.string().required()
 });
 

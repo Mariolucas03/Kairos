@@ -52,14 +52,16 @@ const registerUser = async (req, res) => {
     }
 };
 
-// @desc    Login usuario (POR USERNAME)
+// ... (parte del registro igual)
+
+// @desc    Login usuario
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
     try {
-        // 2. RECIBIMOS USERNAME EN LUGAR DE EMAIL
+        // 🔥 AQUI: Extraemos username, NO email
         const { username, password } = req.body;
 
-        // Buscamos por username
+        // 🔥 AQUI: Buscamos por username
         const user = await User.findOne({ username }).select('+password');
 
         if (user && (await bcrypt.compare(password, user.password))) {
@@ -79,4 +81,5 @@ const loginUser = async (req, res) => {
     }
 };
 
+// ...
 module.exports = { registerUser, loginUser };
