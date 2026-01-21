@@ -5,9 +5,14 @@ import Footer from './Footer';
 import api from '../../services/api';
 import RedemptionScreen from './RedemptionScreen';
 import IosInstallPrompt from '../common/IosInstallPrompt';
+// 🔥 NUEVOS IMPORTS
+import { WorkoutProvider, useWorkout } from '../../context/WorkoutContext';
+import ActiveWorkout from '../components/gym/ActiveWorkout';
 
-export default function Layout() {
+// Componente Wrapper Interno para usar el Hook useWorkout (porque el Provider está fuera)
+function LayoutContent() {
     const navigate = useNavigate();
+    const { activeRoutine } = useWorkout(); // 🔥 AHORA LEEMOS SI HAY ENTRENO
 
     // 1. Inicialización Lazy del Estado
     const [user, setUser] = useState(() => {
@@ -29,7 +34,7 @@ export default function Layout() {
                 // Obtenemos /daily pero también pedimos /users/ para tener las notificaciones frescas
                 const [dailyRes, userRes] = await Promise.all([
                     api.get('/daily'),
-                    api.get('/users/') // Este endpoint trae requests
+                    api.get('/users/')
                 ]);
 
                 setUser((prevUser) => {
@@ -37,7 +42,7 @@ export default function Layout() {
                     const updatedUser = {
                         ...safePrev,
                         ...(dailyRes.data.user || {}),
-                        ...userRes.data, // Mezclamos datos frescos del usuario (notificaciones)
+                        ...userRes.data,
                         dailyLog: dailyRes.data
                     };
 
@@ -82,11 +87,24 @@ export default function Layout() {
                 <Outlet context={{ user, setUser: handleUserUpdate, setIsUiHidden }} />
             </main>
 
-            {/* 🔥 PASAMOS EL USUARIO AL FOOTER PARA LAS NOTIFICACIONES */}
+            {/* 🔥 RENDERIZAR ENTRENO SI EXISTE */}
+            {activeRoutine && (
+                <ActiveWorkout routine={activeRoutine} />
+            )}
+
             {!isUiHidden && <Footer user={user} />}
 
             <IosInstallPrompt />
 
         </div>
+    );
+}
+
+// Exportamos el Layout envuelto en el Provider
+export default function Layout() {
+    return (
+        <WorkoutProvider>
+            <LayoutContent />
+        </WorkoutProvider>
     );
 }

@@ -9,7 +9,8 @@ import {
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
-import ActiveWorkout from '../components/gym/ActiveWorkout';
+// 🔥 IMPORTANTE: Ya no importamos ActiveWorkout aquí, lo maneja el Layout
+import { useWorkout } from '../context/WorkoutContext';
 
 // --- CONSTANTES DEPORTE ---
 const SPORT_ACTIVITIES = [
@@ -145,13 +146,14 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
 // --- PÁGINA PRINCIPAL ---
 export default function Gym() {
     const { user, setUser, setIsUiHidden } = useOutletContext();
+    const { startWorkout } = useWorkout(); // 🔥 USAMOS EL CONTEXTO GLOBAL
+
     const [routines, setRoutines] = useState([]);
     const [todaySports, setTodaySports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
-    // Estados
-    const [activeRoutine, setActiveRoutine] = useState(null);
+    // Estados Locales
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
     const [showSportModal, setShowSportModal] = useState(false);
@@ -179,8 +181,11 @@ export default function Gym() {
     };
     const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
-    const openActiveWorkout = (r) => { setActiveRoutine(r); setIsUiHidden(true); };
-    const closeActiveWorkout = () => { setActiveRoutine(null); setIsUiHidden(false); };
+    // 🔥 MODIFICADO: AHORA LLAMA AL CONTEXTO
+    const openActiveWorkout = (r) => {
+        startWorkout(r);
+        // No hace falta setIsUiHidden(true) porque ActiveWorkout se monta en el Layout por encima
+    };
 
     // Acciones
     const handleEditRoutine = (r) => openCreateRoutine(r);
@@ -199,10 +204,8 @@ export default function Gym() {
         } catch (e) { showToast('Error', 'error'); } finally { setIsSavingSport(false); }
     };
     const handleDeleteSport = () => showToast("Usa la web para borrar", "info");
-    const handleWorkoutFinish = (data) => { closeActiveWorkout(); if (data.user) setUser(data.user); showToast(`¡Terminado! +${data.caloriesBurned} Kcal`, "success"); };
 
     if (loading) return <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>;
-    if (activeRoutine) return <ActiveWorkout routine={activeRoutine} onClose={closeActiveWorkout} onFinish={handleWorkoutFinish} />;
 
     return (
         <div className="animate-in fade-in space-y-8 pb-6 relative">

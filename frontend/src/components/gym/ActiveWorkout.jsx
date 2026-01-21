@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Loader2, X, Trophy, AlertTriangle, Plus, SkipForward, Timer, Save } from 'lucide-react';
+import {
+    Check, Loader2, X, Trophy, AlertTriangle, Plus,
+    SkipForward, Timer, Save, ChevronDown, Maximize2
+} from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
+import { useWorkout } from '../../context/WorkoutContext';
 
-export default function ActiveWorkout({ routine, onClose, onFinish }) {
+export default function ActiveWorkout({ routine }) {
+    const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
+
     const STORAGE_KEY = `workout_active_${routine._id}`;
 
-    // --- ESTADOS ---
+    // --- ESTADOS (IGUAL QUE ANTES) ---
     const [startTime] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved).startTime : Date.now();
@@ -33,8 +39,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
     // --- LÓGICA DE DESCANSO PERSISTENTE ---
     const [isResting, setIsResting] = useState(false);
     const [restRemaining, setRestRemaining] = useState(0);
-
-    // Configuración del tiempo por defecto (guardado en local)
     const [defaultRest, setDefaultRest] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved && JSON.parse(saved).defaultRest ? JSON.parse(saved).defaultRest : 60;
@@ -42,14 +46,13 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
     // UI & Alertas
     const [finishing, setFinishing] = useState(false);
-    const [loadingHistory, setLoadingHistory] = useState(true);
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
 
     // --- EFECTOS ---
 
-    // 1. Cargar estado del descanso al montar (Recuperar tiempo si se recarga la página)
+    // 1. Cargar estado del descanso
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
@@ -61,7 +64,6 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                     setIsResting(true);
                     setRestRemaining(diff);
                 } else {
-                    // El descanso terminó mientras estaba fuera
                     const newState = { ...data, restEndTime: null };
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
                     setIsResting(false);
@@ -70,64 +72,46 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         }
     }, [STORAGE_KEY]);
 
-    // 2. CRONÓMETRO DE DESCANSO (LÓGICA CORREGIDA PARA BACKGROUND)
+    // 2. Cronómetro del Descanso
     useEffect(() => {
         let interval = null;
         if (isResting) {
             interval = setInterval(() => {
-                // 🔥 CAMBIO CLAVE: Leer el tiempo objetivo del storage en cada tick
-                // Esto asegura que si sales de la app, al volver recalcula la diferencia real
                 const saved = localStorage.getItem(STORAGE_KEY);
                 if (!saved) return;
-
                 const data = JSON.parse(saved);
-                if (!data.restEndTime) {
-                    setIsResting(false);
-                    return;
-                }
-
+                if (!data.restEndTime) { setIsResting(false); return; }
                 const now = Date.now();
                 const diff = Math.ceil((data.restEndTime - now) / 1000);
 
                 if (diff <= 0) {
-                    // Terminó el tiempo
                     setIsResting(false);
                     setRestRemaining(0);
                     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-                    // Limpiar timestamp del storage
                     const newState = { ...data, restEndTime: null };
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
                 } else {
-                    // Actualizar UI con el tiempo real restante
                     setRestRemaining(diff);
                 }
-            }, 500); // Revisamos cada 0.5s para mayor precisión visual al volver
+            }, 500);
         }
         return () => clearInterval(interval);
     }, [isResting, STORAGE_KEY]);
 
-    // 3. Auto-save General
+    // 3. Auto-save
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         const prevData = saved ? JSON.parse(saved) : {};
-
         const state = {
-            ...prevData, // Mantenemos restEndTime si existe (importante no sobreescribirlo con null)
-            startTime,
-            exercises,
-            intensity,
-            routineId: routine._id,
-            defaultRest
+            ...prevData,
+            startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }, [exercises, intensity, startTime, routine._id, STORAGE_KEY, defaultRest]);
+    }, [exercises, intensity, startTime, routine._id, routine.name, STORAGE_KEY, defaultRest]);
 
-    // 4. Cronómetro Global (Entreno) - También corregido para ser preciso
+    // 4. Cronómetro Global
     useEffect(() => {
         if (!startTime) return;
-        // El cronómetro global ya usaba la lógica correcta (Date.now - startTime)
-        // así que aunque se pause, al volver dará el tiempo correcto.
         const timer = setInterval(() => {
             const now = Date.now();
             setSeconds(Math.floor((now - startTime) / 1000));
@@ -135,21 +119,18 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         return () => clearInterval(timer);
     }, [startTime]);
 
-    // 5. Cargar Historial
+    // 5. Cargar Historial (Solo una vez)
     useEffect(() => {
         const fetchHistory = async () => {
             try {
                 const exerciseNames = routine.exercises.map(e => e.name);
                 const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
                 const historyData = res.data;
-
                 setExercises(prev => prev.map(ex => {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
-
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
-
                     if (isClean) {
                         newSetsData = ex.setsData.map((set, index) => {
                             if (stats.lastSets && stats.lastSets[index]) {
@@ -160,69 +141,35 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                     }
                     return { ...ex, setsData: newSetsData, pr: stats.bestSet };
                 }));
-            } catch (e) { console.error(e); } finally { setLoadingHistory(false); }
+            } catch (e) { console.error(e); }
         };
         fetchHistory();
-    }, []);
-
-    // --- VISIBILITY CHANGE LISTENER (DOBLE SEGURIDAD) ---
-    // Si el usuario vuelve a la app, forzamos una actualización inmediata del timer
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && isResting) {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    if (data.restEndTime) {
-                        const diff = Math.ceil((data.restEndTime - Date.now()) / 1000);
-                        if (diff > 0) setRestRemaining(diff);
-                        else {
-                            setIsResting(false);
-                            const newState = { ...data, restEndTime: null };
-                            localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-                        }
-                    }
-                }
-            }
-        };
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, [isResting, STORAGE_KEY]);
-
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- HANDLERS ---
-
     const startRest = () => {
         const time = defaultRest === '' ? 60 : parseInt(defaultRest);
         const endTime = Date.now() + (time * 1000);
-
         setRestRemaining(time);
         setIsResting(true);
-
-        // Guardamos IMMEDIATAMENTE el tiempo de fin
         const saved = localStorage.getItem(STORAGE_KEY);
         const data = saved ? JSON.parse(saved) : {};
-        const newState = { ...data, restEndTime: endTime };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: endTime }));
     };
 
     const skipRest = () => {
         setIsResting(false);
         setRestRemaining(0);
-
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             const data = JSON.parse(saved);
-            const newState = { ...data, restEndTime: null };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: null }));
         }
     };
 
     const toggleSetComplete = (exIdx, setIdx) => {
         const currentSet = exercises[exIdx].setsData[setIdx];
         if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Faltan datos', type: 'error' });
-
         setExercises(prev => {
             const newExercises = [...prev];
             const newSetsData = [...newExercises[exIdx].setsData];
@@ -230,10 +177,7 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
             newExercises[exIdx] = { ...newExercises[exIdx], setsData: newSetsData };
             return newExercises;
         });
-
-        if (!currentSet.completed) {
-            startRest();
-        }
+        if (!currentSet.completed) startRest();
     };
 
     const handleInputChange = (exIdx, setIdx, field, val) => {
@@ -259,15 +203,11 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
     const handleRestInputChange = (e) => {
         const val = e.target.value;
-        if (val === '') {
-            setDefaultRest('');
-            return;
-        }
+        if (val === '') { setDefaultRest(''); return; }
         const num = parseInt(val);
         if (!isNaN(num)) {
             setDefaultRest(num);
             if (isResting) {
-                // Si cambiamos el tiempo mientras descansamos, recalculamos el final
                 const endTime = Date.now() + (num * 1000);
                 setRestRemaining(num);
                 const saved = localStorage.getItem(STORAGE_KEY);
@@ -280,6 +220,7 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
     };
 
     const confirmFinish = async () => {
+        if (finishing) return;
         setFinishing(true);
         try {
             const logData = {
@@ -294,7 +235,13 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
             };
             const res = await api.post('/gym/log', logData);
             localStorage.removeItem(STORAGE_KEY);
-            onFinish(res.data);
+            // Usamos el endWorkout del contexto
+            endWorkout();
+            // Si el padre pasó onFinish (para actualizar UI local de Gym si estamos ahí), lo llamamos
+            // Pero como es global, quizás no hace falta, pero por si acaso.
+            if (window.location.pathname === '/gym') {
+                window.location.reload(); // Forma bruta pero efectiva de refrescar el gym
+            }
         } catch (error) {
             setToast({ message: 'Error al guardar', type: 'error' });
             setFinishing(false);
@@ -303,7 +250,13 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
 
     const confirmExit = () => {
         localStorage.removeItem(STORAGE_KEY);
-        onClose();
+        endWorkout();
+    };
+
+    const formatTime = (total) => {
+        const m = Math.floor(total / 60).toString().padStart(2, '0');
+        const s = (total % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
     };
 
     const intensityOptions = [
@@ -312,12 +265,43 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
         { id: 'Alta', label: 'Metabólico', color: 'bg-red-600' },
     ];
 
-    const formatTime = (total) => {
-        const m = Math.floor(total / 60).toString().padStart(2, '0');
-        const s = (total % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
+    // --- RENDERIZADO ---
 
+    // 1. MODO MINIMIZADO (Barra Flotante "Spotify")
+    if (isMinimized) {
+        return createPortal(
+            <div
+                onClick={maximizeWorkout}
+                className="fixed bottom-[68px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10"
+            >
+                <div className="flex items-center gap-3">
+                    {/* Indicador animado */}
+                    <div className="relative w-10 h-10 flex items-center justify-center bg-black rounded-xl border border-yellow-500/20">
+                        {isResting ? (
+                            <span className="text-sm font-black text-blue-400 animate-pulse">{restRemaining}s</span>
+                        ) : (
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">En curso</span>
+                        <span className="text-sm font-black text-white truncate max-w-[150px]">{routine.name}</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <span className="font-mono text-lg font-bold text-zinc-300 tabular-nums">{formatTime(seconds)}</span>
+                    <button className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400">
+                        <Maximize2 size={18} />
+                    </button>
+                </div>
+            </div>,
+            document.body
+        );
+    }
+
+    // 2. MODO EXPANDIDO (Pantalla Completa)
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-black flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -330,9 +314,17 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                         {formatTime(seconds)}
                     </div>
                 </div>
-                <button onClick={() => setShowExitAlert(true)} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95">
-                    <X size={24} />
-                </button>
+
+                <div className="flex gap-2">
+                    {/* Botón Minimizar */}
+                    <button onClick={minimizeWorkout} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95">
+                        <ChevronDown size={24} />
+                    </button>
+                    {/* Botón Cerrar */}
+                    <button onClick={() => setShowExitAlert(true)} className="bg-zinc-900 text-red-500 p-3 rounded-full hover:text-red-400 border border-red-900/30 transition-colors active:scale-95">
+                        <X size={24} />
+                    </button>
+                </div>
             </div>
 
             {/* LISTA EJERCICIOS */}
@@ -444,8 +436,10 @@ export default function ActiveWorkout({ routine, onClose, onFinish }) {
                         <div className="bg-yellow-500/10 p-4 rounded-full text-yellow-500 inline-block mb-4"><Trophy size={32} /></div>
                         <h3 className="text-white font-black text-lg uppercase">¿Terminar Sesión?</h3>
                         <div className="flex gap-3 w-full mt-4">
-                            <button onClick={() => setShowFinishAlert(false)} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-bold text-xs uppercase border border-zinc-800">Seguir</button>
-                            <button onClick={confirmFinish} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-bold text-xs uppercase">Terminar</button>
+                            <button onClick={() => setShowFinishAlert(false)} disabled={finishing} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-bold text-xs uppercase border border-zinc-800 disabled:opacity-50">Seguir</button>
+                            <button onClick={confirmFinish} disabled={finishing} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                {finishing ? <Loader2 className="animate-spin" size={16} /> : 'Terminar'}
+                            </button>
                         </div>
                     </div>
                 </div>
