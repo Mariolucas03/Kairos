@@ -5,14 +5,16 @@ import Footer from './Footer';
 import api from '../../services/api';
 import RedemptionScreen from './RedemptionScreen';
 import IosInstallPrompt from '../common/IosInstallPrompt';
-// 🔥 IMPORTAR EL CONTEXTO Y EL COMPONENTE DE ENTRENO
+// 🔥 IMPORTAR EL CONTEXTO
 import { WorkoutProvider, useWorkout } from '../../context/WorkoutContext';
-import ActiveWorkout from '../components/gym/ActiveWorkout';
+
+// 🔥 CORRECCIÓN AQUÍ: Ruta absoluta desde src para evitar errores
+import ActiveWorkout from '../../components/gym/ActiveWorkout';
 
 // Componente interno para poder usar el hook useWorkout
 function LayoutContent() {
     const navigate = useNavigate();
-    const { activeRoutine, endWorkout } = useWorkout(); // <--- Traemos endWorkout también por si acaso
+    const { activeRoutine, endWorkout } = useWorkout();
 
     const [user, setUser] = useState(() => {
         try {
@@ -54,7 +56,7 @@ function LayoutContent() {
         if (localStorage.getItem('token')) fetchUserData();
     }, [navigate]);
 
-    // 🔥 MANEJADOR DE FIN DE RUTINA (LO QUE FALTABA)
+    // Manejador de fin de rutina
     const handleWorkoutFinish = (data) => {
         // 1. Actualizamos el usuario con las nuevas monedas/XP ganadas
         if (data.user) {
@@ -62,8 +64,6 @@ function LayoutContent() {
         }
         // 2. Si estamos en la página de Gym, forzamos recarga para ver el historial actualizado
         if (window.location.pathname === '/gym') {
-            // Opcional: Podríamos usar un contexto para refrescar sin reload, 
-            // pero reload es más seguro para limpiar estados.
             window.location.reload();
         }
     };
@@ -79,7 +79,6 @@ function LayoutContent() {
             </main>
 
             {/* 🔥 EL ENTRENO GLOBAL VIVE AQUÍ */}
-            {/* AÑADIDO: onFinish={handleWorkoutFinish} para evitar errores al terminar */}
             {activeRoutine && (
                 <ActiveWorkout
                     routine={activeRoutine}
