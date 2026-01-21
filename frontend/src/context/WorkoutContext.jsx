@@ -6,24 +6,21 @@ export function WorkoutProvider({ children }) {
     const [activeRoutine, setActiveRoutine] = useState(null);
     const [isMinimized, setIsMinimized] = useState(false);
 
-    // Al cargar la app, miramos si había un entreno activo en localStorage
+    // Al cargar la app, miramos si había un entreno activo
     useEffect(() => {
-        // Buscamos cualquier clave que empiece por 'workout_active_'
         const keys = Object.keys(localStorage);
         const activeKey = keys.find(k => k.startsWith('workout_active_'));
 
         if (activeKey) {
             try {
                 const saved = JSON.parse(localStorage.getItem(activeKey));
-                // Restauramos la sesión minimizada por defecto para no molestar al entrar
                 if (saved && saved.routineId) {
-                    // Necesitamos reconstruir un objeto rutina mínimo para que arranque
                     setActiveRoutine({
                         _id: saved.routineId,
                         name: saved.routineName || 'Entrenamiento en curso',
                         exercises: saved.exercises || []
                     });
-                    setIsMinimized(true);
+                    setIsMinimized(true); // Restaurar minimizado
                 }
             } catch (e) {
                 console.error("Error recuperando sesión", e);
@@ -42,7 +39,6 @@ export function WorkoutProvider({ children }) {
     const endWorkout = () => {
         setActiveRoutine(null);
         setIsMinimized(false);
-        // Limpieza de claves (se hace también en ActiveWorkout, pero por seguridad)
         const keys = Object.keys(localStorage);
         keys.forEach(k => {
             if (k.startsWith('workout_active_')) localStorage.removeItem(k);
