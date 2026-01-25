@@ -2,19 +2,19 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2,
-    Flame, Zap, Layers
+    SkipForward, Timer, Save, ChevronDown, Maximize2
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 
 export default function ActiveWorkout({ routine, onFinish }) {
+    // Contexto Global para minimizar/maximizar
     const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
 
     const STORAGE_KEY = `workout_active_${routine._id}`;
 
-    // --- ESTADOS ---
+    // --- ESTADOS INICIALES ---
     const [startTime] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved).startTime : Date.now();
@@ -24,14 +24,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved).exercises;
 
-        // Inicializamos con tipo 'N' (Normal) por defecto
+        // Inicializamos sets con tipo 'N' (Normal)
         return routine.exercises.map(ex => ({
             ...ex,
             setsData: Array.from({ length: ex.sets || 3 }, () => ({
                 kg: '',
                 reps: '',
                 completed: false,
-                type: 'N' // N=Normal, W=Warmup, F=Failure, D=Drop
+                type: 'N' // Tipos: N=Normal, W=Warmup (Calentamiento), F=Failure (Fallo), D=Drop
             })),
             pr: null
         }));
@@ -40,7 +40,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [intensity, setIntensity] = useState('Media');
     const [seconds, setSeconds] = useState(0);
 
-    // Descanso
+    // Lógica de Descanso
     const [isResting, setIsResting] = useState(false);
     const [restRemaining, setRestRemaining] = useState(0);
     const [defaultRest, setDefaultRest] = useState(() => {
@@ -54,6 +54,19 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
 
+    // --- FUNCIONES AUXILIARES DE DESCANSO ---
+    const startRest = () => {
+        if (defaultRest > 0) {
+            setIsResting(true);
+            setRestRemaining(defaultRest);
+        }
+    };
+
+    const skipRest = () => {
+        setIsResting(false);
+        setRestRemaining(0);
+    };
+
     // --- EFECTOS ---
 
     // 1. Cronómetro Global
@@ -65,7 +78,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return () => clearInterval(timer);
     }, [startTime]);
 
-    // 2. Auto-save
+    // 2. Auto-save (Persistencia)
     useEffect(() => {
         const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -77,7 +90,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
         if (isResting && restRemaining > 0) {
             interval = setInterval(() => {
                 setRestRemaining(prev => {
-                    if (prev <= 1) { setIsResting(false); if (navigator.vibrate) navigator.vibrate([200, 100, 200]); return 0; }
+                    if (prev <= 1) {
+                        setIsResting(false);
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        return 0;
+                    }
                     return prev - 1;
                 });
             }, 1000);
@@ -85,19 +102,22 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return () => clearInterval(interval);
     }, [isResting, restRemaining]);
 
-    // 4. Cargar Historial
+    // 4. Cargar Historial (PRs y pesos anteriores)
     useEffect(() => {
         const fetchHistory = async () => {
             try {
                 const exerciseNames = routine.exercises.map(e => e.name);
                 const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
                 const historyData = res.data;
+
                 setExercises(prev => prev.map(ex => {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
-                    // Solo rellenar si está vacío
+
+                    // Solo rellenamos si los campos están vacíos
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
+
                     if (isClean) {
                         newSetsData = ex.setsData.map((set, index) => {
                             if (stats.lastSets && stats.lastSets[index]) {
@@ -114,142 +134,204 @@ export default function ActiveWorkout({ routine, onFinish }) {
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 
-    // --- LÓGICA HEVY (NUMERACIÓN INTELIGENTE) ---
-    // Esta función calcula qué número mostrar (1, 2, 2.1, W, etc.)
-    const getSetLabelInfo = (allSets, currentIndex) => {
-        const currentType = allSets[currentIndex].type;
+    // --- LÓGICA DE ESTILOS Y NUMERACIÓN (HEVY STYLE) ---
+    const getSetDisplayInfo = (allSets, currentIndex) => {
+        const type = allSets[currentIndex].type || 'N';
 
-        if (currentType === 'W') return { label: 'C', color: 'text-orange-400 border-orange-500/50 bg-orange-900/20' };
-
-        // Contar series "normales" (N o F) anteriores para saber el número base
-        let normalCount = 0;
-        for (let i = 0; i <= currentIndex; i++) {
-            if (allSets[i].type === 'N' || allSets[i].type === 'F') normalCount++;
-        }
-
-        if (currentType === 'D') {
-            // Drop set: Busca el último "padre" normal
-            let dropDepth = 0;
-            // Retrocedemos buscando cuántos Drop sets hay pegados
-            for (let i = currentIndex; i >= 0; i--) {
-                if (allSets[i].type !== 'D') break;
-                dropDepth++;
-            }
+        // 1. CALENTAMIENTO (Naranja, Caja)
+        if (type === 'W') {
             return {
-                label: `${normalCount}.${dropDepth}`,
-                color: 'text-purple-400 border-purple-500/50 bg-purple-900/20'
+                label: 'C',
+                style: 'bg-orange-900/20 text-orange-500 border border-orange-500/50 rounded-lg',
+                containerClass: 'justify-center'
             };
         }
 
-        if (currentType === 'F') return { label: normalCount, color: 'text-red-500 border-red-500/50 bg-red-900/20' };
+        // Calcular el número de serie "base" (ignorando drop sets anteriores)
+        let normalCount = 0;
+        for (let i = 0; i <= currentIndex; i++) {
+            if (allSets[i].type !== 'D' && allSets[i].type !== 'W') normalCount++;
+        }
 
-        // Normal
-        return { label: normalCount, color: 'text-zinc-500 border-zinc-800 bg-zinc-900' };
+        // 2. DROP SET (Morado, SIN CAJA, Indentado)
+        if (type === 'D') {
+            // Buscamos a qué serie normal pertenece este drop
+            let dropDepth = 0;
+            // Retrocedemos hasta encontrar el padre no-drop
+            for (let i = currentIndex; i >= 0; i--) {
+                if (allSets[i].type !== 'D') break; // Encontramos el padre
+                dropDepth++;
+            }
+
+            // Si es el primer drop es .1, segundo .2, etc.
+            return {
+                label: `${normalCount}.${dropDepth}`,
+                style: 'bg-transparent text-purple-400 font-black border-none p-0 text-sm',
+                containerClass: 'justify-end pr-4' // Alineado a la derecha o indentado
+            };
+        }
+
+        // 3. FALLO (Rojo, Caja)
+        if (type === 'F') {
+            return {
+                label: normalCount,
+                style: 'bg-red-900/20 text-red-500 border border-red-500/50 rounded-lg',
+                containerClass: 'justify-center'
+            };
+        }
+
+        // 4. NORMAL (Gris, Caja)
+        return {
+            label: normalCount,
+            style: 'bg-zinc-900 text-zinc-500 border border-zinc-800 rounded-lg',
+            containerClass: 'justify-center'
+        };
     };
 
-    // --- HANDLERS ---
+    // --- HANDLERS CORREGIDOS (Inmutabilidad Estricta) ---
 
-    // 🔥 CAMBIAR TIPO DE SERIE (CICLO: N -> W -> F -> D -> N)
+    // 1. Ciclo: Normal -> Calentamiento -> Fallo -> Drop -> Normal
     const cycleSetType = (exIdx, setIdx) => {
         const types = ['N', 'W', 'F', 'D'];
-        setExercises(prev => {
-            const newEx = [...prev];
-            const currentType = newEx[exIdx].setsData[setIdx].type || 'N';
-            const nextIndex = (types.indexOf(currentType) + 1) % types.length;
-            newEx[exIdx].setsData[setIdx].type = types[nextIndex];
-            return newEx;
-        });
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            return {
+                ...ex,
+                setsData: ex.setsData.map((set, j) => {
+                    if (j !== setIdx) return set;
+                    const currentType = set.type || 'N';
+                    const nextIndex = (types.indexOf(currentType) + 1) % types.length;
+                    return { ...set, type: types[nextIndex] };
+                })
+            };
+        }));
     };
 
+    // 2. Marcar Check (Completado)
     const toggleSetComplete = (exIdx, setIdx) => {
         const currentSet = exercises[exIdx].setsData[setIdx];
-        if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Faltan datos', type: 'error' });
 
-        setExercises(prev => {
-            const newExercises = [...prev];
-            newExercises[exIdx].setsData[setIdx].completed = !currentSet.completed;
-            return newExercises;
-        });
+        // Validación visual para no marcar cosas vacías
+        if (String(currentSet.kg).trim() === '' || String(currentSet.reps).trim() === '') {
+            return setToast({ message: 'Faltan datos (Kg o Reps)', type: 'error' });
+        }
 
-        if (!currentSet.completed) {
-            // Si es Drop Set, reducimos el descanso o no lo ponemos (opcional, aquí lo dejamos normal)
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            return {
+                ...ex,
+                setsData: ex.setsData.map((set, j) => {
+                    if (j !== setIdx) return set;
+                    return { ...set, completed: !set.completed };
+                })
+            };
+        }));
+
+        // Solo iniciamos descanso si se completa y NO es Drop Set (los drop sets son seguidos)
+        if (!currentSet.completed && currentSet.type !== 'D') {
             startRest();
         }
     };
 
+    // 3. Escribir en inputs (Peso/Reps)
     const handleInputChange = (exIdx, setIdx, field, val) => {
-        setExercises(prev => {
-            const newExercises = [...prev];
-            newExercises[exIdx].setsData[setIdx][field] = val;
-            return newExercises;
-        });
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            return {
+                ...ex,
+                setsData: ex.setsData.map((set, j) => {
+                    if (j !== setIdx) return set;
+                    return { ...set, [field]: val };
+                })
+            };
+        }));
     };
 
+    // 4. Añadir Serie
     const handleAddSet = (exIdx) => {
-        setExercises(prev => {
-            const newExercises = [...prev];
-            const last = newExercises[exIdx].setsData[newExercises[exIdx].setsData.length - 1];
-            // Heredar tipo si el anterior era Drop Set, quizás queramos otro Drop
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+
+            const last = ex.setsData[ex.setsData.length - 1];
+            // Si el anterior era Drop, el nuevo probablemente también lo sea
             const nextType = last?.type === 'D' ? 'D' : 'N';
 
-            newExercises[exIdx].setsData.push({
-                kg: last?.kg || '',
-                reps: last?.reps || '',
-                completed: false,
-                type: nextType
-            });
-            return newExercises;
-        });
+            return {
+                ...ex,
+                setsData: [
+                    ...ex.setsData,
+                    {
+                        kg: last?.kg || '',
+                        reps: last?.reps || '',
+                        completed: false,
+                        type: nextType
+                    }
+                ]
+            };
+        }));
     };
 
-    const startRest = () => {
-        const time = defaultRest === '' ? 60 : parseInt(defaultRest);
-        const endTime = Date.now() + (time * 1000);
-        setRestRemaining(time);
-        setIsResting(true);
-        const saved = localStorage.getItem(STORAGE_KEY);
-        const data = saved ? JSON.parse(saved) : {};
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: endTime }));
-    };
-
-    const skipRest = () => {
-        setIsResting(false);
-        setRestRemaining(0);
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const data = JSON.parse(saved);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: null }));
+    const handleRestInputChange = (e) => {
+        const val = e.target.value;
+        if (val === '') { setDefaultRest(''); return; }
+        const num = parseInt(val);
+        if (!isNaN(num)) {
+            setDefaultRest(num);
+            if (isResting) {
+                // Si cambiamos el tiempo mientras descansamos, ajustamos
+                setRestRemaining(num);
+            }
         }
     };
 
+    // --- FINALIZAR RUTINA BLINDADA ---
     const confirmFinish = async () => {
         if (finishing) return;
+
+        // Validar que haya al menos una serie completada
+        const hasAnyCompleted = exercises.some(ex => ex.setsData.some(s => s.completed));
+        if (!hasAnyCompleted) {
+            setToast({ message: 'Completa al menos una serie', type: 'error' });
+            // Cerramos la alerta para que el usuario pueda seguir editando
+            setShowFinishAlert(false);
+            return;
+        }
+
         setFinishing(true);
         try {
             const logData = {
                 routineId: routine._id,
                 routineName: routine.name,
-                duration: seconds,
+                duration: seconds > 0 ? seconds : 1, // Duración mínima 1s
                 intensity,
-                // Filtrar solo sets completados y añadir el TIPO
                 exercises: exercises.map(ex => ({
                     name: ex.name,
-                    sets: ex.setsData.filter(s => s.completed).map(s => ({
-                        weight: parseFloat(s.kg),
-                        reps: parseFloat(s.reps),
-                        type: s.type // Enviamos el tipo al backend
-                    }))
-                })).filter(ex => ex.sets.length > 0)
+                    // Enviamos SOLO las series marcadas como completadas
+                    sets: ex.setsData
+                        .filter(s => s.completed)
+                        .map(s => ({
+                            // Convertimos comas a puntos y aseguramos números
+                            weight: parseFloat(String(s.kg).replace(',', '.')) || 0,
+                            reps: parseFloat(String(s.reps).replace(',', '.')) || 0,
+                            type: s.type || 'N'
+                        }))
+                })).filter(ex => ex.sets.length > 0) // Quitamos ejercicios sin series hechas
             };
 
             const res = await api.post('/gym/log', logData);
             localStorage.removeItem(STORAGE_KEY);
             if (onFinish) onFinish(res.data);
-
         } catch (error) {
+            console.error(error);
             setToast({ message: 'Error al guardar', type: 'error' });
             setFinishing(false);
+            setShowFinishAlert(false);
         }
+    };
+
+    const confirmExit = () => {
+        localStorage.removeItem(STORAGE_KEY);
+        endWorkout();
     };
 
     const formatTime = (total) => {
@@ -266,7 +348,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // --- RENDERIZADO ---
 
-    // 1. MINIMIZADO
+    // 1. MODO MINIMIZADO (Barra Flotante)
     if (isMinimized) {
         return createPortal(
             <div
@@ -286,16 +368,19 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         <span className="text-sm font-black text-white truncate max-w-[150px]">{routine.name}</span>
                     </div>
                 </div>
+
                 <div className="flex items-center gap-3">
                     <span className="font-mono text-lg font-bold text-zinc-300 tabular-nums">{formatTime(seconds)}</span>
-                    <button className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400"><Maximize2 size={18} /></button>
+                    <button className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400">
+                        <Maximize2 size={18} />
+                    </button>
                 </div>
             </div>,
             document.body
         );
     }
 
-    // 2. EXPANDIDO
+    // 2. MODO EXPANDIDO (Pantalla Completa)
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-black flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -308,9 +393,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         {formatTime(seconds)}
                     </div>
                 </div>
+
                 <div className="flex gap-2">
-                    <button onClick={minimizeWorkout} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95"><ChevronDown size={24} /></button>
-                    <button onClick={() => setShowExitAlert(true)} className="bg-zinc-900 text-red-500 p-3 rounded-full hover:text-red-400 border border-red-900/30 transition-colors active:scale-95"><X size={24} /></button>
+                    <button onClick={minimizeWorkout} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95">
+                        <ChevronDown size={24} />
+                    </button>
+                    <button onClick={() => setShowExitAlert(true)} className="bg-zinc-900 text-red-500 p-3 rounded-full hover:text-red-400 border border-red-900/30 transition-colors active:scale-95">
+                        <X size={24} />
+                    </button>
                 </div>
             </div>
 
@@ -341,35 +431,32 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
                             <div className="space-y-1">
                                 {ex.setsData.map((set, sIdx) => {
-                                    // 🔥 CALCULAMOS EL LABEL INTELIGENTE (1, 2.1, C, etc.)
-                                    const { label, color } = getSetLabelInfo(ex.setsData, sIdx);
-                                    const isDrop = set.type === 'D';
+                                    // OBTENER VISUALIZACIÓN (Caja vs Drop sin caja)
+                                    const { label, style, containerClass } = getSetDisplayInfo(ex.setsData, sIdx);
 
                                     return (
                                         <div key={sIdx} className={`grid grid-cols-12 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
 
-                                            {/* BOTÓN NÚMERO DE SERIE (CAMBIA TIPO) */}
-                                            <div className="col-span-2 flex justify-center">
+                                            {/* BOTÓN NÚMERO DE SERIE */}
+                                            <div className={`col-span-2 flex ${containerClass}`}>
                                                 <button
                                                     onClick={() => cycleSetType(exIdx, sIdx)}
-                                                    className={`
-                                                        w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black border transition-all active:scale-95
-                                                        ${color} ${isDrop ? 'ml-4' : ''} // Indentamos si es Drop
-                                                    `}
+                                                    className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}
                                                 >
-                                                    {isDrop && <Layers size={10} className="mr-0.5" />}
                                                     {label}
                                                 </button>
                                             </div>
 
                                             <div className="col-span-4">
-                                                <input type="number" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+                                                <input type="number" inputMode="decimal" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
                                             </div>
                                             <div className="col-span-3">
-                                                <input type="number" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+                                                <input type="number" inputMode="decimal" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
                                             </div>
                                             <div className="col-span-3 flex justify-center">
-                                                <button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}><Check size={20} strokeWidth={4} /></button>
+                                                <button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>
+                                                    <Check size={20} strokeWidth={4} />
+                                                </button>
                                             </div>
                                         </div>
                                     );
@@ -403,7 +490,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         <div className="h-8 w-[1px] bg-zinc-700"></div>
                         <div className="flex flex-col">
                             <span className="text-[9px] text-zinc-400 font-bold uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Tiempo fijo</span>
-                            <input type="number" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 outline-none" />
+                            <input type="number" inputMode="decimal" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 outline-none" />
                         </div>
                     </div>
                     <button onClick={skipRest} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} /></button>

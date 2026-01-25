@@ -6072,12 +6072,13 @@ import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 
-export default function ActiveWorkout({ routine }) {
+export default function ActiveWorkout({ routine, onFinish }) {
+    // Contexto Global para minimizar/maximizar
     const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
 
     const STORAGE_KEY = `workout_active_${routine._id}`;
 
-    // --- ESTADOS (IGUAL QUE ANTES) ---
+    // --- ESTADOS INICIALES ---
     const [startTime] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved).startTime : Date.now();
@@ -6086,12 +6087,15 @@ export default function ActiveWorkout({ routine }) {
     const [exercises, setExercises] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved).exercises;
+
+        // Inicializamos sets con tipo 'N' (Normal)
         return routine.exercises.map(ex => ({
             ...ex,
             setsData: Array.from({ length: ex.sets || 3 }, () => ({
                 kg: '',
                 reps: '',
-                completed: false
+                completed: false,
+                type: 'N' // Tipos: N=Normal, W=Warmup (Calentamiento), F=Failure (Fallo), D=Drop
             })),
             pr: null
         }));
@@ -6100,7 +6104,7 @@ export default function ActiveWorkout({ routine }) {
     const [intensity, setIntensity] = useState('Media');
     const [seconds, setSeconds] = useState(0);
 
-    // --- LÓGICA DE DESCANSO PERSISTENTE ---
+    // Lógica de Descanso
     const [isResting, setIsResting] = useState(false);
     const [restRemaining, setRestRemaining] = useState(0);
     const [defaultRest, setDefaultRest] = useState(() => {
@@ -6116,66 +6120,8 @@ export default function ActiveWorkout({ routine }) {
 
     // --- EFECTOS ---
 
-    // 1. Cargar estado del descanso
+    // 1. Cronómetro Global
     useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const data = JSON.parse(saved);
-            if (data.restEndTime) {
-                const now = Date.now();
-                const diff = Math.ceil((data.restEndTime - now) / 1000);
-                if (diff > 0) {
-                    setIsResting(true);
-                    setRestRemaining(diff);
-                } else {
-                    const newState = { ...data, restEndTime: null };
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-                    setIsResting(false);
-                }
-            }
-        }
-    }, [STORAGE_KEY]);
-
-    // 2. Cronómetro del Descanso
-    useEffect(() => {
-        let interval = null;
-        if (isResting) {
-            interval = setInterval(() => {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (!saved) return;
-                const data = JSON.parse(saved);
-                if (!data.restEndTime) { setIsResting(false); return; }
-                const now = Date.now();
-                const diff = Math.ceil((data.restEndTime - now) / 1000);
-
-                if (diff <= 0) {
-                    setIsResting(false);
-                    setRestRemaining(0);
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    const newState = { ...data, restEndTime: null };
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-                } else {
-                    setRestRemaining(diff);
-                }
-            }, 500);
-        }
-        return () => clearInterval(interval);
-    }, [isResting, STORAGE_KEY]);
-
-    // 3. Auto-save
-    useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        const prevData = saved ? JSON.parse(saved) : {};
-        const state = {
-            ...prevData,
-            startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }, [exercises, intensity, startTime, routine._id, routine.name, STORAGE_KEY, defaultRest]);
-
-    // 4. Cronómetro Global
-    useEffect(() => {
-        if (!startTime) return;
         const timer = setInterval(() => {
             const now = Date.now();
             setSeconds(Math.floor((now - startTime) / 1000));
@@ -6183,18 +6129,46 @@ export default function ActiveWorkout({ routine }) {
         return () => clearInterval(timer);
     }, [startTime]);
 
-    // 5. Cargar Historial (Solo una vez)
+    // 2. Auto-save (Persistencia)
+    useEffect(() => {
+        const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }, [exercises, intensity, startTime, routine._id, routine.name, defaultRest, STORAGE_KEY]);
+
+    // 3. Cronómetro Descanso
+    useEffect(() => {
+        let interval = null;
+        if (isResting && restRemaining > 0) {
+            interval = setInterval(() => {
+                setRestRemaining(prev => {
+                    if (prev <= 1) {
+                        setIsResting(false);
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isResting, restRemaining]);
+
+    // 4. Cargar Historial (PRs y pesos anteriores)
     useEffect(() => {
         const fetchHistory = async () => {
             try {
                 const exerciseNames = routine.exercises.map(e => e.name);
                 const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
                 const historyData = res.data;
+
                 setExercises(prev => prev.map(ex => {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
+
+                    // Solo rellenamos si los campos están vacíos
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
+
                     if (isClean) {
                         newSetsData = ex.setsData.map((set, index) => {
                             if (stats.lastSets && stats.lastSets[index]) {
@@ -6210,46 +6184,95 @@ export default function ActiveWorkout({ routine }) {
         fetchHistory();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // --- HANDLERS ---
-    const startRest = () => {
-        const time = defaultRest === '' ? 60 : parseInt(defaultRest);
-        const endTime = Date.now() + (time * 1000);
-        setRestRemaining(time);
-        setIsResting(true);
-        const saved = localStorage.getItem(STORAGE_KEY);
-        const data = saved ? JSON.parse(saved) : {};
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: endTime }));
+
+    // --- LÓGICA DE ESTILOS Y NUMERACIÓN (HEVY STYLE) ---
+    const getSetDisplayInfo = (allSets, currentIndex) => {
+        const type = allSets[currentIndex].type || 'N';
+
+        // 1. CALENTAMIENTO (Naranja, Caja)
+        if (type === 'W') {
+            return {
+                label: 'C',
+                style: 'bg-orange-900/20 text-orange-500 border border-orange-500/50 rounded-lg',
+                containerClass: 'justify-center'
+            };
+        }
+
+        // Calcular el número de serie "base" (ignorando drop sets anteriores)
+        let normalCount = 0;
+        for (let i = 0; i <= currentIndex; i++) {
+            if (allSets[i].type !== 'D' && allSets[i].type !== 'W') normalCount++;
+        }
+
+        // 2. DROP SET (Morado, SIN CAJA, Indentado)
+        if (type === 'D') {
+            // Buscamos a qué serie normal pertenece este drop
+            let dropDepth = 0;
+            // Retrocedemos hasta encontrar el padre no-drop
+            for (let i = currentIndex; i >= 0; i--) {
+                if (allSets[i].type !== 'D') break; // Encontramos el padre
+                dropDepth++;
+            }
+
+            // Si es el primer drop es .1, segundo .2, etc.
+            return {
+                label: `${normalCount}.${dropDepth}`,
+                style: 'bg-transparent text-purple-400 font-black border-none p-0 text-sm',
+                containerClass: 'justify-end pr-4' // Alineado a la derecha o indentado
+            };
+        }
+
+        // 3. FALLO (Rojo, Caja)
+        if (type === 'F') {
+            return {
+                label: normalCount,
+                style: 'bg-red-900/20 text-red-500 border border-red-500/50 rounded-lg',
+                containerClass: 'justify-center'
+            };
+        }
+
+        // 4. NORMAL (Gris, Caja)
+        return {
+            label: normalCount,
+            style: 'bg-zinc-900 text-zinc-500 border border-zinc-800 rounded-lg',
+            containerClass: 'justify-center'
+        };
     };
 
-    const skipRest = () => {
-        setIsResting(false);
-        setRestRemaining(0);
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const data = JSON.parse(saved);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: null }));
-        }
+    // --- HANDLERS ---
+
+    // Ciclo: Normal -> Calentamiento -> Fallo -> Drop -> Normal
+    const cycleSetType = (exIdx, setIdx) => {
+        const types = ['N', 'W', 'F', 'D'];
+        setExercises(prev => {
+            const newEx = [...prev];
+            const currentType = newEx[exIdx].setsData[setIdx].type || 'N';
+            const nextIndex = (types.indexOf(currentType) + 1) % types.length;
+            newEx[exIdx].setsData[setIdx].type = types[nextIndex];
+            return newEx;
+        });
     };
 
     const toggleSetComplete = (exIdx, setIdx) => {
         const currentSet = exercises[exIdx].setsData[setIdx];
         if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Faltan datos', type: 'error' });
+
         setExercises(prev => {
             const newExercises = [...prev];
-            const newSetsData = [...newExercises[exIdx].setsData];
-            newSetsData[setIdx] = { ...newSetsData[setIdx], completed: !newSetsData[setIdx].completed };
-            newExercises[exIdx] = { ...newExercises[exIdx], setsData: newSetsData };
+            newExercises[exIdx].setsData[setIdx].completed = !currentSet.completed;
             return newExercises;
         });
-        if (!currentSet.completed) startRest();
+
+        // Solo iniciamos descanso si se completa y NO es Drop Set (los drop sets son seguidos)
+        if (!currentSet.completed && currentSet.type !== 'D') {
+            startRest();
+        }
     };
 
     const handleInputChange = (exIdx, setIdx, field, val) => {
         setExercises(prev => {
             const newExercises = [...prev];
-            const newSetsData = [...newExercises[exIdx].setsData];
-            newSetsData[setIdx] = { ...newSetsData[setIdx], [field]: val };
-            newExercises[exIdx] = { ...newExercises[exIdx], setsData: newSetsData };
+            newExercises[exIdx].setsData[setIdx][field] = val;
             return newExercises;
         });
     };
@@ -6257,10 +6280,16 @@ export default function ActiveWorkout({ routine }) {
     const handleAddSet = (exIdx) => {
         setExercises(prev => {
             const newExercises = [...prev];
-            const currentSets = newExercises[exIdx].setsData;
-            const last = currentSets[currentSets.length - 1];
-            const newSet = { kg: last?.kg || '', reps: last?.reps || '', completed: false };
-            newExercises[exIdx] = { ...newExercises[exIdx], setsData: [...currentSets, newSet] };
+            const last = newExercises[exIdx].setsData[newExercises[exIdx].setsData.length - 1];
+            // Si el anterior era Drop, el nuevo probablemente también lo sea
+            const nextType = last?.type === 'D' ? 'D' : 'N';
+
+            newExercises[exIdx].setsData.push({
+                kg: last?.kg || '',
+                reps: last?.reps || '',
+                completed: false,
+                type: nextType
+            });
             return newExercises;
         });
     };
@@ -6294,18 +6323,16 @@ export default function ActiveWorkout({ routine }) {
                 intensity,
                 exercises: exercises.map(ex => ({
                     name: ex.name,
-                    sets: ex.setsData.filter(s => s.completed).map(s => ({ weight: parseFloat(s.kg), reps: parseFloat(s.reps) }))
+                    sets: ex.setsData.filter(s => s.completed).map(s => ({
+                        weight: parseFloat(s.kg),
+                        reps: parseFloat(s.reps),
+                        type: s.type // Enviamos tipo al backend
+                    }))
                 })).filter(ex => ex.sets.length > 0)
             };
             const res = await api.post('/gym/log', logData);
             localStorage.removeItem(STORAGE_KEY);
-            // Usamos el endWorkout del contexto
-            endWorkout();
-            // Si el padre pasó onFinish (para actualizar UI local de Gym si estamos ahí), lo llamamos
-            // Pero como es global, quizás no hace falta, pero por si acaso.
-            if (window.location.pathname === '/gym') {
-                window.location.reload(); // Forma bruta pero efectiva de refrescar el gym
-            }
+            if (onFinish) onFinish(res.data);
         } catch (error) {
             setToast({ message: 'Error al guardar', type: 'error' });
             setFinishing(false);
@@ -6331,15 +6358,14 @@ export default function ActiveWorkout({ routine }) {
 
     // --- RENDERIZADO ---
 
-    // 1. MODO MINIMIZADO (Barra Flotante "Spotify")
+    // 1. MODO MINIMIZADO (Barra Flotante)
     if (isMinimized) {
         return createPortal(
             <div
                 onClick={maximizeWorkout}
-                className="fixed bottom-[68px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10"
+                className="fixed bottom-[70px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10"
             >
                 <div className="flex items-center gap-3">
-                    {/* Indicador animado */}
                     <div className="relative w-10 h-10 flex items-center justify-center bg-black rounded-xl border border-yellow-500/20">
                         {isResting ? (
                             <span className="text-sm font-black text-blue-400 animate-pulse">{restRemaining}s</span>
@@ -6347,7 +6373,6 @@ export default function ActiveWorkout({ routine }) {
                             <div className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>
                         )}
                     </div>
-
                     <div className="flex flex-col">
                         <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">En curso</span>
                         <span className="text-sm font-black text-white truncate max-w-[150px]">{routine.name}</span>
@@ -6380,11 +6405,9 @@ export default function ActiveWorkout({ routine }) {
                 </div>
 
                 <div className="flex gap-2">
-                    {/* Botón Minimizar */}
                     <button onClick={minimizeWorkout} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95">
                         <ChevronDown size={24} />
                     </button>
-                    {/* Botón Cerrar */}
                     <button onClick={() => setShowExitAlert(true)} className="bg-zinc-900 text-red-500 p-3 rounded-full hover:text-red-400 border border-red-900/30 transition-colors active:scale-95">
                         <X size={24} />
                     </button>
@@ -6408,34 +6431,46 @@ export default function ActiveWorkout({ routine }) {
                         </div>
 
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
-                            <div className="grid grid-cols-10 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
-                                <div className="col-span-1">#</div>
-                                <div className="col-span-3">Kg</div>
+                            {/* CABECERAS DE COLUMNAS */}
+                            <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
+                                <div className="col-span-2">Set</div>
+                                <div className="col-span-4">Kg</div>
                                 <div className="col-span-3">Reps</div>
-                                <div className="col-span-3">Hecho</div>
+                                <div className="col-span-3">Check</div>
                             </div>
 
                             <div className="space-y-1">
-                                {ex.setsData.map((set, sIdx) => (
-                                    <div key={sIdx} className={`grid grid-cols-10 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : 'bg-transparent'}`}>
-                                        <div className="col-span-1 flex justify-center">
-                                            <div className="w-6 h-6 rounded-full bg-zinc-900 text-zinc-500 flex items-center justify-center text-xs font-bold border border-zinc-800">
-                                                {sIdx + 1}
+                                {ex.setsData.map((set, sIdx) => {
+                                    // 🔥 OBTENER VISUALIZACIÓN (Caja vs Drop sin caja)
+                                    const { label, style, containerClass } = getSetDisplayInfo(ex.setsData, sIdx);
+
+                                    return (
+                                        <div key={sIdx} className={`grid grid-cols-12 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
+
+                                            {/* BOTÓN NÚMERO DE SERIE */}
+                                            <div className={`col-span-2 flex ${containerClass}`}>
+                                                <button
+                                                    onClick={() => cycleSetType(exIdx, sIdx)}
+                                                    className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            </div>
+
+                                            <div className="col-span-4">
+                                                <input type="number" inputMode="decimal" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <input type="number" inputMode="decimal" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+                                            </div>
+                                            <div className="col-span-3 flex justify-center">
+                                                <button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>
+                                                    <Check size={20} strokeWidth={4} />
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="col-span-3">
-                                            <input type="number" inputMode="decimal" placeholder="-" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all ${set.completed ? 'text-green-500' : ''}`} />
-                                        </div>
-                                        <div className="col-span-3">
-                                            <input type="number" inputMode="decimal" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className={`w-full text-center bg-zinc-900 font-black text-lg text-white rounded-xl py-2.5 outline-none focus:ring-1 focus:ring-yellow-500 transition-all ${set.completed ? 'text-green-500' : ''}`} />
-                                        </div>
-                                        <div className="col-span-3 flex justify-center">
-                                            <button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-zinc-800 text-zinc-600 hover:bg-zinc-700'}`}>
-                                                <Check size={20} strokeWidth={4} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <button onClick={() => handleAddSet(exIdx)} className="w-full mt-2 py-3 bg-black hover:bg-zinc-900 text-zinc-500 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border-t border-zinc-900"><Plus size={14} /> Añadir Serie</button>
                         </div>
@@ -6456,7 +6491,7 @@ export default function ActiveWorkout({ routine }) {
 
             {/* MODAL DESCANSO */}
             {isResting && (
-                <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 animate-in slide-in-from-bottom-10 fade-in flex items-center justify-between ring-1 ring-white/10">
+                <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 flex items-center justify-between ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
                     <div className="flex items-center gap-4 pl-2">
                         <div className="flex flex-col items-center min-w-[60px]">
                             <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{restRemaining}</span>
@@ -6465,10 +6500,10 @@ export default function ActiveWorkout({ routine }) {
                         <div className="h-8 w-[1px] bg-zinc-700"></div>
                         <div className="flex flex-col">
                             <span className="text-[9px] text-zinc-400 font-bold uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Tiempo fijo</span>
-                            <input type="number" inputMode="decimal" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 focus:border-yellow-500 outline-none" />
+                            <input type="number" inputMode="decimal" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 outline-none" />
                         </div>
                     </div>
-                    <button onClick={skipRest} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} fill="currentColor" /></button>
+                    <button onClick={skipRest} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} /></button>
                 </div>
             )}
 
@@ -7575,14 +7610,14 @@ import Footer from './Footer';
 import api from '../../services/api';
 import RedemptionScreen from './RedemptionScreen';
 import IosInstallPrompt from '../common/IosInstallPrompt';
-// 🔥 IMPORTAR EL CONTEXTO Y EL COMPONENTE DE ENTRENO
+// 🔥 IMPORTS DEL NUEVO SISTEMA DE ENTRENO
 import { WorkoutProvider, useWorkout } from '../../context/WorkoutContext';
-import ActiveWorkout from '../components/gym/ActiveWorkout';
+import ActiveWorkout from '../../components/gym/ActiveWorkout';
 
-// Componente interno para poder usar el hook useWorkout
+// Componente interno para usar el hook useWorkout
 function LayoutContent() {
     const navigate = useNavigate();
-    const { activeRoutine, endWorkout } = useWorkout(); // <--- Traemos endWorkout también por si acaso
+    const { activeRoutine, endWorkout } = useWorkout(); // Leemos el estado global
 
     const [user, setUser] = useState(() => {
         try {
@@ -7602,7 +7637,7 @@ function LayoutContent() {
         });
     }, []);
 
-    // Sincronización inicial con Backend
+    // Sincronización con Backend
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -7624,16 +7659,18 @@ function LayoutContent() {
         if (localStorage.getItem('token')) fetchUserData();
     }, [navigate]);
 
-    // 🔥 MANEJADOR DE FIN DE RUTINA (LO QUE FALTABA)
+    // 🔥 MANEJADOR DE FIN DE RUTINA GLOBAL
     const handleWorkoutFinish = (data) => {
-        // 1. Actualizamos el usuario con las nuevas monedas/XP ganadas
+        // 1. Actualizamos el usuario (monedas ganadas, xp)
         if (data.user) {
             handleUserUpdate(data.user);
         }
-        // 2. Si estamos en la página de Gym, forzamos recarga para ver el historial actualizado
+
+        // 2. Cerramos el estado global de entrenamiento
+        endWorkout();
+
+        // 3. Si estamos en la página de Gym, recargamos para ver el historial actualizado
         if (window.location.pathname === '/gym') {
-            // Opcional: Podríamos usar un contexto para refrescar sin reload, 
-            // pero reload es más seguro para limpiar estados.
             window.location.reload();
         }
     };
@@ -7648,8 +7685,7 @@ function LayoutContent() {
                 <Outlet context={{ user, setUser: handleUserUpdate, setIsUiHidden }} />
             </main>
 
-            {/* 🔥 EL ENTRENO GLOBAL VIVE AQUÍ */}
-            {/* AÑADIDO: onFinish={handleWorkoutFinish} para evitar errores al terminar */}
+            {/* 🔥 EL ENTRENO GLOBAL SE RENDERIZA AQUÍ */}
             {activeRoutine && (
                 <ActiveWorkout
                     routine={activeRoutine}
@@ -7663,7 +7699,6 @@ function LayoutContent() {
     );
 }
 
-// 🔥 EXPORTACIÓN PRINCIPAL CON EL PROVIDER
 export default function Layout() {
     return (
         <WorkoutProvider>
@@ -10554,7 +10589,7 @@ export function WorkoutProvider({ children }) {
     const [activeRoutine, setActiveRoutine] = useState(null);
     const [isMinimized, setIsMinimized] = useState(false);
 
-    // Recuperar sesión al cargar
+    // Recuperar sesión al cargar la página por si se refresca
     useEffect(() => {
         const keys = Object.keys(localStorage);
         const activeKey = keys.find(k => k.startsWith('workout_active_'));
@@ -10568,6 +10603,7 @@ export function WorkoutProvider({ children }) {
                         name: saved.routineName || 'Entrenamiento en curso',
                         exercises: saved.exercises || []
                     });
+                    // Si recuperamos sesión, la mostramos minimizada por defecto para no invadir
                     setIsMinimized(true);
                 }
             } catch (e) {
@@ -10578,7 +10614,7 @@ export function WorkoutProvider({ children }) {
 
     const startWorkout = (routine) => {
         setActiveRoutine(routine);
-        setIsMinimized(false);
+        setIsMinimized(false); // Al empezar, pantalla completa
     };
 
     const minimizeWorkout = () => setIsMinimized(true);
@@ -10587,6 +10623,7 @@ export function WorkoutProvider({ children }) {
     const endWorkout = () => {
         setActiveRoutine(null);
         setIsMinimized(false);
+        // Limpieza de localStorage
         const keys = Object.keys(localStorage);
         keys.forEach(k => {
             if (k.startsWith('workout_active_')) localStorage.removeItem(k);
@@ -13999,7 +14036,8 @@ import {
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
-// 🔥 IMPORTANTE: Ya no importamos ActiveWorkout aquí, lo maneja el Layout
+
+// 🔥 IMPORTAR CONTEXTO
 import { useWorkout } from '../context/WorkoutContext';
 
 // --- CONSTANTES DEPORTE ---
@@ -14012,7 +14050,7 @@ const SPORT_ACTIVITIES = [
     { id: 'Padel', icon: <Activity size={24} />, color: 'text-lime-400', bg: 'bg-lime-900/20 border-lime-500/30' },
 ];
 
-// 🔥 TEMAS VISUALES "WIDGET STYLE" (Colores Neón)
+// 🔥 TEMAS VISUALES "WIDGET STYLE"
 const COLOR_THEMES = {
     blue: { border: 'border-blue-500', shadow: 'rgba(59,130,246,0.4)', bgIcon: 'bg-blue-600', textIcon: 'text-white', play: 'bg-blue-500 text-white' },
     red: { border: 'border-red-500', shadow: 'rgba(239,68,68,0.4)', bgIcon: 'bg-red-600', textIcon: 'text-white', play: 'bg-red-500 text-white' },
@@ -14048,27 +14086,20 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
 
     return (
         <div className="relative w-full mb-4 select-none touch-pan-y">
-
-            {/* FONDO DE ACCIONES */}
             <div className="absolute inset-0 flex justify-between items-center px-6 rounded-3xl bg-zinc-900 border border-zinc-800">
                 <div className="flex items-center gap-2 text-blue-400 font-bold uppercase text-xs animate-in fade-in"><Edit size={20} /> Editar</div>
                 <div className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs animate-in fade-in">Borrar <Trash2 size={20} /></div>
             </div>
 
-            {/* TARJETA VISIBLE (WIDGET) */}
             <div
                 onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                 style={{
                     transform: `translateX(${offsetX}px)`,
                     transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                    boxShadow: `0 0 20px -5px ${theme.shadow}` // Sombra de neón basada en el color
+                    boxShadow: `0 0 20px -5px ${theme.shadow}`
                 }}
-                className={`
-                    relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 
-                    flex justify-between items-center z-10 h-24 overflow-hidden
-                `}
+                className={`relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 flex justify-between items-center z-10 h-24 overflow-hidden`}
             >
-                {/* Brillo sutil de fondo */}
                 <div className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${theme.bgIcon}`}></div>
 
                 <div className="flex items-center gap-5 pointer-events-none relative z-10">
@@ -14083,11 +14114,7 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
 
                 <button
                     onClick={(e) => { e.stopPropagation(); onPlay(); }}
-                    className={`
-                        w-12 h-12 rounded-full flex items-center justify-center shadow-lg 
-                        active:scale-90 transition-all z-20 hover:brightness-110
-                        ${theme.play}
-                    `}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
                 >
                     <Play size={20} fill="currentColor" className="ml-1" />
                 </button>
@@ -14136,14 +14163,14 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
 // --- PÁGINA PRINCIPAL ---
 export default function Gym() {
     const { user, setUser, setIsUiHidden } = useOutletContext();
-    const { startWorkout } = useWorkout(); // 🔥 USAMOS EL CONTEXTO GLOBAL
+    const { startWorkout } = useWorkout(); // 🔥 USAR CONTEXTO
 
     const [routines, setRoutines] = useState([]);
     const [todaySports, setTodaySports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
-    // Estados Locales
+    // Estados
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
     const [showSportModal, setShowSportModal] = useState(false);
@@ -14171,10 +14198,9 @@ export default function Gym() {
     };
     const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
-    // 🔥 MODIFICADO: AHORA LLAMA AL CONTEXTO
+    // 🔥 ACCIÓN PRINCIPAL: DISPARA EL CONTEXTO
     const openActiveWorkout = (r) => {
         startWorkout(r);
-        // No hace falta setIsUiHidden(true) porque ActiveWorkout se monta en el Layout por encima
     };
 
     // Acciones
@@ -14209,7 +14235,7 @@ export default function Gym() {
                 </div>
             </div>
 
-            {/* SECCIÓN 1: DEPORTE (CARDIO) - SIN EMOJIS */}
+            {/* SECCIÓN 1: DEPORTE (CARDIO) */}
             <div>
                 <h3 className="text-lime-500 text-xs font-bold uppercase tracking-widest mb-3 ml-2">Cardio & Actividades</h3>
 
@@ -14227,7 +14253,7 @@ export default function Gym() {
                 )}
             </div>
 
-            {/* SECCIÓN 2: PESAS (RUTINAS) - SIN EMOJIS */}
+            {/* SECCIÓN 2: PESAS (RUTINAS) */}
             <div>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-yellow-500 text-xs font-bold uppercase tracking-widest ml-2">Mis Rutinas</h3>
@@ -14249,7 +14275,7 @@ export default function Gym() {
             {/* MODAL CREAR RUTINA */}
             {showCreateModal && <CreateRoutineModal routineToEdit={routineToEdit} onClose={closeCreateRoutine} onRoutineCreated={() => { fetchRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }} />}
 
-            {/* MODAL REGISTRAR DEPORTE (FIXED FULLSCREEN Z-200) */}
+            {/* MODAL REGISTRAR DEPORTE */}
             {showSportModal && (
                 <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
                     <div className="bg-zinc-950 w-full max-w-sm rounded-[32px] border border-lime-500/20 p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95">
