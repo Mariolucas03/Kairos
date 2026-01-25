@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 
-// --- DND KIT (Solo para visualización correcta del Grid) ---
+// --- DND KIT (Solo visualización) ---
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
@@ -33,6 +33,8 @@ import ProfileStats from '../components/profile/ProfileStats';
 // ==========================================
 // 1. MODALES DE DETALLE (SOLO LECTURA)
 // ==========================================
+// Nota: Mantenemos estos modales porque son la versión "Detallada" del Perfil.
+// Los widgets en Home tienen su propia versión "Bonita/Resumen".
 
 // Detalle Deporte
 function SportDetailsModal({ workouts, onClose }) {
@@ -217,7 +219,6 @@ export default function Profile() {
     const [showBalanceDetails, setShowBalanceDetails] = useState(false);
 
     // --- ORDEN Y CONFIGURACIÓN (SINCRONIZADO CON HOME) ---
-    // Usamos los mismos defaults que Home por si el LocalStorage está vacío
     const DEFAULTS_ORDER = [
         'missions', 'sport', 'food', 'sleep', 'steps',
         'mood', 'weight', 'training', 'streak',
@@ -232,22 +233,15 @@ export default function Profile() {
     const [widgetOrder, setWidgetOrder] = useState(DEFAULTS_ORDER);
     const [visibleWidgets, setVisibleWidgets] = useState(DEFAULTS_CONFIG);
 
-    // Sensores DnD (solo para renderizar el grid correctamente, no permitiremos mover aquí para que sea "espejo")
-    // Opcional: Si quieres permitir mover en perfil, activa los sensores.
-    // Si quieres que sea ESTRICTAMENTE espejo de Home y solo editable en Home, podemos deshabilitar el drag aquí.
-    // El usuario dijo "refleje el home", pero antes pidió Drag and Drop.
-    // Para cumplir "refleje el home tal cual", deshabilitamos el drag visual aquí, solo renderizamos el orden.
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { delay: 999999, tolerance: 5 } }), // Drag desactivado en Perfil
+        useSensor(PointerSensor, { activationConstraint: { delay: 999999, tolerance: 5 } }),
         useSensor(TouchSensor, { activationConstraint: { delay: 999999, tolerance: 5 } })
     );
 
     useEffect(() => {
         try {
-            // Cargar SIEMPRE del LocalStorage del Home
             const savedOrder = JSON.parse(localStorage.getItem('home_widgets_order'));
             if (savedOrder && Array.isArray(savedOrder)) {
-                // Filtramos 'gains'
                 const mergedOrder = savedOrder.filter(key => key !== 'gains');
                 if (!mergedOrder.includes('weekly')) mergedOrder.push('weekly');
                 if (!mergedOrder.includes('kcalBalance')) mergedOrder.push('kcalBalance');
@@ -283,38 +277,37 @@ export default function Profile() {
 
     // 🔥 RENDERIZADO DE WIDGETS
     const renderWidgetByKey = (key) => {
-        // Usamos safeData para evitar fallos, pero mostramos 0/vacio si no hay datos
         const safeData = dailyData || {};
-        const noOp = () => { }; // Función vacía para bloquear updates
+        const noOp = () => { };
 
-        // Clase base: sin interacción de puntero para widgets simples
         const wrapperClass = "h-full w-full pointer-events-none";
-        // Clase interactiva: para widgets con modal de detalle
-        const interactiveClass = "h-full w-full cursor-pointer touch-manipulation active:opacity-80 transition-opacity duration-75";
 
         switch (key) {
             case 'missions':
                 return (
-                    <div onClick={() => setSelectedMissions(safeData.missionStats)} className={interactiveClass}>
-                        <MissionsWidget completed={safeData.missionStats?.completed} total={safeData.missionStats?.total} completedMissions={safeData.missionStats?.listCompleted} />
-                    </div>
+                    <MissionsWidget
+                        completed={safeData.missionStats?.completed}
+                        total={safeData.missionStats?.total}
+                        completedMissions={safeData.missionStats?.listCompleted}
+                        onClick={() => setSelectedMissions(safeData.missionStats)} // 🔥 Pasamos el onClick aquí
+                    />
                 );
             case 'sport':
                 return (
-                    <div onClick={() => safeData.sportWorkouts?.length && setSelectedSportList(safeData.sportWorkouts)} className={interactiveClass}>
+                    <div onClick={() => safeData.sportWorkouts?.length && setSelectedSportList(safeData.sportWorkouts)} className="h-full w-full cursor-pointer">
                         <SportWidget workouts={safeData.sportWorkouts || []} />
                     </div>
                 );
             case 'training':
                 return (
-                    <div onClick={() => safeData.gymWorkouts?.length && setSelectedTrainingList(safeData.gymWorkouts)} className={interactiveClass}>
+                    <div onClick={() => safeData.gymWorkouts?.length && setSelectedTrainingList(safeData.gymWorkouts)} className="h-full w-full cursor-pointer">
                         <TrainingWidget workouts={safeData.gymWorkouts || []} />
                     </div>
                 );
             case 'food':
                 const intake = safeData.nutrition?.totalKcal || safeData.totalKcal || 0;
                 return (
-                    <div onClick={() => setSelectedFood({ totalKcal: intake, meals: safeData.nutrition?.meals || {} })} className={interactiveClass}>
+                    <div onClick={() => setSelectedFood({ totalKcal: intake, meals: safeData.nutrition?.meals || {} })} className="h-full w-full cursor-pointer">
                         <FoodWidget currentKcal={intake} limitKcal={user?.macros?.calories} meals={safeData.nutrition?.meals} />
                     </div>
                 );
@@ -327,14 +320,13 @@ export default function Profile() {
             case 'weight':
                 return <div className="h-full flex flex-col pointer-events-none"><WeightWidget initialWeight={safeData.weight || 0} onUpdate={noOp} /></div>;
             case 'streak':
-                // Racha actual del usuario (siempre visible)
                 return <div className={wrapperClass}><StreakWidget streak={user?.streak?.current || 0} /></div>;
             case 'weekly': return <div className="h-full pointer-events-none"><WeeklyWidget /></div>;
             case 'kcalBalance':
                 const intake2 = safeData.nutrition?.totalKcal || safeData.totalKcal || 0;
                 const burned = (safeData.sportWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0) + (safeData.gymWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0);
                 return (
-                    <div onClick={() => setShowBalanceDetails(true)} className={interactiveClass}>
+                    <div onClick={() => setShowBalanceDetails(true)} className="h-full w-full cursor-pointer">
                         <KcalBalanceWidget intake={intake2} burned={burned} />
                     </div>
                 );
@@ -426,15 +418,12 @@ export default function Profile() {
                     <SortableContext items={widgetOrder} strategy={rectSortingStrategy}>
                         <div className="grid grid-cols-2 gap-4 auto-rows-[160px] grid-flow-dense px-1">
                             {widgetOrder.map((key) => {
-                                // 1. Respetar visibilidad
                                 if (!visibleWidgets[key]) return null;
-                                // 2. Ocultar gains siempre
                                 if (key === 'gains') return null;
 
                                 const isFullWidth = ['training', 'missions', 'sport'].includes(key);
                                 const content = renderWidgetByKey(key);
 
-                                // 3. Si por alguna razón técnica es null (no debería), no renderizar
                                 if (!content) return null;
 
                                 return (
