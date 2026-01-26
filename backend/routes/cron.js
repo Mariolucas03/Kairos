@@ -16,7 +16,7 @@ router.get('/nightly-maintenance', protectCron, async (req, res) => {
     }
 });
 
-// Ruta simple para mantenerlo despierto si quieres (Ping)
+// Ruta simple para mantenerlo despierto
 router.get('/ping', (req, res) => res.send('Pong! 🤖'));
 
 module.exports = router;

@@ -155,7 +155,7 @@ const seedExercises = async (req, res) => {
 };
 
 // ==========================================
-// 7. GUARDAR LOG DE GYM
+// 7. GUARDAR LOG DE GYM (MODIFICADO: RECOMPENSAS DINÁMICAS)
 // ==========================================
 const saveWorkoutLog = async (req, res) => {
     try {
@@ -253,7 +253,21 @@ const saveWorkoutLog = async (req, res) => {
             { upsert: true }
         );
 
-        const result = await levelService.addRewards(req.user._id, 50, 15);
+        // 🔥🔥🔥 RECOMPENSAS DINÁMICAS (AJUSTE FINAL) 🔥🔥🔥
+        // Fórmula:
+        // XP = 50% de las calorías
+        // Fichas (GameCoins) = 35% de las calorías
+        // Monedas (Reales) = 0
+
+        const xpReward = Math.ceil(caloriesBurned * 0.50);
+        const gameCoinsReward = Math.ceil(caloriesBurned * 0.35);
+        const coinsReward = 0;
+
+        // Aseguramos un mínimo para motivar (al menos 5 de cada)
+        const finalXp = Math.max(5, xpReward);
+        const finalGameCoins = Math.max(5, gameCoinsReward);
+
+        const result = await levelService.addRewards(req.user._id, finalXp, coinsReward, finalGameCoins);
 
         res.status(201).json({
             message: `Entreno guardado: ${caloriesBurned} kcal`,
@@ -269,7 +283,7 @@ const saveWorkoutLog = async (req, res) => {
 };
 
 // ==========================================
-// 8. GUARDAR LOG DE DEPORTE
+// 8. GUARDAR LOG DE DEPORTE (MODIFICADO: RECOMPENSAS DINÁMICAS)
 // ==========================================
 const saveSportLog = async (req, res) => {
     try {
@@ -354,7 +368,19 @@ const saveSportLog = async (req, res) => {
             { upsert: true }
         );
 
-        const result = await levelService.addRewards(req.user._id, 30, 10);
+        // 🔥🔥🔥 RECOMPENSAS DINÁMICAS (AJUSTE FINAL) 🔥🔥🔥
+        // Fórmula idéntica:
+        // XP = 50% de las calorías
+        // Fichas (GameCoins) = 35% de las calorías
+
+        const xpReward = Math.ceil(caloriesBurned * 0.50);
+        const gameCoinsReward = Math.ceil(caloriesBurned * 0.35);
+        const coinsReward = 0;
+
+        const finalXp = Math.max(5, xpReward);
+        const finalGameCoins = Math.max(5, gameCoinsReward);
+
+        const result = await levelService.addRewards(req.user._id, finalXp, coinsReward, finalGameCoins);
 
         res.status(201).json({
             message: `Registrado: ${caloriesBurned} kcal`,
@@ -623,7 +649,6 @@ const chatRoutineGenerator = async (req, res) => {
     return res.json({ name: "Rutina de Emergencia", exercises: [{ name: "Flexiones", muscle: "Pecho", sets: 3, reps: "15", rest: 60 }], difficulty: "Novato", message: "Sistemas IA caídos. Aquí tienes algo básico." });
 };
 
-// 🔥 EXPORTAMOS TODAS LAS FUNCIONES, INCLUYENDO deleteRoutine
 module.exports = {
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
     getAllExercises, createCustomExercise, seedExercises,
