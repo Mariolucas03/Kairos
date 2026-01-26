@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
     Plus, Play, Trash2, Dumbbell, X, Bike, Activity, Loader2, MapPin,
-    Timer, Edit, Footprints, Waves, PersonStanding, Flame, Calendar,
-    Save, Trophy
+    Timer, Edit, Footprints, Waves, PersonStanding, Flame,
+    Save, Lock // 🔥 Importamos candado para feedback visual
 } from 'lucide-react';
 
 import api from '../services/api';
@@ -19,7 +19,7 @@ const SPORT_ACTIVITIES = [
     { id: 'Correr', icon: <PersonStanding size={24} />, color: 'text-orange-400', bg: 'bg-orange-900/20 border-orange-500/30' },
     { id: 'Ciclismo', icon: <Bike size={24} />, color: 'text-cyan-400', bg: 'bg-cyan-900/20 border-cyan-500/30' },
     { id: 'Natación', icon: <Waves size={24} />, color: 'text-blue-400', bg: 'bg-blue-900/20 border-blue-500/30' },
-    { id: 'Fútbol', icon: <Trophy size={24} />, color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-500/30' },
+    { id: 'Fútbol', icon: <Activity size={24} />, color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-500/30' },
     { id: 'Padel', icon: <Activity size={24} />, color: 'text-lime-400', bg: 'bg-lime-900/20 border-lime-500/30' },
 ];
 
@@ -34,22 +34,29 @@ const COLOR_THEMES = {
     pink: { border: 'border-pink-500', shadow: 'rgba(236,72,153,0.4)', bgIcon: 'bg-pink-600', textIcon: 'text-white', play: 'bg-pink-500 text-white' },
 };
 
-// --- COMPONENTE TARJETA RUTINA (WIDGET STYLE) ---
-const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
+// --- COMPONENTE TARJETA RUTINA (OPTIMIZADO + PROTEGIDO) ---
+const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
 
-    const handleTouchStart = (e) => { startX.current = e.touches[0].clientX; setIsDragging(true); };
+    const handleTouchStart = (e) => {
+        startX.current = e.touches[0].clientX;
+        setIsDragging(true);
+    };
+
     const handleTouchMove = (e) => {
         if (!isDragging) return;
-        const diff = e.touches[0].clientX - startX.current;
-        if (Math.abs(diff) < 150) setOffsetX(diff);
+        const currentX = e.touches[0].clientX;
+        const diff = currentX - startX.current;
+        if (Math.abs(diff) < 200) setOffsetX(diff);
     };
+
     const handleTouchEnd = () => {
         setIsDragging(false);
-        if (offsetX > 80) onEdit();
-        else if (offsetX < -80) onDelete();
+        // Umbral de activación
+        if (offsetX > 100) onEdit();
+        else if (offsetX < -100) onDelete();
         setOffsetX(0);
     };
 
@@ -58,22 +65,30 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
     const initial = routine.name.charAt(0).toUpperCase();
 
     return (
-        <div className="relative w-full mb-4 select-none touch-pan-y">
-            <div className="absolute inset-0 flex justify-between items-center px-6 rounded-3xl bg-zinc-900 border border-zinc-800">
-                <div className="flex items-center gap-2 text-blue-400 font-bold uppercase text-xs animate-in fade-in"><Edit size={20} /> Editar</div>
-                <div className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs animate-in fade-in">Borrar <Trash2 size={20} /></div>
+        <div className="relative w-full mb-4 select-none touch-pan-y overflow-hidden rounded-3xl">
+            {/* FONDO (ACCIONES) */}
+            <div className="absolute inset-0 flex justify-between items-center px-6 bg-zinc-900 border border-zinc-800">
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-blue-400'} font-bold uppercase text-xs transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
+                    {isLocked ? <><Lock size={20} /> Bloqueado</> : <><Edit size={20} /> Editar</>}
+                </div>
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-red-500'} font-bold uppercase text-xs transition-opacity ${offsetX < -50 ? 'opacity-100' : 'opacity-30'}`}>
+                    {isLocked ? <>Bloqueado <Lock size={20} /></> : <>Borrar <Trash2 size={20} /></>}
+                </div>
             </div>
 
+            {/* TARJETA SUPERIOR */}
             <div
-                onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 style={{
                     transform: `translateX(${offsetX}px)`,
                     transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
                     boxShadow: `0 0 20px -5px ${theme.shadow}`
                 }}
-                className={`relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 flex justify-between items-center z-10 h-24 overflow-hidden`}
+                className={`relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 flex justify-between items-center z-10 h-24 will-change-transform`}
             >
-                <div className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${theme.bgIcon}`}></div>
+                <div className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${theme.bgIcon} pointer-events-none`}></div>
 
                 <div className="flex items-center gap-5 pointer-events-none relative z-10">
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${theme.bgIcon} ${theme.textIcon} font-black text-2xl shadow-lg`}>
@@ -85,34 +100,50 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
                     </div>
                 </div>
 
-                <button
-                    onClick={(e) => { e.stopPropagation(); onPlay(); }}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
-                >
-                    <Play size={20} fill="currentColor" className="ml-1" />
-                </button>
+                {isLocked ? (
+                    // Botón de Bloqueado (si está en uso)
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-zinc-800 text-zinc-500 border border-zinc-700 z-20">
+                        <Activity size={20} className="animate-pulse" />
+                    </div>
+                ) : (
+                    // Botón de Play Normal
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onPlay(); }}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
+                    >
+                        <Play size={20} fill="currentColor" className="ml-1" />
+                    </button>
+                )}
             </div>
         </div>
     );
 };
 
-// --- COMPONENTE TARJETA DEPORTE ---
+// --- COMPONENTE TARJETA DEPORTE (OPTIMIZADO) ---
 const SwipeableSportCard = ({ workout, onDelete }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
 
     const handleTouchStart = (e) => { startX.current = e.touches[0].clientX; setIsDragging(true); };
-    const handleTouchMove = (e) => { if (!isDragging) return; const diff = e.touches[0].clientX - startX.current; if (Math.abs(diff) < 150) setOffsetX(diff); };
-    const handleTouchEnd = () => { setIsDragging(false); if (Math.abs(offsetX) > 80) onDelete(); setOffsetX(0); };
+    const handleTouchMove = (e) => {
+        if (!isDragging) return;
+        const diff = e.touches[0].clientX - startX.current;
+        if (Math.abs(diff) < 200) setOffsetX(diff);
+    };
+    const handleTouchEnd = () => { setIsDragging(false); if (Math.abs(offsetX) > 100) onDelete(); setOffsetX(0); };
 
     return (
-        <div className="relative w-full h-[72px] mb-3 select-none touch-pan-y">
-            <div className="absolute inset-0 bg-red-900/20 border border-red-500/30 rounded-2xl flex items-center justify-center transition-all"><Trash2 className="text-red-500" /></div>
+        <div className="relative w-full h-[72px] mb-3 select-none touch-pan-y overflow-hidden rounded-2xl">
+            <div className="absolute inset-0 bg-red-900/20 border border-red-500/30 flex items-center justify-center transition-all">
+                <Trash2 className={`text-red-500 transition-opacity ${Math.abs(offsetX) > 50 ? 'opacity-100' : 'opacity-30'}`} />
+            </div>
             <div
-                onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 style={{ transform: `translateX(${offsetX}px)`, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
-                className="absolute inset-0 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex justify-between items-center shadow-md z-10"
+                className="absolute inset-0 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex justify-between items-center shadow-md z-10 will-change-transform"
             >
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-lime-500/10 flex items-center justify-center text-lime-400 border border-lime-500/20"><Activity size={18} /></div>
@@ -136,7 +167,8 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
 // --- PÁGINA PRINCIPAL ---
 export default function Gym() {
     const { user, setUser, setIsUiHidden } = useOutletContext();
-    const { startWorkout } = useWorkout(); // 🔥 USAR CONTEXTO
+    // 🔥 OBTENEMOS activeRoutine DEL CONTEXTO
+    const { startWorkout, activeRoutine } = useWorkout();
 
     const [routines, setRoutines] = useState([]);
     const [todaySports, setTodaySports] = useState([]);
@@ -171,17 +203,36 @@ export default function Gym() {
     };
     const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
-    // 🔥 ACCIÓN PRINCIPAL: DISPARA EL CONTEXTO
+    // Acciones
     const openActiveWorkout = (r) => {
+        if (activeRoutine && activeRoutine._id === r._id) {
+            // Si es la misma, maximizamos (esto lo maneja el contexto, pero aquí no hacemos nada extra)
+            return;
+        }
+        if (activeRoutine) {
+            return showToast("Ya hay una rutina en curso", "error");
+        }
         startWorkout(r);
     };
 
-    // Acciones
-    const handleEditRoutine = (r) => openCreateRoutine(r);
+    // 🔥 HANDLE EDIT: PROTEGIDO
+    const handleEditRoutine = (r) => {
+        if (activeRoutine && activeRoutine._id === r._id) {
+            return showToast("⚠️ En curso: Finaliza para editar.", "error");
+        }
+        openCreateRoutine(r);
+    };
+
+    // 🔥 HANDLE DELETE: PROTEGIDO
     const handleDeleteRoutine = async (id) => {
+        if (activeRoutine && activeRoutine._id === id) {
+            return showToast("⚠️ En curso: No se puede borrar.", "error");
+        }
+
         if (!window.confirm("¿Borrar rutina?")) return;
         try { await api.delete(`/gym/routines/${id}`); setRoutines(prev => prev.filter(r => r._id !== id)); showToast("Eliminada", "info"); } catch (e) { showToast("Error", "error"); }
     };
+
     const handleSaveSport = async () => {
         if (!sportForm.name || !sportForm.time) return showToast('Faltan datos', 'error');
         setIsSavingSport(true);
@@ -197,7 +248,7 @@ export default function Gym() {
     if (loading) return <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>;
 
     return (
-        <div className="animate-in fade-in space-y-8 pb-6 relative">
+        <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* HEADER GYM */}
@@ -240,7 +291,16 @@ export default function Gym() {
                             <p className="text-zinc-600 text-xs font-bold uppercase group-hover:text-yellow-100/50">Crear primera rutina</p>
                         </div>
                     ) : (
-                        routines.map((routine) => <SwipeableRoutineCard key={routine._id} routine={routine} onPlay={() => openActiveWorkout(routine)} onDelete={() => handleDeleteRoutine(routine._id)} onEdit={() => handleEditRoutine(routine)} />)
+                        routines.map((routine) => (
+                            <SwipeableRoutineCard
+                                key={routine._id}
+                                routine={routine}
+                                onPlay={() => openActiveWorkout(routine)}
+                                onDelete={() => handleDeleteRoutine(routine._id)}
+                                onEdit={() => handleEditRoutine(routine)}
+                                isLocked={activeRoutine && activeRoutine._id === routine._id} // 🔥 PASAMOS EL ESTADO DE BLOQUEO
+                            />
+                        ))
                     )}
                 </div>
             </div>

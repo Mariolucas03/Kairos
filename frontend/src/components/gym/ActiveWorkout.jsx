@@ -7,7 +7,7 @@ import {
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
-import ExerciseSelector from './ExerciseSelector'; // 🔥 IMPORTANTE: Importamos el selector
+import ExerciseSelector from './ExerciseSelector';
 
 export default function ActiveWorkout({ routine, onFinish }) {
     // Contexto Global para minimizar/maximizar
@@ -32,7 +32,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 kg: '',
                 reps: '',
                 completed: false,
-                type: 'N' // Tipos: N=Normal, W=Warmup (Calentamiento), F=Failure (Fallo), D=Drop
+                type: 'N'
             })),
             pr: null
         }));
@@ -56,7 +56,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [showFinishAlert, setShowFinishAlert] = useState(false);
 
     // 🔥 ESTADOS PARA SWAP (INTERCAMBIO)
-    const [swapIndex, setSwapIndex] = useState(null); // Qué índice estamos cambiando
+    const [swapIndex, setSwapIndex] = useState(null);
     const [showSelector, setShowSelector] = useState(false);
 
     // --- FUNCIONES AUXILIARES DE DESCANSO ---
@@ -107,11 +107,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return () => clearInterval(interval);
     }, [isResting, restRemaining]);
 
-    // 4. Cargar Historial (PRs y pesos anteriores)
+    // 4. Cargar Historial INICIAL (PRs y pesos anteriores de la rutina original)
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const exerciseNames = exercises.map(e => e.name); // Usamos 'exercises' actual por si hubo cambios
+                const exerciseNames = exercises.map(e => e.name);
                 const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
                 const historyData = res.data;
 
@@ -119,14 +119,16 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
 
-                    // Solo rellenamos si los campos están vacíos
+                    // Solo rellenamos si los campos están vacíos (para no borrar lo que el usuario ya escribió)
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
 
-                    if (isClean) {
+                    if (isClean && stats.lastSets && stats.lastSets.length > 0) {
                         newSetsData = ex.setsData.map((set, index) => {
-                            if (stats.lastSets && stats.lastSets[index]) {
-                                return { ...set, kg: stats.lastSets[index].weight, reps: stats.lastSets[index].reps };
+                            // Intentamos emparejar set con historial. Si el historial tiene menos sets, usamos el último disponible.
+                            const historySet = stats.lastSets[index] || stats.lastSets[stats.lastSets.length - 1];
+                            if (historySet) {
+                                return { ...set, kg: historySet.weight, reps: historySet.reps };
                             }
                             return set;
                         });
@@ -135,55 +137,82 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 }));
             } catch (e) { console.error(e); }
         };
-        // Solo cargar si no hay datos guardados previamente para evitar sobreescribir swaps
+        // Solo cargar si no hay datos guardados previamente para evitar sobreescribir
         const saved = localStorage.getItem(STORAGE_KEY);
         if (!saved) fetchHistory();
     }, []);
 
-    // --- 🔥 LÓGICA DE SWAP (INTERCAMBIO) ---
+    // --- 🔥 LÓGICA DE SWAP MEJORADA (CON CARGA DE HISTORIAL) ---
     const handleOpenSwap = (index) => {
         setSwapIndex(index);
         setShowSelector(true);
     };
 
-    const handleSwapComplete = (selectedList) => {
+    const handleSwapComplete = async (selectedList) => {
         if (!selectedList || selectedList.length === 0) {
             setShowSelector(false);
             return;
         }
 
-        // Tomamos el primero seleccionado (ya que es un reemplazo 1 a 1)
         const newExData = selectedList[0];
+        const currentIndex = swapIndex; // Guardamos el índice por si cambia el estado
 
+        // 1. Actualización Optimista (Cambia nombre visualmente rápido)
         setExercises(prev => prev.map((ex, i) => {
-            if (i !== swapIndex) return ex;
-
-            // Mantenemos la cantidad de series que ya tenía configuradas, pero reseteamos datos
-            // porque es un ejercicio nuevo con pesos nuevos.
+            if (i !== currentIndex) return ex;
             const currentSetsCount = ex.setsData.length;
-
             return {
                 ...ex,
                 name: newExData.name,
                 muscle: newExData.muscle,
-                // Reiniciamos los sets limpios para el nuevo ejercicio
+                // Reiniciamos temporalmente a vacío mientras carga
                 setsData: Array.from({ length: currentSetsCount }, () => ({
-                    kg: '',
-                    reps: '',
-                    completed: false,
-                    type: 'N'
+                    kg: '', reps: '', completed: false, type: 'N'
                 })),
-                pr: null // Reseteamos PR hasta que recargue historial (opcional, o dejar null)
+                pr: null
             };
         }));
 
-        setToast({ message: 'Ejercicio cambiado', type: 'success' });
         setShowSelector(false);
         setSwapIndex(null);
+
+        // 2. 🔥 FETCH DE HISTORIAL PARA EL NUEVO EJERCICIO
+        try {
+            const res = await api.post('/gym/history-stats', { exercises: [newExData.name] });
+            const history = res.data[newExData.name];
+
+            if (history) {
+                setExercises(prev => prev.map((ex, i) => {
+                    if (i !== currentIndex) return ex;
+
+                    let updatedSets = ex.setsData;
+                    // Rellenar con los pesos del nuevo ejercicio si existen
+                    if (history.lastSets && history.lastSets.length > 0) {
+                        updatedSets = ex.setsData.map((set, setIdx) => {
+                            const lastSet = history.lastSets[setIdx] || history.lastSets[history.lastSets.length - 1];
+                            return { ...set, kg: lastSet.weight, reps: lastSet.reps };
+                        });
+                    }
+
+                    return {
+                        ...ex,
+                        pr: history.bestSet,
+                        setsData: updatedSets
+                    };
+                }));
+                setToast({ message: 'Ejercicio cambiado (Historial cargado)', type: 'success' });
+            } else {
+                setToast({ message: 'Ejercicio cambiado (Sin historial previo)', type: 'info' });
+            }
+
+        } catch (error) {
+            console.error("Error cargando historial del nuevo ejercicio:", error);
+            setToast({ message: 'Ejercicio cambiado', type: 'success' });
+        }
     };
 
 
-    // --- LÓGICA DE ESTILOS Y NUMERACIÓN (HEVY STYLE) ---
+    // --- LÓGICA DE ESTILOS Y NUMERACIÓN ---
     const getSetDisplayInfo = (allSets, currentIndex) => {
         const type = allSets[currentIndex].type || 'N';
 
@@ -281,6 +310,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
             if (i !== exIdx) return ex;
             const last = ex.setsData[ex.setsData.length - 1];
             const nextType = last?.type === 'D' ? 'D' : 'N';
+            // Al añadir serie nueva, intentamos copiar el peso anterior por comodidad
             return {
                 ...ex,
                 setsData: [...ex.setsData, { kg: last?.kg || '', reps: last?.reps || '', completed: false, type: nextType }]
@@ -298,7 +328,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }
     };
 
-    // --- FINALIZAR RUTINA BLINDADA + ACTUALIZACIÓN DE PLANTILLA ---
+    // --- FINALIZAR RUTINA ---
     const confirmFinish = async () => {
         if (finishing) return;
 
@@ -311,7 +341,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
         setFinishing(true);
         try {
-            // 1. GUARDAR LOG (Historial) - Se guarda LO QUE HICISTE REALMENTE
             const logData = {
                 routineId: routine._id,
                 routineName: routine.name,
@@ -329,18 +358,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             const res = await api.post('/gym/log', logData);
 
-            // 2. 🔥 ACTUALIZAR LA RUTINA PLANTILLA (Si se modificó algo)
-            // Reconstruimos la estructura de la rutina para que coincida con el modelo de datos
-            // (nombre, muscle, sets, reps, targetWeight)
+            // ACTUALIZAR LA RUTINA PLANTILLA
             const updatedExercisesStructure = exercises.map(ex => ({
                 name: ex.name,
-                muscle: ex.muscle || 'Global', // Fallback si falta muscle
-                sets: ex.setsData.length, // Actualizamos el número de series por defecto
-                reps: "10-12", // Valor por defecto o podrías intentar inferirlo
+                muscle: ex.muscle || 'Global',
+                sets: ex.setsData.length,
+                reps: "10-12",
                 targetWeight: 0
             }));
 
-            // Enviamos la actualización al endpoint existente de actualizar rutina
             await api.put(`/gym/routines/${routine._id}`, {
                 exercises: updatedExercisesStructure
             });
@@ -374,7 +400,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // --- RENDERIZADO ---
 
-    // 0. Si se está mostrando el selector de Swap
+    // 0. Selector de Swap
     if (showSelector) {
         return createPortal(
             <div className="fixed inset-0 z-[250] bg-black">
@@ -452,18 +478,20 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 <span className="text-yellow-500 text-sm shrink-0">#{exIdx + 1}</span> {ex.name}
                             </h3>
 
-                            {/* BOTÓN SWAP Y 1RM */}
+                            {/* 🔥 BOTONES DE CABECERA: 1RM Y REFRESH JUNTOS */}
                             <div className="flex items-center gap-2">
                                 {ex.pr && ex.pr.value1RM > 0 && (
-                                    <span className="text-xs text-yellow-500 font-black flex items-center gap-1.5 whitespace-nowrap">
+                                    <div className="flex items-center gap-1 bg-zinc-900/50 px-2 py-1.5 rounded-lg border border-zinc-800">
                                         <Trophy size={14} className="text-yellow-600" />
-                                        {ex.pr.weight}kg
-                                    </span>
+                                        <span className="text-xs font-black text-yellow-500 whitespace-nowrap">
+                                            {ex.pr.weight} <span className="text-[10px] text-zinc-500">KG</span>
+                                        </span>
+                                    </div>
                                 )}
-                                {/* 🔥 BOTÓN DE INTERCAMBIO */}
+
                                 <button
                                     onClick={() => handleOpenSwap(exIdx)}
-                                    className="p-2 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 active:scale-95 transition-all"
+                                    className="p-1.5 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 hover:text-white active:scale-95 transition-all"
                                 >
                                     <RefreshCw size={16} />
                                 </button>
@@ -471,7 +499,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         </div>
 
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
-                            {/* CABECERAS DE COLUMNAS */}
+                            {/* CABECERAS */}
                             <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
                                 <div className="col-span-2">Set</div>
                                 <div className="col-span-4">Kg</div>
