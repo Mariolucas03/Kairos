@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
+import ExerciseSelector from './ExerciseSelector'; // 🔥 IMPORTANTE: Importamos el selector
 
 export default function ActiveWorkout({ routine, onFinish }) {
     // Contexto Global para minimizar/maximizar
@@ -53,6 +54,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
+
+    // 🔥 ESTADOS PARA SWAP (INTERCAMBIO)
+    const [swapIndex, setSwapIndex] = useState(null); // Qué índice estamos cambiando
+    const [showSelector, setShowSelector] = useState(false);
 
     // --- FUNCIONES AUXILIARES DE DESCANSO ---
     const startRest = () => {
@@ -106,7 +111,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const exerciseNames = routine.exercises.map(e => e.name);
+                const exerciseNames = exercises.map(e => e.name); // Usamos 'exercises' actual por si hubo cambios
                 const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
                 const historyData = res.data;
 
@@ -130,15 +135,58 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 }));
             } catch (e) { console.error(e); }
         };
-        fetchHistory();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        // Solo cargar si no hay datos guardados previamente para evitar sobreescribir swaps
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) fetchHistory();
+    }, []);
+
+    // --- 🔥 LÓGICA DE SWAP (INTERCAMBIO) ---
+    const handleOpenSwap = (index) => {
+        setSwapIndex(index);
+        setShowSelector(true);
+    };
+
+    const handleSwapComplete = (selectedList) => {
+        if (!selectedList || selectedList.length === 0) {
+            setShowSelector(false);
+            return;
+        }
+
+        // Tomamos el primero seleccionado (ya que es un reemplazo 1 a 1)
+        const newExData = selectedList[0];
+
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== swapIndex) return ex;
+
+            // Mantenemos la cantidad de series que ya tenía configuradas, pero reseteamos datos
+            // porque es un ejercicio nuevo con pesos nuevos.
+            const currentSetsCount = ex.setsData.length;
+
+            return {
+                ...ex,
+                name: newExData.name,
+                muscle: newExData.muscle,
+                // Reiniciamos los sets limpios para el nuevo ejercicio
+                setsData: Array.from({ length: currentSetsCount }, () => ({
+                    kg: '',
+                    reps: '',
+                    completed: false,
+                    type: 'N'
+                })),
+                pr: null // Reseteamos PR hasta que recargue historial (opcional, o dejar null)
+            };
+        }));
+
+        setToast({ message: 'Ejercicio cambiado', type: 'success' });
+        setShowSelector(false);
+        setSwapIndex(null);
+    };
 
 
     // --- LÓGICA DE ESTILOS Y NUMERACIÓN (HEVY STYLE) ---
     const getSetDisplayInfo = (allSets, currentIndex) => {
         const type = allSets[currentIndex].type || 'N';
 
-        // 1. CALENTAMIENTO (Naranja, Caja)
         if (type === 'W') {
             return {
                 label: 'C',
@@ -147,31 +195,24 @@ export default function ActiveWorkout({ routine, onFinish }) {
             };
         }
 
-        // Calcular el número de serie "base" (ignorando drop sets anteriores)
         let normalCount = 0;
         for (let i = 0; i <= currentIndex; i++) {
             if (allSets[i].type !== 'D' && allSets[i].type !== 'W') normalCount++;
         }
 
-        // 2. DROP SET (Morado, SIN CAJA, Indentado)
         if (type === 'D') {
-            // Buscamos a qué serie normal pertenece este drop
             let dropDepth = 0;
-            // Retrocedemos hasta encontrar el padre no-drop
             for (let i = currentIndex; i >= 0; i--) {
-                if (allSets[i].type !== 'D') break; // Encontramos el padre
+                if (allSets[i].type !== 'D') break;
                 dropDepth++;
             }
-
-            // Si es el primer drop es .1, segundo .2, etc.
             return {
                 label: `${normalCount}.${dropDepth}`,
                 style: 'bg-transparent text-purple-400 font-black border-none p-0 text-sm',
-                containerClass: 'justify-end pr-4' // Alineado a la derecha o indentado
+                containerClass: 'justify-end pr-4'
             };
         }
 
-        // 3. FALLO (Rojo, Caja)
         if (type === 'F') {
             return {
                 label: normalCount,
@@ -180,7 +221,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
             };
         }
 
-        // 4. NORMAL (Gris, Caja)
         return {
             label: normalCount,
             style: 'bg-zinc-900 text-zinc-500 border border-zinc-800 rounded-lg',
@@ -188,9 +228,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         };
     };
 
-    // --- HANDLERS CORREGIDOS (Inmutabilidad Estricta) ---
-
-    // 1. Ciclo: Normal -> Calentamiento -> Fallo -> Drop -> Normal
+    // --- HANDLERS (Inmutabilidad Estricta) ---
     const cycleSetType = (exIdx, setIdx) => {
         const types = ['N', 'W', 'F', 'D'];
         setExercises(prev => prev.map((ex, i) => {
@@ -207,15 +245,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }));
     };
 
-    // 2. Marcar Check (Completado)
     const toggleSetComplete = (exIdx, setIdx) => {
         const currentSet = exercises[exIdx].setsData[setIdx];
-
-        // Validación visual para no marcar cosas vacías
         if (String(currentSet.kg).trim() === '' || String(currentSet.reps).trim() === '') {
             return setToast({ message: 'Faltan datos (Kg o Reps)', type: 'error' });
         }
-
         setExercises(prev => prev.map((ex, i) => {
             if (i !== exIdx) return ex;
             return {
@@ -226,14 +260,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 })
             };
         }));
-
-        // Solo iniciamos descanso si se completa y NO es Drop Set (los drop sets son seguidos)
-        if (!currentSet.completed && currentSet.type !== 'D') {
-            startRest();
-        }
+        if (!currentSet.completed && currentSet.type !== 'D') startRest();
     };
 
-    // 3. Escribir en inputs (Peso/Reps)
     const handleInputChange = (exIdx, setIdx, field, val) => {
         setExercises(prev => prev.map((ex, i) => {
             if (i !== exIdx) return ex;
@@ -247,26 +276,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }));
     };
 
-    // 4. Añadir Serie
     const handleAddSet = (exIdx) => {
         setExercises(prev => prev.map((ex, i) => {
             if (i !== exIdx) return ex;
-
             const last = ex.setsData[ex.setsData.length - 1];
-            // Si el anterior era Drop, el nuevo probablemente también lo sea
             const nextType = last?.type === 'D' ? 'D' : 'N';
-
             return {
                 ...ex,
-                setsData: [
-                    ...ex.setsData,
-                    {
-                        kg: last?.kg || '',
-                        reps: last?.reps || '',
-                        completed: false,
-                        type: nextType
-                    }
-                ]
+                setsData: [...ex.setsData, { kg: last?.kg || '', reps: last?.reps || '', completed: false, type: nextType }]
             };
         }));
     };
@@ -277,48 +294,57 @@ export default function ActiveWorkout({ routine, onFinish }) {
         const num = parseInt(val);
         if (!isNaN(num)) {
             setDefaultRest(num);
-            if (isResting) {
-                // Si cambiamos el tiempo mientras descansamos, ajustamos
-                setRestRemaining(num);
-            }
+            if (isResting) setRestRemaining(num);
         }
     };
 
-    // --- FINALIZAR RUTINA BLINDADA ---
+    // --- FINALIZAR RUTINA BLINDADA + ACTUALIZACIÓN DE PLANTILLA ---
     const confirmFinish = async () => {
         if (finishing) return;
 
-        // Validar que haya al menos una serie completada
         const hasAnyCompleted = exercises.some(ex => ex.setsData.some(s => s.completed));
         if (!hasAnyCompleted) {
             setToast({ message: 'Completa al menos una serie', type: 'error' });
-            // Cerramos la alerta para que el usuario pueda seguir editando
             setShowFinishAlert(false);
             return;
         }
 
         setFinishing(true);
         try {
+            // 1. GUARDAR LOG (Historial) - Se guarda LO QUE HICISTE REALMENTE
             const logData = {
                 routineId: routine._id,
                 routineName: routine.name,
-                duration: seconds > 0 ? seconds : 1, // Duración mínima 1s
+                duration: seconds > 0 ? seconds : 1,
                 intensity,
                 exercises: exercises.map(ex => ({
                     name: ex.name,
-                    // Enviamos SOLO las series marcadas como completadas
-                    sets: ex.setsData
-                        .filter(s => s.completed)
-                        .map(s => ({
-                            // Convertimos comas a puntos y aseguramos números
-                            weight: parseFloat(String(s.kg).replace(',', '.')) || 0,
-                            reps: parseFloat(String(s.reps).replace(',', '.')) || 0,
-                            type: s.type || 'N'
-                        }))
-                })).filter(ex => ex.sets.length > 0) // Quitamos ejercicios sin series hechas
+                    sets: ex.setsData.filter(s => s.completed).map(s => ({
+                        weight: parseFloat(String(s.kg).replace(',', '.')) || 0,
+                        reps: parseFloat(String(s.reps).replace(',', '.')) || 0,
+                        type: s.type || 'N'
+                    }))
+                })).filter(ex => ex.sets.length > 0)
             };
 
             const res = await api.post('/gym/log', logData);
+
+            // 2. 🔥 ACTUALIZAR LA RUTINA PLANTILLA (Si se modificó algo)
+            // Reconstruimos la estructura de la rutina para que coincida con el modelo de datos
+            // (nombre, muscle, sets, reps, targetWeight)
+            const updatedExercisesStructure = exercises.map(ex => ({
+                name: ex.name,
+                muscle: ex.muscle || 'Global', // Fallback si falta muscle
+                sets: ex.setsData.length, // Actualizamos el número de series por defecto
+                reps: "10-12", // Valor por defecto o podrías intentar inferirlo
+                targetWeight: 0
+            }));
+
+            // Enviamos la actualización al endpoint existente de actualizar rutina
+            await api.put(`/gym/routines/${routine._id}`, {
+                exercises: updatedExercisesStructure
+            });
+
             localStorage.removeItem(STORAGE_KEY);
             if (onFinish) onFinish(res.data);
         } catch (error) {
@@ -348,7 +374,20 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // --- RENDERIZADO ---
 
-    // 1. MODO MINIMIZADO (Barra Flotante)
+    // 0. Si se está mostrando el selector de Swap
+    if (showSelector) {
+        return createPortal(
+            <div className="fixed inset-0 z-[250] bg-black">
+                <ExerciseSelector
+                    onSelect={handleSwapComplete}
+                    onClose={() => setShowSelector(false)}
+                />
+            </div>,
+            document.body
+        );
+    }
+
+    // 1. MODO MINIMIZADO
     if (isMinimized) {
         return createPortal(
             <div
@@ -380,7 +419,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         );
     }
 
-    // 2. MODO EXPANDIDO (Pantalla Completa)
+    // 2. MODO EXPANDIDO
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-black flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -412,12 +451,23 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             <h3 className="text-white font-black text-xl uppercase tracking-tight flex items-center gap-2 leading-tight max-w-[65%]">
                                 <span className="text-yellow-500 text-sm shrink-0">#{exIdx + 1}</span> {ex.name}
                             </h3>
-                            {ex.pr && ex.pr.value1RM > 0 && (
-                                <span className="text-xs text-yellow-500 font-black flex items-center gap-1.5 whitespace-nowrap">
-                                    <Trophy size={14} className="text-yellow-600" />
-                                    {ex.pr.weight}kg <span className="text-zinc-600">x</span> {ex.pr.reps}
-                                </span>
-                            )}
+
+                            {/* BOTÓN SWAP Y 1RM */}
+                            <div className="flex items-center gap-2">
+                                {ex.pr && ex.pr.value1RM > 0 && (
+                                    <span className="text-xs text-yellow-500 font-black flex items-center gap-1.5 whitespace-nowrap">
+                                        <Trophy size={14} className="text-yellow-600" />
+                                        {ex.pr.weight}kg
+                                    </span>
+                                )}
+                                {/* 🔥 BOTÓN DE INTERCAMBIO */}
+                                <button
+                                    onClick={() => handleOpenSwap(exIdx)}
+                                    className="p-2 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 active:scale-95 transition-all"
+                                >
+                                    <RefreshCw size={16} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
@@ -431,22 +481,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
                             <div className="space-y-1">
                                 {ex.setsData.map((set, sIdx) => {
-                                    // OBTENER VISUALIZACIÓN (Caja vs Drop sin caja)
                                     const { label, style, containerClass } = getSetDisplayInfo(ex.setsData, sIdx);
-
                                     return (
                                         <div key={sIdx} className={`grid grid-cols-12 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
-
-                                            {/* BOTÓN NÚMERO DE SERIE */}
                                             <div className={`col-span-2 flex ${containerClass}`}>
-                                                <button
-                                                    onClick={() => cycleSetType(exIdx, sIdx)}
-                                                    className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}
-                                                >
+                                                <button onClick={() => cycleSetType(exIdx, sIdx)} className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}>
                                                     {label}
                                                 </button>
                                             </div>
-
                                             <div className="col-span-4">
                                                 <input type="number" inputMode="decimal" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
                                             </div>
