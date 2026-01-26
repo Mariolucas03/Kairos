@@ -3,7 +3,7 @@ const Mission = require('../models/Mission');
 const DailyLog = require('../models/DailyLog');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
-const mongoose = require('mongoose'); // Importante para convertir IDs
+const mongoose = require('mongoose');
 
 const BASE_XP = 10;
 const BASE_COINS = 5;
@@ -12,54 +12,85 @@ const DIFFICULTY_MULTIPLIERS = { easy: 1, medium: 2, hard: 3, epic: 5 };
 const FREQUENCY_MULTIPLIERS = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
 
 // ------------------------------------------------------------------
-// 1. OBTENER MISIONES (BLINDADO)
+// 1. OBTENER MISIONES (VERSIÓN SUPER PERMISIVA)
 // ------------------------------------------------------------------
 const getMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 
-    // 🔥 DEBUG: Ver quién está pidiendo misiones
-    // console.log(`🔍 Buscando misiones para Usuario: ${userId}`);
+    // 1. Preparamos las dos versiones del ID: Texto y Objeto
+    // Esto arregla el problema si en la BD se guardó mezclado
+    const userIdString = userId.toString();
+    let userIdObj;
+    try {
+        userIdObj = new mongoose.Types.ObjectId(userIdString);
+    } catch (e) {
+        userIdObj = userId; // Fallback
+    }
 
-    // Convertimos a ObjectId para asegurar que Mongo lo entienda
-    const userObjectId = new mongoose.Types.ObjectId(userId);
+    console.log(`🔍 [DEBUG] Buscando misiones para: ${userIdString}`);
 
-    const missions = await Mission.find({
+    // 2. Consulta "Atrapalotodo"
+    // Busca donde seas el dueño (String u Object) O donde seas participante (String u Object)
+    const query = {
         $or: [
-            // Caso 1: Soy participante (array)
-            { participants: { $in: [userObjectId] } },
-            // Caso 2: Soy el dueño (creador) -> Esto rescata misiones antiguas sin participants
-            { user: userObjectId },
-            // Caso 3: Coop activas donde estoy invitado
-            { participants: { $in: [userObjectId] }, invitationStatus: 'active' }
+            { user: userIdObj },
+            { user: userIdString },
+            { participants: userIdObj },
+            { participants: userIdString },
+            // Misiones cooperativas activas
+            { participants: { $in: [userIdObj, userIdString] }, invitationStatus: 'active' }
         ]
-    })
+    };
+
+    const missions = await Mission.find(query)
         .populate('participants', 'username avatar')
         .sort({ completed: 1, createdAt: -1 });
 
-    // console.log(`✅ Encontradas ${missions.length} misiones.`);
+    console.log(`✅ [DEBUG] Encontradas: ${missions.length} misiones brutas.`);
 
-    // Resetear hábitos diarios si es un nuevo día (Lógica Lazy Load)
+    // 3. Limpieza de Fechas (Protegido contra errores)
     const today = new Date().toDateString();
     let updated = false;
 
     for (let mission of missions) {
-        if (mission.type === 'habit' && mission.completed) {
-            const lastUpdate = new Date(mission.lastUpdated).toDateString();
-            if (lastUpdate !== today && mission.frequency === 'daily') {
-                mission.progress = 0;
-                mission.completed = false;
-                // Asegurar que contributions es un Map
-                if (!mission.contributions) mission.contributions = new Map();
-                mission.participants.forEach(p => mission.contributions.set(p._id.toString(), 0));
+        try {
+            // Si es hábito, verificamos si hay que resetear
+            if (mission.type === 'habit' && mission.completed) {
+                // Si no tiene fecha, asumimos que es vieja y reseteamos
+                if (!mission.lastUpdated) {
+                    mission.lastUpdated = new Date();
+                }
 
-                await mission.save();
-                updated = true;
+                const lastUpdate = new Date(mission.lastUpdated).toDateString();
+
+                if (lastUpdate !== today && mission.frequency === 'daily') {
+                    console.log(`🔄 [DEBUG] Reseteando misión diaria: ${mission.title}`);
+                    mission.progress = 0;
+                    mission.completed = false;
+
+                    // Asegurar mapa de contribuciones
+                    if (!mission.contributions) mission.contributions = new Map();
+
+                    // Reparar participantes si es necesario
+                    if (mission.participants && mission.participants.length > 0) {
+                        mission.participants.forEach(p => {
+                            const pId = p._id ? p._id.toString() : p.toString();
+                            mission.contributions.set(pId, 0);
+                        });
+                    }
+
+                    await mission.save();
+                    updated = true;
+                }
             }
+        } catch (err) {
+            console.error(`⚠️ [WARN] Error procesando misión corrupta (${mission._id}):`, err.message);
+            // Opcional: Podrías borrarla si está muy rota: await mission.deleteOne();
         }
     }
 
     if (updated) {
-        // Volver a pedir para asegurar consistencia
+        // Volvemos a llamar para traer los datos limpios
         return getMissions(req, res);
     }
 
@@ -90,6 +121,7 @@ const createMission = asyncHandler(async (req, res) => {
     const finalCoins = Math.round(BASE_COINS * mult);
     const finalGameCoins = finalCoins * 2;
 
+    // Aseguramos que el creador está en participantes
     const participants = [req.user._id];
     let invStatus = 'none';
 
@@ -97,6 +129,8 @@ const createMission = asyncHandler(async (req, res) => {
         participants.push(friendId);
         invStatus = 'pending';
     }
+
+    console.log(`📝 [DEBUG] Creando misión: ${title} para usuario ${req.user._id}`);
 
     const mission = await Mission.create({
         user: req.user._id,
@@ -168,7 +202,7 @@ const updateProgress = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('Misión no encontrada'); }
 
-    // Validación más laxa para permitir al creador actualizar aunque los participantes estén raros
+    // Permitimos actualizar si eres participante O el dueño (por si acaso el array de participantes falló)
     const isParticipant = mission.participants.map(p => p.toString()).includes(userId.toString());
     const isOwner = mission.user.toString() === userId.toString();
 
@@ -186,7 +220,6 @@ const updateProgress = asyncHandler(async (req, res) => {
         if (last.toDateString() !== today.toDateString()) {
             mission.progress = 0;
             mission.completed = false;
-            // Reiniciar mapa si no existe
             if (!mission.contributions) mission.contributions = new Map();
             mission.participants.forEach(p => mission.contributions.set(p.toString(), 0));
         } else {
@@ -196,7 +229,7 @@ const updateProgress = asyncHandler(async (req, res) => {
 
     const addAmount = Number(amount) || 1;
 
-    // SYNC LOGIC
+    // SYNC LOGIC (Vinculadas)
     const linkedMissions = await Mission.find({
         user: userId,
         title: mission.title,
@@ -230,6 +263,7 @@ const updateProgress = asyncHandler(async (req, res) => {
         await linked.save();
     }
 
+    // Actualizar Misión Actual
     mission.progress += addAmount;
     if (!mission.contributions) mission.contributions = new Map();
     const currentContrib = mission.contributions.get(userId.toString()) || 0;
@@ -300,16 +334,23 @@ const deleteMission = asyncHandler(async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// 🔥 6. PURGA NUCLEAR (SOLO EMERGENCIAS)
+// 6. PURGA NUCLEAR
 // ------------------------------------------------------------------
 const nukeMyMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    // Borra todas las misiones donde el usuario sea el CREADOR
-    await Mission.deleteMany({ user: userId });
+    const userIdString = userId.toString();
 
-    // Opcional: Borrar donde sea participante también (limpieza total)
-    await Mission.deleteMany({ participants: { $in: [userId] } });
+    // Borramos usando ambas variantes del ID para estar seguros
+    await Mission.deleteMany({
+        $or: [
+            { user: userId },
+            { user: userIdString },
+            { participants: userId },
+            { participants: userIdString }
+        ]
+    });
 
+    console.log(`☢️ Misiones purgadas para el usuario: ${userId}`);
     res.status(200).json({ message: "☢️ Todas tus misiones han sido eliminadas. Cuenta limpia." });
 });
 
@@ -319,5 +360,5 @@ module.exports = {
     updateProgress,
     deleteMission,
     respondMissionInvite,
-    nukeMyMissions // <--- Exportamos la nueva función
+    nukeMyMissions
 };
