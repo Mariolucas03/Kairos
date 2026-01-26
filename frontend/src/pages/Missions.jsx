@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -214,7 +214,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
                 {/* CONTENEDOR INTERNO */}
-                {/* 🔥 CAMBIO: Fondo "Crema" (#2e2924) para Coop, Negro para el resto */}
                 <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-5 relative overflow-hidden h-full flex flex-col justify-between`}>
                     {/* Brillo ambiental */}
                     <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
@@ -327,6 +326,9 @@ export default function Missions() {
     const [toast, setToast] = useState(null);
     const [friends, setFriends] = useState([]);
 
+    // 🔥 NUEVO ESTADO PARA EL MODO "VER TODO"
+    const [viewAllMode, setViewAllMode] = useState(false);
+
     const DEFAULTS = {
         title: '', frequency: 'daily', type: 'habit', difficulty: 'easy', target: 1, unit: '', isCoop: false, friendId: ''
     };
@@ -343,7 +345,10 @@ export default function Missions() {
     }, [activeTab, showCreator]);
 
     const fetchMissions = async () => {
-        try { const res = await api.get('/missions'); setMissions(res.data); } catch (e) { setMissions([]); } finally { setLoading(false); }
+        try {
+            const res = await api.get('/missions');
+            setMissions(res.data);
+        } catch (e) { setMissions([]); } finally { setLoading(false); }
     };
     const fetchFriends = async () => { try { const res = await api.get('/social/friends'); setFriends(res.data.friends); } catch (e) { } };
     const showToast = (message, type = 'success') => setToast({ message, type });
@@ -367,10 +372,14 @@ export default function Missions() {
     };
 
     const getFilteredMissions = () => {
+        // 🔥 SI EL MODO "VER TODO" ESTÁ ACTIVO, DEVOLVEMOS TODO SIN FILTRAR
+        if (viewAllMode) return missions;
+
         const today = new Date().getDay();
         return missions.filter(m => {
             if (activeTab !== 'all' && m.frequency !== activeTab) return false;
             if (m.isCoop && m.invitationStatus === 'pending' && m.user !== user._id) return false;
+            // Filtro de día (Solo mostrar si hoy toca)
             if (m.frequency === 'daily' && m.specificDays && m.specificDays.length > 0) return m.specificDays.includes(today);
             return true;
         });
@@ -455,20 +464,39 @@ export default function Missions() {
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                     <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
-                        Misiones <span className="text-yellow-500 capitalize">{activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES'}</span>
+                        Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
                     </h1>
-                    <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
-                </div>
-                <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
-                    {['daily', 'weekly', 'monthly', 'yearly'].map(freq => (
-                        <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                            {freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANAL' : freq === 'monthly' ? 'MENSUAL' : 'ANUAL'}
+                    <div className="flex gap-2">
+                        {/* 🔥 BOTÓN VER TODO (GESTIÓN) */}
+                        <button
+                            onClick={() => setViewAllMode(!viewAllMode)}
+                            className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}
+                        >
+                            {viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}
                         </button>
-                    ))}
+
+                        <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
+                    </div>
                 </div>
-                <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
-                    <div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} />
-                </div>
+
+                {viewAllMode ? (
+                    <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2">
+                        <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Viendo todas las misiones ocultas</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
+                            {['daily', 'weekly', 'monthly', 'yearly'].map(freq => (
+                                <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                    {freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANAL' : freq === 'monthly' ? 'MENSUAL' : 'ANUAL'}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
+                            <div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} />
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* LISTA */}
