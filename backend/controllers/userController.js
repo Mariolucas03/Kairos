@@ -211,35 +211,30 @@ const forceNightlyMaintenance = asyncHandler(async (req, res) => {
     res.json({ message: "Mantenimiento ejecutado.", result });
 });
 
-// 8. APPLE HEALTH SYNC (VERSIÓN DEBUG)
+// 8. APPLE HEALTH SYNC (MODO SIMPLIFICADO "1234")
 const syncHealthData = asyncHandler(async (req, res) => {
+    // 1. Recogemos los datos (y imprimimos en consola por si acaso)
     const { steps, sleep, secret, userId } = req.body;
 
-    // 🕵️‍♂️ ZONA DE INVESTIGACIÓN 🕵️‍♂️
-    console.log("========================================");
-    console.log("🔍 DEBUG HEALTH SYNC:");
-    console.log(`📨 Recibido del iPhone: '${secret}'`); // Las comillas revelarán espacios
-    console.log(`🔒 Esperado en Render:  '${process.env.CRON_SECRET}'`);
-    console.log(`🤔 ¿Son iguales?:       ${secret === process.env.CRON_SECRET ? "SÍ" : "NO"}`);
-    console.log("========================================");
+    console.log("📱 INTENTO DE SYNC:");
+    console.log("Clave recibida:", secret);
+    console.log("ID Usuario:", userId);
 
-    // 1. Seguridad: Verificar la clave secreta
-    // NOTA: Usamos trim() para perdonar si hay espacios accidentales
-    if (!secret || secret.trim() !== process.env.CRON_SECRET) {
+    // 2. SEGURIDAD: USAMOS UNA CLAVE SIMPLE AHORA MISMO
+    // Si la clave que envía el iPhone NO es "1234", fallamos.
+    if (secret !== '1234') {
         res.status(401);
-        throw new Error('Clave incorrecta');
+        throw new Error(`Clave incorrecta. Recibí: '${secret}' pero esperaba: '1234'`);
     }
 
-    // 2. Verificar ID de usuario
+    // 3. Verificar ID de usuario
     if (!userId) {
         res.status(400);
         throw new Error('Falta el ID de usuario');
     }
 
-    // 3. Obtener fecha de hoy
+    // 4. Guardar datos
     const today = new Date().toISOString().split('T')[0];
-
-    // 4. Actualizar DailyLog
     const log = await DailyLog.findOneAndUpdate(
         { user: userId, date: today },
         {
