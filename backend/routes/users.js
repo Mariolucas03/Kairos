@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+// Importamos TODO del controlador
 const {
     registerUser,
     loginUser,
@@ -15,7 +16,7 @@ const {
     simulateYesterday,
     setManualStreak,
     forceNightlyMaintenance,
-    syncHealthData // <--- Importado aquí al final (asegúrate de que en userController está exportado igual)
+    syncHealthData // <--- ESTO TIENE QUE COINCIDIR CON EL CONTROLLER
 } = require('../controllers/userController');
 
 const protect = require('../middleware/authMiddleware');
@@ -27,7 +28,7 @@ router.post('/', registerUser);
 router.post('/login', loginUser);
 
 // ==========================================
-// RUTAS PROTEGIDAS (Requieren Token)
+// RUTAS PROTEGIDAS
 // ==========================================
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateUser);
@@ -49,7 +50,7 @@ router.post('/manual-streak', protect, setManualStreak);
 router.post('/force-maintenance', protect, forceNightlyMaintenance);
 
 // ==========================================
-// RUTA DE APPLE HEALTH (Pública + Clave Secreta)
+// 🔥 RUTA DE APPLE HEALTH
 // ==========================================
 router.post('/health-sync', syncHealthData);
 
