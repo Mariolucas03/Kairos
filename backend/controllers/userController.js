@@ -211,19 +211,47 @@ const forceNightlyMaintenance = asyncHandler(async (req, res) => {
     res.json({ message: "Mantenimiento ejecutado.", result });
 });
 
-// 8. APPLE HEALTH SYNC
+// 8. APPLE HEALTH SYNC (VERSIÓN DEBUG)
 const syncHealthData = asyncHandler(async (req, res) => {
     const { steps, sleep, secret, userId } = req.body;
-    if (secret !== process.env.CRON_SECRET) { res.status(401); throw new Error('Clave incorrecta'); }
-    if (!userId) { res.status(400); throw new Error('Falta userId'); }
 
+    // 🕵️‍♂️ ZONA DE INVESTIGACIÓN 🕵️‍♂️
+    console.log("========================================");
+    console.log("🔍 DEBUG HEALTH SYNC:");
+    console.log(`📨 Recibido del iPhone: '${secret}'`); // Las comillas revelarán espacios
+    console.log(`🔒 Esperado en Render:  '${process.env.CRON_SECRET}'`);
+    console.log(`🤔 ¿Son iguales?:       ${secret === process.env.CRON_SECRET ? "SÍ" : "NO"}`);
+    console.log("========================================");
+
+    // 1. Seguridad: Verificar la clave secreta
+    // NOTA: Usamos trim() para perdonar si hay espacios accidentales
+    if (!secret || secret.trim() !== process.env.CRON_SECRET) {
+        res.status(401);
+        throw new Error('Clave incorrecta');
+    }
+
+    // 2. Verificar ID de usuario
+    if (!userId) {
+        res.status(400);
+        throw new Error('Falta el ID de usuario');
+    }
+
+    // 3. Obtener fecha de hoy
     const today = new Date().toISOString().split('T')[0];
+
+    // 4. Actualizar DailyLog
     const log = await DailyLog.findOneAndUpdate(
         { user: userId, date: today },
-        { $set: { 'healthStats.steps': Number(steps) || 0, 'healthStats.sleepHours': Number(sleep) || 0 } },
+        {
+            $set: {
+                'healthStats.steps': Number(steps) || 0,
+                'healthStats.sleepHours': Number(sleep) || 0
+            }
+        },
         { new: true, upsert: true }
     );
-    res.status(200).json({ message: 'Datos sincronizados', log });
+
+    res.status(200).json({ message: 'Datos de salud sincronizados', log });
 });
 
 // ==========================================
