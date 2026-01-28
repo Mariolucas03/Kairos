@@ -1,36 +1,46 @@
 const express = require('express');
 const router = express.Router();
-const protect = require('../middleware/authMiddleware');
-
 const {
+    registerUser,
+    loginUser,
     getMe,
-    updateMacros,
+    updateUser, // <--- Asegúrate de que esto estaba importado
+    syncHealthData, // <--- IMPORTANTE: Importar la nueva función
+    updateMacros, // <--- Importar si no estaba
     claimDailyReward,
     addGameReward,
     updatePhysicalStats,
-    simulateYesterday,
-    setManualStreak,
-    forceNightlyMaintenance,
     setRedemptionMission,
     reviveUser,
-    updateStatsManual
+    updateStatsManual,
+    simulateYesterday,
+    setManualStreak,
+    forceNightlyMaintenance
 } = require('../controllers/userController');
+const protect = require('../middleware/authMiddleware');
 
-// Rutas base: /api/users
-router.get('/', protect, getMe);
+router.post('/', registerUser);
+router.post('/login', loginUser);
+router.get('/me', protect, getMe);
+router.put('/profile', protect, updateUser);
+
+// Rutas de Gamificación y Stats
 router.put('/macros', protect, updateMacros);
-router.post('/claim-daily', protect, claimDailyReward); // <--- Esta fallaba
-router.post('/reward', protect, addGameReward);
+router.post('/daily-reward', protect, claimDailyReward);
+router.post('/game-reward', protect, addGameReward);
 router.put('/physical-stats', protect, updatePhysicalStats);
 
-// Rutas Game Over
-router.post('/set-redemption-mission', protect, setRedemptionMission);
+// Rutas de Game Over / Resurrección
+router.post('/redemption', protect, setRedemptionMission);
 router.post('/revive', protect, reviveUser);
-router.put('/update-stats', protect, updateStatsManual);
+router.put('/stats-manual', protect, updateStatsManual);
 
-// Rutas Debug
-router.post('/debug/yesterday', protect, simulateYesterday);
-router.put('/debug/streak', protect, setManualStreak);
-router.post('/debug/force-night', protect, forceNightlyMaintenance);
+// Rutas de Debug / Admin
+router.post('/simulate-yesterday', protect, simulateYesterday);
+router.post('/manual-streak', protect, setManualStreak);
+router.post('/force-maintenance', protect, forceNightlyMaintenance);
+
+// 🔥 RUTA DE APPLE HEALTH (PÚBLICA PERO PROTEGIDA POR CLAVE SECRETA)
+router.post('/health-sync', syncHealthData);
 
 module.exports = router;

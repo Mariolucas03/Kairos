@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const DailyLog = require('../models/DailyLog'); // 🔥 IMPORTANTE: Necesario para guardar pasos/sueño
 const levelService = require('../services/levelService');
 // Importamos la función manual del scheduler
 const { runNightlyMaintenance } = require('../utils/scheduler');
@@ -243,7 +244,43 @@ const forceNightlyMaintenance = asyncHandler(async (req, res) => {
 });
 
 // ==========================================
-// EXPORT FINAL (¡SIEMPRE AL FINAL!)
+// 8. APPLE HEALTH SYNC (NUEVO)
+// ==========================================
+const syncHealthData = asyncHandler(async (req, res) => {
+    const { steps, sleep, secret, userId } = req.body;
+
+    // 1. Seguridad: Verificar la clave secreta
+    if (secret !== process.env.CRON_SECRET) {
+        res.status(401);
+        throw new Error('Acceso denegado: Clave incorrecta');
+    }
+
+    // 2. Verificar ID de usuario
+    if (!userId) {
+        res.status(400);
+        throw new Error('Falta el ID de usuario');
+    }
+
+    // 3. Obtener fecha de hoy
+    const today = new Date().toISOString().split('T')[0];
+
+    // 4. Actualizar DailyLog
+    const log = await DailyLog.findOneAndUpdate(
+        { user: userId, date: today },
+        {
+            $set: {
+                'healthStats.steps': Number(steps) || 0,
+                'healthStats.sleepHours': Number(sleep) || 0
+            }
+        },
+        { new: true, upsert: true }
+    );
+
+    res.status(200).json({ message: 'Datos de salud sincronizados', log });
+});
+
+// ==========================================
+// EXPORT FINAL
 // ==========================================
 module.exports = {
     getMe,
@@ -256,5 +293,6 @@ module.exports = {
     updateStatsManual,
     simulateYesterday,
     setManualStreak,
-    forceNightlyMaintenance
+    forceNightlyMaintenance,
+    syncHealthData // <--- AÑADIDO
 };
