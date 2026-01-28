@@ -211,12 +211,11 @@ const forceNightlyMaintenance = asyncHandler(async (req, res) => {
     res.json({ message: "Mantenimiento ejecutado.", result });
 });
 
-// 8. APPLE HEALTH SYNC (VERSIÓN FINAL SEGURA)
+// 8. APPLE HEALTH SYNC (CORREGIDO)
 const syncHealthData = asyncHandler(async (req, res) => {
     const { steps, sleep, secret, userId } = req.body;
 
-    // 1. SEGURIDAD REAL: Comparamos con la clave de Render
-    // Usamos trim() para evitar errores por espacios invisibles
+    // 1. SEGURIDAD REAL
     if (!secret || secret.trim() !== process.env.CRON_SECRET) {
         res.status(401);
         throw new Error('Clave incorrecta de sincronización');
@@ -234,8 +233,9 @@ const syncHealthData = asyncHandler(async (req, res) => {
         { user: userId, date: today },
         {
             $set: {
-                'healthStats.steps': Number(steps) || 0,
-                'healthStats.sleepHours': Number(sleep) || 0
+                // 🔥 CORRECCIÓN: Quitamos 'healthStats.' para que coincida con DailyLog.js
+                steps: Number(steps) || 0,
+                sleepHours: Number(sleep) || 0
             }
         },
         { new: true, upsert: true }

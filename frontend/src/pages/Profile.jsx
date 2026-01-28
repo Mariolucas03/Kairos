@@ -106,7 +106,7 @@ export default function Profile() {
     };
 
     // 🔥 RENDERIZADO DE WIDGETS
-    // Aquí es donde está la magia. Pasamos los datos y permitimos la interacción (clases interactivas).
+    // Aquí está la corrección: leemos steps y sleepHours de la raíz
     const renderWidgetByKey = (key) => {
         const safeData = dailyData || {};
         const noOp = () => { }; // En historial, algunos widgets son solo lectura (updates bloqueados)
@@ -154,8 +154,10 @@ export default function Profile() {
                     </div>
                 );
             case 'sleep':
+                // 🔥 CORRECCIÓN: safeData.sleepHours (Directo, sin healthStats)
                 return <div className={staticClass}><SleepWidget hours={safeData.sleepHours || 0} onUpdate={noOp} /></div>;
             case 'steps':
+                // 🔥 CORRECCIÓN: safeData.steps (Directo, sin healthStats)
                 return <div className={staticClass}><StepsWidget steps={safeData.steps || 0} onUpdate={noOp} /></div>;
             case 'mood':
                 return <div className={staticClass}><MoodWidget mood={safeData.mood} onUpdate={noOp} /></div>;
@@ -165,7 +167,6 @@ export default function Profile() {
                 // Racha siempre actual del usuario, no del historial
                 return <div className={staticClass}><StreakWidget streak={user?.streak?.current || 0} /></div>;
             case 'weekly':
-                // 🔥 ESTE ERA EL QUE FALLABA: Quitamos pointer-events-none para que abra su modal
                 return (
                     <div className={interactiveClass}>
                         <WeeklyWidget />
