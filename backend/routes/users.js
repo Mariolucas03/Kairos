@@ -4,9 +4,8 @@ const {
     registerUser,
     loginUser,
     getMe,
-    updateUser, // <--- Asegúrate de que esto estaba importado
-    syncHealthData, // <--- IMPORTANTE: Importar la nueva función
-    updateMacros, // <--- Importar si no estaba
+    updateUser,
+    updateMacros,
     claimDailyReward,
     addGameReward,
     updatePhysicalStats,
@@ -15,12 +14,21 @@ const {
     updateStatsManual,
     simulateYesterday,
     setManualStreak,
-    forceNightlyMaintenance
+    forceNightlyMaintenance,
+    syncHealthData // <--- Importado aquí al final (asegúrate de que en userController está exportado igual)
 } = require('../controllers/userController');
+
 const protect = require('../middleware/authMiddleware');
 
+// ==========================================
+// RUTAS PÚBLICAS Y DE AUTH
+// ==========================================
 router.post('/', registerUser);
 router.post('/login', loginUser);
+
+// ==========================================
+// RUTAS PROTEGIDAS (Requieren Token)
+// ==========================================
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateUser);
 
@@ -40,7 +48,9 @@ router.post('/simulate-yesterday', protect, simulateYesterday);
 router.post('/manual-streak', protect, setManualStreak);
 router.post('/force-maintenance', protect, forceNightlyMaintenance);
 
-// 🔥 RUTA DE APPLE HEALTH (PÚBLICA PERO PROTEGIDA POR CLAVE SECRETA)
+// ==========================================
+// RUTA DE APPLE HEALTH (Pública + Clave Secreta)
+// ==========================================
 router.post('/health-sync', syncHealthData);
 
 module.exports = router;
