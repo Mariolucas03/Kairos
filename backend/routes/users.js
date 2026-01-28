@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
-// Importamos TODO del controlador
+const userController = require('../controllers/userController'); // Importamos TODO el objeto
+
+// 🔥 DEBUG: ESTO NOS DIRÁ LA VERDAD EN LOS LOGS
+console.log("🔍 INSPECCIONANDO CONTROLADOR:");
+console.log("Keys disponibles:", Object.keys(userController));
+console.log("¿Existe syncHealthData?", userController.syncHealthData ? "SÍ" : "NO (UNDEFINED)");
+
+// Desestructuramos AHORA (después de importar)
 const {
     registerUser,
     loginUser,
@@ -16,10 +23,13 @@ const {
     simulateYesterday,
     setManualStreak,
     forceNightlyMaintenance,
-    syncHealthData // <--- ESTO TIENE QUE COINCIDIR CON EL CONTROLLER
-} = require('../controllers/userController');
+    syncHealthData // <--- Aquí es donde suele fallar
+} = userController;
 
 const protect = require('../middleware/authMiddleware');
+
+// ... (RESTO DEL CÓDIGO IGUAL QUE ANTES) ...
+// (Asegúrate de mantener el resto de router.post... y el module.exports al final)
 
 // ==========================================
 // RUTAS PÚBLICAS Y DE AUTH
