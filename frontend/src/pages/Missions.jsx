@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 
 // ==========================================
-// 1. HELPERS
+// 1. HELPERS VISUALES
 // ==========================================
 const COOP_COLORS = [
     'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-indigo-500'
@@ -43,9 +43,6 @@ const getDeadlineText = (frequency) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
-// ==========================================
-// 2. ESTILOS (DISEÑO "WIDGET FLOW" CON PALETA SÓLIDA)
-// ==========================================
 const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
     const label = labels[diff] || diff;
@@ -62,7 +59,6 @@ const getGradientStyles = (diff, completed) => {
 
     switch (diff) {
         case 'easy': return {
-            // VERDE MONOCROMÁTICO (Estilo Nutrición)
             gradient: 'from-[#14532d] via-[#166534] to-[#22c55e]',
             shadow: 'rgba(22, 101, 52, 0.4)',
             textGradient: 'from-[#166534] to-[#22c55e]',
@@ -71,7 +67,6 @@ const getGradientStyles = (diff, completed) => {
             label
         };
         case 'medium': return {
-            // AZUL
             gradient: 'from-blue-600 via-cyan-500 to-indigo-600',
             shadow: 'rgba(37, 99, 235, 0.4)',
             textGradient: 'from-blue-400 to-cyan-400',
@@ -80,7 +75,6 @@ const getGradientStyles = (diff, completed) => {
             label
         };
         case 'hard': return {
-            // ROJO
             gradient: 'from-red-600 via-orange-500 to-rose-600',
             shadow: 'rgba(220, 38, 38, 0.4)',
             textGradient: 'from-red-400 to-orange-400',
@@ -89,7 +83,6 @@ const getGradientStyles = (diff, completed) => {
             label
         };
         case 'epic': return {
-            // MORADO
             gradient: 'from-purple-600 via-fuchsia-500 to-violet-600',
             shadow: 'rgba(147, 51, 234, 0.4)',
             textGradient: 'from-purple-400 to-fuchsia-400',
@@ -111,11 +104,12 @@ const getGradientStyles = (diff, completed) => {
 // ==========================================
 // COMPONENTE: TARJETA DE MISIÓN
 // ==========================================
-function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
+function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdit }) {
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [showInput, setShowInput] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false); // 🔥 Para ver detalles y editar
     const startX = useRef(0);
     const THRESHOLD = 80;
 
@@ -123,12 +117,14 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
     const isPending = mission.isCoop && mission.invitationStatus === 'pending';
     const amIOwner = mission.user === currentUserId;
     const isBinary = mission.target === 1;
-    const canSwipe = !isPending && !mission.completed;
+    // Permitimos swipe para borrar incluso si está completada
+    const canSwipe = !isPending;
 
     const handleStart = (clientX) => { if (canSwipe) { setIsDragging(true); startX.current = clientX; } };
     const handleMove = (clientX) => {
         if (!isDragging) return;
         const diff = clientX - startX.current;
+        // Si está completada, solo permitimos swipe a la izquierda (borrar), no derecha (completar de nuevo)
         if (mission.completed && diff > 0) return;
         setDragX(diff);
     };
@@ -136,13 +132,16 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
     const handleEnd = () => {
         setIsDragging(false);
         if (isPending) { setDragX(0); return; }
+
         if (dragX > THRESHOLD) {
             if (!mission.completed) {
                 const remaining = mission.target - mission.progress;
                 onUpdateProgress(mission, Math.max(0, remaining));
             }
         } else if (dragX < -THRESHOLD) {
-            if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar cooperativa?" : "¿Borrar misión?")) onDelete(mission._id);
+            if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión?")) {
+                onDelete(mission._id);
+            }
         }
         setDragX(0);
     };
@@ -169,7 +168,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
 
     const renderProgressBar = () => {
         if (isBinary && !mission.isCoop) return null;
-
         return (
             <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex mt-4 border border-zinc-800/50 relative shadow-inner">
                 {mission.isCoop ? (
@@ -186,8 +184,16 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
         );
     };
 
+    // Formato de días para el detalle
+    const daysMap = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+    const frequencyText = mission.frequency === 'daily'
+        ? (mission.specificDays && mission.specificDays.length > 0
+            ? mission.specificDays.map(d => daysMap[d]).join(', ')
+            : 'Todos los días')
+        : 'Recurrente';
+
     return (
-        <div className="relative w-full mb-5 select-none group">
+        <div className="relative w-full mb-5 select-none group" onClick={() => setIsExpanded(!isExpanded)}>
             {/* Fondo Swipe */}
             {canSwipe && (
                 <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 ${bgAction}`}>
@@ -215,6 +221,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
             >
                 {/* CONTENEDOR INTERNO */}
                 <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-5 relative overflow-hidden h-full flex flex-col justify-between`}>
+
                     {/* Brillo ambiental */}
                     <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
 
@@ -230,6 +237,23 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
                                                 {mission.title}
                                             </h3>
                                         </div>
+
+                                        {/* 🔥 DETALLES EXPANDIDOS (Días y Editar) */}
+                                        {isExpanded && (
+                                            <div className="mt-2 text-[10px] text-zinc-400 font-bold flex flex-col gap-1 animate-in slide-in-from-top-1">
+                                                <div className="flex items-center gap-1 uppercase tracking-wide">
+                                                    <Calendar size={10} /> {frequencyText}
+                                                </div>
+                                                {amIOwner && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onEdit(mission); }}
+                                                        className="text-yellow-500 hover:text-yellow-400 flex items-center gap-1 w-fit mt-1"
+                                                    >
+                                                        <Edit size={10} /> EDITAR
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="absolute -top-1 -right-1 flex flex-col items-end gap-1.5">
@@ -242,7 +266,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
                                     </div>
                                 </div>
 
-                                {/* PROGRESO GRANDE (Texto Metálico) */}
+                                {/* PROGRESO */}
                                 <div className="flex items-center gap-3 mt-3">
                                     <div className="flex items-baseline gap-1">
                                         <span className={`text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110 pr-2 pb-1`}>
@@ -263,12 +287,11 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
                                     )}
                                 </div>
                             </div>
-
                             {mission.completed && <div className="p-1.5 bg-zinc-900 rounded-full border border-zinc-800 shrink-0 mt-0.5"><Check size={18} className={styles.iconColor} /></div>}
                         </div>
 
                         {showInput && !isBinary && (
-                            <form onSubmit={handleNumericSubmit} className="mt-4 flex gap-2 animate-in slide-in-from-top-2">
+                            <form onSubmit={handleNumericSubmit} className="mt-4 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
                                 <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white font-black text-lg text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
                                 <button type="submit" className={`px-4 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient} shadow-lg shadow-${styles.shadow.split(' ')[0]}`}><Check size={20} /></button>
                             </form>
@@ -277,35 +300,11 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
                         {renderProgressBar()}
                     </div>
 
-                    {/* FOOTER REWARDS */}
-                    <div className="flex items-center gap-5 mt-5 pt-3 border-t border-zinc-900/80 flex-wrap">
-                        <div className="flex items-center gap-2" title="Experiencia">
-                            <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-400'}`}>+{mission.xpReward}</span>
-                            <img src="/assets/icons/xp.png" alt="XP" className="w-5 h-5 object-contain rendering-pixelated" />
-                        </div>
-                        <div className="flex items-center gap-2" title="Monedas">
-                            <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-400'}`}>+{mission.coinReward}</span>
-                            <img src="/assets/icons/moneda.png" alt="Monedas" className="w-5 h-5 object-contain rendering-pixelated" />
-                        </div>
-                        <div className="flex items-center gap-2" title="Fichas">
-                            <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-400'}`}>+{mission.gameCoinReward || mission.coinReward * 2}</span>
-                            <img src="/assets/icons/ficha.png" alt="Fichas" className="w-5 h-5 object-contain rendering-pixelated" />
-                        </div>
-
-                        {/* Vida */}
-                        {!mission.completed && (
-                            <div className="ml-auto flex items-center gap-1.5" title="Riesgo de Vida">
-                                <span className="text-sm font-black text-red-500">-5</span>
-                                <img src="/assets/icons/corazon.png" alt="HP" className="w-5 h-5 object-contain rendering-pixelated" />
-                            </div>
-                        )}
-                    </div>
-
                     {isPending && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-[22px] z-30">
                             <Loader2 className="animate-spin text-zinc-500 mb-2" />
                             <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
-                            {amIOwner && <button onClick={() => onDelete(mission._id)} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
+                            {amIOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(mission._id); }} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
                         </div>
                     )}
                 </div>
@@ -326,8 +325,12 @@ export default function Missions() {
     const [toast, setToast] = useState(null);
     const [friends, setFriends] = useState([]);
 
-    // 🔥 NUEVO ESTADO PARA EL MODO "VER TODO"
+    // 🔥 PUNTOS 1 y 3: MODO GESTIÓN Y FILTRADO
     const [viewAllMode, setViewAllMode] = useState(false);
+
+    // 🔥 ESTADO EDICIÓN
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [missionToEdit, setMissionToEdit] = useState(null);
 
     const DEFAULTS = {
         title: '', frequency: 'daily', type: 'habit', difficulty: 'easy', target: 1, unit: '', isCoop: false, friendId: ''
@@ -364,28 +367,34 @@ export default function Missions() {
         let mult = m1 * m2;
         if (newMission.isCoop) mult *= 1.5;
 
-        const xp = Math.round(baseXP * mult);
-        const coins = Math.round(baseCoins * mult);
-        const gameCoins = coins * 2;
-
-        return { xp, coins, gameCoins };
+        return { xp: Math.round(baseXP * mult), coins: Math.round(baseCoins * mult), gameCoins: Math.round(baseCoins * mult * 2) };
     };
 
+    // 🔥 FIX PUNTO 3: LOGICA DE FILTRADO CORREGIDA
     const getFilteredMissions = () => {
-        // 🔥 SI EL MODO "VER TODO" ESTÁ ACTIVO, DEVOLVEMOS TODO SIN FILTRAR
+        // Si activamos el "Ojo", mostramos TODO (incluidas completadas y de otros días) para gestionar
         if (viewAllMode) return missions;
 
         const today = new Date().getDay();
         return missions.filter(m => {
+            // Filtrar por tab activo (diario, semanal...)
             if (activeTab !== 'all' && m.frequency !== activeTab) return false;
+
+            // Si es coop pendiente y no soy yo, ocultar
             if (m.isCoop && m.invitationStatus === 'pending' && m.user !== user._id) return false;
-            // Filtro de día (Solo mostrar si hoy toca)
-            if (m.frequency === 'daily' && m.specificDays && m.specificDays.length > 0) return m.specificDays.includes(today);
+
+            // 🔥 Filtro de día estricto: Solo mostrar si hoy toca
+            if (m.frequency === 'daily' && m.specificDays && m.specificDays.length > 0) {
+                if (!m.specificDays.includes(today)) return false;
+            }
+
             return true;
         });
     };
 
     const filteredMissions = getFilteredMissions();
+
+    // Estadísticas
     const completedCount = filteredMissions.filter(m => m.completed).length;
     const totalCount = filteredMissions.length;
     const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
@@ -404,25 +413,19 @@ export default function Missions() {
 
         const safeUnit = newMission.unit ? newMission.unit.trim() : undefined;
         const finalFreq = newMission.frequency || 'daily';
-        const rewards = getRewardValues(finalFreq, newMission.difficulty);
-        const finalType = newMission.type || 'habit';
 
         const payload = {
             title: newMission.title.trim(),
             frequency: finalFreq,
-            type: finalType,
+            type: newMission.type || 'habit',
             difficulty: newMission.difficulty || 'easy',
             target: parseInt(newMission.target) || 1,
             unit: safeUnit,
             isCoop: !!newMission.isCoop,
-            xpReward: rewards.xp,
-            coinReward: rewards.coins,
-            gameCoinReward: rewards.gameCoins,
             specificDays: finalFreq === 'daily' ? selectedDays : []
         };
 
         if (payload.isCoop) payload.friendId = newMission.friendId;
-        else delete payload.friendId;
 
         try {
             await api.post('/missions', payload);
@@ -439,7 +442,6 @@ export default function Missions() {
             const res = await api.put(`/missions/${mission._id}/progress`, { amount });
             if (res.data.progressOnly) {
                 setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
-                showToast(`+${amount} ${mission.unit || 'progreso'}`, "info");
                 return;
             }
             if (res.data.user) { setUser(res.data.user); localStorage.setItem('user', JSON.stringify(res.data.user)); }
@@ -450,6 +452,23 @@ export default function Missions() {
 
     const handleDelete = async (id) => {
         try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Misión eliminada", "info"); } catch (e) { }
+    };
+
+    // 🔥 HANDLE EDITAR (PUNTO 1)
+    const handleEditMission = async () => {
+        if (!missionToEdit || !missionToEdit.title.trim()) return;
+        try {
+            await api.put(`/missions/${missionToEdit._id}/progress`, {
+                editMode: true,
+                title: missionToEdit.title,
+                target: missionToEdit.target
+            });
+            setShowEditModal(false);
+            fetchMissions();
+            showToast("Misión actualizada");
+        } catch (e) {
+            showToast("Error al editar", "error");
+        }
     };
 
     const previewRewards = getRewardValues(newMission.frequency, newMission.difficulty);
@@ -467,7 +486,7 @@ export default function Missions() {
                         Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
                     </h1>
                     <div className="flex gap-2">
-                        {/* 🔥 BOTÓN VER TODO (GESTIÓN) */}
+                        {/* 🔥 BOTÓN OJO (GESTIÓN) */}
                         <button
                             onClick={() => setViewAllMode(!viewAllMode)}
                             className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}
@@ -481,7 +500,7 @@ export default function Missions() {
 
                 {viewAllMode ? (
                     <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2">
-                        <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Viendo todas las misiones ocultas</p>
+                        <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Viendo todas las misiones (Histórico)</p>
                     </div>
                 ) : (
                     <>
@@ -508,20 +527,59 @@ export default function Missions() {
                     </div>
                 ) : (
                     <>
-                        {filteredMissions.map(m => <MissionCard key={m._id} mission={m} onUpdateProgress={handleUpdateProgress} onDelete={handleDelete} currentUserId={user._id} />)}
+                        {filteredMissions.map(m => (
+                            <MissionCard
+                                key={m._id}
+                                mission={m}
+                                onUpdateProgress={handleUpdateProgress}
+                                onDelete={handleDelete}
+                                currentUserId={user._id}
+                                onEdit={(m) => { setMissionToEdit(m); setShowEditModal(true); }} // PASAR EL CLICK DE EDITAR
+                            />
+                        ))}
 
-                        <div className="text-center mt-8 mb-4">
-                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 flex items-center justify-center gap-2 mx-auto w-fit">
-                                <Clock size={12} /> DISPONIBLE HASTA: <span className="text-zinc-300">{getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}</span>
-                            </span>
-                        </div>
+                        {!viewAllMode && (
+                            <div className="text-center mt-8 mb-4">
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 flex items-center justify-center gap-2 mx-auto w-fit">
+                                    <Clock size={12} /> DISPONIBLE HASTA: <span className="text-zinc-300">{getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}</span>
+                                </span>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
 
-            {/* MODAL CREAR (PORTAL) */}
+            {/* MODAL EDITAR (PUNTO 1) */}
+            {showEditModal && missionToEdit && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2"><Edit size={18} className="text-yellow-500" /> Editar Misión</h2>
+                            <button onClick={() => setShowEditModal(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><X size={18} /></button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label>
+                                <input type="text" value={missionToEdit.title} onChange={e => setMissionToEdit({ ...missionToEdit, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label>
+                                <input type="number" value={missionToEdit.target} onChange={e => setMissionToEdit({ ...missionToEdit, target: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" />
+                            </div>
+
+                            <div className="pt-4 flex gap-2">
+                                <button onClick={() => setShowEditModal(false)} className="flex-1 bg-zinc-800 text-zinc-300 py-3 rounded-xl font-bold text-xs uppercase">Cancelar</button>
+                                <button onClick={handleEditMission} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2"><Save size={16} /> Guardar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>, document.body
+            )}
+
+            {/* MODAL CREAR (MANTENIDO) */}
             {showCreator && createPortal(
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">
                         <div className="flex justify-between items-center p-5 border-b border-zinc-800/50 bg-[#09090b] shrink-0 z-10">
                             <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2"><Plus size={18} className="text-yellow-500" /> Nueva Misión</h2>
@@ -529,14 +587,12 @@ export default function Missions() {
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4 bg-black/20">
-
-                            {/* TÍTULO */}
+                            {/* ... FORMULARIO DE CREAR (Ya estaba bien) ... */}
                             <div className="mt-2">
                                 <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label>
                                 <input type="text" placeholder="Ej: Leer 10 páginas" autoFocus value={newMission.title} onChange={e => setNewMission({ ...newMission, title: e.target.value })} className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-white placeholder-zinc-700 outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all font-bold text-sm" />
                             </div>
 
-                            {/* TIPO */}
                             <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
                                 <button onClick={() => setNewMission({ ...newMission, type: 'habit' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'habit' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Hábito (Recurrente)</button>
                                 <button onClick={() => setNewMission({ ...newMission, type: 'quest' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'quest' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Misión Puntual</button>
@@ -549,13 +605,7 @@ export default function Missions() {
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Unidad</label>
-                                    <input
-                                        type="text"
-                                        placeholder="km, pags, min..."
-                                        className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-center text-white font-medium text-sm outline-none focus:border-blue-500/50 transition-all placeholder-zinc-700"
-                                        value={newMission.unit}
-                                        onChange={e => setNewMission({ ...newMission, unit: e.target.value })}
-                                    />
+                                    <input type="text" placeholder="km, pags, min..." className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-center text-white font-medium text-sm outline-none focus:border-blue-500/50 transition-all placeholder-zinc-700" value={newMission.unit} onChange={e => setNewMission({ ...newMission, unit: e.target.value })} />
                                 </div>
                             </div>
 
@@ -607,12 +657,6 @@ export default function Missions() {
                                         {friends.map(f => <option key={f._id} value={f._id}>{f.username}</option>)}
                                     </select>
                                 )}
-                            </div>
-
-                            <div className="flex justify-center gap-3 pt-1 opacity-70 flex-wrap">
-                                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-400">+{previewRewards.xp} <img src="/assets/icons/xp.png" alt="XP" className="w-5 h-5 object-contain rendering-pixelated mt-[1px]" /></span>
-                                <span className="flex items-center gap-1 text-[10px] font-bold text-yellow-400">+{previewRewards.coins} <img src="/assets/icons/moneda.png" alt="Monedas" className="w-5 h-5 object-contain rendering-pixelated mt-[2px]" /></span>
-                                <span className="flex items-center gap-1 text-[10px] font-bold text-purple-400">+{previewRewards.gameCoins} <img src="/assets/icons/ficha.png" alt="Fichas" className="w-5 h-5 object-contain rendering-pixelated mt-[2px]" /></span>
                             </div>
                         </div>
 

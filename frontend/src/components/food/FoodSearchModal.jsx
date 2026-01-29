@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Plus, X, Flame, Wheat, Droplet, Leaf, Sparkles, ScanBarcode, ArrowRight, Camera, Image as ImageIcon, Trash2, BrainCircuit, Save, Check } from 'lucide-react';
+import {
+    Search, Plus, X, Sparkles, Image as ImageIcon, Trash2, Camera,
+    SortAsc, Filter, ArrowRight, BrainCircuit, Save, Flame, Wheat, Droplet, Leaf
+} from 'lucide-react';
 import api from '../../services/api';
 
-// --- COMPONENTE INTERNO: ÍTEM DESLIZABLE ---
+// --- COMPONENTE INTERNO: ÍTEM DESLIZABLE (Swipe to Delete) ---
 const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -20,7 +23,7 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
         if (!isDragging) return;
         const diffX = e.touches[0].clientX - startX.current;
         const diffY = e.touches[0].clientY - startY.current;
-        if (Math.abs(diffY) > Math.abs(diffX)) return;
+        if (Math.abs(diffY) > Math.abs(diffX)) return; // Scroll vertical
         if (Math.abs(diffX) > 10 && Math.abs(diffX) < 150) setOffsetX(diffX);
     };
     const handleTouchEnd = () => { setIsDragging(false); finishDrag(); };
@@ -40,7 +43,7 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
     const trashScale = Math.min(Math.abs(offsetX) / 50, 1.2);
 
     return (
-        <div className="relative w-full mb-2 h-[72px] select-none overflow-hidden rounded-2xl touch-pan-y">
+        <div className="relative w-full mb-2 h-[72px] select-none overflow-hidden rounded-2xl touch-pan-y group">
             <div className="absolute inset-0 bg-red-600 flex items-center justify-between px-6 rounded-2xl transition-colors">
                 <Trash2 className="text-white transition-transform" style={{ opacity: trashOpacity, transform: `scale(${trashScale})` }} size={24} />
                 <Trash2 className="text-white transition-transform" style={{ opacity: trashOpacity, transform: `scale(${trashScale})` }} size={24} />
@@ -49,10 +52,15 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
                 onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}
                 style={{ transform: `translateX(${offsetX}px)`, transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
-                className="absolute inset-0 bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center z-10"
+                className="absolute inset-0 bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-between items-center z-10 active:scale-[0.98] transition-all"
             >
                 <div className="pointer-events-none">
-                    <p className="font-bold text-white text-sm truncate w-56">{item.name}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="font-bold text-white text-sm truncate w-48">{item.name}</p>
+                        {item.folder && item.folder !== 'General' && (
+                            <span className="text-[8px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded uppercase font-bold border border-zinc-700">{item.folder}</span>
+                        )}
+                    </div>
                     <div className="flex items-center gap-3 mt-1.5 text-[10px] font-black uppercase tracking-wide">
                         <span className="text-zinc-400">KCAL: {Math.round(item.calories)}</span>
                         <span className="text-blue-400">P: {p}</span>
@@ -71,12 +79,16 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
 
 // --- COMPONENTE PRINCIPAL ---
 export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
-    const [mode, setMode] = useState('search');
+    const [mode, setMode] = useState('search'); // 'search', 'ai', 'manual', 'review'
 
-    // Búsqueda
+    // Búsqueda y Filtrado
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // 🔥 FIX PUNTO 13: Estados de ordenación
+    const [sortBy, setSortBy] = useState('name'); // 'name', 'calories'
+    const [filterFolder, setFilterFolder] = useState('Todos'); // 'Todos', 'Desayuno', etc.
 
     // IA
     const [aiInput, setAiInput] = useState('');
@@ -85,22 +97,69 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
     const [aiLoading, setAiLoading] = useState(false);
     const fileInputRef = useRef(null);
 
-    // IA Helper
+    // IA Helper (Manual)
     const [showAiHelper, setShowAiHelper] = useState(false);
     const [aiDescription, setAiDescription] = useState('');
     const [aiHelperLoading, setAiHelperLoading] = useState(false);
 
     // Formulario
-    const [manualForm, setManualForm] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1 });
+    const [manualForm, setManualForm] = useState({
+        name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1,
+        folder: 'General' // 🔥 FIX PUNTO 13: Carpeta por defecto
+    });
     const searchInputRef = useRef(null);
 
+    // Cargar alimentos guardados al inicio
     useEffect(() => { if (mode === 'search' && query.trim() === '') fetchSavedFoods(); }, [mode, query]);
-    const fetchSavedFoods = async () => { setLoading(true); try { const res = await api.get('/food/saved'); setResults(res.data); } catch (e) { console.error(e); } finally { setLoading(false); } };
 
-    useEffect(() => { const timer = setTimeout(() => { if (query.trim().length > 0 && mode === 'search') searchFood(); }, 500); return () => clearTimeout(timer); }, [query]);
-    const searchFood = async () => { setLoading(true); try { const res = await api.get(`/food/search?query=${query}`); setResults(res.data); } catch (e) { console.error(e); } finally { setLoading(false); } };
+    const fetchSavedFoods = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/food/saved');
+            setResults(res.data);
+        } catch (e) { console.error(e); }
+        finally { setLoading(false); }
+    };
 
-    // --- ACCIONES GENERALES ---
+    // Búsqueda en tiempo real
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (query.trim().length > 0 && mode === 'search') searchFood();
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    const searchFood = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get(`/food/search?query=${query}`);
+            setResults(res.data);
+        } catch (e) { console.error(e); }
+        finally { setLoading(false); }
+    };
+
+    // 🔥 LÓGICA DE FILTRADO Y ORDENACIÓN (PUNTO 13)
+    const getProcessedResults = () => {
+        let processed = [...results];
+
+        // 1. Filtrar por carpeta
+        if (filterFolder !== 'Todos') {
+            processed = processed.filter(item => item.folder === filterFolder);
+        }
+
+        // 2. Ordenar
+        processed.sort((a, b) => {
+            if (sortBy === 'name') return a.name.localeCompare(b.name);
+            if (sortBy === 'calories') return b.calories - a.calories; // Mayor a menor
+            return 0;
+        });
+
+        return processed;
+    };
+
+    const processedResults = getProcessedResults();
+
+    // --- ACCIONES ---
     const handleAddFood = async (food) => {
         try {
             const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
@@ -114,21 +173,29 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         catch (e) { onShowToast("No se pudo eliminar", "error"); fetchSavedFoods(); }
     };
 
-    // --- ACCIÓN 1: ESCANEAR (AHORA LLEVA A REVISIÓN) ---
+    // --- IA SCAN (PUNTO 4: Permitir texto SOLO) ---
     const handleAiScanSubmit = async () => {
+        // 🔥 FIX: Permitir si hay texto O imagen. Antes requería ambos en algunos casos lógicos.
         if (!aiInput.trim() && !aiImage) return;
+
         setAiLoading(true);
         try {
             let analyzedData = null;
+
             if (aiImage) {
+                // Si hay imagen, usamos endpoint de visión
                 const formData = new FormData();
                 formData.append('text', aiInput);
                 formData.append('image', aiImage);
                 const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
                 analyzedData = res.data;
             } else {
+                // Si SOLO hay texto, usamos endpoint de texto (PUNTO 4 SOLUCIONADO)
                 const res = await api.post('/food/analyze-text', { text: aiInput });
-                if (res.data.type === 'success') { analyzedData = res.data.data; analyzedData.name = analyzedData.name || aiInput; }
+                if (res.data.type === 'success') {
+                    analyzedData = res.data.data;
+                    analyzedData.name = analyzedData.name || aiInput;
+                }
             }
 
             if (!analyzedData || analyzedData.calories === undefined) throw new Error("No se identificó el alimento");
@@ -140,7 +207,8 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 carbs: analyzedData.carbs || 0,
                 fat: analyzedData.fat || 0,
                 fiber: analyzedData.fiber || 0,
-                quantity: 1
+                quantity: 1,
+                folder: 'General'
             });
 
             onShowToast("¡Analizado! Revisa los datos.", "success");
@@ -154,7 +222,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         }
     };
 
-    // --- ACCIONES DE REVISIÓN / MANUAL ---
+    // --- ACCIONES MANUALES / REVIEW ---
     const handleAddToMealNow = async () => {
         if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
         try {
@@ -170,10 +238,12 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
             const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber), servingSize: '1 ración' };
             await api.post('/food/save', foodData);
             onShowToast("Guardado en tu lista", "success");
-            setMode('search'); setQuery(manualForm.name);
-            const res = await api.get(`/food/search?query=${manualForm.name}`);
+            setMode('search');
+            setQuery(manualForm.name);
+            // Refetch para ver el nuevo item
+            const res = await api.get('/food/saved');
             setResults(res.data);
-            setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1 });
+            setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1, folder: 'General' });
         } catch (e) { onShowToast("Error al guardar", "error"); }
     };
 
@@ -195,6 +265,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
     return (
         <div className="flex flex-col h-full w-full bg-zinc-950 text-white animate-in slide-in-from-bottom-10 duration-200">
+            {/* Header Modal */}
             <div className="px-5 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
                 <h2 className="text-lg font-black uppercase tracking-wider text-white">
                     {mode === 'review' ? 'Revisar Datos' : 'Añadir Alimento'}
@@ -202,8 +273,9 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={20} /></button>
             </div>
 
+            {/* Selector de Modo */}
             {mode !== 'review' && (
-                <div className="p-4 shrink-0">
+                <div className="p-4 shrink-0 pb-0">
                     <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
                         <button onClick={() => setMode('search')} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${mode === 'search' ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500'}`}>Buscar</button>
                         <button onClick={() => setMode('ai')} className={`flex-1 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1 ${mode === 'ai' ? 'bg-blue-900/30 text-blue-400 shadow-md border border-blue-500/30' : 'text-zinc-500'}`}><Sparkles size={12} /> IA Scan</button>
@@ -212,7 +284,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-20">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-20 pt-4">
 
                 {mode === 'search' && (
                     <div className="space-y-4 animate-in fade-in duration-300">
@@ -220,27 +292,59 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
                             <input ref={searchInputRef} type="text" placeholder="Buscar en mis alimentos..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white pl-11 pr-4 py-4 rounded-2xl outline-none focus:border-zinc-600 transition-all font-bold text-sm placeholder-zinc-600" />
                         </div>
+
+                        {/* 🔥 FILTROS Y ORDENACIÓN (PUNTO 13) */}
+                        <div className="flex flex-col gap-2">
+                            {/* Ordenar */}
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
+                                    <SortAsc size={14} className="text-zinc-500" />
+                                    <span className="text-[10px] font-bold text-zinc-500 uppercase">Orden</span>
+                                </div>
+                                <button onClick={() => setSortBy('name')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'name' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>A-Z</button>
+                                <button onClick={() => setSortBy('calories')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'calories' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>Kcal</button>
+                            </div>
+
+                            {/* Filtrar Carpeta */}
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
+                                    <Filter size={14} className="text-zinc-500" />
+                                    <span className="text-[10px] font-bold text-zinc-500 uppercase">Carpeta</span>
+                                </div>
+                                {['Todos', 'General', 'Desayuno', 'Comida', 'Cena', 'Snack'].map(f => (
+                                    <button key={f} onClick={() => setFilterFolder(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === f ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>
+                                        {f}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
                             {loading ? <div className="text-center py-10 text-zinc-600 font-bold uppercase text-xs animate-pulse">Cargando...</div> :
-                                results.length > 0 ? results.map((item, idx) => (
+                                processedResults.length > 0 ? processedResults.map((item, idx) => (
                                     <SwipeableFoodItem key={item._id || idx} item={item} onAdd={handleAddFood} onDelete={handleDeleteSavedFood} />
-                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No tienes alimentos guardados"}</div>}
+                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No hay alimentos en esta carpeta"}</div>}
                         </div>
                     </div>
                 )}
 
                 {mode === 'ai' && (
                     <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
-                        <div className="relative mt-2"><textarea placeholder="Describe tu comida o sube una foto..." className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white text-sm font-medium resize-none focus:border-blue-500/50 outline-none placeholder-zinc-600 leading-relaxed" value={aiInput} onChange={(e) => setAiInput(e.target.value)} /></div>
+                        <div className="relative mt-2"><textarea placeholder="Ej: Un plátano mediano y un café con leche..." className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white text-sm font-medium resize-none focus:border-blue-500/50 outline-none placeholder-zinc-600 leading-relaxed" value={aiInput} onChange={(e) => setAiInput(e.target.value)} /></div>
                         <div>
                             <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
                             {!aiImagePreview ? (
-                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto / Subir Imagen</span></button>
+                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto (Opcional)</span></button>
                             ) : (
                                 <div className="relative rounded-3xl overflow-hidden border border-zinc-800 group"><img src={aiImagePreview} alt="Preview" className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4"><div className="flex justify-between items-center w-full"><span className="text-xs font-bold text-white flex items-center gap-2"><ImageIcon size={14} /> Imagen seleccionada</span><button onClick={clearImage} className="bg-red-500/20 text-red-400 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all backdrop-blur-md border border-red-500/30"><Trash2 size={18} /></button></div></div></div>
                             )}
                         </div>
-                        <div className="pt-2"><button onClick={handleAiScanSubmit} disabled={aiLoading || (!aiInput.trim() && !aiImage)} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-900/20">{aiLoading ? <span className="animate-pulse flex items-center gap-2"><Sparkles size={16} /> Analizando...</span> : <>Procesar con IA <ArrowRight size={18} /></>}</button></div>
+                        <div className="pt-2">
+                            {/* 🔥 FIX PUNTO 4: Habilitar botón si hay texto O imagen */}
+                            <button onClick={handleAiScanSubmit} disabled={aiLoading || (!aiInput.trim() && !aiImage)} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-900/20">
+                                {aiLoading ? <span className="animate-pulse flex items-center gap-2"><Sparkles size={16} /> Analizando...</span> : <>Procesar con IA <ArrowRight size={18} /></>}
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -259,6 +363,22 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             {mode === 'manual' && (
                                 <div className="mt-3 border-t border-zinc-800 pt-3"><button onClick={() => setShowAiHelper(!showAiHelper)} className="flex items-center gap-2 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors"><Sparkles size={14} /> {showAiHelper ? 'Ocultar Asistente IA' : '🪄 Autocompletar con IA'}</button>{showAiHelper && (<div className="mt-3 space-y-2 animate-in slide-in-from-top-2"><textarea placeholder="Ej: 200g de pollo y 100g de arroz blanco cocido..." className="w-full bg-zinc-950 border border-purple-500/30 rounded-xl p-3 text-xs text-white focus:border-purple-500 outline-none min-h-[80px]" value={aiDescription} onChange={(e) => setAiDescription(e.target.value)} /><button onClick={handleAiAutofill} disabled={aiHelperLoading || !aiDescription.trim()} className="w-full bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-xl text-xs font-black uppercase tracking-wider flex justify-center gap-2 disabled:opacity-50">{aiHelperLoading ? <BrainCircuit className="animate-spin" size={14} /> : <BrainCircuit size={14} />} Calcular Macros</button></div>)}</div>
                             )}
+                        </div>
+
+                        {/* 🔥 SELECCIÓN DE CARPETA (PUNTO 13) */}
+                        <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800">
+                            <label className="text-[10px] font-bold text-zinc-400 mb-2 block pl-2 uppercase tracking-wider">Guardar en Carpeta</label>
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                {['General', 'Desayuno', 'Comida', 'Cena', 'Snack'].map(folder => (
+                                    <button
+                                        key={folder}
+                                        onClick={() => setManualForm({ ...manualForm, folder })}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all whitespace-nowrap ${manualForm.folder === folder ? 'bg-white text-black shadow-lg' : 'bg-zinc-950 text-zinc-500 border border-zinc-800'}`}
+                                    >
+                                        {folder}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800 space-y-4">

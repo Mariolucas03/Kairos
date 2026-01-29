@@ -1447,7 +1447,7 @@ const seedExercises = async (req, res) => {
 };
 
 // ==========================================
-// 7. GUARDAR LOG DE GYM
+// 7. GUARDAR LOG DE GYM (MODIFICADO: RECOMPENSAS DINÁMICAS)
 // ==========================================
 const saveWorkoutLog = async (req, res) => {
     try {
@@ -1545,7 +1545,21 @@ const saveWorkoutLog = async (req, res) => {
             { upsert: true }
         );
 
-        const result = await levelService.addRewards(req.user._id, 50, 15);
+        // 🔥🔥🔥 RECOMPENSAS DINÁMICAS (AJUSTE FINAL) 🔥🔥🔥
+        // Fórmula:
+        // XP = 50% de las calorías
+        // Fichas (GameCoins) = 35% de las calorías
+        // Monedas (Reales) = 0
+
+        const xpReward = Math.ceil(caloriesBurned * 0.50);
+        const gameCoinsReward = Math.ceil(caloriesBurned * 0.35);
+        const coinsReward = 0;
+
+        // Aseguramos un mínimo para motivar (al menos 5 de cada)
+        const finalXp = Math.max(5, xpReward);
+        const finalGameCoins = Math.max(5, gameCoinsReward);
+
+        const result = await levelService.addRewards(req.user._id, finalXp, coinsReward, finalGameCoins);
 
         res.status(201).json({
             message: `Entreno guardado: ${caloriesBurned} kcal`,
@@ -1561,7 +1575,7 @@ const saveWorkoutLog = async (req, res) => {
 };
 
 // ==========================================
-// 8. GUARDAR LOG DE DEPORTE
+// 8. GUARDAR LOG DE DEPORTE (MODIFICADO: RECOMPENSAS DINÁMICAS)
 // ==========================================
 const saveSportLog = async (req, res) => {
     try {
@@ -1646,7 +1660,19 @@ const saveSportLog = async (req, res) => {
             { upsert: true }
         );
 
-        const result = await levelService.addRewards(req.user._id, 30, 10);
+        // 🔥🔥🔥 RECOMPENSAS DINÁMICAS (AJUSTE FINAL) 🔥🔥🔥
+        // Fórmula idéntica:
+        // XP = 50% de las calorías
+        // Fichas (GameCoins) = 35% de las calorías
+
+        const xpReward = Math.ceil(caloriesBurned * 0.50);
+        const gameCoinsReward = Math.ceil(caloriesBurned * 0.35);
+        const coinsReward = 0;
+
+        const finalXp = Math.max(5, xpReward);
+        const finalGameCoins = Math.max(5, gameCoinsReward);
+
+        const result = await levelService.addRewards(req.user._id, finalXp, coinsReward, finalGameCoins);
 
         res.status(201).json({
             message: `Registrado: ${caloriesBurned} kcal`,
@@ -1915,7 +1941,6 @@ const chatRoutineGenerator = async (req, res) => {
     return res.json({ name: "Rutina de Emergencia", exercises: [{ name: "Flexiones", muscle: "Pecho", sets: 3, reps: "15", rest: 60 }], difficulty: "Novato", message: "Sistemas IA caídos. Aquí tienes algo básico." });
 };
 
-// 🔥 EXPORTAMOS TODAS LAS FUNCIONES, INCLUYENDO deleteRoutine
 module.exports = {
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
     getAllExercises, createCustomExercise, seedExercises,
@@ -1934,6 +1959,7 @@ const Mission = require('../models/Mission');
 const DailyLog = require('../models/DailyLog');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
+const mongoose = require('mongoose');
 
 const BASE_XP = 10;
 const BASE_COINS = 5;
@@ -1942,44 +1968,85 @@ const DIFFICULTY_MULTIPLIERS = { easy: 1, medium: 2, hard: 3, epic: 5 };
 const FREQUENCY_MULTIPLIERS = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
 
 // ------------------------------------------------------------------
-// 1. OBTENER MISIONES
+// 1. OBTENER MISIONES (VERSIÓN SUPER PERMISIVA)
 // ------------------------------------------------------------------
 const getMissions = asyncHandler(async (req, res) => {
-    // Busca misiones donde el usuario es participante, o es el creador, o son públicas/cooperativas activas
-    const missions = await Mission.find({
-        participants: { $in: [req.user._id] },
-        $or: [
-            { isCoop: false },
-            { invitationStatus: 'active' }, // Solo mostrar cooperativas si ya aceptaron
-            { user: req.user._id, invitationStatus: 'pending' } // O si soy el dueño esperando
-        ]
-    })
-        .populate('participants', 'username avatar')
-        .sort({ completed: 1, createdAt: -1 }); // Primero las no completadas
+    const userId = req.user._id;
 
-    // Resetear hábitos diarios si es un nuevo día (Lógica Lazy Load)
+    // 1. Preparamos las dos versiones del ID: Texto y Objeto
+    // Esto arregla el problema si en la BD se guardó mezclado
+    const userIdString = userId.toString();
+    let userIdObj;
+    try {
+        userIdObj = new mongoose.Types.ObjectId(userIdString);
+    } catch (e) {
+        userIdObj = userId; // Fallback
+    }
+
+    console.log(`🔍 [DEBUG] Buscando misiones para: ${userIdString}`);
+
+    // 2. Consulta "Atrapalotodo"
+    // Busca donde seas el dueño (String u Object) O donde seas participante (String u Object)
+    const query = {
+        $or: [
+            { user: userIdObj },
+            { user: userIdString },
+            { participants: userIdObj },
+            { participants: userIdString },
+            // Misiones cooperativas activas
+            { participants: { $in: [userIdObj, userIdString] }, invitationStatus: 'active' }
+        ]
+    };
+
+    const missions = await Mission.find(query)
+        .populate('participants', 'username avatar')
+        .sort({ completed: 1, createdAt: -1 });
+
+    console.log(`✅ [DEBUG] Encontradas: ${missions.length} misiones brutas.`);
+
+    // 3. Limpieza de Fechas (Protegido contra errores)
     const today = new Date().toDateString();
     let updated = false;
 
     for (let mission of missions) {
-        if (mission.type === 'habit' && mission.completed) {
-            const lastUpdate = new Date(mission.lastUpdated).toDateString();
+        try {
+            // Si es hábito, verificamos si hay que resetear
+            if (mission.type === 'habit' && mission.completed) {
+                // Si no tiene fecha, asumimos que es vieja y reseteamos
+                if (!mission.lastUpdated) {
+                    mission.lastUpdated = new Date();
+                }
 
-            // Si la misión se completó en un día anterior, reiniciarla
-            // Nota: Para semanales/mensuales necesitarías lógica más compleja de fechas, 
-            // aquí asumimos reset diario básico o gestionado por CRON externo para precisión.
-            if (lastUpdate !== today && mission.frequency === 'daily') {
-                mission.progress = 0;
-                mission.completed = false;
-                mission.participants.forEach(p => mission.contributions.set(p.toString(), 0));
-                await mission.save();
-                updated = true;
+                const lastUpdate = new Date(mission.lastUpdated).toDateString();
+
+                if (lastUpdate !== today && mission.frequency === 'daily') {
+                    console.log(`🔄 [DEBUG] Reseteando misión diaria: ${mission.title}`);
+                    mission.progress = 0;
+                    mission.completed = false;
+
+                    // Asegurar mapa de contribuciones
+                    if (!mission.contributions) mission.contributions = new Map();
+
+                    // Reparar participantes si es necesario
+                    if (mission.participants && mission.participants.length > 0) {
+                        mission.participants.forEach(p => {
+                            const pId = p._id ? p._id.toString() : p.toString();
+                            mission.contributions.set(pId, 0);
+                        });
+                    }
+
+                    await mission.save();
+                    updated = true;
+                }
             }
+        } catch (err) {
+            console.error(`⚠️ [WARN] Error procesando misión corrupta (${mission._id}):`, err.message);
+            // Opcional: Podrías borrarla si está muy rota: await mission.deleteOne();
         }
     }
 
     if (updated) {
-        // Volver a pedir para asegurar consistencia
+        // Volvemos a llamar para traer los datos limpios
         return getMissions(req, res);
     }
 
@@ -1997,24 +2064,20 @@ const createMission = asyncHandler(async (req, res) => {
         throw new Error('El título es obligatorio');
     }
 
-    // Default Values
     const freq = frequency || 'daily';
     const diff = difficulty || 'easy';
     const missionType = type || 'habit';
     const days = Array.isArray(specificDays) ? specificDays : [];
-
-    // 🔥 FIX: Unidad vacía se guarda como string vacío, nunca null para evitar error de validación
     const missionUnit = unit ? unit.trim() : '';
 
-    // Cálculo Recompensas Servidor (Seguridad)
     let mult = (DIFFICULTY_MULTIPLIERS[diff] || 1) * (FREQUENCY_MULTIPLIERS[freq] || 1);
     if (isCoop) mult *= 1.5;
 
     const finalXP = Math.round(BASE_XP * mult);
     const finalCoins = Math.round(BASE_COINS * mult);
-    const finalGameCoins = finalCoins * 2; // Doble de monedas virtuales
+    const finalGameCoins = finalCoins * 2;
 
-    // Participantes
+    // Aseguramos que el creador está en participantes
     const participants = [req.user._id];
     let invStatus = 'none';
 
@@ -2022,6 +2085,8 @@ const createMission = asyncHandler(async (req, res) => {
         participants.push(friendId);
         invStatus = 'pending';
     }
+
+    console.log(`📝 [DEBUG] Creando misión: ${title} para usuario ${req.user._id}`);
 
     const mission = await Mission.create({
         user: req.user._id,
@@ -2042,7 +2107,6 @@ const createMission = asyncHandler(async (req, res) => {
         contributions: { [req.user._id]: 0 }
     });
 
-    // Enviar notificación/solicitud al amigo
     if (isCoop && friendId) {
         await User.findByIdAndUpdate(friendId, {
             $push: { missionRequests: mission._id }
@@ -2064,14 +2128,12 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(missionId);
 
     if (!mission) {
-        // Limpieza si ya no existe
         await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
         return res.status(404).json({ message: 'Esta misión ya no existe.' });
     }
 
     if (action === 'accept') {
         mission.invitationStatus = 'active';
-        // Inicializar contribución del invitado
         if (!mission.contributions) mission.contributions = new Map();
         mission.contributions.set(userId.toString(), 0);
 
@@ -2080,7 +2142,6 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
 
         res.json({ message: '¡Misión aceptada! A trabajar.', mission });
     } else {
-        // Si rechaza, se borra la misión para ambos (o se podría sacar al usuario, decisión de diseño)
         await Mission.findByIdAndDelete(missionId);
         await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
         res.json({ message: 'Invitación rechazada.' });
@@ -2088,7 +2149,7 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// 4. ACTUALIZAR PROGRESO (CON SYNC LOGIC)
+// 4. ACTUALIZAR PROGRESO
 // ------------------------------------------------------------------
 const updateProgress = asyncHandler(async (req, res) => {
     const { amount } = req.body;
@@ -2097,21 +2158,25 @@ const updateProgress = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('Misión no encontrada'); }
 
-    // Validaciones
-    if (mission.isCoop && mission.invitationStatus === 'pending') {
-        res.status(400); throw new Error('Esperando a que tu compañero acepte.');
-    }
-    if (!mission.participants.includes(userId)) {
+    // Permitimos actualizar si eres participante O el dueño (por si acaso el array de participantes falló)
+    const isParticipant = mission.participants.map(p => p.toString()).includes(userId.toString());
+    const isOwner = mission.user.toString() === userId.toString();
+
+    if (!isParticipant && !isOwner) {
         res.status(401); throw new Error('No participas en esta misión');
     }
 
-    // Resetear si es Hábito ya completado en día anterior (Safety Check)
+    if (mission.isCoop && mission.invitationStatus === 'pending') {
+        res.status(400); throw new Error('Esperando a que tu compañero acepte.');
+    }
+
     const today = new Date();
     if (mission.type === 'habit' && mission.completed) {
         const last = new Date(mission.lastUpdated);
         if (last.toDateString() !== today.toDateString()) {
             mission.progress = 0;
             mission.completed = false;
+            if (!mission.contributions) mission.contributions = new Map();
             mission.participants.forEach(p => mission.contributions.set(p.toString(), 0));
         } else {
             return res.status(200).json({ message: 'Misión ya completada hoy', alreadyCompleted: true });
@@ -2120,10 +2185,7 @@ const updateProgress = asyncHandler(async (req, res) => {
 
     const addAmount = Number(amount) || 1;
 
-    // =================================================================================
-    // 🔥 SYNC LOGIC: Buscar otras misiones con el MISMO NOMBRE y actualizarlas también
-    // =================================================================================
-    // Buscamos misiones del mismo usuario, con mismo título, que NO sean la actual y NO estén completadas
+    // SYNC LOGIC (Vinculadas)
     const linkedMissions = await Mission.find({
         user: userId,
         title: mission.title,
@@ -2131,24 +2193,19 @@ const updateProgress = asyncHandler(async (req, res) => {
         completed: false
     });
 
-    // Actualizamos las vinculadas
     for (let linked of linkedMissions) {
         linked.progress += addAmount;
         linked.lastUpdated = today;
+        if (!linked.contributions) linked.contributions = new Map();
 
-        // Contribución personal en la vinculada
         const currentLinkedContrib = linked.contributions.get(userId.toString()) || 0;
         linked.contributions.set(userId.toString(), currentLinkedContrib + addAmount);
 
-        // Chequear si se completa la vinculada
         if (linked.progress >= linked.target) {
             linked.completed = true;
-            linked.progress = linked.target; // Cap
-
-            // Dar recompensas de la vinculada también
+            linked.progress = linked.target;
             await levelService.addRewards(userId, linked.xpReward, linked.coinReward, linked.gameCoinReward);
 
-            // Log en DailyLog de la vinculada
             const todayStr = today.toISOString().split('T')[0];
             await DailyLog.findOneAndUpdate(
                 { user: userId, date: todayStr },
@@ -2161,11 +2218,10 @@ const updateProgress = asyncHandler(async (req, res) => {
         }
         await linked.save();
     }
-    // =================================================================================
 
-    // Actualizar Misión Principal (La que tocó el usuario)
+    // Actualizar Misión Actual
     mission.progress += addAmount;
-
+    if (!mission.contributions) mission.contributions = new Map();
     const currentContrib = mission.contributions.get(userId.toString()) || 0;
     mission.contributions.set(userId.toString(), currentContrib + addAmount);
 
@@ -2175,17 +2231,12 @@ const updateProgress = asyncHandler(async (req, res) => {
     let leveledUp = false;
     let userResult = null;
 
-    // Chequear completado principal
     if (mission.progress >= mission.target) {
         mission.completed = true;
         mission.progress = mission.target;
 
-        // Dar recompensas a TODOS los participantes (si es coop)
         for (const pId of mission.participants) {
-            // Nota: Si es coop, ambos reciben premio. Si es solo, solo user.
             const result = await levelService.addRewards(pId, mission.xpReward, mission.coinReward, mission.gameCoinReward);
-
-            // Guardamos resultado solo si es el usuario que hizo la acción para devolverlo al front
             if (pId.toString() === userId.toString()) {
                 userResult = result.user;
                 leveledUp = result.leveledUp;
@@ -2193,7 +2244,6 @@ const updateProgress = asyncHandler(async (req, res) => {
             }
         }
 
-        // Registrar en DailyLog
         const todayStr = today.toISOString().split('T')[0];
         await DailyLog.findOneAndUpdate(
             { user: userId, date: todayStr },
@@ -2210,9 +2260,9 @@ const updateProgress = asyncHandler(async (req, res) => {
     res.json({
         message: mission.completed ? '¡Misión Completada!' : `Progreso: ${mission.progress}/${mission.target}`,
         mission,
-        user: userResult,     // Usuario actualizado con nuevo nivel/monedas
-        leveledUp,            // Booleano para lanzar confeti en front
-        rewards,              // Objeto con lo ganado
+        user: userResult,
+        leveledUp,
+        rewards,
         progressOnly: !mission.completed
     });
 });
@@ -2224,12 +2274,10 @@ const deleteMission = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('No encontrada'); }
 
-    // Solo el creador puede borrar (incluso si es coop)
     if (mission.user.toString() !== req.user._id.toString()) {
         res.status(403); throw new Error('Solo el creador puede cancelar la misión');
     }
 
-    // Si es una misión con "invitación pendiente", limpiamos la request del amigo
     if (mission.invitationStatus === 'pending') {
         const friendId = mission.participants.find(p => p.toString() !== req.user._id.toString());
         if (friendId) {
@@ -2241,12 +2289,34 @@ const deleteMission = asyncHandler(async (req, res) => {
     res.status(200).json({ id: req.params.id, message: "Misión eliminada." });
 });
 
+// ------------------------------------------------------------------
+// 6. PURGA NUCLEAR
+// ------------------------------------------------------------------
+const nukeMyMissions = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const userIdString = userId.toString();
+
+    // Borramos usando ambas variantes del ID para estar seguros
+    await Mission.deleteMany({
+        $or: [
+            { user: userId },
+            { user: userIdString },
+            { participants: userId },
+            { participants: userIdString }
+        ]
+    });
+
+    console.log(`☢️ Misiones purgadas para el usuario: ${userId}`);
+    res.status(200).json({ message: "☢️ Todas tus misiones han sido eliminadas. Cuenta limpia." });
+});
+
 module.exports = {
     getMissions,
     createMission,
     updateProgress,
     deleteMission,
-    respondMissionInvite
+    respondMissionInvite,
+    nukeMyMissions
 };
 
 --- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\missionController.js ---
@@ -4145,7 +4215,7 @@ router.get('/nightly-maintenance', protectCron, async (req, res) => {
     }
 });
 
-// Ruta simple para mantenerlo despierto si quieres (Ping)
+// Ruta simple para mantenerlo despierto
 router.get('/ping', (req, res) => res.send('Pong! 🤖'));
 
 module.exports = router;
@@ -4316,22 +4386,21 @@ const router = express.Router();
 const {
     getMissions,
     createMission,
-    updateProgress, // Renombrado de completeMission
+    updateProgress,
     deleteMission,
-    respondMissionInvite
+    respondMissionInvite,
+    nukeMyMissions // <--- IMPORTADO
 } = require('../controllers/missionController');
 const protect = require('../middleware/authMiddleware');
 
 router.get('/', protect, getMissions);
 router.post('/', protect, createMission);
-
-// 🔥 CAMBIO: Ahora es 'progress' en vez de 'complete' para reflejar que puede ser parcial
 router.put('/:id/progress', protect, updateProgress);
-
 router.delete('/:id', protect, deleteMission);
-
-// 🔥 NUEVO: Responder invitación
 router.post('/respond', protect, respondMissionInvite);
+
+// 🔥 RUTA DE PURGA
+router.delete('/nuke', protect, nukeMyMissions);
 
 module.exports = router;
 
@@ -6066,11 +6135,12 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
+import ExerciseSelector from './ExerciseSelector';
 
 export default function ActiveWorkout({ routine, onFinish }) {
     // Contexto Global para minimizar/maximizar
@@ -6095,7 +6165,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 kg: '',
                 reps: '',
                 completed: false,
-                type: 'N' // Tipos: N=Normal, W=Warmup (Calentamiento), F=Failure (Fallo), D=Drop
+                type: 'N'
             })),
             pr: null
         }));
@@ -6117,6 +6187,23 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
+
+    // 🔥 ESTADOS PARA SWAP (INTERCAMBIO)
+    const [swapIndex, setSwapIndex] = useState(null);
+    const [showSelector, setShowSelector] = useState(false);
+
+    // --- FUNCIONES AUXILIARES DE DESCANSO ---
+    const startRest = () => {
+        if (defaultRest > 0) {
+            setIsResting(true);
+            setRestRemaining(defaultRest);
+        }
+    };
+
+    const skipRest = () => {
+        setIsResting(false);
+        setRestRemaining(0);
+    };
 
     // --- EFECTOS ---
 
@@ -6153,11 +6240,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return () => clearInterval(interval);
     }, [isResting, restRemaining]);
 
-    // 4. Cargar Historial (PRs y pesos anteriores)
+    // 4. Cargar Historial INICIAL (PRs y pesos anteriores de la rutina original)
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const exerciseNames = routine.exercises.map(e => e.name);
+                const exerciseNames = exercises.map(e => e.name);
                 const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
                 const historyData = res.data;
 
@@ -6165,14 +6252,16 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
 
-                    // Solo rellenamos si los campos están vacíos
+                    // Solo rellenamos si los campos están vacíos (para no borrar lo que el usuario ya escribió)
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
 
-                    if (isClean) {
+                    if (isClean && stats.lastSets && stats.lastSets.length > 0) {
                         newSetsData = ex.setsData.map((set, index) => {
-                            if (stats.lastSets && stats.lastSets[index]) {
-                                return { ...set, kg: stats.lastSets[index].weight, reps: stats.lastSets[index].reps };
+                            // Intentamos emparejar set con historial. Si el historial tiene menos sets, usamos el último disponible.
+                            const historySet = stats.lastSets[index] || stats.lastSets[stats.lastSets.length - 1];
+                            if (historySet) {
+                                return { ...set, kg: historySet.weight, reps: historySet.reps };
                             }
                             return set;
                         });
@@ -6181,15 +6270,85 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 }));
             } catch (e) { console.error(e); }
         };
-        fetchHistory();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        // Solo cargar si no hay datos guardados previamente para evitar sobreescribir
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) fetchHistory();
+    }, []);
+
+    // --- 🔥 LÓGICA DE SWAP MEJORADA (CON CARGA DE HISTORIAL) ---
+    const handleOpenSwap = (index) => {
+        setSwapIndex(index);
+        setShowSelector(true);
+    };
+
+    const handleSwapComplete = async (selectedList) => {
+        if (!selectedList || selectedList.length === 0) {
+            setShowSelector(false);
+            return;
+        }
+
+        const newExData = selectedList[0];
+        const currentIndex = swapIndex; // Guardamos el índice por si cambia el estado
+
+        // 1. Actualización Optimista (Cambia nombre visualmente rápido)
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== currentIndex) return ex;
+            const currentSetsCount = ex.setsData.length;
+            return {
+                ...ex,
+                name: newExData.name,
+                muscle: newExData.muscle,
+                // Reiniciamos temporalmente a vacío mientras carga
+                setsData: Array.from({ length: currentSetsCount }, () => ({
+                    kg: '', reps: '', completed: false, type: 'N'
+                })),
+                pr: null
+            };
+        }));
+
+        setShowSelector(false);
+        setSwapIndex(null);
+
+        // 2. 🔥 FETCH DE HISTORIAL PARA EL NUEVO EJERCICIO
+        try {
+            const res = await api.post('/gym/history-stats', { exercises: [newExData.name] });
+            const history = res.data[newExData.name];
+
+            if (history) {
+                setExercises(prev => prev.map((ex, i) => {
+                    if (i !== currentIndex) return ex;
+
+                    let updatedSets = ex.setsData;
+                    // Rellenar con los pesos del nuevo ejercicio si existen
+                    if (history.lastSets && history.lastSets.length > 0) {
+                        updatedSets = ex.setsData.map((set, setIdx) => {
+                            const lastSet = history.lastSets[setIdx] || history.lastSets[history.lastSets.length - 1];
+                            return { ...set, kg: lastSet.weight, reps: lastSet.reps };
+                        });
+                    }
+
+                    return {
+                        ...ex,
+                        pr: history.bestSet,
+                        setsData: updatedSets
+                    };
+                }));
+                setToast({ message: 'Ejercicio cambiado (Historial cargado)', type: 'success' });
+            } else {
+                setToast({ message: 'Ejercicio cambiado (Sin historial previo)', type: 'info' });
+            }
+
+        } catch (error) {
+            console.error("Error cargando historial del nuevo ejercicio:", error);
+            setToast({ message: 'Ejercicio cambiado', type: 'success' });
+        }
+    };
 
 
-    // --- LÓGICA DE ESTILOS Y NUMERACIÓN (HEVY STYLE) ---
+    // --- LÓGICA DE ESTILOS Y NUMERACIÓN ---
     const getSetDisplayInfo = (allSets, currentIndex) => {
         const type = allSets[currentIndex].type || 'N';
 
-        // 1. CALENTAMIENTO (Naranja, Caja)
         if (type === 'W') {
             return {
                 label: 'C',
@@ -6198,31 +6357,24 @@ export default function ActiveWorkout({ routine, onFinish }) {
             };
         }
 
-        // Calcular el número de serie "base" (ignorando drop sets anteriores)
         let normalCount = 0;
         for (let i = 0; i <= currentIndex; i++) {
             if (allSets[i].type !== 'D' && allSets[i].type !== 'W') normalCount++;
         }
 
-        // 2. DROP SET (Morado, SIN CAJA, Indentado)
         if (type === 'D') {
-            // Buscamos a qué serie normal pertenece este drop
             let dropDepth = 0;
-            // Retrocedemos hasta encontrar el padre no-drop
             for (let i = currentIndex; i >= 0; i--) {
-                if (allSets[i].type !== 'D') break; // Encontramos el padre
+                if (allSets[i].type !== 'D') break;
                 dropDepth++;
             }
-
-            // Si es el primer drop es .1, segundo .2, etc.
             return {
                 label: `${normalCount}.${dropDepth}`,
                 style: 'bg-transparent text-purple-400 font-black border-none p-0 text-sm',
-                containerClass: 'justify-end pr-4' // Alineado a la derecha o indentado
+                containerClass: 'justify-end pr-4'
             };
         }
 
-        // 3. FALLO (Rojo, Caja)
         if (type === 'F') {
             return {
                 label: normalCount,
@@ -6231,7 +6383,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
             };
         }
 
-        // 4. NORMAL (Gris, Caja)
         return {
             label: normalCount,
             style: 'bg-zinc-900 text-zinc-500 border border-zinc-800 rounded-lg',
@@ -6239,59 +6390,65 @@ export default function ActiveWorkout({ routine, onFinish }) {
         };
     };
 
-    // --- HANDLERS ---
-
-    // Ciclo: Normal -> Calentamiento -> Fallo -> Drop -> Normal
+    // --- HANDLERS (Inmutabilidad Estricta) ---
     const cycleSetType = (exIdx, setIdx) => {
         const types = ['N', 'W', 'F', 'D'];
-        setExercises(prev => {
-            const newEx = [...prev];
-            const currentType = newEx[exIdx].setsData[setIdx].type || 'N';
-            const nextIndex = (types.indexOf(currentType) + 1) % types.length;
-            newEx[exIdx].setsData[setIdx].type = types[nextIndex];
-            return newEx;
-        });
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            return {
+                ...ex,
+                setsData: ex.setsData.map((set, j) => {
+                    if (j !== setIdx) return set;
+                    const currentType = set.type || 'N';
+                    const nextIndex = (types.indexOf(currentType) + 1) % types.length;
+                    return { ...set, type: types[nextIndex] };
+                })
+            };
+        }));
     };
 
     const toggleSetComplete = (exIdx, setIdx) => {
         const currentSet = exercises[exIdx].setsData[setIdx];
-        if (!currentSet.kg || !currentSet.reps) return setToast({ message: 'Faltan datos', type: 'error' });
-
-        setExercises(prev => {
-            const newExercises = [...prev];
-            newExercises[exIdx].setsData[setIdx].completed = !currentSet.completed;
-            return newExercises;
-        });
-
-        // Solo iniciamos descanso si se completa y NO es Drop Set (los drop sets son seguidos)
-        if (!currentSet.completed && currentSet.type !== 'D') {
-            startRest();
+        if (String(currentSet.kg).trim() === '' || String(currentSet.reps).trim() === '') {
+            return setToast({ message: 'Faltan datos (Kg o Reps)', type: 'error' });
         }
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            return {
+                ...ex,
+                setsData: ex.setsData.map((set, j) => {
+                    if (j !== setIdx) return set;
+                    return { ...set, completed: !set.completed };
+                })
+            };
+        }));
+        if (!currentSet.completed && currentSet.type !== 'D') startRest();
     };
 
     const handleInputChange = (exIdx, setIdx, field, val) => {
-        setExercises(prev => {
-            const newExercises = [...prev];
-            newExercises[exIdx].setsData[setIdx][field] = val;
-            return newExercises;
-        });
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            return {
+                ...ex,
+                setsData: ex.setsData.map((set, j) => {
+                    if (j !== setIdx) return set;
+                    return { ...set, [field]: val };
+                })
+            };
+        }));
     };
 
     const handleAddSet = (exIdx) => {
-        setExercises(prev => {
-            const newExercises = [...prev];
-            const last = newExercises[exIdx].setsData[newExercises[exIdx].setsData.length - 1];
-            // Si el anterior era Drop, el nuevo probablemente también lo sea
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            const last = ex.setsData[ex.setsData.length - 1];
             const nextType = last?.type === 'D' ? 'D' : 'N';
-
-            newExercises[exIdx].setsData.push({
-                kg: last?.kg || '',
-                reps: last?.reps || '',
-                completed: false,
-                type: nextType
-            });
-            return newExercises;
-        });
+            // Al añadir serie nueva, intentamos copiar el peso anterior por comodidad
+            return {
+                ...ex,
+                setsData: [...ex.setsData, { kg: last?.kg || '', reps: last?.reps || '', completed: false, type: nextType }]
+            };
+        }));
     };
 
     const handleRestInputChange = (e) => {
@@ -6300,42 +6457,60 @@ export default function ActiveWorkout({ routine, onFinish }) {
         const num = parseInt(val);
         if (!isNaN(num)) {
             setDefaultRest(num);
-            if (isResting) {
-                const endTime = Date.now() + (num * 1000);
-                setRestRemaining(num);
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, restEndTime: endTime }));
-                }
-            }
+            if (isResting) setRestRemaining(num);
         }
     };
 
+    // --- FINALIZAR RUTINA ---
     const confirmFinish = async () => {
         if (finishing) return;
+
+        const hasAnyCompleted = exercises.some(ex => ex.setsData.some(s => s.completed));
+        if (!hasAnyCompleted) {
+            setToast({ message: 'Completa al menos una serie', type: 'error' });
+            setShowFinishAlert(false);
+            return;
+        }
+
         setFinishing(true);
         try {
             const logData = {
                 routineId: routine._id,
                 routineName: routine.name,
-                duration: seconds,
+                duration: seconds > 0 ? seconds : 1,
                 intensity,
                 exercises: exercises.map(ex => ({
                     name: ex.name,
                     sets: ex.setsData.filter(s => s.completed).map(s => ({
-                        weight: parseFloat(s.kg),
-                        reps: parseFloat(s.reps),
-                        type: s.type // Enviamos tipo al backend
+                        weight: parseFloat(String(s.kg).replace(',', '.')) || 0,
+                        reps: parseFloat(String(s.reps).replace(',', '.')) || 0,
+                        type: s.type || 'N'
                     }))
                 })).filter(ex => ex.sets.length > 0)
             };
+
             const res = await api.post('/gym/log', logData);
+
+            // ACTUALIZAR LA RUTINA PLANTILLA
+            const updatedExercisesStructure = exercises.map(ex => ({
+                name: ex.name,
+                muscle: ex.muscle || 'Global',
+                sets: ex.setsData.length,
+                reps: "10-12",
+                targetWeight: 0
+            }));
+
+            await api.put(`/gym/routines/${routine._id}`, {
+                exercises: updatedExercisesStructure
+            });
+
             localStorage.removeItem(STORAGE_KEY);
             if (onFinish) onFinish(res.data);
         } catch (error) {
+            console.error(error);
             setToast({ message: 'Error al guardar', type: 'error' });
             setFinishing(false);
+            setShowFinishAlert(false);
         }
     };
 
@@ -6358,7 +6533,20 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // --- RENDERIZADO ---
 
-    // 1. MODO MINIMIZADO (Barra Flotante)
+    // 0. Selector de Swap
+    if (showSelector) {
+        return createPortal(
+            <div className="fixed inset-0 z-[250] bg-black">
+                <ExerciseSelector
+                    onSelect={handleSwapComplete}
+                    onClose={() => setShowSelector(false)}
+                />
+            </div>,
+            document.body
+        );
+    }
+
+    // 1. MODO MINIMIZADO
     if (isMinimized) {
         return createPortal(
             <div
@@ -6390,7 +6578,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         );
     }
 
-    // 2. MODO EXPANDIDO (Pantalla Completa)
+    // 2. MODO EXPANDIDO
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-black flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -6422,16 +6610,29 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             <h3 className="text-white font-black text-xl uppercase tracking-tight flex items-center gap-2 leading-tight max-w-[65%]">
                                 <span className="text-yellow-500 text-sm shrink-0">#{exIdx + 1}</span> {ex.name}
                             </h3>
-                            {ex.pr && ex.pr.value1RM > 0 && (
-                                <span className="text-xs text-yellow-500 font-black flex items-center gap-1.5 whitespace-nowrap">
-                                    <Trophy size={14} className="text-yellow-600" />
-                                    {ex.pr.weight}kg <span className="text-zinc-600">x</span> {ex.pr.reps}
-                                </span>
-                            )}
+
+                            {/* 🔥 BOTONES DE CABECERA: 1RM Y REFRESH JUNTOS */}
+                            <div className="flex items-center gap-2">
+                                {ex.pr && ex.pr.value1RM > 0 && (
+                                    <div className="flex items-center gap-1 bg-zinc-900/50 px-2 py-1.5 rounded-lg border border-zinc-800">
+                                        <Trophy size={14} className="text-yellow-600" />
+                                        <span className="text-xs font-black text-yellow-500 whitespace-nowrap">
+                                            {ex.pr.weight} <span className="text-[10px] text-zinc-500">KG</span>
+                                        </span>
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={() => handleOpenSwap(exIdx)}
+                                    className="p-1.5 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 hover:text-white active:scale-95 transition-all"
+                                >
+                                    <RefreshCw size={16} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
-                            {/* CABECERAS DE COLUMNAS */}
+                            {/* CABECERAS */}
                             <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
                                 <div className="col-span-2">Set</div>
                                 <div className="col-span-4">Kg</div>
@@ -6441,22 +6642,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
                             <div className="space-y-1">
                                 {ex.setsData.map((set, sIdx) => {
-                                    // 🔥 OBTENER VISUALIZACIÓN (Caja vs Drop sin caja)
                                     const { label, style, containerClass } = getSetDisplayInfo(ex.setsData, sIdx);
-
                                     return (
                                         <div key={sIdx} className={`grid grid-cols-12 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
-
-                                            {/* BOTÓN NÚMERO DE SERIE */}
                                             <div className={`col-span-2 flex ${containerClass}`}>
-                                                <button
-                                                    onClick={() => cycleSetType(exIdx, sIdx)}
-                                                    className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}
-                                                >
+                                                <button onClick={() => cycleSetType(exIdx, sIdx)} className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}>
                                                     {label}
                                                 </button>
                                             </div>
-
                                             <div className="col-span-4">
                                                 <input type="number" inputMode="decimal" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
                                             </div>
@@ -14029,8 +14222,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
     Plus, Play, Trash2, Dumbbell, X, Bike, Activity, Loader2, MapPin,
-    Timer, Edit, Footprints, Waves, PersonStanding, Flame, Calendar,
-    Save, Trophy
+    Timer, Edit, Footprints, Waves, PersonStanding, Flame,
+    Save, Lock // 🔥 Importamos candado para feedback visual
 } from 'lucide-react';
 
 import api from '../services/api';
@@ -14046,7 +14239,7 @@ const SPORT_ACTIVITIES = [
     { id: 'Correr', icon: <PersonStanding size={24} />, color: 'text-orange-400', bg: 'bg-orange-900/20 border-orange-500/30' },
     { id: 'Ciclismo', icon: <Bike size={24} />, color: 'text-cyan-400', bg: 'bg-cyan-900/20 border-cyan-500/30' },
     { id: 'Natación', icon: <Waves size={24} />, color: 'text-blue-400', bg: 'bg-blue-900/20 border-blue-500/30' },
-    { id: 'Fútbol', icon: <Trophy size={24} />, color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-500/30' },
+    { id: 'Fútbol', icon: <Activity size={24} />, color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-500/30' },
     { id: 'Padel', icon: <Activity size={24} />, color: 'text-lime-400', bg: 'bg-lime-900/20 border-lime-500/30' },
 ];
 
@@ -14061,22 +14254,29 @@ const COLOR_THEMES = {
     pink: { border: 'border-pink-500', shadow: 'rgba(236,72,153,0.4)', bgIcon: 'bg-pink-600', textIcon: 'text-white', play: 'bg-pink-500 text-white' },
 };
 
-// --- COMPONENTE TARJETA RUTINA (WIDGET STYLE) ---
-const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
+// --- COMPONENTE TARJETA RUTINA (OPTIMIZADO + PROTEGIDO) ---
+const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
 
-    const handleTouchStart = (e) => { startX.current = e.touches[0].clientX; setIsDragging(true); };
+    const handleTouchStart = (e) => {
+        startX.current = e.touches[0].clientX;
+        setIsDragging(true);
+    };
+
     const handleTouchMove = (e) => {
         if (!isDragging) return;
-        const diff = e.touches[0].clientX - startX.current;
-        if (Math.abs(diff) < 150) setOffsetX(diff);
+        const currentX = e.touches[0].clientX;
+        const diff = currentX - startX.current;
+        if (Math.abs(diff) < 200) setOffsetX(diff);
     };
+
     const handleTouchEnd = () => {
         setIsDragging(false);
-        if (offsetX > 80) onEdit();
-        else if (offsetX < -80) onDelete();
+        // Umbral de activación
+        if (offsetX > 100) onEdit();
+        else if (offsetX < -100) onDelete();
         setOffsetX(0);
     };
 
@@ -14085,22 +14285,30 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
     const initial = routine.name.charAt(0).toUpperCase();
 
     return (
-        <div className="relative w-full mb-4 select-none touch-pan-y">
-            <div className="absolute inset-0 flex justify-between items-center px-6 rounded-3xl bg-zinc-900 border border-zinc-800">
-                <div className="flex items-center gap-2 text-blue-400 font-bold uppercase text-xs animate-in fade-in"><Edit size={20} /> Editar</div>
-                <div className="flex items-center gap-2 text-red-500 font-bold uppercase text-xs animate-in fade-in">Borrar <Trash2 size={20} /></div>
+        <div className="relative w-full mb-4 select-none touch-pan-y overflow-hidden rounded-3xl">
+            {/* FONDO (ACCIONES) */}
+            <div className="absolute inset-0 flex justify-between items-center px-6 bg-zinc-900 border border-zinc-800">
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-blue-400'} font-bold uppercase text-xs transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
+                    {isLocked ? <><Lock size={20} /> Bloqueado</> : <><Edit size={20} /> Editar</>}
+                </div>
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-red-500'} font-bold uppercase text-xs transition-opacity ${offsetX < -50 ? 'opacity-100' : 'opacity-30'}`}>
+                    {isLocked ? <>Bloqueado <Lock size={20} /></> : <>Borrar <Trash2 size={20} /></>}
+                </div>
             </div>
 
+            {/* TARJETA SUPERIOR */}
             <div
-                onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 style={{
                     transform: `translateX(${offsetX}px)`,
                     transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
                     boxShadow: `0 0 20px -5px ${theme.shadow}`
                 }}
-                className={`relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 flex justify-between items-center z-10 h-24 overflow-hidden`}
+                className={`relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 flex justify-between items-center z-10 h-24 will-change-transform`}
             >
-                <div className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${theme.bgIcon}`}></div>
+                <div className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${theme.bgIcon} pointer-events-none`}></div>
 
                 <div className="flex items-center gap-5 pointer-events-none relative z-10">
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${theme.bgIcon} ${theme.textIcon} font-black text-2xl shadow-lg`}>
@@ -14112,34 +14320,50 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit }) => {
                     </div>
                 </div>
 
-                <button
-                    onClick={(e) => { e.stopPropagation(); onPlay(); }}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
-                >
-                    <Play size={20} fill="currentColor" className="ml-1" />
-                </button>
+                {isLocked ? (
+                    // Botón de Bloqueado (si está en uso)
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-zinc-800 text-zinc-500 border border-zinc-700 z-20">
+                        <Activity size={20} className="animate-pulse" />
+                    </div>
+                ) : (
+                    // Botón de Play Normal
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onPlay(); }}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
+                    >
+                        <Play size={20} fill="currentColor" className="ml-1" />
+                    </button>
+                )}
             </div>
         </div>
     );
 };
 
-// --- COMPONENTE TARJETA DEPORTE ---
+// --- COMPONENTE TARJETA DEPORTE (OPTIMIZADO) ---
 const SwipeableSportCard = ({ workout, onDelete }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
 
     const handleTouchStart = (e) => { startX.current = e.touches[0].clientX; setIsDragging(true); };
-    const handleTouchMove = (e) => { if (!isDragging) return; const diff = e.touches[0].clientX - startX.current; if (Math.abs(diff) < 150) setOffsetX(diff); };
-    const handleTouchEnd = () => { setIsDragging(false); if (Math.abs(offsetX) > 80) onDelete(); setOffsetX(0); };
+    const handleTouchMove = (e) => {
+        if (!isDragging) return;
+        const diff = e.touches[0].clientX - startX.current;
+        if (Math.abs(diff) < 200) setOffsetX(diff);
+    };
+    const handleTouchEnd = () => { setIsDragging(false); if (Math.abs(offsetX) > 100) onDelete(); setOffsetX(0); };
 
     return (
-        <div className="relative w-full h-[72px] mb-3 select-none touch-pan-y">
-            <div className="absolute inset-0 bg-red-900/20 border border-red-500/30 rounded-2xl flex items-center justify-center transition-all"><Trash2 className="text-red-500" /></div>
+        <div className="relative w-full h-[72px] mb-3 select-none touch-pan-y overflow-hidden rounded-2xl">
+            <div className="absolute inset-0 bg-red-900/20 border border-red-500/30 flex items-center justify-center transition-all">
+                <Trash2 className={`text-red-500 transition-opacity ${Math.abs(offsetX) > 50 ? 'opacity-100' : 'opacity-30'}`} />
+            </div>
             <div
-                onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 style={{ transform: `translateX(${offsetX}px)`, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
-                className="absolute inset-0 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex justify-between items-center shadow-md z-10"
+                className="absolute inset-0 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex justify-between items-center shadow-md z-10 will-change-transform"
             >
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-lime-500/10 flex items-center justify-center text-lime-400 border border-lime-500/20"><Activity size={18} /></div>
@@ -14163,7 +14387,8 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
 // --- PÁGINA PRINCIPAL ---
 export default function Gym() {
     const { user, setUser, setIsUiHidden } = useOutletContext();
-    const { startWorkout } = useWorkout(); // 🔥 USAR CONTEXTO
+    // 🔥 OBTENEMOS activeRoutine DEL CONTEXTO
+    const { startWorkout, activeRoutine } = useWorkout();
 
     const [routines, setRoutines] = useState([]);
     const [todaySports, setTodaySports] = useState([]);
@@ -14198,17 +14423,36 @@ export default function Gym() {
     };
     const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
-    // 🔥 ACCIÓN PRINCIPAL: DISPARA EL CONTEXTO
+    // Acciones
     const openActiveWorkout = (r) => {
+        if (activeRoutine && activeRoutine._id === r._id) {
+            // Si es la misma, maximizamos (esto lo maneja el contexto, pero aquí no hacemos nada extra)
+            return;
+        }
+        if (activeRoutine) {
+            return showToast("Ya hay una rutina en curso", "error");
+        }
         startWorkout(r);
     };
 
-    // Acciones
-    const handleEditRoutine = (r) => openCreateRoutine(r);
+    // 🔥 HANDLE EDIT: PROTEGIDO
+    const handleEditRoutine = (r) => {
+        if (activeRoutine && activeRoutine._id === r._id) {
+            return showToast("⚠️ En curso: Finaliza para editar.", "error");
+        }
+        openCreateRoutine(r);
+    };
+
+    // 🔥 HANDLE DELETE: PROTEGIDO
     const handleDeleteRoutine = async (id) => {
+        if (activeRoutine && activeRoutine._id === id) {
+            return showToast("⚠️ En curso: No se puede borrar.", "error");
+        }
+
         if (!window.confirm("¿Borrar rutina?")) return;
         try { await api.delete(`/gym/routines/${id}`); setRoutines(prev => prev.filter(r => r._id !== id)); showToast("Eliminada", "info"); } catch (e) { showToast("Error", "error"); }
     };
+
     const handleSaveSport = async () => {
         if (!sportForm.name || !sportForm.time) return showToast('Faltan datos', 'error');
         setIsSavingSport(true);
@@ -14224,7 +14468,7 @@ export default function Gym() {
     if (loading) return <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>;
 
     return (
-        <div className="animate-in fade-in space-y-8 pb-6 relative">
+        <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* HEADER GYM */}
@@ -14267,7 +14511,16 @@ export default function Gym() {
                             <p className="text-zinc-600 text-xs font-bold uppercase group-hover:text-yellow-100/50">Crear primera rutina</p>
                         </div>
                     ) : (
-                        routines.map((routine) => <SwipeableRoutineCard key={routine._id} routine={routine} onPlay={() => openActiveWorkout(routine)} onDelete={() => handleDeleteRoutine(routine._id)} onEdit={() => handleEditRoutine(routine)} />)
+                        routines.map((routine) => (
+                            <SwipeableRoutineCard
+                                key={routine._id}
+                                routine={routine}
+                                onPlay={() => openActiveWorkout(routine)}
+                                onDelete={() => handleDeleteRoutine(routine._id)}
+                                onEdit={() => handleEditRoutine(routine)}
+                                isLocked={activeRoutine && activeRoutine._id === routine._id} // 🔥 PASAMOS EL ESTADO DE BLOQUEO
+                            />
+                        ))
                     )}
                 </div>
             </div>
@@ -14909,7 +15162,7 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -15120,7 +15373,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId }) {
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
                 {/* CONTENEDOR INTERNO */}
-                {/* 🔥 CAMBIO: Fondo "Crema" (#2e2924) para Coop, Negro para el resto */}
                 <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-5 relative overflow-hidden h-full flex flex-col justify-between`}>
                     {/* Brillo ambiental */}
                     <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
@@ -15233,6 +15485,9 @@ export default function Missions() {
     const [toast, setToast] = useState(null);
     const [friends, setFriends] = useState([]);
 
+    // 🔥 NUEVO ESTADO PARA EL MODO "VER TODO"
+    const [viewAllMode, setViewAllMode] = useState(false);
+
     const DEFAULTS = {
         title: '', frequency: 'daily', type: 'habit', difficulty: 'easy', target: 1, unit: '', isCoop: false, friendId: ''
     };
@@ -15249,7 +15504,10 @@ export default function Missions() {
     }, [activeTab, showCreator]);
 
     const fetchMissions = async () => {
-        try { const res = await api.get('/missions'); setMissions(res.data); } catch (e) { setMissions([]); } finally { setLoading(false); }
+        try {
+            const res = await api.get('/missions');
+            setMissions(res.data);
+        } catch (e) { setMissions([]); } finally { setLoading(false); }
     };
     const fetchFriends = async () => { try { const res = await api.get('/social/friends'); setFriends(res.data.friends); } catch (e) { } };
     const showToast = (message, type = 'success') => setToast({ message, type });
@@ -15273,10 +15531,14 @@ export default function Missions() {
     };
 
     const getFilteredMissions = () => {
+        // 🔥 SI EL MODO "VER TODO" ESTÁ ACTIVO, DEVOLVEMOS TODO SIN FILTRAR
+        if (viewAllMode) return missions;
+
         const today = new Date().getDay();
         return missions.filter(m => {
             if (activeTab !== 'all' && m.frequency !== activeTab) return false;
             if (m.isCoop && m.invitationStatus === 'pending' && m.user !== user._id) return false;
+            // Filtro de día (Solo mostrar si hoy toca)
             if (m.frequency === 'daily' && m.specificDays && m.specificDays.length > 0) return m.specificDays.includes(today);
             return true;
         });
@@ -15361,20 +15623,39 @@ export default function Missions() {
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                     <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
-                        Misiones <span className="text-yellow-500 capitalize">{activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES'}</span>
+                        Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
                     </h1>
-                    <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
-                </div>
-                <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
-                    {['daily', 'weekly', 'monthly', 'yearly'].map(freq => (
-                        <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                            {freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANAL' : freq === 'monthly' ? 'MENSUAL' : 'ANUAL'}
+                    <div className="flex gap-2">
+                        {/* 🔥 BOTÓN VER TODO (GESTIÓN) */}
+                        <button
+                            onClick={() => setViewAllMode(!viewAllMode)}
+                            className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}
+                        >
+                            {viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}
                         </button>
-                    ))}
+
+                        <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
+                    </div>
                 </div>
-                <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
-                    <div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} />
-                </div>
+
+                {viewAllMode ? (
+                    <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2">
+                        <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Viendo todas las misiones ocultas</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
+                            {['daily', 'weekly', 'monthly', 'yearly'].map(freq => (
+                                <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                    {freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANAL' : freq === 'monthly' ? 'MENSUAL' : 'ANUAL'}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
+                            <div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} />
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* LISTA */}
@@ -15513,19 +15794,16 @@ export default function Missions() {
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
-    Trophy, Coins, Activity, Dumbbell, Utensils,
-    X, CheckCircle, Clock, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Zap,
-    LogOut, Gamepad2, Star, MapPin, Lock,
-    Sunrise, Sun, Moon, Coffee, Flame, HeartCrack, ArrowRightLeft
+    Activity, ChevronLeft, ChevronRight, Lock, MapPin, LogOut
 } from 'lucide-react';
 import api from '../services/api';
 
-// --- DND KIT (Solo para visualización correcta del Grid) ---
+// --- DND KIT (Solo visualización del Grid) ---
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
 
-// --- WIDGETS ---
+// --- WIDGETS AUTÓNOMOS (Cada uno maneja su propio Modal) ---
 import MoodWidget from '../components/widgets/MoodWidget';
 import WeightWidget from '../components/widgets/WeightWidget';
 import FoodWidget from '../components/widgets/FoodWidget';
@@ -15543,171 +15821,6 @@ import RPGBody from '../components/profile/RPGBody';
 import ProfileStats from '../components/profile/ProfileStats';
 
 // ==========================================
-// 1. MODALES DE DETALLE (SOLO LECTURA)
-// ==========================================
-
-// Detalle Deporte
-function SportDetailsModal({ workouts, onClose }) {
-    const [activeTab, setActiveTab] = useState(0);
-    if (!workouts || workouts.length === 0) return null;
-    const current = workouts[activeTab];
-
-    return (
-        <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
-                <div className="flex justify-between items-center mb-4 shrink-0">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><Activity className="text-green-500" /> Historial Deporte</h2>
-                    <button onClick={onClose} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
-                </div>
-                {workouts.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto mb-4 pb-2 border-b border-gray-800">
-                        {workouts.map((w, idx) => (
-                            <button key={idx} onClick={() => setActiveTab(idx)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${activeTab === idx ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{w.routineName || `Actividad ${idx + 1}`}</button>
-                        ))}
-                    </div>
-                )}
-                <div className="space-y-4 overflow-y-auto custom-scrollbar">
-                    <div className="text-center">
-                        <h3 className="text-2xl font-black text-white uppercase mb-1">{current.routineName}</h3>
-                        <div className="flex justify-center gap-2">
-                            <span className="text-xs bg-gray-800 px-2 py-1 rounded text-gray-400 font-mono">{new Date(current.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            <span className="text-xs bg-green-900/30 text-green-400 border border-green-500/30 px-2 py-1 rounded font-bold capitalize">{current.intensity}</span>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                        <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800 text-center"><span className="text-blue-500 text-[10px] font-bold uppercase block mb-1 flex justify-center gap-1"><MapPin size={10} /> DISTANCIA</span><span className="text-white font-bold text-xl">{current.distance || 0} km</span></div>
-                        <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800 text-center"><span className="text-orange-500 text-[10px] font-bold uppercase block mb-1 flex justify-center gap-1"><Clock size={10} /> TIEMPO</span><span className="text-white font-bold text-xl">{current.duration} min</span></div>
-                    </div>
-                    <div className="bg-gray-800/50 p-4 rounded-xl text-center"><span className="text-gray-500 text-xs">Calorías Quemadas</span><p className="text-2xl font-black text-white">{current.caloriesBurned} kcal</p></div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// Detalle Gym
-function GymDetailsModal({ workouts, onClose }) {
-    const [activeTab, setActiveTab] = useState(0);
-    if (!workouts || workouts.length === 0) return null;
-    const current = workouts[activeTab];
-    const totalVolume = current.exercises?.reduce((t, e) => t + e.sets.reduce((s, st) => s + (st.weight * st.reps), 0), 0);
-
-    const durationMin = Math.max(1, Math.floor((current.duration || 0) / 60));
-    let intensityFactor = 5;
-    if (current.intensity === 'Baja') intensityFactor = 3.5;
-    if (current.intensity === 'Alta') intensityFactor = 7.5;
-    const estimatedKcal = Math.round(durationMin * intensityFactor);
-    const finalKcal = current.caloriesBurned > 0 ? current.caloriesBurned : estimatedKcal;
-
-    return (
-        <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
-                <div className="flex justify-between items-center mb-4 shrink-0">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><Dumbbell className="text-blue-500" /> Historial Gym</h2>
-                    <button onClick={onClose} className="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
-                </div>
-                {workouts.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto mb-4 pb-2 border-b border-gray-800 shrink-0 custom-scrollbar">
-                        {workouts.map((w, idx) => (
-                            <button key={idx} onClick={() => setActiveTab(idx)} className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${activeTab === idx ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{w.name || `Rutina ${idx + 1}`}</button>
-                        ))}
-                    </div>
-                )}
-                <div className="flex-1 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-4 fade-in duration-300 key={activeTab}">
-                    <div className="flex justify-between items-end mb-4 px-1">
-                        <div><h3 className="font-bold text-white text-xl">{current.name}</h3><span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12} /> {Math.floor(current.duration / 60)} min</span></div>
-                        <span className="bg-blue-900/30 text-blue-400 text-xs font-bold px-2 py-1 rounded border border-blue-500/30">{current.exercises?.length || 0} Ejercicios</span>
-                    </div>
-                    <div className="space-y-3">
-                        {current.exercises?.map((ex, i) => (
-                            <div key={i} className="bg-gray-950 p-3 rounded-xl border border-gray-800">
-                                <div className="flex justify-between mb-2"><span className="text-gray-200 font-bold text-sm">{ex.name}</span><span className="text-gray-500 text-xs font-mono">{ex.sets.length} Sets</span></div>
-                                <div className="flex flex-wrap gap-2">{ex.sets.map((s, j) => (<div key={j} className="bg-gray-900 px-2 py-1 rounded text-xs text-zinc-400 border border-gray-800"><span className="text-white font-bold">{s.weight}kg</span> x {s.reps}</div>))}</div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-gray-800 grid grid-cols-2 gap-4">
-                        <div className="text-center"><p className="text-xs text-gray-500 uppercase font-bold">Volumen Total</p><p className="text-xl font-black text-white">{totalVolume.toLocaleString()} <span className="text-sm font-normal text-gray-500">kg</span></p></div>
-                        <div className="text-center border-l border-gray-800"><p className="text-xs text-orange-500 uppercase font-bold flex items-center justify-center gap-1"><Flame size={12} /> Kcal Aprox</p><p className="text-xl font-black text-orange-400">{finalKcal}</p></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// Detalle Balance
-function BalanceDetailsModal({ data, onClose }) {
-    const intake = data.nutrition?.totalKcal || data.totalKcal || 0;
-    const sportBurn = data.sportWorkouts?.reduce((acc, curr) => acc + (curr.caloriesBurned || 0), 0) || 0;
-    const gymBurn = data.gymWorkouts?.reduce((acc, curr) => acc + (curr.caloriesBurned || 0), 0) || 0;
-    const totalBurned = sportBurn + gymBurn;
-    const net = intake - totalBurned;
-
-    return (
-        <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                <button onClick={onClose} className="absolute top-4 right-4 bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white z-20"><X size={20} /></button>
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><ArrowRightLeft className="text-purple-500" /> Balance del Día</h2>
-                <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-gray-800 mb-6">
-                    <div className="text-center"><span className="text-xs text-gray-500 font-bold uppercase block mb-1">Neto</span><span className={`text-3xl font-black ${net > 0 ? 'text-white' : 'text-green-400'}`}>{net > 0 ? '+' : ''}{Math.round(net)}</span></div>
-                    <div className="h-10 w-[1px] bg-gray-700"></div>
-                    <div className="text-center"><span className="text-xs text-gray-500 font-bold uppercase block mb-1">Estado</span><span className="text-sm font-bold text-gray-300">{net > 500 ? 'Superávit' : net < -500 ? 'Déficit' : 'Mant.'}</span></div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-950/50 p-4 rounded-2xl border border-blue-900/30">
-                        <div className="flex items-center gap-2 mb-3 text-blue-400 border-b border-blue-900/30 pb-2"><Utensils size={16} /> <span className="text-xs font-black uppercase">Ingesta</span></div>
-                        <span className="text-lg font-black text-blue-400">+{Math.round(intake)}</span>
-                    </div>
-                    <div className="bg-gray-950/50 p-4 rounded-2xl border border-orange-900/30">
-                        <div className="flex items-center gap-2 mb-3 text-orange-500 border-b border-orange-900/30 pb-2"><Flame size={16} /> <span className="text-xs font-black uppercase">Actividad</span></div>
-                        <span className="text-lg font-black text-orange-500">-{Math.round(totalBurned)}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// Detalle Misiones
-function MissionsHistoryModal({ stats, onClose }) {
-    return (
-        <div className="fixed inset-0 z-[80] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[32px] p-6 shadow-2xl relative flex flex-col max-h-[80vh]">
-                <button onClick={onClose} className="absolute top-4 right-4 bg-gray-800/50 p-2 rounded-full text-silver-500 hover:text-white border border-white/10"><X size={20} /></button>
-                <div className="flex items-center gap-2 text-gold-500 font-black text-xs tracking-widest uppercase mb-1"><Trophy size={14} /> Historial</div>
-                <h2 className="text-2xl font-black text-white mb-4">Misiones</h2>
-                <div className="space-y-3 overflow-y-auto custom-scrollbar pr-1 flex-1">
-                    {stats.listCompleted && stats.listCompleted.length > 0 ? (
-                        stats.listCompleted.map((m, idx) => (
-                            <div key={idx} className={`p-4 rounded-xl border flex flex-col gap-2 relative overflow-hidden group ${m.failed ? 'bg-red-950/30 border-red-500/30' : 'bg-gray-950 border-gray-800/50'}`}>
-                                <div className="flex justify-between items-start relative z-10">
-                                    <span className={`text-sm font-bold block line-clamp-2 ${m.failed ? 'text-red-200 line-through' : 'text-white'}`}>{m.title}</span>
-                                    {m.failed ? <span className="text-[9px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded uppercase">FAIL</span> : <CheckCircle size={16} className="text-green-500" />}
-                                </div>
-                                <div className={`flex gap-3 mt-1 pt-2 border-t relative z-10 ${m.failed ? 'border-red-500/20' : 'border-gray-800'}`}>
-                                    {m.failed ? (
-                                        <div className="flex items-center gap-1 w-full justify-center"><HeartCrack size={12} className="text-red-500 fill-red-500" /><span className="text-xs font-bold text-red-400">{m.hpLoss ? `-${m.hpLoss} HP` : 'Sin castigo'}</span></div>
-                                    ) : (
-                                        <>
-                                            {(m.xpReward > 0) && <div className="flex items-center gap-1"><Star size={10} className="text-blue-400" /><span className="text-[10px] font-bold text-blue-200">+{m.xpReward} XP</span></div>}
-                                            {(m.coinReward > 0) && <div className="flex items-center gap-1"><Coins size={10} className="text-yellow-400" /><span className="text-[10px] font-bold text-yellow-200">+{m.coinReward}</span></div>}
-                                            {(m.gameCoinReward > 0) && <div className="flex items-center gap-1"><Gamepad2 size={10} className="text-purple-400" /><span className="text-[10px] font-bold text-purple-200">+{m.gameCoinReward}</span></div>}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-center py-6 bg-gray-950 rounded-xl border border-gray-800 text-gray-500 text-sm"><p>Sin actividad registrada.</p></div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ==========================================
 // COMPONENTE PRINCIPAL PERFIL
 // ==========================================
 
@@ -15715,21 +15828,16 @@ export default function Profile() {
     const { user, setUser } = useOutletContext();
     const navigate = useNavigate();
 
+    // Estados de Datos
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [calendarViewDate, setCalendarViewDate] = useState(new Date());
     const [dailyData, setDailyData] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    // Modales Interactivos
+    // Modal Exclusivo de Perfil (Fuerza 1RM)
     const [openStrength, setOpenStrength] = useState(false);
-    const [selectedSportList, setSelectedSportList] = useState(null);
-    const [selectedTrainingList, setSelectedTrainingList] = useState(null);
-    const [selectedFood, setSelectedFood] = useState(null);
-    const [selectedMissions, setSelectedMissions] = useState(null);
-    const [showBalanceDetails, setShowBalanceDetails] = useState(false);
 
-    // --- ORDEN Y CONFIGURACIÓN (SINCRONIZADO CON HOME) ---
-    // Usamos los mismos defaults que Home por si el LocalStorage está vacío
+    // --- CONFIGURACIÓN DE WIDGETS (Sincronizada con Home) ---
     const DEFAULTS_ORDER = [
         'missions', 'sport', 'food', 'sleep', 'steps',
         'mood', 'weight', 'training', 'streak',
@@ -15744,22 +15852,18 @@ export default function Profile() {
     const [widgetOrder, setWidgetOrder] = useState(DEFAULTS_ORDER);
     const [visibleWidgets, setVisibleWidgets] = useState(DEFAULTS_CONFIG);
 
-    // Sensores DnD (solo para renderizar el grid correctamente, no permitiremos mover aquí para que sea "espejo")
-    // Opcional: Si quieres permitir mover en perfil, activa los sensores.
-    // Si quieres que sea ESTRICTAMENTE espejo de Home y solo editable en Home, podemos deshabilitar el drag aquí.
-    // El usuario dijo "refleje el home", pero antes pidió Drag and Drop.
-    // Para cumplir "refleje el home tal cual", deshabilitamos el drag visual aquí, solo renderizamos el orden.
+    // Sensores DnD (Desactivamos delay largo para permitir scroll, pero no drag en perfil)
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { delay: 999999, tolerance: 5 } }), // Drag desactivado en Perfil
+        useSensor(PointerSensor, { activationConstraint: { delay: 999999, tolerance: 5 } }),
         useSensor(TouchSensor, { activationConstraint: { delay: 999999, tolerance: 5 } })
     );
 
+    // Cargar orden desde LocalStorage (Espejo del Home)
     useEffect(() => {
         try {
-            // Cargar SIEMPRE del LocalStorage del Home
             const savedOrder = JSON.parse(localStorage.getItem('home_widgets_order'));
             if (savedOrder && Array.isArray(savedOrder)) {
-                // Filtramos 'gains'
+                // Filtramos 'gains' que no se usa aquí
                 const mergedOrder = savedOrder.filter(key => key !== 'gains');
                 if (!mergedOrder.includes('weekly')) mergedOrder.push('weekly');
                 if (!mergedOrder.includes('kcalBalance')) mergedOrder.push('kcalBalance');
@@ -15774,6 +15878,7 @@ export default function Profile() {
         } catch (e) { console.error("Error config", e); }
     }, []);
 
+    // Cargar Historial Diario
     useEffect(() => {
         const fetchHistory = async () => {
             setLoading(true);
@@ -15794,67 +15899,84 @@ export default function Profile() {
     };
 
     // 🔥 RENDERIZADO DE WIDGETS
+    // Aquí es donde está la magia. Pasamos los datos y permitimos la interacción (clases interactivas).
     const renderWidgetByKey = (key) => {
-        // Usamos safeData para evitar fallos, pero mostramos 0/vacio si no hay datos
         const safeData = dailyData || {};
-        const noOp = () => { }; // Función vacía para bloquear updates
+        const noOp = () => { }; // En historial, algunos widgets son solo lectura (updates bloqueados)
 
-        // Clase base: sin interacción de puntero para widgets simples
-        const wrapperClass = "h-full w-full pointer-events-none";
-        // Clase interactiva: para widgets con modal de detalle
-        const interactiveClass = "h-full w-full cursor-pointer touch-manipulation active:opacity-80 transition-opacity duration-75";
+        // Clase base para widgets que SÍ queremos que sean clickables (abren modal)
+        const interactiveClass = "h-full w-full cursor-pointer touch-manipulation active:scale-[0.98] transition-transform duration-200";
+        // Clase para widgets estáticos (solo lectura sin modal, ej: Racha)
+        const staticClass = "h-full w-full pointer-events-none";
 
         switch (key) {
             case 'missions':
                 return (
-                    <div onClick={() => setSelectedMissions(safeData.missionStats)} className={interactiveClass}>
-                        <MissionsWidget completed={safeData.missionStats?.completed} total={safeData.missionStats?.total} completedMissions={safeData.missionStats?.listCompleted} />
+                    <div className={interactiveClass}>
+                        <MissionsWidget
+                            completed={safeData.missionStats?.completed}
+                            total={safeData.missionStats?.total}
+                            completedMissions={safeData.missionStats?.listCompleted}
+                        // No pasamos onClick para que use su propio modal interno
+                        />
                     </div>
                 );
             case 'sport':
                 return (
-                    <div onClick={() => safeData.sportWorkouts?.length && setSelectedSportList(safeData.sportWorkouts)} className={interactiveClass}>
+                    <div className={interactiveClass}>
                         <SportWidget workouts={safeData.sportWorkouts || []} />
                     </div>
                 );
             case 'training':
                 return (
-                    <div onClick={() => safeData.gymWorkouts?.length && setSelectedTrainingList(safeData.gymWorkouts)} className={interactiveClass}>
+                    <div className={interactiveClass}>
                         <TrainingWidget workouts={safeData.gymWorkouts || []} />
                     </div>
                 );
             case 'food':
                 const intake = safeData.nutrition?.totalKcal || safeData.totalKcal || 0;
+                // Estructuramos las comidas para que el widget las entienda si vienen del backend plano
+                const mealsData = safeData.nutrition?.meals || {};
                 return (
-                    <div onClick={() => setSelectedFood({ totalKcal: intake, meals: safeData.nutrition?.meals || {} })} className={interactiveClass}>
-                        <FoodWidget currentKcal={intake} limitKcal={user?.macros?.calories} meals={safeData.nutrition?.meals} />
+                    <div className={interactiveClass}>
+                        <FoodWidget
+                            currentKcal={intake}
+                            limitKcal={user?.macros?.calories}
+                            meals={mealsData}
+                        />
                     </div>
                 );
             case 'sleep':
-                return <div className={wrapperClass}><SleepWidget hours={safeData.sleepHours || 0} onUpdate={noOp} /></div>;
+                return <div className={staticClass}><SleepWidget hours={safeData.sleepHours || 0} onUpdate={noOp} /></div>;
             case 'steps':
-                return <div className={wrapperClass}><StepsWidget steps={safeData.steps || 0} onUpdate={noOp} /></div>;
+                return <div className={staticClass}><StepsWidget steps={safeData.steps || 0} onUpdate={noOp} /></div>;
             case 'mood':
-                return <div className={wrapperClass}><MoodWidget mood={safeData.mood} onUpdate={noOp} /></div>;
+                return <div className={staticClass}><MoodWidget mood={safeData.mood} onUpdate={noOp} /></div>;
             case 'weight':
-                return <div className="h-full flex flex-col pointer-events-none"><WeightWidget initialWeight={safeData.weight || 0} onUpdate={noOp} /></div>;
+                return <div className={staticClass}><WeightWidget initialWeight={safeData.weight || 0} onUpdate={noOp} /></div>;
             case 'streak':
-                // Racha actual del usuario (siempre visible)
-                return <div className={wrapperClass}><StreakWidget streak={user?.streak?.current || 0} /></div>;
-            case 'weekly': return <div className="h-full pointer-events-none"><WeeklyWidget /></div>;
+                // Racha siempre actual del usuario, no del historial
+                return <div className={staticClass}><StreakWidget streak={user?.streak?.current || 0} /></div>;
+            case 'weekly':
+                // 🔥 ESTE ERA EL QUE FALLABA: Quitamos pointer-events-none para que abra su modal
+                return (
+                    <div className={interactiveClass}>
+                        <WeeklyWidget />
+                    </div>
+                );
             case 'kcalBalance':
                 const intake2 = safeData.nutrition?.totalKcal || safeData.totalKcal || 0;
                 const burned = (safeData.sportWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0) + (safeData.gymWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0);
                 return (
-                    <div onClick={() => setShowBalanceDetails(true)} className={interactiveClass}>
-                        <KcalBalanceWidget intake={intake2} burned={burned} />
+                    <div className={interactiveClass}>
+                        <KcalBalanceWidget intake={intake2} burned={burned} weight={safeData.weight || user?.weight} />
                     </div>
                 );
             default: return null;
         }
     };
 
-    // --- CALENDARIO ---
+    // --- CALENDARIO (Visualización) ---
     const renderCalendar = () => {
         const getDaysInMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
         const getFirstDay = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), 1).getDay(); return x === 0 ? 6 : x - 1; };
@@ -15912,12 +16034,12 @@ export default function Profile() {
                 {/* 1. FUERZA 1RM (Abre Modal Grande) */}
                 <ProfileStats mini={true} onClick={() => setOpenStrength(true)} />
 
-                {/* 2. CUERPO (BLOQUEADO) */}
+                {/* 2. CUERPO (BLOQUEADO / FUTURO) */}
                 <div className="relative w-full h-[160px] rounded-[32px] overflow-hidden border border-zinc-800 group bg-zinc-900">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
                         <Lock className="text-zinc-500 mb-2" size={32} />
                         <span className="text-zinc-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
-                            <MapPin size={14} /> MAPA MUSCULAR (PRÓXIMAMENTE)
+                            <MapPin size={14} /> MAPA MUSCULAR
                         </span>
                     </div>
                     <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -15938,15 +16060,12 @@ export default function Profile() {
                     <SortableContext items={widgetOrder} strategy={rectSortingStrategy}>
                         <div className="grid grid-cols-2 gap-4 auto-rows-[160px] grid-flow-dense px-1">
                             {widgetOrder.map((key) => {
-                                // 1. Respetar visibilidad
                                 if (!visibleWidgets[key]) return null;
-                                // 2. Ocultar gains siempre
                                 if (key === 'gains') return null;
 
                                 const isFullWidth = ['training', 'missions', 'sport'].includes(key);
                                 const content = renderWidgetByKey(key);
 
-                                // 3. Si por alguna razón técnica es null (no debería), no renderizar
                                 if (!content) return null;
 
                                 return (
@@ -15968,54 +16087,11 @@ export default function Profile() {
                 <p className="text-center text-[10px] text-zinc-700 mt-4 font-mono">ID: {user?._id}</p>
             </div>
 
-            {/* MODAL 1RM GRANDE (ESTILO PREMIUM) */}
+            {/* MODAL 1RM GRANDE (ESTILO PREMIUM) - Único modal propio del perfil */}
             {openStrength && (
                 <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
                     <div className="w-full max-w-2xl relative z-10">
                         <ProfileStats onCloseExternal={() => setOpenStrength(false)} />
-                    </div>
-                </div>
-            )}
-
-            {/* Modales Detalle de Historial */}
-            {selectedSportList && <SportDetailsModal workouts={selectedSportList} onClose={() => setSelectedSportList(null)} />}
-            {selectedTrainingList && <GymDetailsModal workouts={selectedTrainingList} onClose={() => setSelectedTrainingList(null)} />}
-            {showBalanceDetails && dailyData && <BalanceDetailsModal data={dailyData} onClose={() => setShowBalanceDetails(false)} />}
-            {selectedMissions && <MissionsHistoryModal stats={selectedMissions} onClose={() => setSelectedMissions(null)} />}
-
-            {/* Modal Comida */}
-            {selectedFood && (
-                <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-gray-900 border border-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative flex flex-col">
-                        <button onClick={() => setSelectedFood(null)} className="absolute top-4 right-4 bg-gray-800/50 p-2 rounded-full text-gray-400 hover:text-white"><X size={20} /></button>
-                        <div className="flex items-center gap-2 text-orange-500 font-bold text-sm tracking-wider uppercase mb-1"><Utensils size={18} /> HISTORIAL</div>
-                        <h2 className="text-3xl font-black text-white mb-4">{selectedFood.totalKcal} <span className="text-lg text-gray-500 font-bold">kcal</span></h2>
-                        <div className="space-y-3">
-                            {[
-                                { label: 'Desayuno', key: 'breakfast', icon: <Sunrise size={18} className="text-yellow-400" /> },
-                                { label: 'Comida', key: 'lunch', icon: <Sun size={18} className="text-orange-500" /> },
-                                { label: 'Merienda', key: 'merienda', icon: <Coffee size={18} className="text-amber-700" /> },
-                                { label: 'Cena', key: 'dinner', icon: <Moon size={18} className="text-indigo-400" /> },
-                                { label: 'Snacks', key: 'snacks', icon: <Zap size={18} className="text-purple-400" /> },
-                            ].map((meal) => {
-                                const kcal = selectedFood.meals?.[meal.key] || 0;
-                                const percent = selectedFood.totalKcal > 0 ? (kcal / selectedFood.totalKcal) * 100 : 0;
-                                return (
-                                    <div key={meal.key} className="bg-gray-950 p-3 rounded-xl border border-gray-800 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-gray-900 p-2 rounded-lg">{meal.icon}</div>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-gray-200">{meal.label}</span>
-                                                <div className="w-16 h-1 bg-gray-800 rounded-full mt-1 overflow-hidden">
-                                                    <div className="h-full bg-blue-500" style={{ width: `${percent}%` }}></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <span className="font-mono text-white font-bold">{Math.round(kcal)} <span className="text-xs text-gray-500">kcal</span></span>
-                                    </div>
-                                );
-                            })}
-                        </div>
                     </div>
                 </div>
             )}

@@ -95,7 +95,8 @@ const analyzeFoodText = async (req, res) => {
         "protein": 0,
         "carbs": 0,
         "fat": 0,
-        "fiber": 0
+        "fiber": 0,
+        "name": "Nombre corto y claro del plato"
     }
     `;
 
@@ -136,16 +137,15 @@ const analyzeFoodText = async (req, res) => {
 // ==========================================
 const analyzeImage = async (req, res) => {
     // 🔥 LISTA MASIVA DE MODELOS DE VISIÓN (Prioridad: Calidad -> Velocidad)
-    // Si uno falla, pasa al siguiente. Es casi imposible que fallen todos.
     const VISION_MODELS = [
-        "google/gemini-2.0-flash-exp:free",           // Top tier
-        "google/gemini-2.0-pro-exp-02-05:free",       // Experimental potente
-        "qwen/qwen-2.5-vl-72b-instruct:free",         // Excelente open source
+        "google/gemini-2.0-flash-exp:free",            // Top tier
+        "google/gemini-2.0-pro-exp-02-05:free",        // Experimental potente
+        "qwen/qwen-2.5-vl-72b-instruct:free",          // Excelente open source
         "meta-llama/llama-3.2-90b-vision-instruct:free", // Llama Vision Grande
         "meta-llama/llama-3.2-11b-vision-instruct:free", // Llama Vision Rápida
-        "mistralai/pixtral-12b:free",                 // Mistral Vision
-        "microsoft/phi-3.5-vision-instruct:free",     // Microsoft Vision
-        "google/gemini-flash-1.5-8b:free"             // Gemini Ligero
+        "mistralai/pixtral-12b:free",                  // Mistral Vision
+        "microsoft/phi-3.5-vision-instruct:free",      // Microsoft Vision
+        "google/gemini-flash-1.5-8b:free"              // Gemini Ligero
     ];
 
     try {
@@ -313,6 +313,47 @@ const addFoodToLog = async (req, res) => {
     }
 };
 
+// 🔥 NUEVA FUNCIÓN: ELIMINAR COMIDA DE UN LOG (Punto 5)
+const removeFoodFromLog = async (req, res) => {
+    try {
+        const { mealId, foodItemId } = req.params;
+        const today = getTodayStr();
+
+        const log = await NutritionLog.findOne({ user: req.user._id, date: today });
+        if (!log) return res.status(404).json({ message: 'Log no encontrado' });
+
+        const meal = log.meals.id(mealId);
+        if (!meal) return res.status(404).json({ message: 'Comida no encontrada' });
+
+        // Encontrar el alimento y restar sus macros
+        const foodItem = meal.foods.id(foodItemId);
+        if (!foodItem) return res.status(404).json({ message: 'Alimento no encontrado' });
+
+        // Restamos con cuidado de no bajar de 0
+        log.totalCalories = Math.max(0, Math.round(log.totalCalories - foodItem.calories));
+        log.totalProtein = Math.max(0, Math.round(log.totalProtein - foodItem.protein));
+        log.totalCarbs = Math.max(0, Math.round(log.totalCarbs - foodItem.carbs));
+        log.totalFat = Math.max(0, Math.round(log.totalFat - foodItem.fat));
+        log.totalFiber = Math.max(0, Math.round(log.totalFiber - foodItem.fiber));
+
+        // Eliminar del array usando pull
+        meal.foods.pull(foodItemId);
+
+        await log.save();
+
+        // Sincronizar con DailyLog para que el widget del home se actualice
+        await DailyLog.findOneAndUpdate(
+            { user: req.user._id, date: today },
+            { $set: { "nutrition.totalKcal": log.totalCalories } }
+        );
+
+        res.json(log);
+    } catch (error) {
+        console.error("Error removeFoodFromLog:", error);
+        res.status(500).json({ message: 'Error eliminando alimento' });
+    }
+};
+
 const searchFoods = async (req, res) => {
     try {
         const { query } = req.query;
@@ -334,10 +375,20 @@ const getSavedFoods = async (req, res) => {
 
 const saveCustomFood = async (req, res) => {
     try {
-        const { name, calories, protein, carbs, fat, fiber, servingSize } = req.body;
+        // 🔥 FIX PUNTO 13: Recibir y guardar la carpeta (folder)
+        const { name, calories, protein, carbs, fat, fiber, servingSize, folder } = req.body;
+
         const newFood = await Food.create({
             user: req.user._id,
-            name, calories, protein, carbs, fat, fiber: fiber || 0, servingSize: servingSize || '1 ración', icon: '🍽️'
+            name,
+            calories,
+            protein,
+            carbs,
+            fat,
+            fiber: fiber || 0,
+            servingSize: servingSize || '1 ración',
+            icon: '🍽️',
+            folder: folder || 'General' // Por defecto General si no se envía
         });
         res.status(201).json(newFood);
     } catch (error) { res.status(500).json({ message: 'Error guardando comida' }); }
@@ -365,5 +416,7 @@ module.exports = {
     analyzeImage, getSavedFoods, saveCustomFood, deleteSavedFood,
     updateSavedFood, chatMacroCalculator,
     addFoodToLog, searchFoods, addFoodEntry,
-    analyzeFoodText
+    analyzeFoodText,
+    removeFoodFromLog // 🔥 Exportamos la nueva función
 };
+

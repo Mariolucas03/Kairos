@@ -25,7 +25,7 @@ const EVENT_CONFIG = {
     xp: { title: "Era de Sabiduría", unit: "XP", icon: Zap, color: "text-purple-400", bg: "from-purple-600 to-indigo-500", border: "border-purple-500/30" }
 };
 
-// --- DEFINICIÓN DE ANIMACIÓN CSS SUAVE (Igual que en Header) ---
+// --- DEFINICIÓN DE ANIMACIÓN CSS SUAVE ---
 const customAnimationsStyle = `
   @keyframes smoothGradient {
     0% { background-position: 0% 50%; }
@@ -40,9 +40,7 @@ const customAnimationsStyle = `
 
 // --- HELPER: COLORES DE NIVEL ---
 const getLevelStyle = (level) => {
-    // Nivel 100+ (Cromático Suave - Sin parpadeo)
     if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
-
     if (level >= 90) return "bg-cyan-900/40 text-cyan-400 border-cyan-500/40 shadow-[0_0_8px_rgba(34,211,238,0.2)]";
     if (level >= 80) return "bg-pink-900/40 text-pink-400 border-pink-500/40";
     if (level >= 70) return "bg-purple-900/40 text-purple-400 border-purple-500/40";
@@ -56,19 +54,16 @@ const getLevelStyle = (level) => {
 };
 
 // ESTILO BASE DE TARJETAS
-const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-4 rounded-[24px] border border-white/5 mb-2 relative group hover:border-white/10 transition-all shadow-sm";
+const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-3 rounded-[20px] border border-white/5 mb-2 relative group hover:border-white/10 transition-all shadow-sm";
 
 // ==========================================
 // 1. COMPONENTES UI
 // ==========================================
 
-// BANNER PREMIOS MENSUALES (CORREGIDO: LAYOUT PIRÁMIDE)
 const MonthlyRewardsBanner = () => (
     <div className="bg-zinc-900/80 border border-purple-500/20 rounded-[24px] p-4 mb-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-12 bg-purple-600/10 blur-3xl rounded-full -mr-6 -mt-6 pointer-events-none"></div>
-
         <div className="flex items-center justify-between relative z-10">
-            {/* Texto Izquierda */}
             <div className="self-start pt-2">
                 <h3 className="text-white font-black uppercase italic text-sm flex items-center gap-2 mb-1">
                     <Calendar size={14} className="text-purple-400" /> Premios Mensuales
@@ -77,26 +72,18 @@ const MonthlyRewardsBanner = () => (
                     Los 3 mejores al final del mes ganan fichas.
                 </p>
             </div>
-
-            {/* Estructura Pirámide Derecha */}
             <div className="flex flex-col items-center gap-1.5">
-
-                {/* 1º Puesto (Arriba Centrado) */}
                 <div className="flex items-center justify-between w-[100px] bg-black/70 px-3 py-1.5 rounded-lg border border-yellow-500/40 shadow-lg shadow-yellow-500/10 relative z-20">
                     <span className="text-xs text-yellow-400 font-black">1º</span>
                     <span className="text-xs text-white font-bold tracking-wide">10k</span>
                     <img src="/assets/icons/ficha.png" className="w-4 h-4 object-contain" alt="f" />
                 </div>
-
-                {/* Fila 2º y 3º (Abajo) */}
                 <div className="flex gap-2 relative z-10">
-                    {/* 2º */}
                     <div className="flex items-center justify-between w-[80px] bg-black/50 px-2 py-1 rounded border border-white/10">
                         <span className="text-[10px] text-zinc-300 font-black">2º</span>
                         <span className="text-[10px] text-zinc-200 font-bold tracking-wide">5k</span>
                         <img src="/assets/icons/ficha.png" className="w-3 h-3 object-contain opacity-80" alt="f" />
                     </div>
-                    {/* 3º */}
                     <div className="flex items-center justify-between w-[80px] bg-black/50 px-2 py-1 rounded border border-white/10">
                         <span className="text-[10px] text-orange-600 font-black">3º</span>
                         <span className="text-[10px] text-zinc-200 font-bold tracking-wide">2.5k</span>
@@ -170,11 +157,9 @@ function FriendCard({ friend, onRemoveRequest, onChallengeOrView }) {
     const handleEnd = () => { setIsDragging(false); if (dragX < -THRESHOLD) onRemoveRequest(friend); else if (dragX > THRESHOLD) onChallengeOrView(friend); setDragX(0); };
 
     let bgAction = dragX > 0 ? 'bg-zinc-800 text-yellow-500' : 'bg-red-900/20 text-red-500';
-
     const missions = friend.missionProgress || { completed: 0, total: 1 };
     const safeTotal = Math.max(missions.total || 1, missions.completed, 1);
     const percent = Math.min((missions.completed / safeTotal) * 100, 100);
-
     const levelClass = getLevelStyle(friend.level || 1);
 
     return (
@@ -219,18 +204,21 @@ function FriendCard({ friend, onRemoveRequest, onChallengeOrView }) {
     );
 }
 
+// 🔥 FIX PUNTO 9: TARJETA DE MIEMBRO CLAN REDISEÑADA
 function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId }) {
     if (!member) return null;
     const currentRankData = RANK_CONFIG[member.clanRank || 'esclavo'];
+    // Regla: Puedes editar si eres mayor rango que el objetivo, o si eres líder
     const hasAuthority = member._id !== currentUserId && ((RANK_CONFIG[myRank || 'esclavo'].value === 4) || (RANK_CONFIG[myRank || 'esclavo'].value === 3 && RANK_CONFIG[member.clanRank || 'esclavo'].value < 3));
     const availableOptions = ['esclavo', 'recluta', 'guerrero'];
     if (RANK_CONFIG[myRank || 'esclavo'].value === 4) availableOptions.push('rey');
-    const nameColor = member.clanRank === 'dios' ? 'text-yellow-400' : 'text-white';
 
+    const nameColor = member.clanRank === 'dios' ? 'text-yellow-400' : 'text-white';
     const levelClass = getLevelStyle(member.level || 1);
 
     return (
         <div className={cardBaseStyle}>
+            {/* IZQUIERDA: Avatar y Nombre */}
             <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
                 <div className="relative flex-shrink-0 overflow-visible">
                     <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/5 overflow-hidden">
@@ -238,40 +226,55 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
                     </div>
                     {member.frame && <img src={member.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
                 </div>
-                <div className="flex flex-col min-w-0 pr-2 items-start">
+
+                <div className="flex flex-col min-w-0 pr-2">
                     <span className={`text-sm font-black truncate ${nameColor}`}>{member.username}</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>
-                            Lvl {member.level}
-                        </span>
-                        <span className="text-[9px] text-zinc-500 font-bold uppercase truncate max-w-[80px]">{member.title || 'Novato'}</span>
-                    </div>
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase truncate max-w-[80px]">{member.title || 'Novato'}</span>
                 </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-                {hasAuthority ? (
-                    <div className={`relative flex items-center gap-1 px-2 py-1 rounded-lg border cursor-pointer hover:brightness-110 transition-all ${currentRankData.color}`}>
+
+            {/* DERECHA: Columna de Datos y Acciones */}
+            <div className="flex flex-col items-end gap-1.5">
+
+                {/* FILA 1: Nivel y Rango */}
+                <div className="flex items-center gap-1.5">
+                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>
+                        Lvl {member.level}
+                    </span>
+
+                    {/* Badge de Rango */}
+                    <div className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${currentRankData.color}`}>
                         {member.clanRank === 'dios' && <Crown size={10} strokeWidth={3} />}
-                        <span className="text-[9px] font-black uppercase tracking-wider">{currentRankData.label}</span>
-                        <ChevronDown size={10} className="opacity-70" />
-                        <select className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-50" value={member.clanRank || 'esclavo'} onChange={(e) => onUpdateRank(member._id, e.target.value)}>
-                            {availableOptions.map(opt => (
-                                <option key={opt} value={opt} className="bg-white text-black font-bold">
-                                    {opt.toUpperCase()}
-                                </option>
-                            ))}
-                        </select>
+                        <span className="text-[8px] font-black uppercase tracking-wider">{currentRankData.label}</span>
                     </div>
-                ) : (
-                    <div className={`px-2 py-1 rounded-lg border opacity-90 flex items-center gap-1 ${currentRankData.color}`}>
-                        {member.clanRank === 'dios' && <Crown size={10} strokeWidth={3} />}
-                        <span className="text-[9px] font-black uppercase tracking-wider">{currentRankData.label}</span>
-                    </div>
-                )}
+                </div>
+
+                {/* FILA 2: Acciones de Gestión (Solo si tienes autoridad) */}
                 {hasAuthority && (
-                    <button onClick={() => onKick(member)} className="w-7 h-7 flex items-center justify-center bg-red-900/20 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-colors">
-                        <Trash2 size={12} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {/* Selector de Rango Discreto */}
+                        <div className="relative">
+                            <select
+                                className="bg-zinc-800 text-[9px] text-zinc-300 font-bold py-1 px-2 rounded border border-zinc-700 outline-none appearance-none pr-4"
+                                value={member.clanRank || 'esclavo'}
+                                onChange={(e) => onUpdateRank(member._id, e.target.value)}
+                            >
+                                {availableOptions.map(opt => (
+                                    <option key={opt} value={opt}>{opt.toUpperCase()}</option>
+                                ))}
+                            </select>
+                            <ChevronDown size={10} className="absolute right-0.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                        </div>
+
+                        {/* Botón Expulsar */}
+                        <button
+                            onClick={() => onKick(member)}
+                            className="bg-red-900/20 p-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                            title="Expulsar"
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    </div>
                 )}
             </div>
         </div>
@@ -360,7 +363,7 @@ function CreateChallengeModal({ friend, onClose, onSend }) {
     );
 }
 
-// 3. MODAL CLAN PREVIEW (FLOTANTE + FIX SPACING)
+// 3. MODAL CLAN PREVIEW
 function ClanPreviewModal({ clanId, currentUserId, userClanId, onClose, onJoin }) {
     const [clanData, setClanData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -689,7 +692,6 @@ export default function Social() {
             setToast({ message: "Falta el nombre del clan", type: "error" });
             return;
         }
-        // VALIDACIÓN EMOJI
         if (!newClanData.icon.trim() || [...newClanData.icon].length > 4) {
             setToast({ message: "Elige un estandarte (1 Emoji)", type: "error" });
             return;
@@ -792,7 +794,7 @@ export default function Social() {
                             <div className="bg-zinc-900 border border-white/10 rounded-[32px] p-6 relative overflow-hidden shadow-2xl">
                                 <div className="absolute top-0 right-0 p-10 opacity-10 bg-purple-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
 
-                                {/* HEADER DE TU CLAN (CORREGIDO) */}
+                                {/* HEADER DE TU CLAN (CORREGIDO - FIX 8) */}
                                 <div className="relative z-10 mb-6">
                                     <div className="flex items-start gap-4 w-full">
                                         {/* Icono */}

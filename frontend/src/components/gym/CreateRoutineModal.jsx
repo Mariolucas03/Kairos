@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check } from 'lucide-react';
+import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash } from 'lucide-react';
 import api from '../../services/api';
 import ExerciseSelector from './ExerciseSelector';
 
@@ -19,6 +19,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     // Datos Rutina
     const [routineName, setRoutineName] = useState('');
     const [routineColor, setRoutineColor] = useState(ROUTINE_COLORS[0].id);
+    const [restTime, setRestTime] = useState(60); // 🔥 FIX PUNTO 14: Tiempo descanso
     const [addedExercises, setAddedExercises] = useState([]);
 
     // Estados UI
@@ -31,6 +32,8 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             setRoutineName(routineToEdit.name);
             setAddedExercises(routineToEdit.exercises || []);
             setRoutineColor(routineToEdit.color || 'blue');
+            // Si la rutina guardada tenía descanso personalizado, lo cargamos, si no 60
+            setRestTime(routineToEdit.defaultRest || 60);
         }
     }, [routineToEdit]);
 
@@ -39,7 +42,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         const formatted = selectedList.map(ex => ({
             name: ex.name,
             muscle: ex.muscle,
-            sets: 3,
+            sets: 3, // Valor inicial por defecto
             reps: "10-12",
             targetWeight: 0
         }));
@@ -59,6 +62,14 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         setAddedExercises(newExercises);
     };
 
+    // 🔥 FIX PUNTO 14: Actualizar series de un ejercicio específico
+    const updateExerciseSets = (index, val) => {
+        const newExercises = [...addedExercises];
+        const num = parseInt(val);
+        newExercises[index].sets = isNaN(num) || num < 1 ? 1 : num;
+        setAddedExercises(newExercises);
+    };
+
     const handleSave = async () => {
         if (!routineName.trim()) return alert("Ponle un nombre a la rutina");
         if (addedExercises.length === 0) return alert("Añade al menos un ejercicio");
@@ -69,7 +80,8 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                 name: routineName,
                 color: routineColor,
                 exercises: addedExercises,
-                difficulty: 'Guerrero'
+                difficulty: 'Guerrero',
+                defaultRest: parseInt(restTime) || 60 // 🔥 ENVIAMOS EL DESCANSO AL BACKEND
             };
 
             if (routineToEdit) {
@@ -109,7 +121,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             {/* BODY */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-black p-6 pb-32 space-y-8">
 
-                {/* 1. SECCIÓN NOMBRE Y COLOR */}
+                {/* 1. SECCIÓN CONFIGURACIÓN */}
                 <div className="space-y-4">
                     <div>
                         <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest">Nombre de la Rutina</label>
@@ -122,11 +134,23 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                         />
                     </div>
 
+                    {/* 🔥 FIX PUNTO 14: INPUT DESCANSO */}
+                    <div>
+                        <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest flex items-center gap-1">
+                            <Timer size={12} /> Descanso entre series (Seg)
+                        </label>
+                        <input
+                            type="number"
+                            placeholder="60"
+                            value={restTime}
+                            onChange={(e) => setRestTime(e.target.value)}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-base focus:border-blue-500 outline-none transition-colors text-center"
+                        />
+                    </div>
+
                     {/* SELECTOR DE COLOR */}
                     <div>
                         <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest">Color de la Tarjeta</label>
-
-                        {/* 🔥 FIX: Margen negativo y padding para que NO SE CORTEN los círculos ni sus sombras */}
                         <div className="flex gap-4 overflow-x-auto py-4 -mx-6 px-6 no-scrollbar">
                             {ROUTINE_COLORS.map((c) => (
                                 <button
@@ -158,48 +182,45 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                             </div>
                         ) : (
                             addedExercises.map((ex, idx) => (
-                                <div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between group">
+                                <div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between group animate-in slide-in-from-bottom-2 duration-300">
 
-                                    {/* INFO EJERCICIO (IZQUIERDA) */}
-                                    <div className="flex items-center gap-4 flex-1">
-                                        {/* 🔥 FIX: CUADRADO AMARILLO CON EL NÚMERO */}
+                                    {/* INFO EJERCICIO */}
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
                                         <div className="w-8 h-8 rounded-lg bg-yellow-500 text-black font-black text-sm flex items-center justify-center shadow-lg shadow-yellow-900/20 shrink-0">
                                             {idx + 1}
                                         </div>
-                                        <div>
-                                            <h4 className="text-white font-bold text-sm uppercase">{ex.name}</h4>
+                                        <div className="min-w-0 pr-2">
+                                            <h4 className="text-white font-bold text-sm uppercase truncate">{ex.name}</h4>
                                             <span className="text-[10px] text-zinc-500 font-bold uppercase bg-black px-2 py-0.5 rounded border border-zinc-800 mt-1 inline-block">
                                                 {ex.muscle}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* CONTROLES (DERECHA) */}
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex flex-col gap-1 mr-2">
-                                            <button
-                                                onClick={() => moveExercise(idx, -1)}
-                                                disabled={idx === 0}
-                                                className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
-                                            >
-                                                <ArrowUp size={14} />
-                                            </button>
-
-                                            <button
-                                                onClick={() => moveExercise(idx, 1)}
-                                                disabled={idx === addedExercises.length - 1}
-                                                className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
-                                            >
-                                                <ArrowDown size={14} />
-                                            </button>
+                                    {/* 🔥 FIX PUNTO 14: INPUT SERIES DENTRO DE LA TARJETA */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
+                                            <label className="text-[8px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
+                                                <Hash size={8} /> SETS
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="20"
+                                                value={ex.sets}
+                                                onChange={(e) => updateExerciseSets(idx, e.target.value)}
+                                                className="w-10 bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0"
+                                            />
                                         </div>
 
-                                        <button
-                                            onClick={() => removeExercise(idx)}
-                                            className="bg-red-900/20 p-2.5 rounded-xl text-red-500 border border-red-500/20 hover:bg-red-900/40 transition-colors"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
+                                        {/* CONTROLES ORDEN/BORRAR */}
+                                        <div className="flex flex-col gap-1 border-l border-zinc-800 pl-3">
+                                            <div className="flex gap-1">
+                                                <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0} className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 disabled:opacity-20"><ArrowUp size={12} /></button>
+                                                <button onClick={() => moveExercise(idx, 1)} disabled={idx === addedExercises.length - 1} className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 disabled:opacity-20"><ArrowDown size={12} /></button>
+                                            </div>
+                                            <button onClick={() => removeExercise(idx)} className="bg-red-900/20 p-1 rounded text-red-500 hover:bg-red-900/40 w-full flex justify-center"><Trash2 size={14} /></button>
+                                        </div>
                                     </div>
                                 </div>
                             ))

@@ -12,13 +12,13 @@ const DIFFICULTY_MULTIPLIERS = { easy: 1, medium: 2, hard: 3, epic: 5 };
 const FREQUENCY_MULTIPLIERS = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
 
 // ------------------------------------------------------------------
-// 1. OBTENER MISIONES (VERSIÓN SUPER PERMISIVA)
+// 1. OBTENER MISIONES (VERSIÓN ROBUSTA Y PERMISIVA)
 // ------------------------------------------------------------------
 const getMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 
     // 1. Preparamos las dos versiones del ID: Texto y Objeto
-    // Esto arregla el problema si en la BD se guardó mezclado
+    // Esto arregla el problema si en la BD se guardó mezclado por migraciones antiguas
     const userIdString = userId.toString();
     let userIdObj;
     try {
@@ -26,8 +26,6 @@ const getMissions = asyncHandler(async (req, res) => {
     } catch (e) {
         userIdObj = userId; // Fallback
     }
-
-    console.log(`🔍 [DEBUG] Buscando misiones para: ${userIdString}`);
 
     // 2. Consulta "Atrapalotodo"
     // Busca donde seas el dueño (String u Object) O donde seas participante (String u Object)
@@ -37,24 +35,24 @@ const getMissions = asyncHandler(async (req, res) => {
             { user: userIdString },
             { participants: userIdObj },
             { participants: userIdString },
-            // Misiones cooperativas activas
+            // Misiones cooperativas donde fuiste invitado y aceptaste
             { participants: { $in: [userIdObj, userIdString] }, invitationStatus: 'active' }
         ]
     };
 
+    // Ordenamos: Primero las no completadas, luego por fecha de creación (más nuevas primero)
     const missions = await Mission.find(query)
         .populate('participants', 'username avatar')
         .sort({ completed: 1, createdAt: -1 });
 
-    console.log(`✅ [DEBUG] Encontradas: ${missions.length} misiones brutas.`);
-
-    // 3. Limpieza de Fechas (Protegido contra errores)
+    // 3. Limpieza de Fechas (Auto-Reset para Hábitos)
+    // Esto soluciona el problema de que el widget muestre 5/3 si cuenta misiones viejas
     const today = new Date().toDateString();
     let updated = false;
 
     for (let mission of missions) {
         try {
-            // Si es hábito, verificamos si hay que resetear
+            // Si es hábito y está marcado como completado, verificamos la fecha
             if (mission.type === 'habit' && mission.completed) {
                 // Si no tiene fecha, asumimos que es vieja y reseteamos
                 if (!mission.lastUpdated) {
@@ -63,15 +61,17 @@ const getMissions = asyncHandler(async (req, res) => {
 
                 const lastUpdate = new Date(mission.lastUpdated).toDateString();
 
+                // Lógica de reseteo según frecuencia
+                // Aquí nos enfocamos principalmente en DAILY para el widget del Home
                 if (lastUpdate !== today && mission.frequency === 'daily') {
-                    console.log(`🔄 [DEBUG] Reseteando misión diaria: ${mission.title}`);
+                    console.log(`🔄 [AUTO-FIX] Reseteando hábito diario antiguo: ${mission.title}`);
                     mission.progress = 0;
                     mission.completed = false;
 
-                    // Asegurar mapa de contribuciones
+                    // Asegurar mapa de contribuciones limpio
                     if (!mission.contributions) mission.contributions = new Map();
 
-                    // Reparar participantes si es necesario
+                    // Resetear contribuciones de todos los participantes
                     if (mission.participants && mission.participants.length > 0) {
                         mission.participants.forEach(p => {
                             const pId = p._id ? p._id.toString() : p.toString();
@@ -84,13 +84,12 @@ const getMissions = asyncHandler(async (req, res) => {
                 }
             }
         } catch (err) {
-            console.error(`⚠️ [WARN] Error procesando misión corrupta (${mission._id}):`, err.message);
-            // Opcional: Podrías borrarla si está muy rota: await mission.deleteOne();
+            console.error(`⚠️ [WARN] Error procesando reset de misión (${mission._id}):`, err.message);
         }
     }
 
     if (updated) {
-        // Volvemos a llamar para traer los datos limpios
+        // Si hubo cambios (reseteos), volvemos a llamar recursivamente para traer los datos limpios
         return getMissions(req, res);
     }
 
@@ -114,8 +113,9 @@ const createMission = asyncHandler(async (req, res) => {
     const days = Array.isArray(specificDays) ? specificDays : [];
     const missionUnit = unit ? unit.trim() : '';
 
+    // Calculamos recompensas basándonos en la dificultad
     let mult = (DIFFICULTY_MULTIPLIERS[diff] || 1) * (FREQUENCY_MULTIPLIERS[freq] || 1);
-    if (isCoop) mult *= 1.5;
+    if (isCoop) mult *= 1.5; // Bonus por cooperativo
 
     const finalXP = Math.round(BASE_XP * mult);
     const finalCoins = Math.round(BASE_COINS * mult);
@@ -129,8 +129,6 @@ const createMission = asyncHandler(async (req, res) => {
         participants.push(friendId);
         invStatus = 'pending';
     }
-
-    console.log(`📝 [DEBUG] Creando misión: ${title} para usuario ${req.user._id}`);
 
     const mission = await Mission.create({
         user: req.user._id,
@@ -151,6 +149,7 @@ const createMission = asyncHandler(async (req, res) => {
         contributions: { [req.user._id]: 0 }
     });
 
+    // Enviar notificación al amigo (añadiendo la misión a su array de requests)
     if (isCoop && friendId) {
         await User.findByIdAndUpdate(friendId, {
             $push: { missionRequests: mission._id }
@@ -172,8 +171,9 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(missionId);
 
     if (!mission) {
+        // Limpiamos la request muerta del usuario
         await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
-        return res.status(404).json({ message: 'Esta misión ya no existe.' });
+        return res.status(404).json({ message: 'Esta misión ya no existe o fue cancelada.' });
     }
 
     if (action === 'accept') {
@@ -186,54 +186,73 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
 
         res.json({ message: '¡Misión aceptada! A trabajar.', mission });
     } else {
+        // Si se rechaza, la misión se borra por completo (reglas estrictas)
         await Mission.findByIdAndDelete(missionId);
         await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
-        res.json({ message: 'Invitación rechazada.' });
+        res.json({ message: 'Invitación rechazada y misión cancelada.' });
     }
 });
 
 // ------------------------------------------------------------------
-// 4. ACTUALIZAR PROGRESO
+// 4. ACTUALIZAR PROGRESO / EDITAR MISIÓN
 // ------------------------------------------------------------------
 const updateProgress = asyncHandler(async (req, res) => {
-    const { amount } = req.body;
+    const { amount, editMode, title, target } = req.body;
     const userId = req.user._id;
 
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('Misión no encontrada'); }
 
-    // Permitimos actualizar si eres participante O el dueño (por si acaso el array de participantes falló)
+    // Validación de seguridad: Participante o Dueño
     const isParticipant = mission.participants.map(p => p.toString()).includes(userId.toString());
     const isOwner = mission.user.toString() === userId.toString();
 
     if (!isParticipant && !isOwner) {
-        res.status(401); throw new Error('No participas en esta misión');
+        res.status(401); throw new Error('No tienes permiso para tocar esta misión');
     }
 
+    // --- MODO EDICIÓN (Fix Solicitado Punto 1) ---
+    if (editMode) {
+        if (title) mission.title = title.trim();
+        if (target) mission.target = Number(target);
+
+        // Si el target cambia y es menor que el progreso actual, ajustamos
+        if (mission.progress > mission.target) mission.progress = mission.target;
+
+        await mission.save();
+        return res.json({ message: "Misión actualizada correctamente", mission });
+    }
+
+    // Validar estado cooperativo
     if (mission.isCoop && mission.invitationStatus === 'pending') {
-        res.status(400); throw new Error('Esperando a que tu compañero acepte.');
+        res.status(400); throw new Error('Tu compañero aún no ha aceptado la misión.');
     }
 
+    // Validación de Hábito Diario completado hoy
     const today = new Date();
     if (mission.type === 'habit' && mission.completed) {
         const last = new Date(mission.lastUpdated);
-        if (last.toDateString() !== today.toDateString()) {
+        // Si la última vez fue HOY, ya no se puede sumar más
+        if (last.toDateString() === today.toDateString()) {
+            return res.status(200).json({ message: 'Misión ya completada hoy', alreadyCompleted: true });
+        } else {
+            // Si fue ayer, reseteamos (aunque el getMissions ya debería haberlo hecho, doble seguridad)
             mission.progress = 0;
             mission.completed = false;
             if (!mission.contributions) mission.contributions = new Map();
             mission.participants.forEach(p => mission.contributions.set(p.toString(), 0));
-        } else {
-            return res.status(200).json({ message: 'Misión ya completada hoy', alreadyCompleted: true });
         }
     }
 
     const addAmount = Number(amount) || 1;
 
-    // SYNC LOGIC (Vinculadas)
+    // --- SYNC LOGIC (Misiones Vinculadas) ---
+    // 🔥 CORRECCIÓN PUNTO 2: Buscamos misiones con el mismo Título Y la misma UNIDAD
     const linkedMissions = await Mission.find({
         user: userId,
         title: mission.title,
-        _id: { $ne: mission._id },
+        unit: mission.unit, // <--- CLAVE: Ahora diferenciamos "1 Pagina" de "1 Libro"
+        _id: { $ne: mission._id }, // No la actual
         completed: false
     });
 
@@ -248,8 +267,10 @@ const updateProgress = asyncHandler(async (req, res) => {
         if (linked.progress >= linked.target) {
             linked.completed = true;
             linked.progress = linked.target;
+            // Dar recompensa de la vinculada
             await levelService.addRewards(userId, linked.xpReward, linked.coinReward, linked.gameCoinReward);
 
+            // Log en el diario
             const todayStr = today.toISOString().split('T')[0];
             await DailyLog.findOneAndUpdate(
                 { user: userId, date: todayStr },
@@ -263,7 +284,7 @@ const updateProgress = asyncHandler(async (req, res) => {
         await linked.save();
     }
 
-    // Actualizar Misión Actual
+    // --- ACTUALIZAR MISIÓN ACTUAL ---
     mission.progress += addAmount;
     if (!mission.contributions) mission.contributions = new Map();
     const currentContrib = mission.contributions.get(userId.toString()) || 0;
@@ -275,12 +296,16 @@ const updateProgress = asyncHandler(async (req, res) => {
     let leveledUp = false;
     let userResult = null;
 
+    // Verificar Completitud
     if (mission.progress >= mission.target) {
         mission.completed = true;
         mission.progress = mission.target;
 
+        // Dar recompensas a TODOS los participantes
         for (const pId of mission.participants) {
             const result = await levelService.addRewards(pId, mission.xpReward, mission.coinReward, mission.gameCoinReward);
+
+            // Guardamos el resultado si soy yo para devolverlo al frontend
             if (pId.toString() === userId.toString()) {
                 userResult = result.user;
                 leveledUp = result.leveledUp;
@@ -288,6 +313,7 @@ const updateProgress = asyncHandler(async (req, res) => {
             }
         }
 
+        // Registrar en DailyLog
         const todayStr = today.toISOString().split('T')[0];
         await DailyLog.findOneAndUpdate(
             { user: userId, date: todayStr },
@@ -318,10 +344,12 @@ const deleteMission = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('No encontrada'); }
 
+    // Permitir borrar aunque esté acabada si eres el dueño (Fix Punto 1)
     if (mission.user.toString() !== req.user._id.toString()) {
         res.status(403); throw new Error('Solo el creador puede cancelar la misión');
     }
 
+    // Si era una invitación pendiente, limpiamos el buzón del amigo
     if (mission.invitationStatus === 'pending') {
         const friendId = mission.participants.find(p => p.toString() !== req.user._id.toString());
         if (friendId) {
@@ -334,13 +362,12 @@ const deleteMission = asyncHandler(async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// 6. PURGA NUCLEAR
+// 6. PURGA NUCLEAR (DEV TOOL)
 // ------------------------------------------------------------------
 const nukeMyMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const userIdString = userId.toString();
 
-    // Borramos usando ambas variantes del ID para estar seguros
     await Mission.deleteMany({
         $or: [
             { user: userId },
