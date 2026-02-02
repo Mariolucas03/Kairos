@@ -4,7 +4,7 @@ import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
     Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save,
-    Star, HeartCrack, Zap
+    Zap, HeartCrack
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -116,7 +116,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const [isDragging, setIsDragging] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [showInput, setShowInput] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
     const startX = useRef(0);
     const THRESHOLD = 80;
 
@@ -201,12 +200,12 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         );
     };
 
+    // 🔥 MANEJO DEL CLICK: Si es modo gestión, edita directo. Si no, NO HACE NADA (eliminado el expand).
     const handleCardClick = () => {
         if (viewAllMode) {
             onEdit(mission);
-        } else {
-            setIsExpanded(!isExpanded);
         }
+        // Eliminado el else { setIsExpanded } para que no haga nada al clickar normal
     };
 
     return (
@@ -256,15 +255,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                                 {mission.title}
                                             </h3>
                                         </div>
-
-                                        {isExpanded && !viewAllMode && (
-                                            <div className="mt-1 text-[10px] text-zinc-500 font-bold flex flex-col gap-1 animate-in slide-in-from-top-1">
-                                                <div className="flex items-center gap-1 uppercase tracking-wide">
-                                                    <Calendar size={10} /> {mission.frequency.toUpperCase()}
-                                                </div>
-                                                {/* 🔥 BOTÓN EDITAR ELIMINADO EN MODO NORMAL - SOLO INFO */}
-                                            </div>
-                                        )}
                                     </div>
 
                                     <div className="absolute -top-1 -right-1 flex flex-col items-end gap-1.5">
@@ -298,33 +288,37 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                             {mission.completed && <div className="p-1 bg-zinc-900 rounded-full border border-zinc-800 shrink-0 mt-0.5"><Check size={16} className={styles.iconColor} /></div>}
                         </div>
 
-                        {/* 🔥 RECOMPENSAS / RIESGOS (RESTILO ANTIGUO) */}
-                        <div className="flex items-center gap-4 mt-3 pt-2 border-t border-white/5 opacity-90">
-                            {/* Recompensas (Verde/Amarillo/Azul) */}
-                            <div className="flex items-center gap-3">
-                                {mission.xpReward > 0 && (
-                                    <div className="flex items-center gap-1 text-[10px] font-bold text-blue-300">
-                                        <Star size={12} className="text-blue-500 fill-blue-500" /> +{mission.xpReward}
-                                    </div>
-                                )}
-                                {(mission.coinReward > 0 || mission.gameCoinReward > 0) && (
-                                    <div className="flex items-center gap-1 text-[10px] font-bold text-yellow-300">
-                                        <img src="/assets/icons/moneda.png" alt="c" className="w-3 h-3" />
-                                        <span>+{mission.coinReward}</span>
-                                    </div>
-                                )}
-                                {mission.gameCoinReward > 0 && (
-                                    <div className="flex items-center gap-1 text-[10px] font-bold text-purple-300">
-                                        <img src="/assets/icons/ficha.png" alt="f" className="w-3 h-3" />
-                                        <span>+{mission.gameCoinReward}</span>
-                                    </div>
-                                )}
-                            </div>
+                        {/* 🔥 RECOMPENSAS GRANDES Y CLARAS (ESTILO ANTIGUO) */}
+                        <div className={`flex gap-3 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
 
-                            {/* Daño (Rojo) */}
-                            <div className="ml-auto flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-900/20 px-2 py-0.5 rounded border border-red-500/20">
-                                <HeartCrack size={12} className="text-red-500 fill-red-500" />
-                                <span>-{damage} HP</span>
+                            {/* XP (Rayo) */}
+                            {mission.xpReward > 0 && (
+                                <div className="flex items-center gap-1 bg-zinc-900/60 px-2 py-1 rounded-lg border border-white/5">
+                                    <Zap size={14} className="text-blue-400 fill-blue-400" />
+                                    <span className="text-xs font-black text-blue-200">+{mission.xpReward}</span>
+                                </div>
+                            )}
+
+                            {/* Monedas */}
+                            {(mission.coinReward > 0) && (
+                                <div className="flex items-center gap-1 bg-gold-900/10 px-2 py-1 rounded-lg border border-gold-500/10">
+                                    <img src="/assets/icons/moneda.png" alt="c" className="w-4 h-4 object-contain" />
+                                    <span className="text-xs font-black text-gold-400">+{mission.coinReward}</span>
+                                </div>
+                            )}
+
+                            {/* Fichas */}
+                            {(mission.gameCoinReward > 0) && (
+                                <div className="flex items-center gap-1 bg-purple-900/10 px-2 py-1 rounded-lg border border-purple-500/10">
+                                    <img src="/assets/icons/ficha.png" alt="f" className="w-4 h-4 object-contain" />
+                                    <span className="text-xs font-black text-purple-400">+{mission.gameCoinReward}</span>
+                                </div>
+                            )}
+
+                            {/* Daño (Corazón Roto) - SIEMPRE A LA DERECHA */}
+                            <div className="ml-auto flex items-center gap-1 text-xs font-black text-red-400 bg-red-900/20 px-2 py-1 rounded-lg border border-red-500/20">
+                                <HeartCrack size={14} className="text-red-500 fill-red-500" />
+                                <span>-{damage}</span>
                             </div>
                         </div>
 
@@ -363,8 +357,12 @@ export default function Missions() {
     const [toast, setToast] = useState(null);
     const [friends, setFriends] = useState([]);
     const [viewAllMode, setViewAllMode] = useState(false);
+
+    // Estados Edición
     const [showEditModal, setShowEditModal] = useState(false);
     const [missionToEdit, setMissionToEdit] = useState(null);
+    // 🔥 ESTADO NUEVO: Días específicos para edición
+    const [editSelectedDays, setEditSelectedDays] = useState([]);
 
     const DEFAULTS = {
         title: '', frequency: 'daily', type: 'habit', difficulty: 'easy', target: 1, unit: '', isCoop: false, friendId: ''
@@ -396,18 +394,11 @@ export default function Missions() {
     const showToast = (message, type = 'success') => setToast({ message, type });
 
     const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
+
+    // Toggle para crear
     const toggleDay = (dayValue) => setSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
-
-    const getRewardValues = (freq, diff) => {
-        const baseXP = 10; const baseCoins = 5;
-        const diffMult = { easy: 1, medium: 2, hard: 3, epic: 5 };
-        const freqMult = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
-        const m1 = diffMult[diff] || 1; const m2 = freqMult[freq] || 1;
-        let mult = m1 * m2;
-        if (newMission.isCoop) mult *= 1.5;
-
-        return { xp: Math.round(baseXP * mult), coins: Math.round(baseCoins * mult), gameCoins: Math.round(baseCoins * mult * 2) };
-    };
+    // Toggle para editar
+    const toggleEditDay = (dayValue) => setEditSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
 
     const getFilteredMissions = () => {
         if (viewAllMode) return missions;
@@ -483,6 +474,13 @@ export default function Missions() {
         try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Misión eliminada", "info"); } catch (e) { }
     };
 
+    // Al abrir editor, cargamos los días
+    const openEditModal = (mission) => {
+        setMissionToEdit(mission);
+        setEditSelectedDays(mission.specificDays || []);
+        setShowEditModal(true);
+    };
+
     const handleEditMission = async () => {
         if (!missionToEdit || !missionToEdit.title.trim()) return;
         try {
@@ -492,7 +490,9 @@ export default function Missions() {
                 target: missionToEdit.target,
                 frequency: missionToEdit.frequency,
                 difficulty: missionToEdit.difficulty,
-                unit: missionToEdit.unit
+                unit: missionToEdit.unit,
+                // 🔥 ENVIAMOS DÍAS ESPECÍFICOS AL EDITAR
+                specificDays: missionToEdit.frequency === 'daily' ? editSelectedDays : []
             });
             setShowEditModal(false);
             fetchMissions();
@@ -515,12 +515,14 @@ export default function Missions() {
                         Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
                     </h1>
                     <div className="flex gap-2">
+                        {/* BOTÓN OJO (GESTIÓN) */}
                         <button
                             onClick={() => setViewAllMode(!viewAllMode)}
                             className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}
                         >
                             {viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}
                         </button>
+
                         <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
                     </div>
                 </div>
@@ -561,7 +563,7 @@ export default function Missions() {
                                 onUpdateProgress={handleUpdateProgress}
                                 onDelete={handleDelete}
                                 currentUserId={user._id}
-                                onEdit={(m) => { setMissionToEdit(m); setShowEditModal(true); }}
+                                onEdit={openEditModal} // 🔥 USAMOS FUNCIÓN WRAPPER QUE CARGA DÍAS
                                 viewAllMode={viewAllMode}
                             />
                         ))}
@@ -577,7 +579,7 @@ export default function Missions() {
                 )}
             </div>
 
-            {/* MODAL EDITAR */}
+            {/* MODAL EDITAR COMPLETO */}
             {showEditModal && missionToEdit && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -587,10 +589,13 @@ export default function Missions() {
                         </div>
 
                         <div className="space-y-4">
+                            {/* TITULO */}
                             <div>
                                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label>
                                 <input type="text" value={missionToEdit.title} onChange={e => setMissionToEdit({ ...missionToEdit, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" />
                             </div>
+
+                            {/* OBJETIVO + UNIDAD */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label>
@@ -601,6 +606,8 @@ export default function Missions() {
                                     <input type="text" value={missionToEdit.unit || ''} onChange={e => setMissionToEdit({ ...missionToEdit, unit: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" placeholder="Págs, Km..." />
                                 </div>
                             </div>
+
+                            {/* FRECUENCIA */}
                             <div>
                                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Frecuencia</label>
                                 <select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.frequency} onChange={e => setMissionToEdit({ ...missionToEdit, frequency: e.target.value })}>
@@ -610,6 +617,20 @@ export default function Missions() {
                                     <option value="yearly">Anual</option>
                                 </select>
                             </div>
+
+                            {/* 🔥 SELECTOR DÍAS ESPECÍFICOS (SOLO SI ES DIARIA) */}
+                            {missionToEdit.frequency === 'daily' && (
+                                <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl">
+                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label>
+                                    <div className="flex justify-between">
+                                        {daysOptions.map(d => (
+                                            <button key={d.value} onClick={() => toggleEditDay(d.value)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all border ${editSelectedDays.includes(d.value) ? 'bg-white text-black border-white scale-110' : 'bg-black text-zinc-600 border-zinc-800'}`}>{d.label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* DIFICULTAD */}
                             <div>
                                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Dificultad</label>
                                 <select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.difficulty} onChange={e => setMissionToEdit({ ...missionToEdit, difficulty: e.target.value })}>
@@ -619,6 +640,7 @@ export default function Missions() {
                                     <option value="epic">Épica</option>
                                 </select>
                             </div>
+
                             <div className="pt-4 flex gap-2">
                                 <button onClick={() => setShowEditModal(false)} className="flex-1 bg-zinc-800 text-zinc-300 py-3 rounded-xl font-bold text-xs uppercase">Cancelar</button>
                                 <button onClick={handleEditMission} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2"><Save size={16} /> Guardar</button>
@@ -628,7 +650,7 @@ export default function Missions() {
                 </div>, document.body
             )}
 
-            {/* MODAL CREAR */}
+            {/* MODAL CREAR (MANTENIDO) */}
             {showCreator && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">
@@ -636,15 +658,18 @@ export default function Missions() {
                             <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2"><Plus size={18} className="text-yellow-500" /> Nueva Misión</h2>
                             <button onClick={handleCloseCreator} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={18} /></button>
                         </div>
+
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4 bg-black/20">
                             <div className="mt-2">
                                 <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label>
                                 <input type="text" placeholder="Ej: Leer 10 páginas" autoFocus value={newMission.title} onChange={e => setNewMission({ ...newMission, title: e.target.value })} className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-white placeholder-zinc-700 outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all font-bold text-sm" />
                             </div>
+
                             <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
                                 <button onClick={() => setNewMission({ ...newMission, type: 'habit' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'habit' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Hábito (Recurrente)</button>
                                 <button onClick={() => setNewMission({ ...newMission, type: 'quest' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'quest' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Misión Puntual</button>
                             </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label>
@@ -655,6 +680,7 @@ export default function Missions() {
                                     <input type="text" placeholder="km, pags, min..." className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-center text-white font-medium text-sm outline-none focus:border-blue-500/50 transition-all placeholder-zinc-700" value={newMission.unit} onChange={e => setNewMission({ ...newMission, unit: e.target.value })} />
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Frecuencia</label>
@@ -675,6 +701,7 @@ export default function Missions() {
                                     </select>
                                 </div>
                             </div>
+
                             {newMission.frequency === 'daily' && (
                                 <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl">
                                     <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label>
@@ -685,6 +712,7 @@ export default function Missions() {
                                     </div>
                                 </div>
                             )}
+
                             <div className={`p-3 rounded-xl border transition-all ${newMission.isCoop ? 'bg-purple-900/10 border-purple-500/30' : 'bg-zinc-900/30 border-zinc-800'}`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -703,6 +731,7 @@ export default function Missions() {
                                 )}
                             </div>
                         </div>
+
                         <div className="p-5 border-t border-zinc-800 bg-[#09090b] shrink-0 z-10">
                             <button onClick={handleCreate} className="w-full bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition-all shadow-lg">Crear Misión</button>
                         </div>
