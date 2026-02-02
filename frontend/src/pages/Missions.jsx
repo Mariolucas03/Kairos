@@ -3,11 +3,18 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save,
-    Zap, HeartCrack
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+
+// ==========================================
+// 0. CONFIGURACIÓN DE ICONOS (Ruta estática)
+// ==========================================
+const ICON_XP = "/assets/icons/xp.png";
+const ICON_COIN = "/assets/icons/moneda.png";
+const ICON_CHIP = "/assets/icons/ficha.png";
+const ICON_HEART = "/assets/icons/corazon.png";
 
 // ==========================================
 // 1. HELPERS VISUALES Y LÓGICOS
@@ -200,12 +207,12 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         );
     };
 
-    // 🔥 MANEJO DEL CLICK: Si es modo gestión, edita directo. Si no, NO HACE NADA (eliminado el expand).
+    // 🔥 MANEJO DEL CLICK: Solo editar si es MODO OJO.
+    // Eliminado el isExpanded para evitar despliegues innecesarios.
     const handleCardClick = () => {
         if (viewAllMode) {
             onEdit(mission);
         }
-        // Eliminado el else { setIsExpanded } para que no haga nada al clickar normal
     };
 
     return (
@@ -247,7 +254,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                         <div className="flex justify-between items-start gap-3 mb-1">
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1 relative">
-                                    <div className="pr-16">
+                                    <div className="pr-20">
                                         <div className="flex items-center gap-2">
                                             {mission.isCoop && <Users size={16} className={styles.iconColor} />}
                                             {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
@@ -257,12 +264,16 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                         </div>
                                     </div>
 
-                                    <div className="absolute -top-1 -right-1 flex flex-col items-end gap-1.5">
-                                        <div className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>
-                                            {styles.label}
-                                        </div>
+                                    {/* 🔥 ETIQUETAS SUPERIORES DERECHA REORGANIZADAS */}
+                                    <div className="absolute -top-1 -right-1 flex items-center gap-2">
+                                        {/* TIPO (IZQUIERDA) */}
                                         <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
                                             {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
+                                        </div>
+
+                                        {/* NIVEL (DERECHA) */}
+                                        <div className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>
+                                            {styles.label}
                                         </div>
                                     </div>
                                 </div>
@@ -288,37 +299,39 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                             {mission.completed && <div className="p-1 bg-zinc-900 rounded-full border border-zinc-800 shrink-0 mt-0.5"><Check size={16} className={styles.iconColor} /></div>}
                         </div>
 
-                        {/* 🔥 RECOMPENSAS GRANDES Y CLARAS (ESTILO ANTIGUO) */}
-                        <div className={`flex gap-3 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
+                        {/* 🔥 RECOMPENSAS / RIESGOS (IMÁGENES REALES, NÚMERO PRIMERO) */}
+                        <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
 
-                            {/* XP (Rayo) */}
-                            {mission.xpReward > 0 && (
-                                <div className="flex items-center gap-1 bg-zinc-900/60 px-2 py-1 rounded-lg border border-white/5">
-                                    <Zap size={14} className="text-blue-400 fill-blue-400" />
-                                    <span className="text-xs font-black text-blue-200">+{mission.xpReward}</span>
-                                </div>
-                            )}
+                            <div className="flex items-center gap-4">
+                                {/* XP */}
+                                {mission.xpReward > 0 && (
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-xs font-black text-blue-200">+{mission.xpReward}</span>
+                                        <img src={ICON_XP} className="w-5 h-5 object-contain" alt="XP" />
+                                    </div>
+                                )}
 
-                            {/* Monedas */}
-                            {(mission.coinReward > 0) && (
-                                <div className="flex items-center gap-1 bg-gold-900/10 px-2 py-1 rounded-lg border border-gold-500/10">
-                                    <img src="/assets/icons/moneda.png" alt="c" className="w-4 h-4 object-contain" />
-                                    <span className="text-xs font-black text-gold-400">+{mission.coinReward}</span>
-                                </div>
-                            )}
+                                {/* Monedas */}
+                                {(mission.coinReward > 0) && (
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-xs font-black text-yellow-200">+{mission.coinReward}</span>
+                                        <img src={ICON_COIN} className="w-5 h-5 object-contain" alt="Coins" />
+                                    </div>
+                                )}
 
-                            {/* Fichas */}
-                            {(mission.gameCoinReward > 0) && (
-                                <div className="flex items-center gap-1 bg-purple-900/10 px-2 py-1 rounded-lg border border-purple-500/10">
-                                    <img src="/assets/icons/ficha.png" alt="f" className="w-4 h-4 object-contain" />
-                                    <span className="text-xs font-black text-purple-400">+{mission.gameCoinReward}</span>
-                                </div>
-                            )}
+                                {/* Fichas */}
+                                {(mission.gameCoinReward > 0) && (
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-xs font-black text-purple-200">+{mission.gameCoinReward}</span>
+                                        <img src={ICON_CHIP} className="w-5 h-5 object-contain" alt="Chips" />
+                                    </div>
+                                )}
+                            </div>
 
-                            {/* Daño (Corazón Roto) - SIEMPRE A LA DERECHA */}
-                            <div className="ml-auto flex items-center gap-1 text-xs font-black text-red-400 bg-red-900/20 px-2 py-1 rounded-lg border border-red-500/20">
-                                <HeartCrack size={14} className="text-red-500 fill-red-500" />
-                                <span>-{damage}</span>
+                            {/* Daño (Corazón) - SIEMPRE A LA DERECHA */}
+                            <div className="ml-auto flex items-center gap-1 opacity-80">
+                                <span className="text-xs font-black text-red-400">-{damage}</span>
+                                <img src={ICON_HEART} className="w-5 h-5 object-contain grayscale-[0.2]" alt="HP" />
                             </div>
                         </div>
 
@@ -361,7 +374,6 @@ export default function Missions() {
     // Estados Edición
     const [showEditModal, setShowEditModal] = useState(false);
     const [missionToEdit, setMissionToEdit] = useState(null);
-    // 🔥 ESTADO NUEVO: Días específicos para edición
     const [editSelectedDays, setEditSelectedDays] = useState([]);
 
     const DEFAULTS = {
@@ -373,7 +385,7 @@ export default function Missions() {
 
     // 🔥 FIX SCROLL TOP AL CAMBIAR TAB
     useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: 'instant' });
     }, [activeTab]);
 
     useEffect(() => {
@@ -395,9 +407,7 @@ export default function Missions() {
 
     const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
 
-    // Toggle para crear
     const toggleDay = (dayValue) => setSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
-    // Toggle para editar
     const toggleEditDay = (dayValue) => setEditSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
 
     const getFilteredMissions = () => {
@@ -474,7 +484,6 @@ export default function Missions() {
         try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Misión eliminada", "info"); } catch (e) { }
     };
 
-    // Al abrir editor, cargamos los días
     const openEditModal = (mission) => {
         setMissionToEdit(mission);
         setEditSelectedDays(mission.specificDays || []);
@@ -491,7 +500,7 @@ export default function Missions() {
                 frequency: missionToEdit.frequency,
                 difficulty: missionToEdit.difficulty,
                 unit: missionToEdit.unit,
-                // 🔥 ENVIAMOS DÍAS ESPECÍFICOS AL EDITAR
+                // 🔥 ENVIAR DÍAS ESPECÍFICOS AL EDITAR
                 specificDays: missionToEdit.frequency === 'daily' ? editSelectedDays : []
             });
             setShowEditModal(false);
@@ -515,14 +524,12 @@ export default function Missions() {
                         Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
                     </h1>
                     <div className="flex gap-2">
-                        {/* BOTÓN OJO (GESTIÓN) */}
                         <button
                             onClick={() => setViewAllMode(!viewAllMode)}
                             className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}
                         >
                             {viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}
                         </button>
-
                         <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
                     </div>
                 </div>
@@ -563,7 +570,7 @@ export default function Missions() {
                                 onUpdateProgress={handleUpdateProgress}
                                 onDelete={handleDelete}
                                 currentUserId={user._id}
-                                onEdit={openEditModal} // 🔥 USAMOS FUNCIÓN WRAPPER QUE CARGA DÍAS
+                                onEdit={openEditModal}
                                 viewAllMode={viewAllMode}
                             />
                         ))}
@@ -618,7 +625,7 @@ export default function Missions() {
                                 </select>
                             </div>
 
-                            {/* 🔥 SELECTOR DÍAS ESPECÍFICOS (SOLO SI ES DIARIA) */}
+                            {/* 🔥 EDITOR DE DÍAS ESPECÍFICOS (Solo si es diaria) */}
                             {missionToEdit.frequency === 'daily' && (
                                 <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl">
                                     <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label>
