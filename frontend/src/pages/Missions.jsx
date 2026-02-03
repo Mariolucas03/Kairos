@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save,
-    HeartCrack // Importamos corazón roto para el daño
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -15,9 +14,7 @@ import Toast from '../components/common/Toast';
 const ICON_XP = "/assets/icons/xp.png";
 const ICON_COIN = "/assets/icons/moneda.png";
 const ICON_CHIP = "/assets/icons/ficha.png";
-// Si no tienes imagen de corazón roto, usa el componente HeartCrack de Lucide, 
-// pero aquí dejo la constante por si tienes la imagen.
-const ICON_HEART = "/assets/icons/corazon.png";
+const ICON_HEART = "/assets/icons/corazon.png"; // 🔥 CAMBIO 2: Usamos tu imagen
 
 // ==========================================
 // 1. HELPERS
@@ -34,7 +31,6 @@ const getDeadlineText = (freq) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
-// 🔥 FIX 2: DAÑO INVERTIDO (Fácil = 10, Épica = 0)
 const getPotentialDamage = (diff) => {
     const rules = { easy: 10, medium: 5, hard: 2, epic: 0 };
     return rules[diff] !== undefined ? rules[diff] : 5;
@@ -43,7 +39,16 @@ const getPotentialDamage = (diff) => {
 const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
     const label = labels[diff] || diff;
-    if (completed) return { gradient: 'from-zinc-800 via-zinc-700 to-zinc-800', shadow: 'rgba(82, 82, 91, 0.3)', textGradient: 'from-zinc-400 to-zinc-600', badge: 'text-zinc-500 border-zinc-700 bg-zinc-800/50', iconColor: 'text-zinc-600', label };
+
+    // 🔥 CAMBIO 3: Estilo Completado "Bloqueado/Metal" (Gris oscuro, sin saturación)
+    if (completed) return {
+        gradient: 'from-zinc-900 to-black',
+        shadow: 'rgba(0,0,0,0)',
+        textGradient: 'from-zinc-600 to-zinc-500',
+        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900',
+        iconColor: 'text-zinc-700',
+        label: 'COMPLETADO'
+    };
 
     switch (diff) {
         case 'easy': return { gradient: 'from-[#14532d] via-[#166534] to-[#22c55e]', shadow: 'rgba(22, 101, 52, 0.4)', textGradient: 'from-[#166534] to-[#22c55e]', badge: 'text-green-400 border-green-500/30 bg-green-900/20', iconColor: 'text-green-400', label };
@@ -70,14 +75,15 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const amIOwner = mission.user === currentUserId;
     const isBinary = mission.target === 1;
     const damage = getPotentialDamage(mission.difficulty);
-    const canSwipe = !isPending;
+
+    // 🔥 CAMBIO 4: Si estamos en viewAllMode (OJO), NO se puede deslizar
+    const canSwipe = !isPending && !viewAllMode;
 
     const handleStart = (cx) => { if (canSwipe) { setIsDragging(true); startX.current = cx; } };
     const handleMove = (cx) => {
         if (!isDragging) return;
         const diff = cx - startX.current;
-        if (mission.completed && diff > 0) return;
-        if (mission.completed && diff < 0 && !viewAllMode) return;
+        if (mission.completed && diff > 0) return; // No recompletar
         setDragX(diff);
     };
     const handleEnd = () => {
@@ -85,7 +91,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (isPending) { setDragX(0); return; }
         if (dragX > THRESHOLD && !mission.completed) {
             onUpdateProgress(mission, Math.max(0, mission.target - mission.progress));
-        } else if (dragX < -THRESHOLD && (!mission.completed || viewAllMode)) {
+        } else if (dragX < -THRESHOLD && !mission.completed) {
             if (window.confirm("¿Borrar misión?")) onDelete(mission._id);
         }
         setDragX(0);
@@ -117,6 +123,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     };
 
     return (
+        // Solo permite click en modo edición (ojo)
         <div className="relative w-full mb-4 select-none group" onClick={() => viewAllMode && onEdit(mission)}>
             {canSwipe && (
                 <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
@@ -125,7 +132,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                 </div>
             )}
 
-            <div style={cardStyle} className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} shadow-[0_0_25px_${styles.shadow}] ${isPending ? 'opacity-70 grayscale' : ''} ${viewAllMode ? 'cursor-pointer active:scale-95' : ''} ${mission.completed && !viewAllMode ? 'opacity-50' : 'opacity-100'}`}
+            <div style={cardStyle} className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} shadow-[0_0_25px_${styles.shadow}] ${isPending ? 'opacity-70 grayscale' : ''} ${viewAllMode ? 'cursor-pointer active:scale-95' : ''} ${mission.completed ? 'opacity-60 grayscale' : 'opacity-100'}`}
                 onTouchStart={e => handleStart(e.targetTouches[0].clientX)} onTouchMove={e => handleMove(e.targetTouches[0].clientX)} onTouchEnd={handleEnd}
                 onMouseDown={e => handleStart(e.clientX)} onMouseMove={e => handleMove(e.clientX)} onMouseUp={handleEnd} onMouseLeave={() => isDragging && handleEnd()}
             >
@@ -136,26 +143,28 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                         {/* HEADER */}
                         <div className="flex justify-between items-start gap-3 mb-1">
                             <div className="flex-1 min-w-0 relative">
-                                {/* 🔥 FIX 4: Padding right para evitar corte con badges + Leading ajustado para descenders */}
                                 <div className="pr-20 mb-1">
                                     <div className="flex items-center gap-2">
                                         {mission.isCoop && <Users size={16} className={styles.iconColor} />}
+                                        {/* Icono de edición solo visible en modo ojo */}
                                         {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                                        <h3 className={`text-base font-black leading-normal uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-400 line-through' : 'text-white'} pb-1`}>
+                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through' : 'text-white'}`}>
                                             {mission.title}
                                         </h3>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-zinc-500 uppercase font-bold flex gap-1"><Calendar size={10} /> {mission.frequency}</span>
-                                        {/* PROGRESO NUMÉRICO */}
-                                        <div className="flex items-baseline gap-1 ml-2">
-                                            <span className={`text-lg font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>{mission.progress}</span>
-                                            <span className="text-xs font-bold text-zinc-500">/ {mission.target} {mission.unit}</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {/* 🔥 CAMBIO 1: Eliminado Frecuencia (Daily etc) */}
+
+                                        {/* 🔥 CAMBIO 5: Contador Gigante */}
+                                        <div className="flex items-baseline gap-1">
+                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>
+                                                {mission.progress}/{mission.target}
+                                            </span>
+                                            {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* BADGES ARRIBA DERECHA */}
                                 <div className="absolute -top-1 -right-1 flex items-center gap-2">
                                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
                                         {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
@@ -164,44 +173,32 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                 </div>
                             </div>
 
-                            {/* Check Completado / Botón Sumar */}
+                            {/* 🔥 CAMBIO 6: Botón Check eliminado. Solo queda el '+' si no es binaria */}
                             <div className="flex flex-col items-center gap-2">
-                                {mission.completed ? (
-                                    <div className="p-1 bg-zinc-900 rounded-full border border-zinc-800 shrink-0"><Check size={16} className={styles.iconColor} /></div>
-                                ) : (
-                                    !isBinary && !isPending && !viewAllMode && (
-                                        <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
-                                            <Plus size={16} />
-                                        </button>
-                                    )
+                                {!isBinary && !mission.completed && !isPending && !viewAllMode && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
+                                        <Plus size={16} />
+                                    </button>
                                 )}
                             </div>
                         </div>
 
-                        {/* 🔥 FIX 1: BARRA PROGRESO AQUÍ */}
                         {renderProgressBar()}
 
-                        {/* 🔥 FIX 2: RECOMPENSAS (IMÁGENES REALES, MÁS GRANDES) */}
                         <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
-
                             <div className="flex items-center gap-4">
-                                {/* XP */}
                                 {mission.xpReward > 0 && (
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-sm font-black text-blue-200">+{mission.xpReward}</span>
                                         <img src={ICON_XP} className="w-6 h-6 object-contain" alt="XP" />
                                     </div>
                                 )}
-
-                                {/* Monedas */}
                                 {(mission.coinReward > 0) && (
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-sm font-black text-yellow-200">+{mission.coinReward}</span>
                                         <img src={ICON_COIN} className="w-6 h-6 object-contain" alt="Coins" />
                                     </div>
                                 )}
-
-                                {/* Fichas */}
                                 {(mission.gameCoinReward > 0) && (
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-sm font-black text-purple-200">+{mission.gameCoinReward}</span>
@@ -209,11 +206,10 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                     </div>
                                 )}
                             </div>
-
-                            {/* Daño (Corazón) */}
+                            {/* 🔥 CAMBIO 2: Corazón con imagen */}
                             <div className="ml-auto flex items-center gap-1.5 opacity-90">
                                 <span className="text-sm font-black text-red-400">-{damage}</span>
-                                <HeartCrack size={18} className="text-red-500 fill-red-500/20" />
+                                <img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" />
                             </div>
                         </div>
 
@@ -261,10 +257,7 @@ export default function Missions() {
     const [selectedDays, setSelectedDays] = useState([]);
     const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
 
-    // 🔥 FIX SCROLL TOP AL CAMBIAR TAB
-    useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'instant' });
-    }, [activeTab]);
+    useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
 
     useEffect(() => {
         if (!showCreator) setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab }));
@@ -276,13 +269,7 @@ export default function Missions() {
     const showToast = (message, type = 'success') => setToast({ message, type });
 
     const toggleDay = (dayValue) => setSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
-    // 🔥 Toggle para editor (FIX 3)
     const toggleEditDay = (dayValue) => setEditSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
-
-    const getRewardValues = (freq, diff) => {
-        // ... (lógica anterior de preview, visual solamente) ...
-        return { xp: 0, coins: 0, gameCoins: 0 };
-    };
 
     const getFilteredMissions = () => {
         if (viewAllMode) return missions;
@@ -337,7 +324,6 @@ export default function Missions() {
             await api.put(`/missions/${missionToEdit._id}/progress`, {
                 editMode: true,
                 title: missionToEdit.title, target: missionToEdit.target, frequency: missionToEdit.frequency, difficulty: missionToEdit.difficulty, unit: missionToEdit.unit,
-                // 🔥 ENVIAR DÍAS ESPECÍFICOS
                 specificDays: missionToEdit.frequency === 'daily' ? editSelectedDays : []
             });
             setShowEditModal(false); fetchMissions(); showToast("Actualizada");
@@ -350,10 +336,12 @@ export default function Missions() {
         <div className="min-h-screen bg-black text-white pb-24 animate-in fade-in relative">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER */}
+            {/* HEADER STICKY */}
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
-                    <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span></h1>
+                    <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
+                        Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
+                    </h1>
                     <div className="flex gap-2">
                         <button onClick={() => setViewAllMode(!viewAllMode)} className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}>{viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}</button>
                         <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
@@ -375,7 +363,7 @@ export default function Missions() {
             {/* LISTA */}
             <div className="px-4 mt-4 space-y-4">
                 {filteredMissions.length === 0 ? (
-                    <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones</p></div>
+                    <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p></div>
                 ) : (
                     <>
                         {filteredMissions.map(m => <MissionCard key={m._id} mission={m} onUpdateProgress={handleUpdateProgress} onDelete={handleDelete} currentUserId={user._id} onEdit={openEditModal} viewAllMode={viewAllMode} />)}
@@ -393,19 +381,7 @@ export default function Missions() {
                             <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label><input type="text" value={missionToEdit.title} onChange={e => setMissionToEdit({ ...missionToEdit, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div>
                             <div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label><input type="number" value={missionToEdit.target} onChange={e => setMissionToEdit({ ...missionToEdit, target: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Unidad</label><input type="text" value={missionToEdit.unit || ''} onChange={e => setMissionToEdit({ ...missionToEdit, unit: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div></div>
                             <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Frecuencia</label><select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.frequency} onChange={e => setMissionToEdit({ ...missionToEdit, frequency: e.target.value })}><option value="daily">Diaria</option><option value="weekly">Semanal</option><option value="monthly">Mensual</option><option value="yearly">Anual</option></select></div>
-
-                            {/* 🔥 FIX 3: SELECTOR DÍAS EN MODO EDICIÓN */}
-                            {missionToEdit.frequency === 'daily' && (
-                                <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl">
-                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label>
-                                    <div className="flex justify-between">
-                                        {daysOptions.map(d => (
-                                            <button key={d.value} onClick={() => toggleEditDay(d.value)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all border ${editSelectedDays.includes(d.value) ? 'bg-white text-black border-white scale-110' : 'bg-black text-zinc-600 border-zinc-800'}`}>{d.label}</button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
+                            {missionToEdit.frequency === 'daily' && (<div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl"><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label><div className="flex justify-between">{daysOptions.map(d => (<button key={d.value} onClick={() => toggleEditDay(d.value)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all border ${editSelectedDays.includes(d.value) ? 'bg-white text-black border-white scale-110' : 'bg-black text-zinc-600 border-zinc-800'}`}>{d.label}</button>))}</div></div>)}
                             <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Dificultad</label><select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.difficulty} onChange={e => setMissionToEdit({ ...missionToEdit, difficulty: e.target.value })}><option value="easy">Fácil</option><option value="medium">Media</option><option value="hard">Difícil</option><option value="epic">Épica</option></select></div>
                             <div className="pt-4 flex gap-2"><button onClick={() => setShowEditModal(false)} className="flex-1 bg-zinc-800 text-zinc-300 py-3 rounded-xl font-bold text-xs uppercase">Cancelar</button><button onClick={handleEditMission} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2"><Save size={16} /> Guardar</button></div>
                         </div>
@@ -413,7 +389,7 @@ export default function Missions() {
                 </div>, document.body
             )}
 
-            {/* MODAL CREAR (IGUAL) */}
+            {/* MODAL CREAR */}
             {showCreator && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">
