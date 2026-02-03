@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save,
+    HeartCrack
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -14,7 +15,7 @@ import Toast from '../components/common/Toast';
 const ICON_XP = "/assets/icons/xp.png";
 const ICON_COIN = "/assets/icons/moneda.png";
 const ICON_CHIP = "/assets/icons/ficha.png";
-const ICON_HEART = "/assets/icons/corazon.png"; // 🔥 CAMBIO 2: Usamos tu imagen
+const ICON_HEART = "/assets/icons/corazon.png";
 
 // ==========================================
 // 1. HELPERS
@@ -31,6 +32,7 @@ const getDeadlineText = (freq) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
+// DAÑO INVERTIDO (Fácil = 10, Épica = 0)
 const getPotentialDamage = (diff) => {
     const rules = { easy: 10, medium: 5, hard: 2, epic: 0 };
     return rules[diff] !== undefined ? rules[diff] : 5;
@@ -40,7 +42,7 @@ const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
     const label = labels[diff] || diff;
 
-    // 🔥 CAMBIO 3: Estilo Completado "Bloqueado/Metal" (Gris oscuro, sin saturación)
+    // Estilo "Bloqueado/Metal" para completadas
     if (completed) return {
         gradient: 'from-zinc-900 to-black',
         shadow: 'rgba(0,0,0,0)',
@@ -76,7 +78,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const isBinary = mission.target === 1;
     const damage = getPotentialDamage(mission.difficulty);
 
-    // 🔥 CAMBIO 4: Si estamos en viewAllMode (OJO), NO se puede deslizar
     const canSwipe = !isPending && !viewAllMode;
 
     const handleStart = (cx) => { if (canSwipe) { setIsDragging(true); startX.current = cx; } };
@@ -84,6 +85,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (!isDragging) return;
         const diff = cx - startX.current;
         if (mission.completed && diff > 0) return; // No recompletar
+        if (mission.completed && diff < 0 && !viewAllMode) return; // No borrar completada si no es modo ojo
         setDragX(diff);
     };
     const handleEnd = () => {
@@ -91,8 +93,12 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (isPending) { setDragX(0); return; }
         if (dragX > THRESHOLD && !mission.completed) {
             onUpdateProgress(mission, Math.max(0, mission.target - mission.progress));
-        } else if (dragX < -THRESHOLD && !mission.completed) {
-            if (window.confirm("¿Borrar misión?")) onDelete(mission._id);
+        } else if (dragX < -THRESHOLD) {
+            if (!mission.completed || viewAllMode) {
+                if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión permanentemente?")) {
+                    onDelete(mission._id);
+                }
+            }
         }
         setDragX(0);
     };
@@ -123,7 +129,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     };
 
     return (
-        // Solo permite click en modo edición (ojo)
         <div className="relative w-full mb-4 select-none group" onClick={() => viewAllMode && onEdit(mission)}>
             {canSwipe && (
                 <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
@@ -146,21 +151,16 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                 <div className="pr-20 mb-1">
                                     <div className="flex items-center gap-2">
                                         {mission.isCoop && <Users size={16} className={styles.iconColor} />}
-                                        {/* Icono de edición solo visible en modo ojo */}
                                         {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through' : 'text-white'}`}>
+                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-400 line-through' : 'text-white'}`}>
                                             {mission.title}
                                         </h3>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
-                                        {/* 🔥 CAMBIO 1: Eliminado Frecuencia (Daily etc) */}
-
-                                        {/* 🔥 CAMBIO 5: Contador Gigante */}
-                                        <div className="flex items-baseline gap-1">
-                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>
-                                                {mission.progress}/{mission.target}
-                                            </span>
-                                            {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
+                                        <span className="text-[10px] text-zinc-500 uppercase font-bold flex gap-1"><Calendar size={10} /> {mission.frequency}</span>
+                                        <div className="flex items-baseline gap-1 ml-2">
+                                            <span className={`text-lg font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>{mission.progress}</span>
+                                            <span className="text-xs font-bold text-zinc-500">/ {mission.target} {mission.unit}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -173,12 +173,15 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                 </div>
                             </div>
 
-                            {/* 🔥 CAMBIO 6: Botón Check eliminado. Solo queda el '+' si no es binaria */}
                             <div className="flex flex-col items-center gap-2">
-                                {!isBinary && !mission.completed && !isPending && !viewAllMode && (
-                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
-                                        <Plus size={16} />
-                                    </button>
+                                {mission.completed ? (
+                                    <div className="p-1 bg-zinc-900 rounded-full border border-zinc-800 shrink-0"><Check size={16} className={styles.iconColor} /></div>
+                                ) : (
+                                    !isBinary && !isPending && !viewAllMode && (
+                                        <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
+                                            <Plus size={16} />
+                                        </button>
+                                    )
                                 )}
                             </div>
                         </div>
@@ -206,7 +209,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                     </div>
                                 )}
                             </div>
-                            {/* 🔥 CAMBIO 2: Corazón con imagen */}
                             <div className="ml-auto flex items-center gap-1.5 opacity-90">
                                 <span className="text-sm font-black text-red-400">-{damage}</span>
                                 <img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" />

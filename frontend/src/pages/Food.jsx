@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
-import { Settings, X, Save, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf, Plus, Target, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Settings, X, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf, Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Image as ImageIcon, Sparkles, Camera } from 'lucide-react';
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
@@ -19,7 +19,7 @@ export default function Food() {
     const [showSearch, setShowSearch] = useState(false);
     const [configModal, setConfigModal] = useState({ show: false, mode: 'manual' });
 
-    // Estado Objetivos (Macros del Usuario)
+    // Estado Objetivos
     const [goals, setGoals] = useState(() => {
         if (user && user.macros) return user.macros;
         return { calories: 2100, protein: 158, carbs: 210, fat: 70, fiber: 30 };
@@ -31,19 +31,12 @@ export default function Food() {
     const [chatLoading, setChatLoading] = useState(false);
     const chatEndRef = useRef(null);
 
-    // Estado temporal para el formulario manual de macros
+    // Manual Form
     const [manualStats, setManualStats] = useState({
-        calories: 2100,
-        protein: 150,
-        carbs: 200,
-        fat: 70,
-        fiber: 30
+        calories: 2100, protein: 150, carbs: 200, fat: 70, fiber: 30
     });
-
-    // 🔥 NUEVO: Estado para el modo Autocompletar
     const [isAutoMacro, setIsAutoMacro] = useState(true);
 
-    // Sincronizar estado local con usuario
     useEffect(() => {
         if (user && user.macros) {
             setGoals(user.macros);
@@ -51,37 +44,26 @@ export default function Food() {
         }
     }, [user]);
 
-    // Cargar Log al inicio
     useEffect(() => { fetchLog(); }, []);
-
-    // Scroll chat
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
-    // --- API CALLS ---
     const fetchLog = async () => {
         try {
             const res = await api.get('/food/log');
             setLog(res.data);
-        } catch (error) {
-            console.error("Error cargando log comida:", error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (error) { console.error("Error log:", error); }
+        finally { setLoading(false); }
     };
 
     const showToast = (message, type = 'success') => setToast({ message, type });
 
     const handleRemoveFood = async (mealId, foodItemId) => {
-        if (!window.confirm("¿Borrar este alimento?")) return;
-
+        if (!window.confirm("¿Borrar alimento?")) return;
         try {
             await api.delete(`/food/log/${mealId}/${foodItemId}`);
-            showToast("Alimento eliminado", "info");
+            showToast("Eliminado", "info");
             fetchLog();
-        } catch (error) {
-            console.error(error);
-            showToast("Error al eliminar", "error");
-        }
+        } catch (error) { showToast("Error al eliminar", "error"); }
     };
 
     const updateGoals = async (newGoals) => {
@@ -90,54 +72,36 @@ export default function Food() {
             setGoals(res.data.macros);
             setUser(res.data);
             return true;
-        } catch (error) {
-            showToast("Error guardando objetivos", "error");
-            return false;
-        }
+        } catch (error) { showToast("Error al guardar", "error"); return false; }
     };
 
-    // 🔥 FIX PUNTO 2: Manejo inteligente de macros (Auto vs Manual)
     const handleCalorieChange = (e) => {
         const kcal = parseInt(e.target.value) || 0;
-
         if (isAutoMacro) {
-            // Si está en auto, calculamos los macros automáticamente
-            const p = Math.round((kcal * 0.3) / 4);
-            const c = Math.round((kcal * 0.4) / 4);
-            const f = Math.round((kcal * 0.3) / 9);
-            const fib = Math.round(kcal / 1000 * 14);
-
             setManualStats({
                 calories: kcal,
-                protein: p,
-                carbs: c,
-                fat: f,
-                fiber: fib
+                protein: Math.round((kcal * 0.3) / 4),
+                carbs: Math.round((kcal * 0.4) / 4),
+                fat: Math.round((kcal * 0.3) / 9),
+                fiber: Math.round(kcal / 1000 * 14)
             });
         } else {
-            // Si NO está en auto, solo actualizamos calorías
             setManualStats(prev => ({ ...prev, calories: kcal }));
         }
     };
 
     const handleMacroChange = (field, value) => {
-        setManualStats(prev => ({
-            ...prev,
-            [field]: parseInt(value) || 0
-        }));
+        setManualStats(prev => ({ ...prev, [field]: parseInt(value) || 0 }));
     };
 
     const handleSaveManual = async () => {
-        if (manualStats.calories < 500) return showToast("Calorías mínimas 500", "error");
-
-        const success = await updateGoals(manualStats);
-        if (success) {
+        if (manualStats.calories < 500) return showToast("Mínimo 500 kcal", "error");
+        if (await updateGoals(manualStats)) {
             setConfigModal({ show: false, mode: 'manual' });
             showToast("Objetivos actualizados");
         }
     };
 
-    // --- CHAT IA ---
     const handleSendChat = async () => {
         if (!chatInput.trim()) return;
         const userMsg = { role: 'user', content: chatInput };
@@ -151,28 +115,21 @@ export default function Food() {
             if (res.data.type === 'final') {
                 const { calories, protein, carbs, fat, fiber, message } = res.data.data;
                 const finalData = { calories, protein, carbs, fat, fiber: fiber || 30 };
-
                 await updateGoals(finalData);
                 setManualStats(finalData);
-
                 setConfigModal({ show: false, mode: 'manual' });
-                showToast(message || "Calculado por IA", "success");
+                showToast(message || "Calculado", "success");
                 setChatHistory([]);
             } else {
                 setChatHistory([...newHistory, { role: 'assistant', content: res.data.message }]);
             }
-        } catch (error) {
-            showToast("Error conexión IA", "error");
-        } finally {
-            setChatLoading(false);
-        }
+        } catch (error) { showToast("Error IA", "error"); }
+        finally { setChatLoading(false); }
     };
 
-    const handleOpenAdd = (mealId) => {
-        setActiveMealId(mealId);
-        setShowSearch(true);
-    };
+    const handleOpenAdd = (mealId) => { setActiveMealId(mealId); setShowSearch(true); };
 
+    // --- CÁLCULOS VISUALES ---
     const getCircleGradient = (percent) => {
         if (percent > 100) return { start: "#ef4444", end: "#dc2626" };
         if (percent <= 25) return { start: "#22c55e", end: "#84cc16" };
@@ -187,7 +144,10 @@ export default function Food() {
     const limitKcal = goals.calories || 2100;
     const calPercent = Math.min((currentKcal / limitKcal) * 100, 100);
     const isOver = currentKcal > limitKcal;
+
+    // 🔥 FIX PANTALLA NEGRA: Definición de variables de color
     const gradientColors = getCircleGradient(calPercent);
+    const gradientClasses = `from-[${gradientColors.start}] to-[${gradientColors.end}]`; // Esta línea faltaba
     const shadowColor = isOver ? "rgba(220, 38, 38, 0.4)" : "rgba(34, 197, 94, 0.4)";
 
     return (
@@ -212,7 +172,7 @@ export default function Food() {
 
             {/* RESUMEN CIRCULAR */}
             <div className="px-4">
-                <div className={`relative rounded-[32px] overflow-hidden p-[2px] bg-gradient-to-br from-[${gradientColors.start}] to-[${gradientColors.end}] shadow-[0_0_25px_${shadowColor}]`} style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientColors.start}, ${gradientColors.end})` }}>
+                <div className={`relative rounded-[32px] overflow-hidden p-[2px] bg-gradient-to-br ${gradientClasses} shadow-[0_0_25px_${shadowColor}]`} style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientColors.start}, ${gradientColors.end})` }}>
                     <div className="bg-zinc-950 rounded-[30px] p-6 relative overflow-hidden flex items-center justify-between">
                         <div className="absolute -right-10 -bottom-10 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: gradientColors.end }}></div>
                         <div className="relative w-32 h-32 flex items-center justify-center shrink-0 z-10">
@@ -290,7 +250,6 @@ export default function Food() {
                                                     <span className="text-blue-400/80">P: {Math.round(item.protein)}</span>
                                                     <span className="text-yellow-400/80">C: {Math.round(item.carbs)}</span>
                                                     <span className="text-red-400/80">G: {Math.round(item.fat)}</span>
-                                                    {/* 🔥 FIX 1: Fibra añadida en la tarjeta */}
                                                     <span className="text-green-500/80">F: {Math.round(item.fiber)}</span>
                                                 </div>
                                             </div>
@@ -311,7 +270,7 @@ export default function Food() {
                 })}
             </div>
 
-            {/* MODAL BÚSQUEDA */}
+            {/* MODALES */}
             {showSearch && createPortal(
                 <div className="fixed inset-0 z-[9999] bg-black">
                     <div className="absolute inset-0 top-14 transform bg-zinc-950/50">
@@ -326,15 +285,12 @@ export default function Food() {
                 document.body
             )}
 
-            {/* MODAL CONFIGURACIÓN (MACROS) */}
             {configModal.show && createPortal(
                 <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-zinc-950 border border-zinc-800 rounded-[32px] w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
                         <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-                            <h3 className="text-lg font-black text-white uppercase italic tracking-wide">
-                                {configModal.mode === 'ai' ? 'Nutricionista IA' : 'Ajustes Macro'}
-                            </h3>
+                            <h3 className="text-lg font-black text-white uppercase italic tracking-wide">{configModal.mode === 'ai' ? 'Nutricionista IA' : 'Ajustes Macro'}</h3>
                             <button onClick={() => setConfigModal({ ...configModal, show: false })} className="text-zinc-500 hover:text-white bg-black p-2 rounded-full border border-zinc-800 transition-colors"><X size={20} /></button>
                         </div>
                         <div className="p-5 overflow-y-auto custom-scrollbar flex-1 bg-black/20">
@@ -342,49 +298,26 @@ export default function Food() {
                                 <div className="space-y-6">
                                     <button onClick={() => { setChatHistory([{ role: 'assistant', content: "Dime tus datos: Género, Edad, Peso, Altura, Actividad y Objetivo." }]); setConfigModal({ show: true, mode: 'ai' }); }} className="w-full bg-blue-900/10 p-4 rounded-2xl border border-blue-500/20 flex items-center gap-4 hover:bg-blue-900/20 transition-all group">
                                         <div className="bg-blue-600 p-3 rounded-xl text-white shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform"><Bot size={24} /></div>
-                                        <div className="text-left">
-                                            <h4 className="font-black text-blue-200 text-sm uppercase">Usar IA</h4>
-                                            <p className="text-[10px] text-blue-400/60 font-bold uppercase tracking-wide">Cálculo automático</p>
-                                        </div>
+                                        <div className="text-left"><h4 className="font-black text-blue-200 text-sm uppercase">Usar IA</h4><p className="text-[10px] text-blue-400/60 font-bold uppercase tracking-wide">Cálculo automático</p></div>
                                         <ChevronRight className="ml-auto text-blue-500" />
                                     </button>
 
                                     <div>
                                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Objetivo Calorías</label>
-                                        <input
-                                            type="number"
-                                            value={manualStats.calories}
-                                            onChange={handleCalorieChange}
-                                            className="w-full bg-black text-white text-3xl font-black p-4 rounded-2xl border border-zinc-800 focus:border-white/20 outline-none text-center transition-colors mb-4"
-                                        />
+                                        <input type="number" value={manualStats.calories} onChange={handleCalorieChange} className="w-full bg-black text-white text-3xl font-black p-4 rounded-2xl border border-zinc-800 focus:border-white/20 outline-none text-center transition-colors mb-4" />
 
-                                        {/* 🔥 FIX 2: SWITCH AUTO COMPLETAR */}
                                         <div onClick={() => setIsAutoMacro(!isAutoMacro)} className="flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-zinc-800 mb-4 cursor-pointer">
                                             <span className="text-xs font-bold text-zinc-400 uppercase">Autocompletar Macros</span>
                                             {isAutoMacro ? <ToggleRight className="text-green-500" size={24} /> : <ToggleLeft className="text-zinc-600" size={24} />}
                                         </div>
 
-                                        {/* 🔥 FIX 2: GRID 2x2 + FIBRA */}
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-[9px] font-bold text-blue-400 uppercase block mb-1 text-center">Proteína</label>
-                                                <input type="number" value={manualStats.protein} onChange={(e) => handleMacroChange('protein', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-blue-500 outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="text-[9px] font-bold text-yellow-400 uppercase block mb-1 text-center">Carbos</label>
-                                                <input type="number" value={manualStats.carbs} onChange={(e) => handleMacroChange('carbs', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-yellow-500 outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="text-[9px] font-bold text-red-400 uppercase block mb-1 text-center">Grasa</label>
-                                                <input type="number" value={manualStats.fat} onChange={(e) => handleMacroChange('fat', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-red-500 outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="text-[9px] font-bold text-green-500 uppercase block mb-1 text-center">Fibra</label>
-                                                <input type="number" value={manualStats.fiber} onChange={(e) => handleMacroChange('fiber', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-green-500 outline-none" />
-                                            </div>
+                                            <div><label className="text-[9px] font-bold text-blue-400 uppercase block mb-1 text-center">Proteína</label><input type="number" value={manualStats.protein} onChange={(e) => handleMacroChange('protein', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-blue-500 outline-none" /></div>
+                                            <div><label className="text-[9px] font-bold text-yellow-400 uppercase block mb-1 text-center">Carbos</label><input type="number" value={manualStats.carbs} onChange={(e) => handleMacroChange('carbs', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-yellow-500 outline-none" /></div>
+                                            <div><label className="text-[9px] font-bold text-red-400 uppercase block mb-1 text-center">Grasa</label><input type="number" value={manualStats.fat} onChange={(e) => handleMacroChange('fat', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-red-500 outline-none" /></div>
+                                            <div><label className="text-[9px] font-bold text-green-500 uppercase block mb-1 text-center">Fibra</label><input type="number" value={manualStats.fiber} onChange={(e) => handleMacroChange('fiber', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-green-500 outline-none" /></div>
                                         </div>
                                     </div>
-
                                     <button onClick={handleSaveManual} className="w-full bg-white text-black font-black py-4 rounded-2xl flex justify-center gap-2 uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all"><Save size={18} /> Guardar Cambios</button>
                                 </div>
                             )}
@@ -392,24 +325,16 @@ export default function Food() {
                             {configModal.mode === 'ai' && (
                                 <div className="flex flex-col h-full min-h-[400px]">
                                     <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-zinc-900/50 rounded-2xl border border-zinc-800 mb-4 custom-scrollbar">
-                                        {chatHistory.map((msg, idx) => (
-                                            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium whitespace-pre-line ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-bl-none'}`}>{msg.content}</div>
-                                            </div>
-                                        ))}
+                                        {chatHistory.map((msg, idx) => (<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium whitespace-pre-line ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-bl-none'}`}>{msg.content}</div></div>))}
                                         {chatLoading && <div className="text-[10px] font-bold text-zinc-500 animate-pulse uppercase tracking-widest text-center mt-2">Calculando...</div>}
                                         <div ref={chatEndRef} />
                                     </div>
-                                    <div className="flex gap-2">
-                                        <input autoFocus type="text" placeholder="Escribe aquí..." value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChat()} className="flex-1 bg-black text-white p-4 rounded-2xl border border-zinc-800 focus:border-blue-500 outline-none text-sm font-medium" />
-                                        <button onClick={handleSendChat} disabled={chatLoading} className="bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-500 disabled:opacity-50 transition-colors"><Send size={20} /></button>
-                                    </div>
+                                    <div className="flex gap-2"><input autoFocus type="text" placeholder="Escribe aquí..." value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChat()} className="flex-1 bg-black text-white p-4 rounded-2xl border border-zinc-800 focus:border-blue-500 outline-none text-sm font-medium" /><button onClick={handleSendChat} disabled={chatLoading} className="bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-500 disabled:opacity-50 transition-colors"><Send size={20} /></button></div>
                                 </div>
                             )}
                         </div>
                     </div>
-                </div>,
-                document.body
+                </div>, document.body
             )}
         </div>
     );

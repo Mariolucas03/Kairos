@@ -5,7 +5,7 @@ const User = require('../models/User');
 const levelService = require('../services/levelService');
 const mongoose = require('mongoose');
 
-// 🔥 1. NUEVA TABLA DE RECOMPENSAS AUMENTADA
+// 🔥 NUEVA TABLA DE RECOMPENSAS
 const REWARD_TABLE = {
     easy: { xp: 50, gameCoins: 100, coins: 10 },
     medium: { xp: 75, gameCoins: 150, coins: 30 },
@@ -27,12 +27,6 @@ const calculateRewards = (difficulty, frequency, isCoop) => {
     };
 };
 
-// ... (getMissions, createMission se mantienen igual, usando calculateRewards) ...
-// SOLO PONGO EL CONTROLADOR QUE CAMBIA (updateProgress) Y LA EXPORTACIÓN
-
-// ------------------------------------------------------------------
-// 1. OBTENER MISIONES
-// ------------------------------------------------------------------
 const getMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const userIdString = userId.toString();
@@ -79,9 +73,6 @@ const getMissions = asyncHandler(async (req, res) => {
     res.status(200).json(missions);
 });
 
-// ------------------------------------------------------------------
-// 2. CREAR MISIÓN
-// ------------------------------------------------------------------
 const createMission = asyncHandler(async (req, res) => {
     const { title, frequency, type, difficulty, target, specificDays, unit, isCoop, friendId } = req.body;
 
@@ -91,7 +82,6 @@ const createMission = asyncHandler(async (req, res) => {
     const diff = difficulty || 'easy';
     const days = Array.isArray(specificDays) ? specificDays : [];
 
-    // Calculamos recompensas con la nueva tabla
     const rewards = calculateRewards(diff, freq, !!isCoop);
 
     const participants = [req.user._id];
@@ -126,9 +116,6 @@ const createMission = asyncHandler(async (req, res) => {
     res.status(201).json(mission);
 });
 
-// ------------------------------------------------------------------
-// 4. ACTUALIZAR / EDITAR
-// ------------------------------------------------------------------
 const updateProgress = asyncHandler(async (req, res) => {
     const { amount, editMode, title, target, frequency, difficulty, unit, specificDays } = req.body;
     const userId = req.user._id;
@@ -141,7 +128,6 @@ const updateProgress = asyncHandler(async (req, res) => {
 
     if (!isParticipant && !isOwner) { res.status(401); throw new Error('No tienes permiso'); }
 
-    // --- MODO EDICIÓN ---
     if (editMode) {
         if (title) mission.title = title.trim();
         if (target) mission.target = Number(target);
@@ -149,7 +135,6 @@ const updateProgress = asyncHandler(async (req, res) => {
         if (difficulty) mission.difficulty = difficulty;
         if (unit !== undefined) mission.unit = unit.trim();
 
-        // 🔥 FIX 3: Guardar días específicos al editar (Antes no se guardaba)
         if (specificDays && Array.isArray(specificDays)) {
             mission.specificDays = specificDays;
         }
@@ -171,7 +156,6 @@ const updateProgress = asyncHandler(async (req, res) => {
         return res.json({ message: "Misión actualizada", mission });
     }
 
-    // --- LÓGICA DE PROGRESO (SIN CAMBIOS) ---
     if (mission.isCoop && mission.invitationStatus === 'pending') {
         res.status(400); throw new Error('Tu compañero aún no ha aceptado.');
     }
@@ -185,7 +169,6 @@ const updateProgress = asyncHandler(async (req, res) => {
 
     const addAmount = Number(amount) || 1;
 
-    // Sync Vinculadas (Mismo Título + Unidad)
     const linkedMissions = await Mission.find({ user: userId, title: mission.title, unit: mission.unit, _id: { $ne: mission._id }, completed: false });
     for (let linked of linkedMissions) {
         linked.progress += addAmount; linked.lastUpdated = today;
@@ -213,7 +196,6 @@ const updateProgress = asyncHandler(async (req, res) => {
     res.json({ message: mission.completed ? '¡Completada!' : 'Actualizada', mission, user: userResult, leveledUp, rewards, progressOnly: !mission.completed });
 });
 
-// ... (deleteMission, respondMissionInvite, nukeMyMissions IGUAL QUE ANTES) ...
 const deleteMission = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('No encontrada'); }
