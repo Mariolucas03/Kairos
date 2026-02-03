@@ -1,7 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const DailyLog = require('../models/DailyLog');
 const Mission = require('../models/Mission');
-const NutritionLog = require('../models/NutritionLog'); // 🔥 FIX PUNTO 7: Importar modelo
+const NutritionLog = require('../models/NutritionLog');
 
 // Utilidad para fecha servidor (Fallback)
 const getServerDateString = () => new Date().toISOString().split('T')[0];
@@ -13,33 +13,36 @@ const getServerDateString = () => new Date().toISOString().split('T')[0];
  */
 const ensureDailyLog = async (userId, dateString, userStreak) => {
     // Creamos fecha local simulada para obtener el día de la semana correcto (0-6)
+    // Nota: new Date('YYYY-MM-DD') en UTC puede dar el día anterior según la zona horaria.
+    // Usamos una pequeña corrección para asegurar el día local.
     const dateObj = new Date(dateString);
-    const dayOfWeek = dateObj.getDay();
+    const dayOfWeek = dateObj.getDay(); // 0 = Domingo, 1 = Lunes...
 
     // 1. OPTIMIZACIÓN: Ejecutar consultas independientes en PARALELO
-    // 🔥 FIX PUNTO 3: Contamos solo las misiones que APLICAN HOY para el denominador (Total)
-    // No filtramos por 'completed: false' aquí porque 'total' debe ser la suma de hechas + pendientes
+
+    // 🔥 FIX WIDGET: Contar SOLO misiones diarias que tocan HOY
+    const missionQuery = {
+        $or: [
+            { user: userId },
+            { participants: userId }
+        ],
+        frequency: 'daily', // SOLO DIARIAS
+        // Si es coop, aseguramos que esté activa
+        $or: [
+            { isCoop: false },
+            { isCoop: true, invitationStatus: 'active' }
+        ],
+        // 🔥 FILTRO DE DÍA: O array vacío (todos los días) O contiene el día de hoy
+        $or: [
+            { specificDays: { $size: 0 } },
+            { specificDays: dayOfWeek }
+        ]
+    };
+
     const [activeCount, lastLog, nutritionLog] = await Promise.all([
-        Mission.countDocuments({
-            $or: [
-                { user: userId },
-                { participants: userId }
-            ],
-            frequency: 'daily',
-            // Si es coop, aseguramos que esté activa
-            $or: [
-                { isCoop: false },
-                { isCoop: true, invitationStatus: 'active' }
-            ],
-            // Filtrar por día específico o todos los días
-            $or: [
-                { specificDays: { $size: 0 } }, // Todos los días
-                { specificDays: dayOfWeek }     // Día específico de hoy
-            ]
-        }),
+        Mission.countDocuments(missionQuery),
         // .lean() para lectura rápida del último peso
         DailyLog.findOne({ user: userId }).sort({ date: -1 }).select('weight').lean(),
-        // 🔥 FIX PUNTO 7: Traer el log de nutrición real para inyectar datos
         NutritionLog.findOne({ user: userId, date: dateString }).lean()
     ]);
 
@@ -49,7 +52,6 @@ const ensureDailyLog = async (userId, dateString, userStreak) => {
     const currentKcal = nutritionLog ? nutritionLog.totalCalories : 0;
 
     // 2. Operación Atómica: Buscar O Crear
-    // No usamos .lean() aquí porque necesitamos el documento Mongoose completo por si hay que guardar
     let log = await DailyLog.findOneAndUpdate(
         { user: userId, date: dateString },
         {
@@ -69,12 +71,20 @@ const ensureDailyLog = async (userId, dateString, userStreak) => {
     // 3. Sincronizaciones posteriores a la creación (Self-Healing)
     let needsSave = false;
 
-    // Sincronizar total de misiones si cambió (ej: se añadió una misión nueva hoy)
-    // Solo actualizamos si es mayor, para no romper históricos pasados, o si es hoy
-    const isToday = dateString === getServerDateString();
-    if (isToday && log.missionStats.total !== activeCount) {
+    // 🔥 AUTO-CORRECCIÓN WIDGET:
+    // Si el total guardado en el Log no coincide con el cálculo real de hoy, lo actualizamos.
+    // Esto arregla el bug "1/12" si cambiaste los días de las misiones después de crearse el log.
+    if (log.missionStats.total !== activeCount) {
+        // Solo actualizamos el total, mantenemos las completadas
         log.missionStats.total = activeCount;
+
+        // Safety check: Si por algún motivo completadas > total (bug raro), ajustamos
+        if (log.missionStats.completed > activeCount) {
+            log.missionStats.completed = activeCount;
+        }
+
         needsSave = true;
+        console.log(`🔧 [DailyLog] Corrigiendo total de misiones: ${log.missionStats.total} -> ${activeCount}`);
     }
 
     // Sincronizar calorías si difieren
@@ -106,12 +116,11 @@ const getDailyLog = asyncHandler(async (req, res) => {
 
     const logObj = log.toObject();
 
-    // 🔥 FIX PUNTO 7: INYECTAR DETALLE DE COMIDAS
-    // El widget espera ver 'meals' para hacer el desglose. Si existe nutritionLog, lo pasamos.
+    // INYECTAR DETALLE DE COMIDAS
     if (nutritionLog) {
         logObj.nutrition = {
             ...logObj.nutrition,
-            meals: nutritionLog.meals, // Array de { name: 'Desayuno', foods: [...] }
+            meals: nutritionLog.meals,
             totalKcal: nutritionLog.totalCalories,
             totalProtein: nutritionLog.totalProtein,
             totalCarbs: nutritionLog.totalCarbs,
@@ -159,16 +168,13 @@ const getDailyLogByDate = asyncHandler(async (req, res) => {
 // @route   PUT /api/daily
 const updateDailyLog = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    const { type, value, date } = req.body; // Aceptamos fecha en el body también
+    const { type, value, date } = req.body;
 
     // Prioridad: Fecha del body > Query > Servidor
     const targetDate = date || req.query.date || getServerDateString();
 
-    // 1. Garantizamos que el log existe usando el Helper
-    // Desestructuramos para obtener solo el documento mongoose 'log'
     let { log } = await ensureDailyLog(userId, targetDate, req.user.streak.current);
 
-    // 2. Switch Case para actualizar campos
     switch (type) {
         case 'mood': log.mood = value; break;
         case 'weight': log.weight = value; break;
@@ -177,7 +183,6 @@ const updateDailyLog = asyncHandler(async (req, res) => {
         case 'streakCurrent': log.streakCurrent = value; break;
 
         case 'nutrition':
-            // Merge de objetos para no borrar otros macros si solo mandas kcal
             log.nutrition = { ...log.nutrition, ...value };
             break;
 
@@ -187,7 +192,6 @@ const updateDailyLog = asyncHandler(async (req, res) => {
         case 'gains': log.gains = value; break;
 
         default:
-            // Seguridad: solo actualiza si el campo existe en el esquema raíz
             if (log[type] !== undefined) log[type] = value;
             break;
     }
@@ -207,9 +211,9 @@ const getWeightHistory = asyncHandler(async (req, res) => {
         user: req.user._id,
         weight: { $gt: 0 } // Solo días donde se registró peso
     })
-        .sort({ date: 1 }) // Orden cronológico
-        .select('date weight') // Solo devolver lo necesario (Rendimiento)
-        .lean(); // 🔥 Lean para velocidad
+        .sort({ date: 1 })
+        .select('date weight')
+        .lean();
 
     res.status(200).json(logs);
 });

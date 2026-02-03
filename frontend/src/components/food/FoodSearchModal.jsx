@@ -12,7 +12,6 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
     const startX = useRef(0);
     const startY = useRef(0);
 
-    // Cálculos de macros (asegurando ceros)
     const p = Math.round(item.protein || item.macros?.protein || 0);
     const c = Math.round(item.carbs || item.macros?.carbs || 0);
     const f = Math.round(item.fat || item.macros?.fat || 0);
@@ -23,7 +22,7 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
         if (!isDragging) return;
         const diffX = e.touches[0].clientX - startX.current;
         const diffY = e.touches[0].clientY - startY.current;
-        if (Math.abs(diffY) > Math.abs(diffX)) return; // Scroll vertical
+        if (Math.abs(diffY) > Math.abs(diffX)) return;
         if (Math.abs(diffX) > 10 && Math.abs(diffX) < 150) setOffsetX(diffX);
     };
     const handleTouchEnd = () => { setIsDragging(false); finishDrag(); };
@@ -79,37 +78,29 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
 
 // --- COMPONENTE PRINCIPAL ---
 export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
-    const [mode, setMode] = useState('search'); // 'search', 'ai', 'manual', 'review'
-
-    // Búsqueda y Filtrado
+    const [mode, setMode] = useState('search');
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [sortBy, setSortBy] = useState('name');
+    const [filterFolder, setFilterFolder] = useState('Todos');
 
-    // 🔥 FIX PUNTO 13: Estados de ordenación
-    const [sortBy, setSortBy] = useState('name'); // 'name', 'calories'
-    const [filterFolder, setFilterFolder] = useState('Todos'); // 'Todos', 'Desayuno', etc.
-
-    // IA
     const [aiInput, setAiInput] = useState('');
     const [aiImage, setAiImage] = useState(null);
     const [aiImagePreview, setAiImagePreview] = useState(null);
     const [aiLoading, setAiLoading] = useState(false);
     const fileInputRef = useRef(null);
 
-    // IA Helper (Manual)
     const [showAiHelper, setShowAiHelper] = useState(false);
     const [aiDescription, setAiDescription] = useState('');
     const [aiHelperLoading, setAiHelperLoading] = useState(false);
 
-    // Formulario
     const [manualForm, setManualForm] = useState({
         name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1,
-        folder: 'General' // 🔥 FIX PUNTO 13: Carpeta por defecto
+        folder: 'General'
     });
     const searchInputRef = useRef(null);
 
-    // Cargar alimentos guardados al inicio
     useEffect(() => { if (mode === 'search' && query.trim() === '') fetchSavedFoods(); }, [mode, query]);
 
     const fetchSavedFoods = async () => {
@@ -121,7 +112,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         finally { setLoading(false); }
     };
 
-    // Búsqueda en tiempo real
     useEffect(() => {
         const timer = setTimeout(() => {
             if (query.trim().length > 0 && mode === 'search') searchFood();
@@ -138,28 +128,21 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         finally { setLoading(false); }
     };
 
-    // 🔥 LÓGICA DE FILTRADO Y ORDENACIÓN (PUNTO 13)
     const getProcessedResults = () => {
         let processed = [...results];
-
-        // 1. Filtrar por carpeta
         if (filterFolder !== 'Todos') {
             processed = processed.filter(item => item.folder === filterFolder);
         }
-
-        // 2. Ordenar
         processed.sort((a, b) => {
             if (sortBy === 'name') return a.name.localeCompare(b.name);
-            if (sortBy === 'calories') return b.calories - a.calories; // Mayor a menor
+            if (sortBy === 'calories') return b.calories - a.calories;
             return 0;
         });
-
         return processed;
     };
 
     const processedResults = getProcessedResults();
 
-    // --- ACCIONES ---
     const handleAddFood = async (food) => {
         try {
             const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
@@ -173,30 +156,18 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         catch (e) { onShowToast("No se pudo eliminar", "error"); fetchSavedFoods(); }
     };
 
-    // --- IA SCAN (PUNTO 4: Permitir texto SOLO) ---
     const handleAiScanSubmit = async () => {
-        // 🔥 FIX: Permitir si hay texto O imagen. Antes requería ambos en algunos casos lógicos.
-        if (!aiInput.trim() && !aiImage) return;
+        // 🔥 FIX 5: Restricción estricta (Solo con imagen)
+        if (!aiImage) return;
 
         setAiLoading(true);
         try {
-            let analyzedData = null;
+            const formData = new FormData();
+            formData.append('text', aiInput || "Analizar comida"); // Texto opcional si hay imagen
+            formData.append('image', aiImage);
 
-            if (aiImage) {
-                // Si hay imagen, usamos endpoint de visión
-                const formData = new FormData();
-                formData.append('text', aiInput);
-                formData.append('image', aiImage);
-                const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                analyzedData = res.data;
-            } else {
-                // Si SOLO hay texto, usamos endpoint de texto (PUNTO 4 SOLUCIONADO)
-                const res = await api.post('/food/analyze-text', { text: aiInput });
-                if (res.data.type === 'success') {
-                    analyzedData = res.data.data;
-                    analyzedData.name = analyzedData.name || aiInput;
-                }
-            }
+            const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            const analyzedData = res.data;
 
             if (!analyzedData || analyzedData.calories === undefined) throw new Error("No se identificó el alimento");
 
@@ -222,7 +193,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         }
     };
 
-    // --- ACCIONES MANUALES / REVIEW ---
+    // 🔥 FIX 4: FUNCIÓN AÑADIR DIRECTO (Manual)
     const handleAddToMealNow = async () => {
         if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
         try {
@@ -240,7 +211,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
             onShowToast("Guardado en tu lista", "success");
             setMode('search');
             setQuery(manualForm.name);
-            // Refetch para ver el nuevo item
             const res = await api.get('/food/saved');
             setResults(res.data);
             setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1, folder: 'General' });
@@ -265,7 +235,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
     return (
         <div className="flex flex-col h-full w-full bg-zinc-950 text-white animate-in slide-in-from-bottom-10 duration-200">
-            {/* Header Modal */}
             <div className="px-5 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
                 <h2 className="text-lg font-black uppercase tracking-wider text-white">
                     {mode === 'review' ? 'Revisar Datos' : 'Añadir Alimento'}
@@ -273,7 +242,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={20} /></button>
             </div>
 
-            {/* Selector de Modo */}
             {mode !== 'review' && (
                 <div className="p-4 shrink-0 pb-0">
                     <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
@@ -285,7 +253,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
             )}
 
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-20 pt-4">
-
                 {mode === 'search' && (
                     <div className="space-y-4 animate-in fade-in duration-300">
                         <div className="relative">
@@ -293,9 +260,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             <input ref={searchInputRef} type="text" placeholder="Buscar en mis alimentos..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white pl-11 pr-4 py-4 rounded-2xl outline-none focus:border-zinc-600 transition-all font-bold text-sm placeholder-zinc-600" />
                         </div>
 
-                        {/* 🔥 FILTROS Y ORDENACIÓN (PUNTO 13) */}
                         <div className="flex flex-col gap-2">
-                            {/* Ordenar */}
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
                                     <SortAsc size={14} className="text-zinc-500" />
@@ -305,13 +270,13 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                                 <button onClick={() => setSortBy('calories')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'calories' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>Kcal</button>
                             </div>
 
-                            {/* Filtrar Carpeta */}
+                            {/* 🔥 FIX 3: SOLO GENERAL Y TODOS */}
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
                                     <Filter size={14} className="text-zinc-500" />
                                     <span className="text-[10px] font-bold text-zinc-500 uppercase">Carpeta</span>
                                 </div>
-                                {['Todos', 'General', 'Desayuno', 'Comida', 'Cena', 'Snack'].map(f => (
+                                {['Todos', 'General'].map(f => (
                                     <button key={f} onClick={() => setFilterFolder(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === f ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>
                                         {f}
                                     </button>
@@ -323,25 +288,34 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             {loading ? <div className="text-center py-10 text-zinc-600 font-bold uppercase text-xs animate-pulse">Cargando...</div> :
                                 processedResults.length > 0 ? processedResults.map((item, idx) => (
                                     <SwipeableFoodItem key={item._id || idx} item={item} onAdd={handleAddFood} onDelete={handleDeleteSavedFood} />
-                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No hay alimentos en esta carpeta"}</div>}
+                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No hay alimentos guardados"}</div>}
                         </div>
                     </div>
                 )}
 
                 {mode === 'ai' && (
                     <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
-                        <div className="relative mt-2"><textarea placeholder="Ej: Un plátano mediano y un café con leche..." className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white text-sm font-medium resize-none focus:border-blue-500/50 outline-none placeholder-zinc-600 leading-relaxed" value={aiInput} onChange={(e) => setAiInput(e.target.value)} /></div>
+                        {/* 🔥 FIX 5: Textarea deshabilitado si no hay foto */}
+                        <div className="relative mt-2">
+                            <textarea
+                                placeholder={aiImage ? "Añade detalles extra (opcional)..." : "Sube una foto primero para escribir..."}
+                                disabled={!aiImage}
+                                className={`w-full h-32 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white text-sm font-medium resize-none focus:border-blue-500/50 outline-none leading-relaxed ${!aiImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                value={aiInput}
+                                onChange={(e) => setAiInput(e.target.value)}
+                            />
+                        </div>
                         <div>
                             <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
                             {!aiImagePreview ? (
-                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto (Opcional)</span></button>
+                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto (Requerido)</span></button>
                             ) : (
                                 <div className="relative rounded-3xl overflow-hidden border border-zinc-800 group"><img src={aiImagePreview} alt="Preview" className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4"><div className="flex justify-between items-center w-full"><span className="text-xs font-bold text-white flex items-center gap-2"><ImageIcon size={14} /> Imagen seleccionada</span><button onClick={clearImage} className="bg-red-500/20 text-red-400 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all backdrop-blur-md border border-red-500/30"><Trash2 size={18} /></button></div></div></div>
                             )}
                         </div>
                         <div className="pt-2">
-                            {/* 🔥 FIX PUNTO 4: Habilitar botón si hay texto O imagen */}
-                            <button onClick={handleAiScanSubmit} disabled={aiLoading || (!aiInput.trim() && !aiImage)} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-900/20">
+                            {/* 🔥 FIX 5: Botón deshabilitado si no hay foto */}
+                            <button onClick={handleAiScanSubmit} disabled={aiLoading || !aiImage} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-900/20">
                                 {aiLoading ? <span className="animate-pulse flex items-center gap-2"><Sparkles size={16} /> Analizando...</span> : <>Procesar con IA <ArrowRight size={18} /></>}
                             </button>
                         </div>
@@ -365,7 +339,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             )}
                         </div>
 
-                        {/* 🔥 SELECCIÓN DE CARPETA (PUNTO 13) */}
                         <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800">
                             <label className="text-[10px] font-bold text-zinc-400 mb-2 block pl-2 uppercase tracking-wider">Guardar en Carpeta</label>
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -393,7 +366,11 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
                         <div className="pt-2 space-y-2">
                             {mode === 'manual' ? (
-                                <button onClick={handleSaveToList} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all shadow-lg shadow-white/10">Guardar Alimento</button>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {/* 🔥 FIX 4: BOTÓN AÑADIR AHORA */}
+                                    <button onClick={handleAddToMealNow} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/10"><Plus size={18} strokeWidth={3} /> Añadir a Comida Hoy</button>
+                                    <button onClick={handleSaveToList} className="w-full bg-zinc-800 text-zinc-300 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-zinc-700"><Save size={16} /> Guardar en Mis Alimentos</button>
+                                </div>
                             ) : (
                                 <div className="grid grid-cols-1 gap-3">
                                     <button onClick={handleAddToMealNow} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/10"><Plus size={18} strokeWidth={3} /> Añadir a Comida Hoy</button>

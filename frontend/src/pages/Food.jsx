@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
-import { Settings, X, Save, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf, Plus, Target, Trash2 } from 'lucide-react';
+import { Settings, X, Save, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf, Plus, Target, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
@@ -40,6 +40,9 @@ export default function Food() {
         fiber: 30
     });
 
+    // 🔥 NUEVO: Estado para el modo Autocompletar
+    const [isAutoMacro, setIsAutoMacro] = useState(true);
+
     // Sincronizar estado local con usuario
     useEffect(() => {
         if (user && user.macros) {
@@ -57,7 +60,6 @@ export default function Food() {
     // --- API CALLS ---
     const fetchLog = async () => {
         try {
-            // Nota: Este endpoint devuelve el NutritionLog completo
             const res = await api.get('/food/log');
             setLog(res.data);
         } catch (error) {
@@ -69,29 +71,24 @@ export default function Food() {
 
     const showToast = (message, type = 'success') => setToast({ message, type });
 
-    // 🔥 FIX PUNTO 5: ELIMINAR ALIMENTO
-    // Necesita que hayas añadido la ruta DELETE en el backend (foodRoutes y foodController)
     const handleRemoveFood = async (mealId, foodItemId) => {
         if (!window.confirm("¿Borrar este alimento?")) return;
 
         try {
-            // Endpoint esperado: router.delete('/log/:mealId/:foodItemId', protect, removeFoodFromLog);
             await api.delete(`/food/log/${mealId}/${foodItemId}`);
-
             showToast("Alimento eliminado", "info");
-            fetchLog(); // Recargar datos para actualizar la barra de progreso
+            fetchLog();
         } catch (error) {
             console.error(error);
             showToast("Error al eliminar", "error");
         }
     };
 
-    // --- ACTUALIZAR METAS ---
     const updateGoals = async (newGoals) => {
         try {
             const res = await api.put('/users/macros', newGoals);
             setGoals(res.data.macros);
-            setUser(res.data); // Actualizar contexto global
+            setUser(res.data);
             return true;
         } catch (error) {
             showToast("Error guardando objetivos", "error");
@@ -99,23 +96,28 @@ export default function Food() {
         }
     };
 
-    // 🔥 FIX PUNTO 12: MANEJO INTELIGENTE DE MACROS MANUALES
-    // Al cambiar calorías, sugerimos macros, pero permitimos editar cada uno individualmente
+    // 🔥 FIX PUNTO 2: Manejo inteligente de macros (Auto vs Manual)
     const handleCalorieChange = (e) => {
         const kcal = parseInt(e.target.value) || 0;
-        // Recalcular macros sugeridos (30% P, 40% C, 30% G)
-        const p = Math.round((kcal * 0.3) / 4);
-        const c = Math.round((kcal * 0.4) / 4);
-        const f = Math.round((kcal * 0.3) / 9);
-        const fib = Math.round(kcal / 1000 * 14);
 
-        setManualStats({
-            calories: kcal,
-            protein: p,
-            carbs: c,
-            fat: f,
-            fiber: fib
-        });
+        if (isAutoMacro) {
+            // Si está en auto, calculamos los macros automáticamente
+            const p = Math.round((kcal * 0.3) / 4);
+            const c = Math.round((kcal * 0.4) / 4);
+            const f = Math.round((kcal * 0.3) / 9);
+            const fib = Math.round(kcal / 1000 * 14);
+
+            setManualStats({
+                calories: kcal,
+                protein: p,
+                carbs: c,
+                fat: f,
+                fiber: fib
+            });
+        } else {
+            // Si NO está en auto, solo actualizamos calorías
+            setManualStats(prev => ({ ...prev, calories: kcal }));
+        }
     };
 
     const handleMacroChange = (field, value) => {
@@ -151,7 +153,7 @@ export default function Food() {
                 const finalData = { calories, protein, carbs, fat, fiber: fiber || 30 };
 
                 await updateGoals(finalData);
-                setManualStats(finalData); // Sincronizar form manual también
+                setManualStats(finalData);
 
                 setConfigModal({ show: false, mode: 'manual' });
                 showToast(message || "Calculado por IA", "success");
@@ -171,19 +173,16 @@ export default function Food() {
         setShowSearch(true);
     };
 
-    // --- COLORES DEL CÍRCULO ---
     const getCircleGradient = (percent) => {
-        if (percent > 100) return { start: "#ef4444", end: "#dc2626" }; // Rojo Alerta
-        if (percent <= 25) return { start: "#22c55e", end: "#84cc16" }; // Verde
-        if (percent <= 50) return { start: "#84cc16", end: "#eab308" }; // Verde -> Amarillo
-        if (percent <= 75) return { start: "#eab308", end: "#f97316" }; // Amarillo -> Naranja
-        return { start: "#f97316", end: "#ef4444" }; // Naranja -> Rojo
+        if (percent > 100) return { start: "#ef4444", end: "#dc2626" };
+        if (percent <= 25) return { start: "#22c55e", end: "#84cc16" };
+        if (percent <= 50) return { start: "#84cc16", end: "#eab308" };
+        if (percent <= 75) return { start: "#eab308", end: "#f97316" };
+        return { start: "#f97316", end: "#ef4444" };
     };
 
-    // Render loading
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="text-center text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando datos...</div></div>;
 
-    // Datos para renderizar
     const currentKcal = log?.totalCalories || 0;
     const limitKcal = goals.calories || 2100;
     const calPercent = Math.min((currentKcal / limitKcal) * 100, 100);
@@ -213,17 +212,9 @@ export default function Food() {
 
             {/* RESUMEN CIRCULAR */}
             <div className="px-4">
-                <div className={`
-                    relative rounded-[32px] overflow-hidden p-[2px] 
-                    bg-gradient-to-br from-[${gradientColors.start}] to-[${gradientColors.end}]
-                    shadow-[0_0_25px_${shadowColor}]
-                `} style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientColors.start}, ${gradientColors.end})` }}>
-
+                <div className={`relative rounded-[32px] overflow-hidden p-[2px] bg-gradient-to-br from-[${gradientColors.start}] to-[${gradientColors.end}] shadow-[0_0_25px_${shadowColor}]`} style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientColors.start}, ${gradientColors.end})` }}>
                     <div className="bg-zinc-950 rounded-[30px] p-6 relative overflow-hidden flex items-center justify-between">
-                        {/* Brillo de fondo */}
                         <div className="absolute -right-10 -bottom-10 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: gradientColors.end }}></div>
-
-                        {/* Círculo Gráfico */}
                         <div className="relative w-32 h-32 flex items-center justify-center shrink-0 z-10">
                             <svg className="transform -rotate-90 w-full h-full overflow-visible">
                                 <defs>
@@ -233,20 +224,11 @@ export default function Food() {
                                     </linearGradient>
                                 </defs>
                                 <circle cx="50%" cy="50%" r="54" stroke="#27272a" strokeWidth="8" fill="transparent" />
-                                <circle
-                                    cx="50%" cy="50%" r="54"
-                                    stroke="url(#calorieFlowGradient)"
-                                    strokeWidth="8"
-                                    fill="transparent"
-                                    strokeDasharray={339}
-                                    strokeDashoffset={339 - (339 * calPercent) / 100}
-                                    strokeLinecap="round"
-                                    className="transition-all duration-1000 ease-out drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]"
-                                />
+                                <circle cx="50%" cy="50%" r="54" stroke="url(#calorieFlowGradient)" strokeWidth="8" fill="transparent" strokeDasharray={339} strokeDashoffset={339 - (339 * calPercent) / 100} strokeLinecap="round" className="transition-all duration-1000 ease-out drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]" />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center leading-none pointer-events-none">
                                 <div className="w-full flex justify-center items-center px-1">
-                                    <span className="text-3xl font-black tracking-tighter text-white filter brightness-110 leading-none pb-1">
+                                    <span className={`text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${gradientClasses} drop-shadow-lg filter brightness-125 pb-2 pr-2`}>
                                         {Math.round(currentKcal)}
                                     </span>
                                 </div>
@@ -288,10 +270,7 @@ export default function Food() {
                                     <h3 className="text-white font-black text-base uppercase tracking-tighter">{meal.name}</h3>
                                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{meal.foods.length} items • <span className="text-zinc-300">{mealKcal} KCAL</span></p>
                                 </div>
-                                <button
-                                    onClick={() => handleOpenAdd(meal._id)}
-                                    className="bg-zinc-800 text-zinc-400 p-2 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700"
-                                >
+                                <button onClick={() => handleOpenAdd(meal._id)} className="bg-zinc-800 text-zinc-400 p-2 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700">
                                     <Plus size={20} />
                                 </button>
                             </div>
@@ -311,19 +290,15 @@ export default function Food() {
                                                     <span className="text-blue-400/80">P: {Math.round(item.protein)}</span>
                                                     <span className="text-yellow-400/80">C: {Math.round(item.carbs)}</span>
                                                     <span className="text-red-400/80">G: {Math.round(item.fat)}</span>
+                                                    {/* 🔥 FIX 1: Fibra añadida en la tarjeta */}
+                                                    <span className="text-green-500/80">F: {Math.round(item.fiber)}</span>
                                                 </div>
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-black text-white whitespace-nowrap bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-800 flex items-center gap-1">
                                                     {Math.round(item.calories)} <span className="text-[9px] text-zinc-500 font-bold">KCAL</span>
                                                 </span>
-
-                                                {/* 🔥 PUNTO 5: BOTÓN ELIMINAR */}
-                                                <button
-                                                    onClick={() => handleRemoveFood(meal._id, item._id)}
-                                                    className="p-2 bg-red-900/10 text-red-500 rounded-lg hover:bg-red-900/30 transition-colors"
-                                                >
+                                                <button onClick={() => handleRemoveFood(meal._id, item._id)} className="p-2 bg-red-900/10 text-red-500 rounded-lg hover:bg-red-900/30 transition-colors">
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
@@ -375,7 +350,6 @@ export default function Food() {
                                     </button>
 
                                     <div>
-                                        {/* 🔥 INPUT PRINCIPAL: CALORÍAS */}
                                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Objetivo Calorías</label>
                                         <input
                                             type="number"
@@ -384,34 +358,29 @@ export default function Food() {
                                             className="w-full bg-black text-white text-3xl font-black p-4 rounded-2xl border border-zinc-800 focus:border-white/20 outline-none text-center transition-colors mb-4"
                                         />
 
-                                        {/* 🔥 FIX PUNTO 12: INPUTS INDIVIDUALES MACROS */}
-                                        <div className="grid grid-cols-3 gap-3">
+                                        {/* 🔥 FIX 2: SWITCH AUTO COMPLETAR */}
+                                        <div onClick={() => setIsAutoMacro(!isAutoMacro)} className="flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-zinc-800 mb-4 cursor-pointer">
+                                            <span className="text-xs font-bold text-zinc-400 uppercase">Autocompletar Macros</span>
+                                            {isAutoMacro ? <ToggleRight className="text-green-500" size={24} /> : <ToggleLeft className="text-zinc-600" size={24} />}
+                                        </div>
+
+                                        {/* 🔥 FIX 2: GRID 2x2 + FIBRA */}
+                                        <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label className="text-[9px] font-bold text-blue-400 uppercase block mb-1 text-center">Proteína</label>
-                                                <input
-                                                    type="number"
-                                                    value={manualStats.protein}
-                                                    onChange={(e) => handleMacroChange('protein', e.target.value)}
-                                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-center text-white font-bold focus:border-blue-500 outline-none"
-                                                />
+                                                <input type="number" value={manualStats.protein} onChange={(e) => handleMacroChange('protein', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-blue-500 outline-none" />
                                             </div>
                                             <div>
                                                 <label className="text-[9px] font-bold text-yellow-400 uppercase block mb-1 text-center">Carbos</label>
-                                                <input
-                                                    type="number"
-                                                    value={manualStats.carbs}
-                                                    onChange={(e) => handleMacroChange('carbs', e.target.value)}
-                                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
-                                                />
+                                                <input type="number" value={manualStats.carbs} onChange={(e) => handleMacroChange('carbs', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-yellow-500 outline-none" />
                                             </div>
                                             <div>
                                                 <label className="text-[9px] font-bold text-red-400 uppercase block mb-1 text-center">Grasa</label>
-                                                <input
-                                                    type="number"
-                                                    value={manualStats.fat}
-                                                    onChange={(e) => handleMacroChange('fat', e.target.value)}
-                                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-center text-white font-bold focus:border-red-500 outline-none"
-                                                />
+                                                <input type="number" value={manualStats.fat} onChange={(e) => handleMacroChange('fat', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-red-500 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-bold text-green-500 uppercase block mb-1 text-center">Fibra</label>
+                                                <input type="number" value={manualStats.fiber} onChange={(e) => handleMacroChange('fiber', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-green-500 outline-none" />
                                             </div>
                                         </div>
                                     </div>
