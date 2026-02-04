@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save,
-    HeartCrack
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -15,20 +14,40 @@ import Toast from '../components/common/Toast';
 const ICON_XP = "/assets/icons/xp.png";
 const ICON_COIN = "/assets/icons/moneda.png";
 const ICON_CHIP = "/assets/icons/ficha.png";
-const ICON_HEART = "/assets/icons/corazon.png";
+const ICON_HEART = "/assets/icons/corazon.png"; // 🔥 CAMBIO 2: Usando tu imagen
 
 // ==========================================
-// 1. HELPERS
+// 1. HELPERS VISUALES Y LÓGICOS
 // ==========================================
-const COOP_COLORS = ['bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-indigo-500'];
-const getUserColor = (id) => { if (!id) return 'bg-zinc-500'; let h = 0; for (let i = 0; i < id.length; i++) h = id.charCodeAt(i) + ((h << 5) - h); return COOP_COLORS[Math.abs(h) % COOP_COLORS.length]; };
+const COOP_COLORS = [
+    'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-indigo-500'
+];
 
-const getDeadlineText = (freq) => {
-    const now = new Date(); const end = new Date(now);
-    if (freq === 'daily') end.setHours(23, 59, 59, 999);
-    else if (freq === 'weekly') end.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? 0 : 7));
-    else if (freq === 'monthly') end.setMonth(now.getMonth() + 1, 0);
-    else if (freq === 'yearly') end.setMonth(11, 31);
+const getUserColor = (userId) => {
+    if (!userId) return 'bg-zinc-500';
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % COOP_COLORS.length;
+    return COOP_COLORS[index];
+};
+
+const getDeadlineText = (frequency) => {
+    const now = new Date();
+    const end = new Date(now);
+
+    if (frequency === 'daily') {
+        end.setHours(23, 59, 59, 999);
+    } else if (frequency === 'weekly') {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? 0 : 7);
+        end.setDate(diff);
+    } else if (frequency === 'monthly') {
+        end.setMonth(now.getMonth() + 1, 0);
+    } else if (frequency === 'yearly') {
+        end.setMonth(11, 31);
+    }
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
@@ -42,27 +61,62 @@ const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
     const label = labels[diff] || diff;
 
-    // Estilo "Bloqueado/Metal" para completadas
+    // 🔥 CAMBIO 3: Estilo Completado "Bloqueado/Metal" (Gris muy oscuro y apagado)
     if (completed) return {
-        gradient: 'from-zinc-900 to-black',
-        shadow: 'rgba(0,0,0,0)',
-        textGradient: 'from-zinc-600 to-zinc-500',
-        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900',
+        gradient: 'from-[#18181b] to-[#09090b]', // Zinc-900 to Black
+        shadow: 'rgba(0,0,0,0)', // Sin sombra de color
+        textGradient: 'from-zinc-600 to-zinc-500', // Texto gris apagado
+        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900', // Badge invisible casi
         iconColor: 'text-zinc-700',
-        label: 'COMPLETADO'
+        label: 'HECHO'
     };
 
     switch (diff) {
-        case 'easy': return { gradient: 'from-[#14532d] via-[#166534] to-[#22c55e]', shadow: 'rgba(22, 101, 52, 0.4)', textGradient: 'from-[#166534] to-[#22c55e]', badge: 'text-green-400 border-green-500/30 bg-green-900/20', iconColor: 'text-green-400', label };
-        case 'medium': return { gradient: 'from-blue-600 via-cyan-500 to-indigo-600', shadow: 'rgba(37, 99, 235, 0.4)', textGradient: 'from-blue-400 to-cyan-400', badge: 'text-blue-300 border-blue-500/30 bg-blue-500/10', iconColor: 'text-blue-400', label };
-        case 'hard': return { gradient: 'from-red-600 via-orange-500 to-rose-600', shadow: 'rgba(220, 38, 38, 0.4)', textGradient: 'from-red-400 to-orange-400', badge: 'text-red-300 border-red-500/30 bg-red-500/10', iconColor: 'text-red-400', label };
-        case 'epic': return { gradient: 'from-purple-600 via-fuchsia-500 to-violet-600', shadow: 'rgba(147, 51, 234, 0.4)', textGradient: 'from-purple-400 to-fuchsia-400', badge: 'text-purple-300 border-purple-500/30 bg-purple-500/10', iconColor: 'text-purple-400', label };
-        default: return { gradient: 'from-zinc-500 to-zinc-700', shadow: 'rgba(113, 113, 122, 0.2)', textGradient: 'from-zinc-400 to-zinc-600', badge: 'text-zinc-400 border-zinc-600', iconColor: 'text-zinc-400', label };
+        case 'easy': return {
+            gradient: 'from-[#14532d] via-[#166534] to-[#22c55e]',
+            shadow: 'rgba(22, 101, 52, 0.4)',
+            textGradient: 'from-[#166534] to-[#22c55e]',
+            badge: 'text-green-400 border-green-500/30 bg-green-900/20',
+            iconColor: 'text-green-400',
+            label
+        };
+        case 'medium': return {
+            gradient: 'from-blue-600 via-cyan-500 to-indigo-600',
+            shadow: 'rgba(37, 99, 235, 0.4)',
+            textGradient: 'from-blue-400 to-cyan-400',
+            badge: 'text-blue-300 border-blue-500/30 bg-blue-500/10',
+            iconColor: 'text-blue-400',
+            label
+        };
+        case 'hard': return {
+            gradient: 'from-red-600 via-orange-500 to-rose-600',
+            shadow: 'rgba(220, 38, 38, 0.4)',
+            textGradient: 'from-red-400 to-orange-400',
+            badge: 'text-red-300 border-red-500/30 bg-red-500/10',
+            iconColor: 'text-red-400',
+            label
+        };
+        case 'epic': return {
+            gradient: 'from-purple-600 via-fuchsia-500 to-violet-600',
+            shadow: 'rgba(147, 51, 234, 0.4)',
+            textGradient: 'from-purple-400 to-fuchsia-400',
+            badge: 'text-purple-300 border-purple-500/30 bg-purple-500/10',
+            iconColor: 'text-purple-400',
+            label
+        };
+        default: return {
+            gradient: 'from-zinc-500 to-zinc-700',
+            shadow: 'rgba(113, 113, 122, 0.2)',
+            textGradient: 'from-zinc-400 to-zinc-600',
+            badge: 'text-zinc-400 border-zinc-600',
+            iconColor: 'text-zinc-400',
+            label
+        };
     }
 };
 
 // ==========================================
-// COMPONENTE TARJETA
+// COMPONENTE: TARJETA DE MISIÓN
 // ==========================================
 function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdit, viewAllMode }) {
     const [dragX, setDragX] = useState(0);
@@ -78,22 +132,34 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const isBinary = mission.target === 1;
     const damage = getPotentialDamage(mission.difficulty);
 
+    // 🔥 CAMBIO 4: Si estamos en viewAllMode (OJO), NO se puede deslizar
     const canSwipe = !isPending && !viewAllMode;
 
-    const handleStart = (cx) => { if (canSwipe) { setIsDragging(true); startX.current = cx; } };
-    const handleMove = (cx) => {
+    const handleStart = (clientX) => { if (canSwipe) { setIsDragging(true); startX.current = clientX; } };
+
+    const handleMove = (clientX) => {
         if (!isDragging) return;
-        const diff = cx - startX.current;
+        const diff = clientX - startX.current;
+
+        // Bloqueos de lógica:
         if (mission.completed && diff > 0) return; // No recompletar
-        if (mission.completed && diff < 0 && !viewAllMode) return; // No borrar completada si no es modo ojo
+        if (mission.completed && diff < 0 && !viewAllMode) return; // No borrar si está hecha (salvo modo ojo)
+
         setDragX(diff);
     };
+
     const handleEnd = () => {
         setIsDragging(false);
         if (isPending) { setDragX(0); return; }
-        if (dragX > THRESHOLD && !mission.completed) {
-            onUpdateProgress(mission, Math.max(0, mission.target - mission.progress));
+
+        if (dragX > THRESHOLD) {
+            // Completar (Derecha)
+            if (!mission.completed) {
+                const remaining = mission.target - mission.progress;
+                onUpdateProgress(mission, Math.max(0, remaining));
+            }
         } else if (dragX < -THRESHOLD) {
+            // Borrar (Izquierda)
             if (!mission.completed || viewAllMode) {
                 if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión permanentemente?")) {
                     onDelete(mission._id);
@@ -107,29 +173,49 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         e.preventDefault();
         if (!inputValue) return;
         onUpdateProgress(mission, parseFloat(inputValue));
-        setInputValue(''); setShowInput(false);
+        setInputValue('');
+        setShowInput(false);
     };
 
-    const cardStyle = { transform: `translate3d(${dragX}px, 0, 0)`, transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)', touchAction: 'pan-y' };
-    const bgAction = dragX > 0 ? 'bg-emerald-900/50 border-emerald-500/30' : 'bg-red-900/50 border-red-500/30';
+    const cardStyle = {
+        transform: `translate3d(${dragX}px, 0, 0)`,
+        transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+        touchAction: 'pan-y'
+    };
+
+    let bgAction = 'bg-transparent';
+    if (dragX > 0) bgAction = 'bg-emerald-900/50 border border-emerald-500/30 rounded-[24px]';
+    else if (dragX < 0) bgAction = 'bg-red-900/50 border border-red-500/30 rounded-[24px]';
+
     const progressPercent = mission.target > 0 ? Math.min((mission.progress / mission.target) * 100, 100) : 0;
 
     const renderProgressBar = () => {
         if (isBinary && !mission.isCoop) return null;
         return (
             <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex mt-2 border border-zinc-800/50 relative shadow-inner">
-                {mission.isCoop ? mission.participants.map(p => {
-                    const w = ((mission.contributions?.[p._id] || 0) / mission.target) * 100;
-                    return <div key={p._id} className={`h-full ${getUserColor(p._id)} transition-all duration-500`} style={{ width: `${w}%` }} />;
-                }) : (
+                {mission.isCoop ? (
+                    mission.participants.map((p) => {
+                        const contrib = (mission.contributions && mission.contributions[p._id]) || 0;
+                        const w = (contrib / mission.target) * 100;
+                        const colorClass = getUserColor(p._id);
+                        return <div key={p._id} className={`h-full ${colorClass} transition-all duration-500`} style={{ width: `${w}%` }} />;
+                    })
+                ) : (
                     <div className={`h-full transition-all duration-500 relative bg-gradient-to-r ${styles.gradient}`} style={{ width: `${progressPercent}%` }} />
                 )}
             </div>
         );
     };
 
+    const handleCardClick = () => {
+        if (viewAllMode) {
+            onEdit(mission);
+        }
+    };
+
     return (
-        <div className="relative w-full mb-4 select-none group" onClick={() => viewAllMode && onEdit(mission)}>
+        <div className="relative w-full mb-4 select-none group" onClick={handleCardClick}>
+            {/* Fondo Swipe */}
             {canSwipe && (
                 <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
                     {dragX > 0 && <div className="flex items-center gap-2 text-emerald-400 font-black text-sm"><Check size={24} /> COMPLETAR</div>}
@@ -137,12 +223,31 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                 </div>
             )}
 
-            <div style={cardStyle} className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} shadow-[0_0_25px_${styles.shadow}] ${isPending ? 'opacity-70 grayscale' : ''} ${viewAllMode ? 'cursor-pointer active:scale-95' : ''} ${mission.completed ? 'opacity-60 grayscale' : 'opacity-100'}`}
-                onTouchStart={e => handleStart(e.targetTouches[0].clientX)} onTouchMove={e => handleMove(e.targetTouches[0].clientX)} onTouchEnd={handleEnd}
-                onMouseDown={e => handleStart(e.clientX)} onMouseMove={e => handleMove(e.clientX)} onMouseUp={handleEnd} onMouseLeave={() => isDragging && handleEnd()}
+            {/* Tarjeta Principal */}
+            <div
+                style={cardStyle}
+                className={`
+                    relative rounded-[24px] overflow-hidden z-10 will-change-transform
+                    p-[2px] bg-gradient-to-br ${styles.gradient}
+                    shadow-[0_0_25px_${styles.shadow}]
+                    ${isPending ? 'opacity-70 grayscale-[0.5]' : ''}
+                    ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''}
+                    ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'} 
+                `}
+                onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
+                onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
+                onTouchEnd={handleEnd}
+                onMouseDown={(e) => handleStart(e.clientX)}
+                onMouseMove={(e) => handleMove(e.clientX)}
+                onMouseUp={handleEnd}
+                onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
                 <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-4 relative overflow-hidden h-full flex flex-col justify-between`}>
-                    <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
+
+                    {/* Brillo ambiental (Apagado si está completada) */}
+                    {!mission.completed && (
+                        <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
+                    )}
 
                     <div className="relative z-10">
                         {/* HEADER */}
@@ -152,15 +257,19 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                     <div className="flex items-center gap-2">
                                         {mission.isCoop && <Users size={16} className={styles.iconColor} />}
                                         {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-400 line-through' : 'text-white'}`}>
+                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>
                                             {mission.title}
                                         </h3>
                                     </div>
+
                                     <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[10px] text-zinc-500 uppercase font-bold flex gap-1"><Calendar size={10} /> {mission.frequency}</span>
-                                        <div className="flex items-baseline gap-1 ml-2">
-                                            <span className={`text-lg font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>{mission.progress}</span>
-                                            <span className="text-xs font-bold text-zinc-500">/ {mission.target} {mission.unit}</span>
+                                        {/* 🔥 CAMBIO 1: Eliminado Frecuencia visual */}
+                                        {/* 🔥 CAMBIO 5: Contador Gigante */}
+                                        <div className="flex items-baseline gap-1">
+                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>
+                                                {mission.progress}/{mission.target}
+                                            </span>
+                                            {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
                                         </div>
                                     </div>
                                 </div>
@@ -173,46 +282,53 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                 </div>
                             </div>
 
+                            {/* 🔥 CAMBIO 6: Botón Check eliminado completamente. Solo queda "+" si es necesario */}
                             <div className="flex flex-col items-center gap-2">
-                                {mission.completed ? (
-                                    <div className="p-1 bg-zinc-900 rounded-full border border-zinc-800 shrink-0"><Check size={16} className={styles.iconColor} /></div>
-                                ) : (
-                                    !isBinary && !isPending && !viewAllMode && (
-                                        <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
-                                            <Plus size={16} />
-                                        </button>
-                                    )
+                                {!isBinary && !mission.completed && !isPending && !viewAllMode && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
+                                        <Plus size={16} />
+                                    </button>
                                 )}
                             </div>
                         </div>
 
                         {renderProgressBar()}
 
+                        {/* RECOMPENSAS / RIESGOS */}
                         <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
                             <div className="flex items-center gap-4">
+                                {/* XP */}
                                 {mission.xpReward > 0 && (
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-sm font-black text-blue-200">+{mission.xpReward}</span>
-                                        <img src={ICON_XP} className="w-6 h-6 object-contain" alt="XP" />
+                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span>
+                                        <img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" />
                                     </div>
                                 )}
+
+                                {/* Monedas */}
                                 {(mission.coinReward > 0) && (
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-sm font-black text-yellow-200">+{mission.coinReward}</span>
-                                        <img src={ICON_COIN} className="w-6 h-6 object-contain" alt="Coins" />
+                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span>
+                                        <img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" />
                                     </div>
                                 )}
+
+                                {/* Fichas */}
                                 {(mission.gameCoinReward > 0) && (
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-sm font-black text-purple-200">+{mission.gameCoinReward}</span>
-                                        <img src={ICON_CHIP} className="w-6 h-6 object-contain" alt="Chips" />
+                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span>
+                                        <img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" />
                                     </div>
                                 )}
                             </div>
-                            <div className="ml-auto flex items-center gap-1.5 opacity-90">
-                                <span className="text-sm font-black text-red-400">-{damage}</span>
-                                <img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" />
-                            </div>
+
+                            {/* 🔥 CAMBIO 2: Icono Corazón Imagen */}
+                            {!mission.completed && (
+                                <div className="ml-auto flex items-center gap-1.5 opacity-90">
+                                    <span className="text-sm font-black text-red-400">-{damage}</span>
+                                    <img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" />
+                                </div>
+                            )}
                         </div>
 
                         {showInput && !isBinary && (
@@ -259,7 +375,9 @@ export default function Missions() {
     const [selectedDays, setSelectedDays] = useState([]);
     const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
 
-    useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    }, [activeTab]);
 
     useEffect(() => {
         if (!showCreator) setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab }));
@@ -381,7 +499,7 @@ export default function Missions() {
                         <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2"><Edit size={18} className="text-yellow-500" /> Editar</h2><button onClick={() => setShowEditModal(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><X size={18} /></button></div>
                         <div className="space-y-4">
                             <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label><input type="text" value={missionToEdit.title} onChange={e => setMissionToEdit({ ...missionToEdit, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div>
-                            <div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label><input type="number" value={missionToEdit.target} onChange={e => setMissionToEdit({ ...missionToEdit, target: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Unidad</label><input type="text" value={missionToEdit.unit || ''} onChange={e => setMissionToEdit({ ...missionToEdit, unit: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div></div>
+                            <div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label><input type="number" value={missionToEdit.target} onChange={e => setMissionToEdit({ ...missionToEdit, target: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Unidad</label><input type="text" value={missionToEdit.unit || ''} onChange={e => setMissionToEdit({ ...missionToEdit, unit: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" placeholder="Págs, Km..." /></div></div>
                             <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Frecuencia</label><select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.frequency} onChange={e => setMissionToEdit({ ...missionToEdit, frequency: e.target.value })}><option value="daily">Diaria</option><option value="weekly">Semanal</option><option value="monthly">Mensual</option><option value="yearly">Anual</option></select></div>
                             {missionToEdit.frequency === 'daily' && (<div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl"><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label><div className="flex justify-between">{daysOptions.map(d => (<button key={d.value} onClick={() => toggleEditDay(d.value)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all border ${editSelectedDays.includes(d.value) ? 'bg-white text-black border-white scale-110' : 'bg-black text-zinc-600 border-zinc-800'}`}>{d.label}</button>))}</div></div>)}
                             <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Dificultad</label><select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.difficulty} onChange={e => setMissionToEdit({ ...missionToEdit, difficulty: e.target.value })}><option value="easy">Fácil</option><option value="medium">Media</option><option value="hard">Difícil</option><option value="epic">Épica</option></select></div>
