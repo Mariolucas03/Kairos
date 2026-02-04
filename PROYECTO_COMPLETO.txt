@@ -627,64 +627,36 @@ module.exports = {
 const asyncHandler = require('express-async-handler');
 const DailyLog = require('../models/DailyLog');
 const Mission = require('../models/Mission');
-const NutritionLog = require('../models/NutritionLog'); // 🔥 FIX PUNTO 7: Importar modelo
+const NutritionLog = require('../models/NutritionLog');
 
-// Utilidad para fecha servidor (Fallback)
 const getServerDateString = () => new Date().toISOString().split('T')[0];
 
-/**
- * 🔥 HELPER INTERNO OPTIMIZADO: Busca o Crea el Log del día
- * Usa Promise.all para paralelizar lecturas y reduce latencia.
- * Sincroniza Nutrición y Misiones.
- */
 const ensureDailyLog = async (userId, dateString, userStreak) => {
-    // Creamos fecha local simulada para obtener el día de la semana correcto (0-6)
     const dateObj = new Date(dateString);
     const dayOfWeek = dateObj.getDay();
 
-    // 1. OPTIMIZACIÓN: Ejecutar consultas independientes en PARALELO
-    // 🔥 FIX PUNTO 3: Contamos solo las misiones que APLICAN HOY para el denominador (Total)
-    // No filtramos por 'completed: false' aquí porque 'total' debe ser la suma de hechas + pendientes
+    const missionQuery = {
+        $or: [{ user: userId }, { participants: userId }],
+        frequency: 'daily',
+        $or: [{ specificDays: { $size: 0 } }, { specificDays: dayOfWeek }],
+        $or: [{ isCoop: false }, { isCoop: true, invitationStatus: 'active' }]
+    };
+
     const [activeCount, lastLog, nutritionLog] = await Promise.all([
-        Mission.countDocuments({
-            $or: [
-                { user: userId },
-                { participants: userId }
-            ],
-            frequency: 'daily',
-            // Si es coop, aseguramos que esté activa
-            $or: [
-                { isCoop: false },
-                { isCoop: true, invitationStatus: 'active' }
-            ],
-            // Filtrar por día específico o todos los días
-            $or: [
-                { specificDays: { $size: 0 } }, // Todos los días
-                { specificDays: dayOfWeek }     // Día específico de hoy
-            ]
-        }),
-        // .lean() para lectura rápida del último peso
+        Mission.countDocuments(missionQuery),
         DailyLog.findOne({ user: userId }).sort({ date: -1 }).select('weight').lean(),
-        // 🔥 FIX PUNTO 7: Traer el log de nutrición real para inyectar datos
         NutritionLog.findOne({ user: userId, date: dateString }).lean()
     ]);
 
     const persistentWeight = lastLog ? lastLog.weight : 0;
-
-    // Preparar datos de nutrición sincronizados
     const currentKcal = nutritionLog ? nutritionLog.totalCalories : 0;
 
-    // 2. Operación Atómica: Buscar O Crear
-    // No usamos .lean() aquí porque necesitamos el documento Mongoose completo por si hay que guardar
     let log = await DailyLog.findOneAndUpdate(
         { user: userId, date: dateString },
         {
             $setOnInsert: {
-                user: userId,
-                date: dateString,
-                weight: persistentWeight,
-                streakCurrent: userStreak,
-                nutrition: { totalKcal: currentKcal }, // Sincronizado al crear
+                user: userId, date: dateString, weight: persistentWeight, streakCurrent: userStreak,
+                nutrition: { totalKcal: currentKcal },
                 missionStats: { completed: 0, total: activeCount, listCompleted: [] },
                 gains: { coins: 0, xp: 0, lives: 0 }
             }
@@ -692,160 +664,77 @@ const ensureDailyLog = async (userId, dateString, userStreak) => {
         { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
-    // 3. Sincronizaciones posteriores a la creación (Self-Healing)
     let needsSave = false;
 
-    // Sincronizar total de misiones si cambió (ej: se añadió una misión nueva hoy)
-    // Solo actualizamos si es mayor, para no romper históricos pasados, o si es hoy
-    const isToday = dateString === getServerDateString();
-    if (isToday && log.missionStats.total !== activeCount) {
+    if (log.missionStats.total !== activeCount) {
         log.missionStats.total = activeCount;
+        if (log.missionStats.completed > activeCount) log.missionStats.completed = activeCount;
         needsSave = true;
     }
 
-    // Sincronizar calorías si difieren
     if (log.nutrition.totalKcal !== currentKcal) {
         log.nutrition.totalKcal = currentKcal;
         needsSave = true;
     }
 
-    if (needsSave) {
-        await log.save();
-    }
+    if (needsSave) await log.save();
 
     return { log, nutritionLog };
 };
 
-// ==========================================
-// CONTROLADORES EXPORTADOS
-// ==========================================
-
-// @desc    Obtener datos de HOY (o fecha pasada por query)
-// @route   GET /api/daily?date=YYYY-MM-DD
 const getDailyLog = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    // Prioridad: Fecha del cliente > Fecha del servidor
     const targetDate = req.query.date || getServerDateString();
-
-    // Usamos el helper centralizado
     const { log, nutritionLog } = await ensureDailyLog(userId, targetDate, req.user.streak.current);
-
     const logObj = log.toObject();
-
-    // 🔥 FIX PUNTO 7: INYECTAR DETALLE DE COMIDAS
-    // El widget espera ver 'meals' para hacer el desglose. Si existe nutritionLog, lo pasamos.
     if (nutritionLog) {
-        logObj.nutrition = {
-            ...logObj.nutrition,
-            meals: nutritionLog.meals, // Array de { name: 'Desayuno', foods: [...] }
-            totalKcal: nutritionLog.totalCalories,
-            totalProtein: nutritionLog.totalProtein,
-            totalCarbs: nutritionLog.totalCarbs,
-            totalFat: nutritionLog.totalFat,
-            totalFiber: nutritionLog.totalFiber
-        };
+        logObj.nutrition = { ...logObj.nutrition, meals: nutritionLog.meals, totalKcal: nutritionLog.totalCalories, totalProtein: nutritionLog.totalProtein, totalCarbs: nutritionLog.totalCarbs, totalFat: nutritionLog.totalFat, totalFiber: nutritionLog.totalFiber };
     }
-
     res.status(200).json(logObj);
 });
 
-// @desc    Obtener datos de una FECHA ANTIGUA (Específica para calendario)
-// @route   GET /api/daily/specific?date=YYYY-MM-DD
 const getDailyLogByDate = asyncHandler(async (req, res) => {
     const { date } = req.query;
-    if (!date) {
-        res.status(400);
-        throw new Error('Falta el parámetro fecha');
-    }
-
-    // Aquí solo buscamos, no creamos (si no entró ese día, no hay datos)
+    if (!date) { res.status(400); throw new Error('Falta fecha'); }
     const log = await DailyLog.findOne({ user: req.user._id, date: date }).lean();
-
     if (log) {
-        // Intentar buscar nutrición para ese día también para completar datos
         const nutritionLog = await NutritionLog.findOne({ user: req.user._id, date: date }).lean();
-
-        if (nutritionLog) {
-            log.nutrition = {
-                ...log.nutrition,
-                meals: nutritionLog.meals,
-                totalKcal: nutritionLog.totalCalories
-            };
-        } else {
-            log.totalKcal = log.nutrition ? log.nutrition.totalKcal : 0;
-        }
-
+        if (nutritionLog) log.nutrition = { ...log.nutrition, meals: nutritionLog.meals, totalKcal: nutritionLog.totalCalories };
         res.status(200).json(log);
-    } else {
-        res.status(200).json(null);
-    }
+    } else { res.status(200).json(null); }
 });
 
-// @desc    Actualizar widgets (Peso, Sueño, Mood...)
-// @route   PUT /api/daily
 const updateDailyLog = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    const { type, value, date } = req.body; // Aceptamos fecha en el body también
-
-    // Prioridad: Fecha del body > Query > Servidor
+    const { type, value, date } = req.body;
     const targetDate = date || req.query.date || getServerDateString();
-
-    // 1. Garantizamos que el log existe usando el Helper
-    // Desestructuramos para obtener solo el documento mongoose 'log'
     let { log } = await ensureDailyLog(userId, targetDate, req.user.streak.current);
 
-    // 2. Switch Case para actualizar campos
     switch (type) {
         case 'mood': log.mood = value; break;
         case 'weight': log.weight = value; break;
         case 'sleepHours': log.sleepHours = value; break;
         case 'steps': log.steps = value; break;
         case 'streakCurrent': log.streakCurrent = value; break;
-
-        case 'nutrition':
-            // Merge de objetos para no borrar otros macros si solo mandas kcal
-            log.nutrition = { ...log.nutrition, ...value };
-            break;
-
+        case 'nutrition': log.nutrition = { ...log.nutrition, ...value }; break;
         case 'sport': log.sportWorkouts = value; break;
         case 'training': log.gymWorkouts = value; break;
         case 'missions': log.missionStats = value; break;
         case 'gains': log.gains = value; break;
-
-        default:
-            // Seguridad: solo actualiza si el campo existe en el esquema raíz
-            if (log[type] !== undefined) log[type] = value;
-            break;
+        default: if (log[type] !== undefined) log[type] = value; break;
     }
-
     await log.save();
-
     const logObj = log.toObject();
     logObj.totalKcal = log.nutrition.totalKcal;
-
     res.status(200).json(logObj);
 });
 
-// @desc    Obtener historial de peso para gráficas
-// @route   GET /api/daily/history
 const getWeightHistory = asyncHandler(async (req, res) => {
-    const logs = await DailyLog.find({
-        user: req.user._id,
-        weight: { $gt: 0 } // Solo días donde se registró peso
-    })
-        .sort({ date: 1 }) // Orden cronológico
-        .select('date weight') // Solo devolver lo necesario (Rendimiento)
-        .lean(); // 🔥 Lean para velocidad
-
+    const logs = await DailyLog.find({ user: req.user._id, weight: { $gt: 0 } }).sort({ date: 1 }).select('date weight').lean();
     res.status(200).json(logs);
 });
 
-module.exports = {
-    getDailyLog,
-    getDailyLogByDate,
-    updateDailyLog,
-    getWeightHistory
-};
+module.exports = { getDailyLog, getDailyLogByDate, updateDailyLog, getWeightHistory };
 
 --- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\dailyController.js ---
 
@@ -2073,127 +1962,89 @@ const User = require('../models/User');
 const levelService = require('../services/levelService');
 const mongoose = require('mongoose');
 
-const BASE_XP = 10;
-const BASE_COINS = 5;
+// 🔥 NUEVA TABLA DE RECOMPENSAS
+const REWARD_TABLE = {
+    easy: { xp: 50, gameCoins: 100, coins: 10 },
+    medium: { xp: 75, gameCoins: 150, coins: 30 },
+    hard: { xp: 100, gameCoins: 200, coins: 50 },
+    epic: { xp: 150, gameCoins: 250, coins: 70 }
+};
 
-const DIFFICULTY_MULTIPLIERS = { easy: 1, medium: 2, hard: 3, epic: 5 };
 const FREQUENCY_MULTIPLIERS = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
 
-// ------------------------------------------------------------------
-// 1. OBTENER MISIONES (VERSIÓN ROBUSTA Y PERMISIVA)
-// ------------------------------------------------------------------
+const calculateRewards = (difficulty, frequency, isCoop) => {
+    const base = REWARD_TABLE[difficulty] || REWARD_TABLE.easy;
+    const mult = FREQUENCY_MULTIPLIERS[frequency] || 1;
+    const coopMult = isCoop ? 1.5 : 1;
+
+    return {
+        xpReward: Math.round(base.xp * mult * coopMult),
+        gameCoinReward: Math.round(base.gameCoins * mult * coopMult),
+        coinReward: Math.round(base.coins * mult * coopMult)
+    };
+};
+
 const getMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-
-    // 1. Preparamos las dos versiones del ID: Texto y Objeto
-    // Esto arregla el problema si en la BD se guardó mezclado por migraciones antiguas
     const userIdString = userId.toString();
     let userIdObj;
-    try {
-        userIdObj = new mongoose.Types.ObjectId(userIdString);
-    } catch (e) {
-        userIdObj = userId; // Fallback
-    }
+    try { userIdObj = new mongoose.Types.ObjectId(userIdString); } catch (e) { userIdObj = userId; }
 
-    // 2. Consulta "Atrapalotodo"
-    // Busca donde seas el dueño (String u Object) O donde seas participante (String u Object)
     const query = {
         $or: [
-            { user: userIdObj },
-            { user: userIdString },
-            { participants: userIdObj },
-            { participants: userIdString },
-            // Misiones cooperativas donde fuiste invitado y aceptaste
+            { user: userIdObj }, { user: userIdString },
+            { participants: userIdObj }, { participants: userIdString },
             { participants: { $in: [userIdObj, userIdString] }, invitationStatus: 'active' }
         ]
     };
 
-    // Ordenamos: Primero las no completadas, luego por fecha de creación (más nuevas primero)
-    const missions = await Mission.find(query)
-        .populate('participants', 'username avatar')
-        .sort({ completed: 1, createdAt: -1 });
+    const missions = await Mission.find(query).populate('participants', 'username avatar').sort({ completed: 1, createdAt: -1 });
 
-    // 3. Limpieza de Fechas (Auto-Reset para Hábitos)
-    // Esto soluciona el problema de que el widget muestre 5/3 si cuenta misiones viejas
     const today = new Date().toDateString();
     let updated = false;
 
     for (let mission of missions) {
         try {
-            // Si es hábito y está marcado como completado, verificamos la fecha
             if (mission.type === 'habit' && mission.completed) {
-                // Si no tiene fecha, asumimos que es vieja y reseteamos
-                if (!mission.lastUpdated) {
-                    mission.lastUpdated = new Date();
-                }
-
+                if (!mission.lastUpdated) mission.lastUpdated = new Date();
                 const lastUpdate = new Date(mission.lastUpdated).toDateString();
 
-                // Lógica de reseteo según frecuencia
-                // Aquí nos enfocamos principalmente en DAILY para el widget del Home
                 if (lastUpdate !== today && mission.frequency === 'daily') {
-                    console.log(`🔄 [AUTO-FIX] Reseteando hábito diario antiguo: ${mission.title}`);
                     mission.progress = 0;
                     mission.completed = false;
-
-                    // Asegurar mapa de contribuciones limpio
                     if (!mission.contributions) mission.contributions = new Map();
-
-                    // Resetear contribuciones de todos los participantes
-                    if (mission.participants && mission.participants.length > 0) {
+                    if (mission.participants) {
                         mission.participants.forEach(p => {
                             const pId = p._id ? p._id.toString() : p.toString();
                             mission.contributions.set(pId, 0);
                         });
                     }
-
                     await mission.save();
                     updated = true;
                 }
             }
-        } catch (err) {
-            console.error(`⚠️ [WARN] Error procesando reset de misión (${mission._id}):`, err.message);
-        }
+        } catch (err) { }
     }
 
-    if (updated) {
-        // Si hubo cambios (reseteos), volvemos a llamar recursivamente para traer los datos limpios
-        return getMissions(req, res);
-    }
-
+    if (updated) return getMissions(req, res);
     res.status(200).json(missions);
 });
 
-// ------------------------------------------------------------------
-// 2. CREAR MISIÓN
-// ------------------------------------------------------------------
 const createMission = asyncHandler(async (req, res) => {
     const { title, frequency, type, difficulty, target, specificDays, unit, isCoop, friendId } = req.body;
 
-    if (!title) {
-        res.status(400);
-        throw new Error('El título es obligatorio');
-    }
+    if (!title) { res.status(400); throw new Error('El título es obligatorio'); }
 
     const freq = frequency || 'daily';
     const diff = difficulty || 'easy';
-    const missionType = type || 'habit';
     const days = Array.isArray(specificDays) ? specificDays : [];
-    const missionUnit = unit ? unit.trim() : '';
 
-    // Calculamos recompensas basándonos en la dificultad
-    let mult = (DIFFICULTY_MULTIPLIERS[diff] || 1) * (FREQUENCY_MULTIPLIERS[freq] || 1);
-    if (isCoop) mult *= 1.5; // Bonus por cooperativo
+    const rewards = calculateRewards(diff, freq, !!isCoop);
 
-    const finalXP = Math.round(BASE_XP * mult);
-    const finalCoins = Math.round(BASE_COINS * mult);
-    const finalGameCoins = finalCoins * 2;
-
-    // Aseguramos que el creador está en participantes
     const participants = [req.user._id];
     let invStatus = 'none';
 
-    if (isCoop && friendId && friendId.trim() !== '') {
+    if (isCoop && friendId) {
         participants.push(friendId);
         invStatus = 'pending';
     }
@@ -2203,261 +2054,144 @@ const createMission = asyncHandler(async (req, res) => {
         title: title.trim(),
         frequency: freq,
         specificDays: days,
-        type: missionType,
+        type: type || 'habit',
         difficulty: diff,
         target: Number(target) || 1,
-        unit: missionUnit,
+        unit: unit ? unit.trim() : '',
         progress: 0,
-        xpReward: finalXP,
-        coinReward: finalCoins,
-        gameCoinReward: finalGameCoins,
+        ...rewards,
         isCoop: !!isCoop,
         participants: participants,
         invitationStatus: invStatus,
         contributions: { [req.user._id]: 0 }
     });
 
-    // Enviar notificación al amigo (añadiendo la misión a su array de requests)
     if (isCoop && friendId) {
-        await User.findByIdAndUpdate(friendId, {
-            $push: { missionRequests: mission._id }
-        });
+        await User.findByIdAndUpdate(friendId, { $push: { missionRequests: mission._id } });
     }
 
     res.status(201).json(mission);
 });
 
-// ------------------------------------------------------------------
-// 3. RESPONDER INVITACIÓN
-// ------------------------------------------------------------------
-const respondMissionInvite = asyncHandler(async (req, res) => {
-    const { missionId, action } = req.body;
-    const userId = req.user._id;
-
-    if (!missionId) { res.status(400); throw new Error('Falta ID de misión'); }
-
-    const mission = await Mission.findById(missionId);
-
-    if (!mission) {
-        // Limpiamos la request muerta del usuario
-        await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
-        return res.status(404).json({ message: 'Esta misión ya no existe o fue cancelada.' });
-    }
-
-    if (action === 'accept') {
-        mission.invitationStatus = 'active';
-        if (!mission.contributions) mission.contributions = new Map();
-        mission.contributions.set(userId.toString(), 0);
-
-        await mission.save();
-        await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
-
-        res.json({ message: '¡Misión aceptada! A trabajar.', mission });
-    } else {
-        // Si se rechaza, la misión se borra por completo (reglas estrictas)
-        await Mission.findByIdAndDelete(missionId);
-        await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
-        res.json({ message: 'Invitación rechazada y misión cancelada.' });
-    }
-});
-
-// ------------------------------------------------------------------
-// 4. ACTUALIZAR PROGRESO / EDITAR MISIÓN
-// ------------------------------------------------------------------
 const updateProgress = asyncHandler(async (req, res) => {
-    const { amount, editMode, title, target } = req.body;
+    const { amount, editMode, title, target, frequency, difficulty, unit, specificDays } = req.body;
     const userId = req.user._id;
 
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('Misión no encontrada'); }
 
-    // Validación de seguridad: Participante o Dueño
     const isParticipant = mission.participants.map(p => p.toString()).includes(userId.toString());
     const isOwner = mission.user.toString() === userId.toString();
 
-    if (!isParticipant && !isOwner) {
-        res.status(401); throw new Error('No tienes permiso para tocar esta misión');
-    }
+    if (!isParticipant && !isOwner) { res.status(401); throw new Error('No tienes permiso'); }
 
-    // --- MODO EDICIÓN (Fix Solicitado Punto 1) ---
     if (editMode) {
         if (title) mission.title = title.trim();
         if (target) mission.target = Number(target);
+        if (frequency) mission.frequency = frequency;
+        if (difficulty) mission.difficulty = difficulty;
+        if (unit !== undefined) mission.unit = unit.trim();
 
-        // Si el target cambia y es menor que el progreso actual, ajustamos
+        if (specificDays && Array.isArray(specificDays)) {
+            mission.specificDays = specificDays;
+        }
+
+        if (frequency || difficulty) {
+            const r = calculateRewards(
+                frequency || mission.frequency,
+                difficulty || mission.difficulty,
+                mission.isCoop
+            );
+            mission.xpReward = r.xpReward;
+            mission.coinReward = r.coinReward;
+            mission.gameCoinReward = r.gameCoinReward;
+        }
+
         if (mission.progress > mission.target) mission.progress = mission.target;
 
         await mission.save();
-        return res.json({ message: "Misión actualizada correctamente", mission });
+        return res.json({ message: "Misión actualizada", mission });
     }
 
-    // Validar estado cooperativo
     if (mission.isCoop && mission.invitationStatus === 'pending') {
-        res.status(400); throw new Error('Tu compañero aún no ha aceptado la misión.');
+        res.status(400); throw new Error('Tu compañero aún no ha aceptado.');
     }
-
-    // Validación de Hábito Diario completado hoy
     const today = new Date();
     if (mission.type === 'habit' && mission.completed) {
         const last = new Date(mission.lastUpdated);
-        // Si la última vez fue HOY, ya no se puede sumar más
-        if (last.toDateString() === today.toDateString()) {
-            return res.status(200).json({ message: 'Misión ya completada hoy', alreadyCompleted: true });
-        } else {
-            // Si fue ayer, reseteamos (aunque el getMissions ya debería haberlo hecho, doble seguridad)
-            mission.progress = 0;
-            mission.completed = false;
-            if (!mission.contributions) mission.contributions = new Map();
-            mission.participants.forEach(p => mission.contributions.set(p.toString(), 0));
-        }
+        if (last.toDateString() === today.toDateString()) return res.status(200).json({ message: 'Ya completada hoy', alreadyCompleted: true });
+        mission.progress = 0; mission.completed = false;
+        if (mission.contributions) mission.participants.forEach(p => mission.contributions.set(p.toString(), 0));
     }
 
     const addAmount = Number(amount) || 1;
 
-    // --- SYNC LOGIC (Misiones Vinculadas) ---
-    // 🔥 CORRECCIÓN PUNTO 2: Buscamos misiones con el mismo Título Y la misma UNIDAD
-    const linkedMissions = await Mission.find({
-        user: userId,
-        title: mission.title,
-        unit: mission.unit, // <--- CLAVE: Ahora diferenciamos "1 Pagina" de "1 Libro"
-        _id: { $ne: mission._id }, // No la actual
-        completed: false
-    });
-
+    const linkedMissions = await Mission.find({ user: userId, title: mission.title, unit: mission.unit, _id: { $ne: mission._id }, completed: false });
     for (let linked of linkedMissions) {
-        linked.progress += addAmount;
-        linked.lastUpdated = today;
-        if (!linked.contributions) linked.contributions = new Map();
-
-        const currentLinkedContrib = linked.contributions.get(userId.toString()) || 0;
-        linked.contributions.set(userId.toString(), currentLinkedContrib + addAmount);
-
+        linked.progress += addAmount; linked.lastUpdated = today;
         if (linked.progress >= linked.target) {
-            linked.completed = true;
-            linked.progress = linked.target;
-            // Dar recompensa de la vinculada
+            linked.completed = true; linked.progress = linked.target;
             await levelService.addRewards(userId, linked.xpReward, linked.coinReward, linked.gameCoinReward);
-
-            // Log en el diario
-            const todayStr = today.toISOString().split('T')[0];
-            await DailyLog.findOneAndUpdate(
-                { user: userId, date: todayStr },
-                {
-                    $inc: { 'missionStats.completed': 1 },
-                    $push: { 'missionStats.listCompleted': { title: linked.title, coinReward: linked.coinReward, xpReward: linked.xpReward, type: linked.type } }
-                },
-                { upsert: true }
-            );
+            await DailyLog.findOneAndUpdate({ user: userId, date: today.toISOString().split('T')[0] }, { $inc: { 'missionStats.completed': 1 }, $push: { 'missionStats.listCompleted': { title: linked.title, coinReward: linked.coinReward, xpReward: linked.xpReward, type: linked.type } } }, { upsert: true });
         }
         await linked.save();
     }
 
-    // --- ACTUALIZAR MISIÓN ACTUAL ---
     mission.progress += addAmount;
-    if (!mission.contributions) mission.contributions = new Map();
-    const currentContrib = mission.contributions.get(userId.toString()) || 0;
-    mission.contributions.set(userId.toString(), currentContrib + addAmount);
-
     mission.lastUpdated = today;
+    let rewards = null, leveledUp = false, userResult = null;
 
-    let rewards = null;
-    let leveledUp = false;
-    let userResult = null;
-
-    // Verificar Completitud
     if (mission.progress >= mission.target) {
-        mission.completed = true;
-        mission.progress = mission.target;
-
-        // Dar recompensas a TODOS los participantes
+        mission.completed = true; mission.progress = mission.target;
         for (const pId of mission.participants) {
-            const result = await levelService.addRewards(pId, mission.xpReward, mission.coinReward, mission.gameCoinReward);
-
-            // Guardamos el resultado si soy yo para devolverlo al frontend
-            if (pId.toString() === userId.toString()) {
-                userResult = result.user;
-                leveledUp = result.leveledUp;
-                rewards = { xp: mission.xpReward, coins: mission.coinReward, gameCoins: mission.gameCoinReward };
-            }
+            const r = await levelService.addRewards(pId, mission.xpReward, mission.coinReward, mission.gameCoinReward);
+            if (pId.toString() === userId.toString()) { userResult = r.user; leveledUp = r.leveledUp; rewards = { xp: mission.xpReward, coins: mission.coinReward, gameCoins: mission.gameCoinReward }; }
         }
-
-        // Registrar en DailyLog
-        const todayStr = today.toISOString().split('T')[0];
-        await DailyLog.findOneAndUpdate(
-            { user: userId, date: todayStr },
-            {
-                $inc: { 'missionStats.completed': 1 },
-                $push: { 'missionStats.listCompleted': { title: mission.title, coinReward: mission.coinReward, xpReward: mission.xpReward, type: mission.type } }
-            },
-            { upsert: true }
-        );
+        await DailyLog.findOneAndUpdate({ user: userId, date: today.toISOString().split('T')[0] }, { $inc: { 'missionStats.completed': 1 }, $push: { 'missionStats.listCompleted': { title: mission.title, coinReward: mission.coinReward, xpReward: mission.xpReward, type: mission.type } } }, { upsert: true });
     }
-
     await mission.save();
-
-    res.json({
-        message: mission.completed ? '¡Misión Completada!' : `Progreso: ${mission.progress}/${mission.target}`,
-        mission,
-        user: userResult,
-        leveledUp,
-        rewards,
-        progressOnly: !mission.completed
-    });
+    res.json({ message: mission.completed ? '¡Completada!' : 'Actualizada', mission, user: userResult, leveledUp, rewards, progressOnly: !mission.completed });
 });
 
-// ------------------------------------------------------------------
-// 5. ELIMINAR MISIÓN
-// ------------------------------------------------------------------
 const deleteMission = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('No encontrada'); }
-
-    // Permitir borrar aunque esté acabada si eres el dueño (Fix Punto 1)
-    if (mission.user.toString() !== req.user._id.toString()) {
-        res.status(403); throw new Error('Solo el creador puede cancelar la misión');
-    }
-
-    // Si era una invitación pendiente, limpiamos el buzón del amigo
+    if (mission.user.toString() !== req.user._id.toString()) { res.status(403); throw new Error('Solo el creador puede cancelar'); }
     if (mission.invitationStatus === 'pending') {
         const friendId = mission.participants.find(p => p.toString() !== req.user._id.toString());
-        if (friendId) {
-            await User.findByIdAndUpdate(friendId, { $pull: { missionRequests: mission._id } });
-        }
+        if (friendId) await User.findByIdAndUpdate(friendId, { $pull: { missionRequests: mission._id } });
     }
-
     await mission.deleteOne();
-    res.status(200).json({ id: req.params.id, message: "Misión eliminada." });
+    res.status(200).json({ id: req.params.id, message: "Eliminada" });
 });
 
-// ------------------------------------------------------------------
-// 6. PURGA NUCLEAR (DEV TOOL)
-// ------------------------------------------------------------------
+const respondMissionInvite = asyncHandler(async (req, res) => {
+    const { missionId, action } = req.body;
+    const userId = req.user._id;
+    if (!missionId) { res.status(400); throw new Error('Falta ID'); }
+    const mission = await Mission.findById(missionId);
+    if (!mission) { await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } }); return res.status(404).json({ message: 'No existe' }); }
+    if (action === 'accept') {
+        mission.invitationStatus = 'active';
+        if (!mission.contributions) mission.contributions = new Map();
+        mission.contributions.set(userId.toString(), 0);
+        await mission.save();
+        await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
+        res.json({ message: 'Aceptada', mission });
+    } else {
+        await Mission.findByIdAndDelete(missionId);
+        await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
+        res.json({ message: 'Rechazada' });
+    }
+});
+
 const nukeMyMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    const userIdString = userId.toString();
-
-    await Mission.deleteMany({
-        $or: [
-            { user: userId },
-            { user: userIdString },
-            { participants: userId },
-            { participants: userIdString }
-        ]
-    });
-
-    console.log(`☢️ Misiones purgadas para el usuario: ${userId}`);
-    res.status(200).json({ message: "☢️ Todas tus misiones han sido eliminadas. Cuenta limpia." });
+    await Mission.deleteMany({ $or: [{ user: userId }, { participants: userId }] });
+    res.status(200).json({ message: "Purgado" });
 });
 
-module.exports = {
-    getMissions,
-    createMission,
-    updateProgress,
-    deleteMission,
-    respondMissionInvite,
-    nukeMyMissions
-};
-
+module.exports = { getMissions, createMission, updateProgress, deleteMission, respondMissionInvite, nukeMyMissions };
 
 --- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\controllers\missionController.js ---
 
@@ -6076,7 +5810,6 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
     const startX = useRef(0);
     const startY = useRef(0);
 
-    // Cálculos de macros (asegurando ceros)
     const p = Math.round(item.protein || item.macros?.protein || 0);
     const c = Math.round(item.carbs || item.macros?.carbs || 0);
     const f = Math.round(item.fat || item.macros?.fat || 0);
@@ -6087,7 +5820,7 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
         if (!isDragging) return;
         const diffX = e.touches[0].clientX - startX.current;
         const diffY = e.touches[0].clientY - startY.current;
-        if (Math.abs(diffY) > Math.abs(diffX)) return; // Scroll vertical
+        if (Math.abs(diffY) > Math.abs(diffX)) return;
         if (Math.abs(diffX) > 10 && Math.abs(diffX) < 150) setOffsetX(diffX);
     };
     const handleTouchEnd = () => { setIsDragging(false); finishDrag(); };
@@ -6143,37 +5876,29 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
 
 // --- COMPONENTE PRINCIPAL ---
 export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
-    const [mode, setMode] = useState('search'); // 'search', 'ai', 'manual', 'review'
-
-    // Búsqueda y Filtrado
+    const [mode, setMode] = useState('search');
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [sortBy, setSortBy] = useState('name');
+    const [filterFolder, setFilterFolder] = useState('Todos');
 
-    // 🔥 FIX PUNTO 13: Estados de ordenación
-    const [sortBy, setSortBy] = useState('name'); // 'name', 'calories'
-    const [filterFolder, setFilterFolder] = useState('Todos'); // 'Todos', 'Desayuno', etc.
-
-    // IA
     const [aiInput, setAiInput] = useState('');
     const [aiImage, setAiImage] = useState(null);
     const [aiImagePreview, setAiImagePreview] = useState(null);
     const [aiLoading, setAiLoading] = useState(false);
     const fileInputRef = useRef(null);
 
-    // IA Helper (Manual)
     const [showAiHelper, setShowAiHelper] = useState(false);
     const [aiDescription, setAiDescription] = useState('');
     const [aiHelperLoading, setAiHelperLoading] = useState(false);
 
-    // Formulario
     const [manualForm, setManualForm] = useState({
         name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1,
-        folder: 'General' // 🔥 FIX PUNTO 13: Carpeta por defecto
+        folder: 'General'
     });
     const searchInputRef = useRef(null);
 
-    // Cargar alimentos guardados al inicio
     useEffect(() => { if (mode === 'search' && query.trim() === '') fetchSavedFoods(); }, [mode, query]);
 
     const fetchSavedFoods = async () => {
@@ -6185,7 +5910,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         finally { setLoading(false); }
     };
 
-    // Búsqueda en tiempo real
     useEffect(() => {
         const timer = setTimeout(() => {
             if (query.trim().length > 0 && mode === 'search') searchFood();
@@ -6202,28 +5926,21 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         finally { setLoading(false); }
     };
 
-    // 🔥 LÓGICA DE FILTRADO Y ORDENACIÓN (PUNTO 13)
     const getProcessedResults = () => {
         let processed = [...results];
-
-        // 1. Filtrar por carpeta
         if (filterFolder !== 'Todos') {
             processed = processed.filter(item => item.folder === filterFolder);
         }
-
-        // 2. Ordenar
         processed.sort((a, b) => {
             if (sortBy === 'name') return a.name.localeCompare(b.name);
-            if (sortBy === 'calories') return b.calories - a.calories; // Mayor a menor
+            if (sortBy === 'calories') return b.calories - a.calories;
             return 0;
         });
-
         return processed;
     };
 
     const processedResults = getProcessedResults();
 
-    // --- ACCIONES ---
     const handleAddFood = async (food) => {
         try {
             const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
@@ -6237,30 +5954,18 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         catch (e) { onShowToast("No se pudo eliminar", "error"); fetchSavedFoods(); }
     };
 
-    // --- IA SCAN (PUNTO 4: Permitir texto SOLO) ---
     const handleAiScanSubmit = async () => {
-        // 🔥 FIX: Permitir si hay texto O imagen. Antes requería ambos en algunos casos lógicos.
-        if (!aiInput.trim() && !aiImage) return;
+        // 🔥 FIX 5: Restricción estricta (Solo con imagen)
+        if (!aiImage) return;
 
         setAiLoading(true);
         try {
-            let analyzedData = null;
+            const formData = new FormData();
+            formData.append('text', aiInput || "Analizar comida"); // Texto opcional si hay imagen
+            formData.append('image', aiImage);
 
-            if (aiImage) {
-                // Si hay imagen, usamos endpoint de visión
-                const formData = new FormData();
-                formData.append('text', aiInput);
-                formData.append('image', aiImage);
-                const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                analyzedData = res.data;
-            } else {
-                // Si SOLO hay texto, usamos endpoint de texto (PUNTO 4 SOLUCIONADO)
-                const res = await api.post('/food/analyze-text', { text: aiInput });
-                if (res.data.type === 'success') {
-                    analyzedData = res.data.data;
-                    analyzedData.name = analyzedData.name || aiInput;
-                }
-            }
+            const res = await api.post('/food/analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            const analyzedData = res.data;
 
             if (!analyzedData || analyzedData.calories === undefined) throw new Error("No se identificó el alimento");
 
@@ -6286,7 +5991,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
         }
     };
 
-    // --- ACCIONES MANUALES / REVIEW ---
+    // 🔥 FIX 4: FUNCIÓN AÑADIR DIRECTO (Manual)
     const handleAddToMealNow = async () => {
         if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
         try {
@@ -6304,7 +6009,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
             onShowToast("Guardado en tu lista", "success");
             setMode('search');
             setQuery(manualForm.name);
-            // Refetch para ver el nuevo item
             const res = await api.get('/food/saved');
             setResults(res.data);
             setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1, folder: 'General' });
@@ -6329,7 +6033,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
     return (
         <div className="flex flex-col h-full w-full bg-zinc-950 text-white animate-in slide-in-from-bottom-10 duration-200">
-            {/* Header Modal */}
             <div className="px-5 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
                 <h2 className="text-lg font-black uppercase tracking-wider text-white">
                     {mode === 'review' ? 'Revisar Datos' : 'Añadir Alimento'}
@@ -6337,7 +6040,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={20} /></button>
             </div>
 
-            {/* Selector de Modo */}
             {mode !== 'review' && (
                 <div className="p-4 shrink-0 pb-0">
                     <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
@@ -6349,7 +6051,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
             )}
 
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-20 pt-4">
-
                 {mode === 'search' && (
                     <div className="space-y-4 animate-in fade-in duration-300">
                         <div className="relative">
@@ -6357,9 +6058,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             <input ref={searchInputRef} type="text" placeholder="Buscar en mis alimentos..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white pl-11 pr-4 py-4 rounded-2xl outline-none focus:border-zinc-600 transition-all font-bold text-sm placeholder-zinc-600" />
                         </div>
 
-                        {/* 🔥 FILTROS Y ORDENACIÓN (PUNTO 13) */}
                         <div className="flex flex-col gap-2">
-                            {/* Ordenar */}
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
                                     <SortAsc size={14} className="text-zinc-500" />
@@ -6369,13 +6068,13 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                                 <button onClick={() => setSortBy('calories')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'calories' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>Kcal</button>
                             </div>
 
-                            {/* Filtrar Carpeta */}
+                            {/* 🔥 FIX 3: SOLO GENERAL Y TODOS */}
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
                                     <Filter size={14} className="text-zinc-500" />
                                     <span className="text-[10px] font-bold text-zinc-500 uppercase">Carpeta</span>
                                 </div>
-                                {['Todos', 'General', 'Desayuno', 'Comida', 'Cena', 'Snack'].map(f => (
+                                {['Todos', 'General'].map(f => (
                                     <button key={f} onClick={() => setFilterFolder(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === f ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>
                                         {f}
                                     </button>
@@ -6387,25 +6086,34 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             {loading ? <div className="text-center py-10 text-zinc-600 font-bold uppercase text-xs animate-pulse">Cargando...</div> :
                                 processedResults.length > 0 ? processedResults.map((item, idx) => (
                                     <SwipeableFoodItem key={item._id || idx} item={item} onAdd={handleAddFood} onDelete={handleDeleteSavedFood} />
-                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No hay alimentos en esta carpeta"}</div>}
+                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No hay alimentos guardados"}</div>}
                         </div>
                     </div>
                 )}
 
                 {mode === 'ai' && (
                     <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
-                        <div className="relative mt-2"><textarea placeholder="Ej: Un plátano mediano y un café con leche..." className="w-full h-32 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white text-sm font-medium resize-none focus:border-blue-500/50 outline-none placeholder-zinc-600 leading-relaxed" value={aiInput} onChange={(e) => setAiInput(e.target.value)} /></div>
+                        {/* 🔥 FIX 5: Textarea deshabilitado si no hay foto */}
+                        <div className="relative mt-2">
+                            <textarea
+                                placeholder={aiImage ? "Añade detalles extra (opcional)..." : "Sube una foto primero para escribir..."}
+                                disabled={!aiImage}
+                                className={`w-full h-32 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white text-sm font-medium resize-none focus:border-blue-500/50 outline-none leading-relaxed ${!aiImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                value={aiInput}
+                                onChange={(e) => setAiInput(e.target.value)}
+                            />
+                        </div>
                         <div>
                             <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
                             {!aiImagePreview ? (
-                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto (Opcional)</span></button>
+                                <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto (Requerido)</span></button>
                             ) : (
                                 <div className="relative rounded-3xl overflow-hidden border border-zinc-800 group"><img src={aiImagePreview} alt="Preview" className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4"><div className="flex justify-between items-center w-full"><span className="text-xs font-bold text-white flex items-center gap-2"><ImageIcon size={14} /> Imagen seleccionada</span><button onClick={clearImage} className="bg-red-500/20 text-red-400 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all backdrop-blur-md border border-red-500/30"><Trash2 size={18} /></button></div></div></div>
                             )}
                         </div>
                         <div className="pt-2">
-                            {/* 🔥 FIX PUNTO 4: Habilitar botón si hay texto O imagen */}
-                            <button onClick={handleAiScanSubmit} disabled={aiLoading || (!aiInput.trim() && !aiImage)} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-900/20">
+                            {/* 🔥 FIX 5: Botón deshabilitado si no hay foto */}
+                            <button onClick={handleAiScanSubmit} disabled={aiLoading || !aiImage} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 shadow-lg shadow-blue-900/20">
                                 {aiLoading ? <span className="animate-pulse flex items-center gap-2"><Sparkles size={16} /> Analizando...</span> : <>Procesar con IA <ArrowRight size={18} /></>}
                             </button>
                         </div>
@@ -6429,7 +6137,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             )}
                         </div>
 
-                        {/* 🔥 SELECCIÓN DE CARPETA (PUNTO 13) */}
                         <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800">
                             <label className="text-[10px] font-bold text-zinc-400 mb-2 block pl-2 uppercase tracking-wider">Guardar en Carpeta</label>
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -6457,7 +6164,11 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
                         <div className="pt-2 space-y-2">
                             {mode === 'manual' ? (
-                                <button onClick={handleSaveToList} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all shadow-lg shadow-white/10">Guardar Alimento</button>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {/* 🔥 FIX 4: BOTÓN AÑADIR AHORA */}
+                                    <button onClick={handleAddToMealNow} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/10"><Plus size={18} strokeWidth={3} /> Añadir a Comida Hoy</button>
+                                    <button onClick={handleSaveToList} className="w-full bg-zinc-800 text-zinc-300 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-zinc-700"><Save size={16} /> Guardar en Mis Alimentos</button>
+                                </div>
                             ) : (
                                 <div className="grid grid-cols-1 gap-3">
                                     <button onClick={handleAddToMealNow} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/10"><Plus size={18} strokeWidth={3} /> Añadir a Comida Hoy</button>
@@ -11519,7 +11230,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
-import { Settings, X, Save, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf, Plus, Target, Trash2 } from 'lucide-react';
+import { Settings, X, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf, Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Image as ImageIcon, Sparkles, Camera } from 'lucide-react';
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
@@ -11537,7 +11248,7 @@ export default function Food() {
     const [showSearch, setShowSearch] = useState(false);
     const [configModal, setConfigModal] = useState({ show: false, mode: 'manual' });
 
-    // Estado Objetivos (Macros del Usuario)
+    // Estado Objetivos
     const [goals, setGoals] = useState(() => {
         if (user && user.macros) return user.macros;
         return { calories: 2100, protein: 158, carbs: 210, fat: 70, fiber: 30 };
@@ -11549,16 +11260,12 @@ export default function Food() {
     const [chatLoading, setChatLoading] = useState(false);
     const chatEndRef = useRef(null);
 
-    // Estado temporal para el formulario manual de macros
+    // Manual Form
     const [manualStats, setManualStats] = useState({
-        calories: 2100,
-        protein: 150,
-        carbs: 200,
-        fat: 70,
-        fiber: 30
+        calories: 2100, protein: 150, carbs: 200, fat: 70, fiber: 30
     });
+    const [isAutoMacro, setIsAutoMacro] = useState(true);
 
-    // Sincronizar estado local con usuario
     useEffect(() => {
         if (user && user.macros) {
             setGoals(user.macros);
@@ -11566,94 +11273,64 @@ export default function Food() {
         }
     }, [user]);
 
-    // Cargar Log al inicio
     useEffect(() => { fetchLog(); }, []);
-
-    // Scroll chat
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
-    // --- API CALLS ---
     const fetchLog = async () => {
         try {
-            // Nota: Este endpoint devuelve el NutritionLog completo
             const res = await api.get('/food/log');
             setLog(res.data);
-        } catch (error) {
-            console.error("Error cargando log comida:", error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (error) { console.error("Error log:", error); }
+        finally { setLoading(false); }
     };
 
     const showToast = (message, type = 'success') => setToast({ message, type });
 
-    // 🔥 FIX PUNTO 5: ELIMINAR ALIMENTO
-    // Necesita que hayas añadido la ruta DELETE en el backend (foodRoutes y foodController)
     const handleRemoveFood = async (mealId, foodItemId) => {
-        if (!window.confirm("¿Borrar este alimento?")) return;
-
+        if (!window.confirm("¿Borrar alimento?")) return;
         try {
-            // Endpoint esperado: router.delete('/log/:mealId/:foodItemId', protect, removeFoodFromLog);
             await api.delete(`/food/log/${mealId}/${foodItemId}`);
-
-            showToast("Alimento eliminado", "info");
-            fetchLog(); // Recargar datos para actualizar la barra de progreso
-        } catch (error) {
-            console.error(error);
-            showToast("Error al eliminar", "error");
-        }
+            showToast("Eliminado", "info");
+            fetchLog();
+        } catch (error) { showToast("Error al eliminar", "error"); }
     };
 
-    // --- ACTUALIZAR METAS ---
     const updateGoals = async (newGoals) => {
         try {
             const res = await api.put('/users/macros', newGoals);
             setGoals(res.data.macros);
-            setUser(res.data); // Actualizar contexto global
+            setUser(res.data);
             return true;
-        } catch (error) {
-            showToast("Error guardando objetivos", "error");
-            return false;
+        } catch (error) { showToast("Error al guardar", "error"); return false; }
+    };
+
+    const handleCalorieChange = (e) => {
+        const kcal = parseInt(e.target.value) || 0;
+        if (isAutoMacro) {
+            setManualStats({
+                calories: kcal,
+                protein: Math.round((kcal * 0.3) / 4),
+                carbs: Math.round((kcal * 0.4) / 4),
+                fat: Math.round((kcal * 0.3) / 9),
+                fiber: Math.round(kcal / 1000 * 14)
+            });
+        } else {
+            setManualStats(prev => ({ ...prev, calories: kcal }));
         }
     };
 
-    // 🔥 FIX PUNTO 12: MANEJO INTELIGENTE DE MACROS MANUALES
-    // Al cambiar calorías, sugerimos macros, pero permitimos editar cada uno individualmente
-    const handleCalorieChange = (e) => {
-        const kcal = parseInt(e.target.value) || 0;
-        // Recalcular macros sugeridos (30% P, 40% C, 30% G)
-        const p = Math.round((kcal * 0.3) / 4);
-        const c = Math.round((kcal * 0.4) / 4);
-        const f = Math.round((kcal * 0.3) / 9);
-        const fib = Math.round(kcal / 1000 * 14);
-
-        setManualStats({
-            calories: kcal,
-            protein: p,
-            carbs: c,
-            fat: f,
-            fiber: fib
-        });
-    };
-
     const handleMacroChange = (field, value) => {
-        setManualStats(prev => ({
-            ...prev,
-            [field]: parseInt(value) || 0
-        }));
+        setManualStats(prev => ({ ...prev, [field]: parseInt(value) || 0 }));
     };
 
     const handleSaveManual = async () => {
-        if (manualStats.calories < 500) return showToast("Calorías mínimas 500", "error");
-
-        const success = await updateGoals(manualStats);
-        if (success) {
+        if (manualStats.calories < 500) return showToast("Mínimo 500 kcal", "error");
+        if (await updateGoals(manualStats)) {
             setConfigModal({ show: false, mode: 'manual' });
             showToast("Objetivos actualizados");
         }
     };
 
-    // --- CHAT IA ---
     const handleSendChat = async () => {
         if (!chatInput.trim()) return;
         const userMsg = { role: 'user', content: chatInput };
@@ -11667,46 +11344,39 @@ export default function Food() {
             if (res.data.type === 'final') {
                 const { calories, protein, carbs, fat, fiber, message } = res.data.data;
                 const finalData = { calories, protein, carbs, fat, fiber: fiber || 30 };
-
                 await updateGoals(finalData);
-                setManualStats(finalData); // Sincronizar form manual también
-
+                setManualStats(finalData);
                 setConfigModal({ show: false, mode: 'manual' });
-                showToast(message || "Calculado por IA", "success");
+                showToast(message || "Calculado", "success");
                 setChatHistory([]);
             } else {
                 setChatHistory([...newHistory, { role: 'assistant', content: res.data.message }]);
             }
-        } catch (error) {
-            showToast("Error conexión IA", "error");
-        } finally {
-            setChatLoading(false);
-        }
+        } catch (error) { showToast("Error IA", "error"); }
+        finally { setChatLoading(false); }
     };
 
-    const handleOpenAdd = (mealId) => {
-        setActiveMealId(mealId);
-        setShowSearch(true);
-    };
+    const handleOpenAdd = (mealId) => { setActiveMealId(mealId); setShowSearch(true); };
 
-    // --- COLORES DEL CÍRCULO ---
+    // --- CÁLCULOS VISUALES ---
     const getCircleGradient = (percent) => {
-        if (percent > 100) return { start: "#ef4444", end: "#dc2626" }; // Rojo Alerta
-        if (percent <= 25) return { start: "#22c55e", end: "#84cc16" }; // Verde
-        if (percent <= 50) return { start: "#84cc16", end: "#eab308" }; // Verde -> Amarillo
-        if (percent <= 75) return { start: "#eab308", end: "#f97316" }; // Amarillo -> Naranja
-        return { start: "#f97316", end: "#ef4444" }; // Naranja -> Rojo
+        if (percent > 100) return { start: "#ef4444", end: "#dc2626" };
+        if (percent <= 25) return { start: "#22c55e", end: "#84cc16" };
+        if (percent <= 50) return { start: "#84cc16", end: "#eab308" };
+        if (percent <= 75) return { start: "#eab308", end: "#f97316" };
+        return { start: "#f97316", end: "#ef4444" };
     };
 
-    // Render loading
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="text-center text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando datos...</div></div>;
 
-    // Datos para renderizar
     const currentKcal = log?.totalCalories || 0;
     const limitKcal = goals.calories || 2100;
     const calPercent = Math.min((currentKcal / limitKcal) * 100, 100);
     const isOver = currentKcal > limitKcal;
+
+    // 🔥 FIX PANTALLA NEGRA: Definición de variables de color
     const gradientColors = getCircleGradient(calPercent);
+    const gradientClasses = `from-[${gradientColors.start}] to-[${gradientColors.end}]`; // Esta línea faltaba
     const shadowColor = isOver ? "rgba(220, 38, 38, 0.4)" : "rgba(34, 197, 94, 0.4)";
 
     return (
@@ -11731,17 +11401,9 @@ export default function Food() {
 
             {/* RESUMEN CIRCULAR */}
             <div className="px-4">
-                <div className={`
-                    relative rounded-[32px] overflow-hidden p-[2px] 
-                    bg-gradient-to-br from-[${gradientColors.start}] to-[${gradientColors.end}]
-                    shadow-[0_0_25px_${shadowColor}]
-                `} style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientColors.start}, ${gradientColors.end})` }}>
-
+                <div className={`relative rounded-[32px] overflow-hidden p-[2px] bg-gradient-to-br ${gradientClasses} shadow-[0_0_25px_${shadowColor}]`} style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientColors.start}, ${gradientColors.end})` }}>
                     <div className="bg-zinc-950 rounded-[30px] p-6 relative overflow-hidden flex items-center justify-between">
-                        {/* Brillo de fondo */}
                         <div className="absolute -right-10 -bottom-10 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: gradientColors.end }}></div>
-
-                        {/* Círculo Gráfico */}
                         <div className="relative w-32 h-32 flex items-center justify-center shrink-0 z-10">
                             <svg className="transform -rotate-90 w-full h-full overflow-visible">
                                 <defs>
@@ -11751,20 +11413,11 @@ export default function Food() {
                                     </linearGradient>
                                 </defs>
                                 <circle cx="50%" cy="50%" r="54" stroke="#27272a" strokeWidth="8" fill="transparent" />
-                                <circle
-                                    cx="50%" cy="50%" r="54"
-                                    stroke="url(#calorieFlowGradient)"
-                                    strokeWidth="8"
-                                    fill="transparent"
-                                    strokeDasharray={339}
-                                    strokeDashoffset={339 - (339 * calPercent) / 100}
-                                    strokeLinecap="round"
-                                    className="transition-all duration-1000 ease-out drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]"
-                                />
+                                <circle cx="50%" cy="50%" r="54" stroke="url(#calorieFlowGradient)" strokeWidth="8" fill="transparent" strokeDasharray={339} strokeDashoffset={339 - (339 * calPercent) / 100} strokeLinecap="round" className="transition-all duration-1000 ease-out drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]" />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center leading-none pointer-events-none">
                                 <div className="w-full flex justify-center items-center px-1">
-                                    <span className="text-3xl font-black tracking-tighter text-white filter brightness-110 leading-none pb-1">
+                                    <span className={`text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${gradientClasses} drop-shadow-lg filter brightness-125 pb-2 pr-2`}>
                                         {Math.round(currentKcal)}
                                     </span>
                                 </div>
@@ -11806,10 +11459,7 @@ export default function Food() {
                                     <h3 className="text-white font-black text-base uppercase tracking-tighter">{meal.name}</h3>
                                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{meal.foods.length} items • <span className="text-zinc-300">{mealKcal} KCAL</span></p>
                                 </div>
-                                <button
-                                    onClick={() => handleOpenAdd(meal._id)}
-                                    className="bg-zinc-800 text-zinc-400 p-2 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700"
-                                >
+                                <button onClick={() => handleOpenAdd(meal._id)} className="bg-zinc-800 text-zinc-400 p-2 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700">
                                     <Plus size={20} />
                                 </button>
                             </div>
@@ -11829,19 +11479,14 @@ export default function Food() {
                                                     <span className="text-blue-400/80">P: {Math.round(item.protein)}</span>
                                                     <span className="text-yellow-400/80">C: {Math.round(item.carbs)}</span>
                                                     <span className="text-red-400/80">G: {Math.round(item.fat)}</span>
+                                                    <span className="text-green-500/80">F: {Math.round(item.fiber)}</span>
                                                 </div>
                                             </div>
-
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-black text-white whitespace-nowrap bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-800 flex items-center gap-1">
                                                     {Math.round(item.calories)} <span className="text-[9px] text-zinc-500 font-bold">KCAL</span>
                                                 </span>
-
-                                                {/* 🔥 PUNTO 5: BOTÓN ELIMINAR */}
-                                                <button
-                                                    onClick={() => handleRemoveFood(meal._id, item._id)}
-                                                    className="p-2 bg-red-900/10 text-red-500 rounded-lg hover:bg-red-900/30 transition-colors"
-                                                >
+                                                <button onClick={() => handleRemoveFood(meal._id, item._id)} className="p-2 bg-red-900/10 text-red-500 rounded-lg hover:bg-red-900/30 transition-colors">
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
@@ -11854,7 +11499,7 @@ export default function Food() {
                 })}
             </div>
 
-            {/* MODAL BÚSQUEDA */}
+            {/* MODALES */}
             {showSearch && createPortal(
                 <div className="fixed inset-0 z-[9999] bg-black">
                     <div className="absolute inset-0 top-14 transform bg-zinc-950/50">
@@ -11869,15 +11514,12 @@ export default function Food() {
                 document.body
             )}
 
-            {/* MODAL CONFIGURACIÓN (MACROS) */}
             {configModal.show && createPortal(
                 <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-zinc-950 border border-zinc-800 rounded-[32px] w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
                         <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-                            <h3 className="text-lg font-black text-white uppercase italic tracking-wide">
-                                {configModal.mode === 'ai' ? 'Nutricionista IA' : 'Ajustes Macro'}
-                            </h3>
+                            <h3 className="text-lg font-black text-white uppercase italic tracking-wide">{configModal.mode === 'ai' ? 'Nutricionista IA' : 'Ajustes Macro'}</h3>
                             <button onClick={() => setConfigModal({ ...configModal, show: false })} className="text-zinc-500 hover:text-white bg-black p-2 rounded-full border border-zinc-800 transition-colors"><X size={20} /></button>
                         </div>
                         <div className="p-5 overflow-y-auto custom-scrollbar flex-1 bg-black/20">
@@ -11885,55 +11527,26 @@ export default function Food() {
                                 <div className="space-y-6">
                                     <button onClick={() => { setChatHistory([{ role: 'assistant', content: "Dime tus datos: Género, Edad, Peso, Altura, Actividad y Objetivo." }]); setConfigModal({ show: true, mode: 'ai' }); }} className="w-full bg-blue-900/10 p-4 rounded-2xl border border-blue-500/20 flex items-center gap-4 hover:bg-blue-900/20 transition-all group">
                                         <div className="bg-blue-600 p-3 rounded-xl text-white shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform"><Bot size={24} /></div>
-                                        <div className="text-left">
-                                            <h4 className="font-black text-blue-200 text-sm uppercase">Usar IA</h4>
-                                            <p className="text-[10px] text-blue-400/60 font-bold uppercase tracking-wide">Cálculo automático</p>
-                                        </div>
+                                        <div className="text-left"><h4 className="font-black text-blue-200 text-sm uppercase">Usar IA</h4><p className="text-[10px] text-blue-400/60 font-bold uppercase tracking-wide">Cálculo automático</p></div>
                                         <ChevronRight className="ml-auto text-blue-500" />
                                     </button>
 
                                     <div>
-                                        {/* 🔥 INPUT PRINCIPAL: CALORÍAS */}
                                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Objetivo Calorías</label>
-                                        <input
-                                            type="number"
-                                            value={manualStats.calories}
-                                            onChange={handleCalorieChange}
-                                            className="w-full bg-black text-white text-3xl font-black p-4 rounded-2xl border border-zinc-800 focus:border-white/20 outline-none text-center transition-colors mb-4"
-                                        />
+                                        <input type="number" value={manualStats.calories} onChange={handleCalorieChange} className="w-full bg-black text-white text-3xl font-black p-4 rounded-2xl border border-zinc-800 focus:border-white/20 outline-none text-center transition-colors mb-4" />
 
-                                        {/* 🔥 FIX PUNTO 12: INPUTS INDIVIDUALES MACROS */}
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div>
-                                                <label className="text-[9px] font-bold text-blue-400 uppercase block mb-1 text-center">Proteína</label>
-                                                <input
-                                                    type="number"
-                                                    value={manualStats.protein}
-                                                    onChange={(e) => handleMacroChange('protein', e.target.value)}
-                                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-center text-white font-bold focus:border-blue-500 outline-none"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[9px] font-bold text-yellow-400 uppercase block mb-1 text-center">Carbos</label>
-                                                <input
-                                                    type="number"
-                                                    value={manualStats.carbs}
-                                                    onChange={(e) => handleMacroChange('carbs', e.target.value)}
-                                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[9px] font-bold text-red-400 uppercase block mb-1 text-center">Grasa</label>
-                                                <input
-                                                    type="number"
-                                                    value={manualStats.fat}
-                                                    onChange={(e) => handleMacroChange('fat', e.target.value)}
-                                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-center text-white font-bold focus:border-red-500 outline-none"
-                                                />
-                                            </div>
+                                        <div onClick={() => setIsAutoMacro(!isAutoMacro)} className="flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-zinc-800 mb-4 cursor-pointer">
+                                            <span className="text-xs font-bold text-zinc-400 uppercase">Autocompletar Macros</span>
+                                            {isAutoMacro ? <ToggleRight className="text-green-500" size={24} /> : <ToggleLeft className="text-zinc-600" size={24} />}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div><label className="text-[9px] font-bold text-blue-400 uppercase block mb-1 text-center">Proteína</label><input type="number" value={manualStats.protein} onChange={(e) => handleMacroChange('protein', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-blue-500 outline-none" /></div>
+                                            <div><label className="text-[9px] font-bold text-yellow-400 uppercase block mb-1 text-center">Carbos</label><input type="number" value={manualStats.carbs} onChange={(e) => handleMacroChange('carbs', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-yellow-500 outline-none" /></div>
+                                            <div><label className="text-[9px] font-bold text-red-400 uppercase block mb-1 text-center">Grasa</label><input type="number" value={manualStats.fat} onChange={(e) => handleMacroChange('fat', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-red-500 outline-none" /></div>
+                                            <div><label className="text-[9px] font-bold text-green-500 uppercase block mb-1 text-center">Fibra</label><input type="number" value={manualStats.fiber} onChange={(e) => handleMacroChange('fiber', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold focus:border-green-500 outline-none" /></div>
                                         </div>
                                     </div>
-
                                     <button onClick={handleSaveManual} className="w-full bg-white text-black font-black py-4 rounded-2xl flex justify-center gap-2 uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all"><Save size={18} /> Guardar Cambios</button>
                                 </div>
                             )}
@@ -11941,24 +11554,16 @@ export default function Food() {
                             {configModal.mode === 'ai' && (
                                 <div className="flex flex-col h-full min-h-[400px]">
                                     <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-zinc-900/50 rounded-2xl border border-zinc-800 mb-4 custom-scrollbar">
-                                        {chatHistory.map((msg, idx) => (
-                                            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium whitespace-pre-line ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-bl-none'}`}>{msg.content}</div>
-                                            </div>
-                                        ))}
+                                        {chatHistory.map((msg, idx) => (<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium whitespace-pre-line ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-bl-none'}`}>{msg.content}</div></div>))}
                                         {chatLoading && <div className="text-[10px] font-bold text-zinc-500 animate-pulse uppercase tracking-widest text-center mt-2">Calculando...</div>}
                                         <div ref={chatEndRef} />
                                     </div>
-                                    <div className="flex gap-2">
-                                        <input autoFocus type="text" placeholder="Escribe aquí..." value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChat()} className="flex-1 bg-black text-white p-4 rounded-2xl border border-zinc-800 focus:border-blue-500 outline-none text-sm font-medium" />
-                                        <button onClick={handleSendChat} disabled={chatLoading} className="bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-500 disabled:opacity-50 transition-colors"><Send size={20} /></button>
-                                    </div>
+                                    <div className="flex gap-2"><input autoFocus type="text" placeholder="Escribe aquí..." value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChat()} className="flex-1 bg-black text-white p-4 rounded-2xl border border-zinc-800 focus:border-blue-500 outline-none text-sm font-medium" /><button onClick={handleSendChat} disabled={chatLoading} className="bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-500 disabled:opacity-50 transition-colors"><Send size={20} /></button></div>
                                 </div>
                             )}
                         </div>
                     </div>
-                </div>,
-                document.body
+                </div>, document.body
             )}
         </div>
     );
@@ -15595,13 +15200,21 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Calendar, Edit, Save
+    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 
 // ==========================================
-// 1. HELPERS VISUALES
+// 0. CONFIGURACIÓN DE ICONOS
+// ==========================================
+const ICON_XP = "/assets/icons/xp.png";
+const ICON_COIN = "/assets/icons/moneda.png";
+const ICON_CHIP = "/assets/icons/ficha.png";
+const ICON_HEART = "/assets/icons/corazon.png"; // 🔥 CAMBIO 2: Usando tu imagen
+
+// ==========================================
+// 1. HELPERS VISUALES Y LÓGICOS
 // ==========================================
 const COOP_COLORS = [
     'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-indigo-500'
@@ -15635,18 +15248,24 @@ const getDeadlineText = (frequency) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
+// DAÑO INVERTIDO (Fácil = 10, Épica = 0)
+const getPotentialDamage = (diff) => {
+    const rules = { easy: 10, medium: 5, hard: 2, epic: 0 };
+    return rules[diff] !== undefined ? rules[diff] : 5;
+};
+
 const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
     const label = labels[diff] || diff;
 
-    // Estilo para completadas (Gris Metálico Apagado)
+    // 🔥 CAMBIO 3: Estilo Completado "Bloqueado/Metal" (Gris muy oscuro y apagado)
     if (completed) return {
-        gradient: 'from-zinc-700 via-zinc-600 to-zinc-700',
-        shadow: 'rgba(82, 82, 91, 0.3)',
-        textGradient: 'from-zinc-400 to-zinc-600',
-        badge: 'text-zinc-500 border-zinc-700 bg-zinc-800/50',
-        iconColor: 'text-zinc-600',
-        label
+        gradient: 'from-[#18181b] to-[#09090b]', // Zinc-900 to Black
+        shadow: 'rgba(0,0,0,0)', // Sin sombra de color
+        textGradient: 'from-zinc-600 to-zinc-500', // Texto gris apagado
+        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900', // Badge invisible casi
+        iconColor: 'text-zinc-700',
+        label: 'HECHO'
     };
 
     switch (diff) {
@@ -15696,12 +15315,11 @@ const getGradientStyles = (diff, completed) => {
 // ==========================================
 // COMPONENTE: TARJETA DE MISIÓN
 // ==========================================
-function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdit }) {
+function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdit, viewAllMode }) {
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [showInput, setShowInput] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false); // 🔥 Para ver detalles y editar
     const startX = useRef(0);
     const THRESHOLD = 80;
 
@@ -15709,15 +15327,21 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const isPending = mission.isCoop && mission.invitationStatus === 'pending';
     const amIOwner = mission.user === currentUserId;
     const isBinary = mission.target === 1;
-    // Permitimos swipe para borrar incluso si está completada
-    const canSwipe = !isPending;
+    const damage = getPotentialDamage(mission.difficulty);
+
+    // 🔥 CAMBIO 4: Si estamos en viewAllMode (OJO), NO se puede deslizar
+    const canSwipe = !isPending && !viewAllMode;
 
     const handleStart = (clientX) => { if (canSwipe) { setIsDragging(true); startX.current = clientX; } };
+
     const handleMove = (clientX) => {
         if (!isDragging) return;
         const diff = clientX - startX.current;
-        // Si está completada, solo permitimos swipe a la izquierda (borrar), no derecha (completar de nuevo)
-        if (mission.completed && diff > 0) return;
+
+        // Bloqueos de lógica:
+        if (mission.completed && diff > 0) return; // No recompletar
+        if (mission.completed && diff < 0 && !viewAllMode) return; // No borrar si está hecha (salvo modo ojo)
+
         setDragX(diff);
     };
 
@@ -15726,13 +15350,17 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (isPending) { setDragX(0); return; }
 
         if (dragX > THRESHOLD) {
+            // Completar (Derecha)
             if (!mission.completed) {
                 const remaining = mission.target - mission.progress;
                 onUpdateProgress(mission, Math.max(0, remaining));
             }
         } else if (dragX < -THRESHOLD) {
-            if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión?")) {
-                onDelete(mission._id);
+            // Borrar (Izquierda)
+            if (!mission.completed || viewAllMode) {
+                if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión permanentemente?")) {
+                    onDelete(mission._id);
+                }
             }
         }
         setDragX(0);
@@ -15761,7 +15389,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const renderProgressBar = () => {
         if (isBinary && !mission.isCoop) return null;
         return (
-            <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex mt-4 border border-zinc-800/50 relative shadow-inner">
+            <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex mt-2 border border-zinc-800/50 relative shadow-inner">
                 {mission.isCoop ? (
                     mission.participants.map((p) => {
                         const contrib = (mission.contributions && mission.contributions[p._id]) || 0;
@@ -15776,21 +15404,19 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         );
     };
 
-    // Formato de días para el detalle
-    const daysMap = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
-    const frequencyText = mission.frequency === 'daily'
-        ? (mission.specificDays && mission.specificDays.length > 0
-            ? mission.specificDays.map(d => daysMap[d]).join(', ')
-            : 'Todos los días')
-        : 'Recurrente';
+    const handleCardClick = () => {
+        if (viewAllMode) {
+            onEdit(mission);
+        }
+    };
 
     return (
-        <div className="relative w-full mb-5 select-none group" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="relative w-full mb-4 select-none group" onClick={handleCardClick}>
             {/* Fondo Swipe */}
             {canSwipe && (
-                <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 ${bgAction}`}>
-                    {dragX > 0 && <div className="flex items-center gap-2 text-emerald-400 font-black tracking-widest text-sm drop-shadow-md"><Check size={24} /> COMPLETAR</div>}
-                    {dragX < 0 && <div className="flex items-center gap-2 text-red-400 font-black tracking-widest text-sm drop-shadow-md">ELIMINAR <Trash2 size={24} /></div>}
+                <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
+                    {dragX > 0 && <div className="flex items-center gap-2 text-emerald-400 font-black text-sm"><Check size={24} /> COMPLETAR</div>}
+                    {dragX < 0 && <div className="flex items-center gap-2 text-red-400 font-black text-sm">ELIMINAR <Trash2 size={24} /></div>}
                 </div>
             )}
 
@@ -15802,6 +15428,8 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                     p-[2px] bg-gradient-to-br ${styles.gradient}
                     shadow-[0_0_25px_${styles.shadow}]
                     ${isPending ? 'opacity-70 grayscale-[0.5]' : ''}
+                    ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''}
+                    ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'} 
                 `}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
@@ -15811,85 +15439,101 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                 onMouseUp={handleEnd}
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
-                {/* CONTENEDOR INTERNO */}
-                <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-5 relative overflow-hidden h-full flex flex-col justify-between`}>
+                <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-4 relative overflow-hidden h-full flex flex-col justify-between`}>
 
-                    {/* Brillo ambiental */}
-                    <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
+                    {/* Brillo ambiental (Apagado si está completada) */}
+                    {!mission.completed && (
+                        <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
+                    )}
 
                     <div className="relative z-10">
                         {/* HEADER */}
-                        <div className="flex justify-between items-start gap-3 mb-2">
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start mb-1 relative">
-                                    <div className="pr-16">
-                                        <div className="flex items-center gap-2">
-                                            {mission.isCoop && <Users size={16} className={styles.iconColor} />}
-                                            <h3 className={`text-lg font-black leading-snug uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through' : 'text-white'}`}>
-                                                {mission.title}
-                                            </h3>
-                                        </div>
-
-                                        {/* 🔥 DETALLES EXPANDIDOS (Días y Editar) */}
-                                        {isExpanded && (
-                                            <div className="mt-2 text-[10px] text-zinc-400 font-bold flex flex-col gap-1 animate-in slide-in-from-top-1">
-                                                <div className="flex items-center gap-1 uppercase tracking-wide">
-                                                    <Calendar size={10} /> {frequencyText}
-                                                </div>
-                                                {amIOwner && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); onEdit(mission); }}
-                                                        className="text-yellow-500 hover:text-yellow-400 flex items-center gap-1 w-fit mt-1"
-                                                    >
-                                                        <Edit size={10} /> EDITAR
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
+                        <div className="flex justify-between items-start gap-3 mb-1">
+                            <div className="flex-1 min-w-0 relative">
+                                <div className="pr-20 mb-1">
+                                    <div className="flex items-center gap-2">
+                                        {mission.isCoop && <Users size={16} className={styles.iconColor} />}
+                                        {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
+                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>
+                                            {mission.title}
+                                        </h3>
                                     </div>
 
-                                    <div className="absolute -top-1 -right-1 flex flex-col items-end gap-1.5">
-                                        <div className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>
-                                            {styles.label}
-                                        </div>
-                                        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                                            {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {/* 🔥 CAMBIO 1: Eliminado Frecuencia visual */}
+                                        {/* 🔥 CAMBIO 5: Contador Gigante */}
+                                        <div className="flex items-baseline gap-1">
+                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>
+                                                {mission.progress}/{mission.target}
+                                            </span>
+                                            {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* PROGRESO */}
-                                <div className="flex items-center gap-3 mt-3">
-                                    <div className="flex items-baseline gap-1">
-                                        <span className={`text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110 pr-2 pb-1`}>
-                                            {mission.progress}
-                                        </span>
-                                        <span className="text-base font-black text-white uppercase tracking-tighter">
-                                            / {mission.target} {mission.unit || 'Vez'}
-                                        </span>
+                                <div className="absolute -top-1 -right-1 flex items-center gap-2">
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                                        {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
                                     </div>
-
-                                    {!isBinary && !mission.completed && !isPending && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }}
-                                            className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 transition-all shadow-md active:scale-95 ml-auto"
-                                        >
-                                            <Plus size={18} />
-                                        </button>
-                                    )}
+                                    <div className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>{styles.label}</div>
                                 </div>
                             </div>
-                            {mission.completed && <div className="p-1.5 bg-zinc-900 rounded-full border border-zinc-800 shrink-0 mt-0.5"><Check size={18} className={styles.iconColor} /></div>}
+
+                            {/* 🔥 CAMBIO 6: Botón Check eliminado completamente. Solo queda "+" si es necesario */}
+                            <div className="flex flex-col items-center gap-2">
+                                {!isBinary && !mission.completed && !isPending && !viewAllMode && (
+                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
+                                        <Plus size={16} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {renderProgressBar()}
+
+                        {/* RECOMPENSAS / RIESGOS */}
+                        <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
+                            <div className="flex items-center gap-4">
+                                {/* XP */}
+                                {mission.xpReward > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span>
+                                        <img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" />
+                                    </div>
+                                )}
+
+                                {/* Monedas */}
+                                {(mission.coinReward > 0) && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span>
+                                        <img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" />
+                                    </div>
+                                )}
+
+                                {/* Fichas */}
+                                {(mission.gameCoinReward > 0) && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span>
+                                        <img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 🔥 CAMBIO 2: Icono Corazón Imagen */}
+                            {!mission.completed && (
+                                <div className="ml-auto flex items-center gap-1.5 opacity-90">
+                                    <span className="text-sm font-black text-red-400">-{damage}</span>
+                                    <img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" />
+                                </div>
+                            )}
                         </div>
 
                         {showInput && !isBinary && (
-                            <form onSubmit={handleNumericSubmit} className="mt-4 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
-                                <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white font-black text-lg text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-                                <button type="submit" className={`px-4 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient} shadow-lg shadow-${styles.shadow.split(' ')[0]}`}><Check size={20} /></button>
+                            <form onSubmit={handleNumericSubmit} className="mt-3 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
+                                <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
+                                <button type="submit" className={`px-3 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient} shadow-lg shadow-${styles.shadow.split(' ')[0]}`}><Check size={18} /></button>
                             </form>
                         )}
-
-                        {renderProgressBar()}
                     </div>
 
                     {isPending && (
@@ -15916,154 +15560,92 @@ export default function Missions() {
     const [showCreator, setShowCreator] = useState(false);
     const [toast, setToast] = useState(null);
     const [friends, setFriends] = useState([]);
-
-    // 🔥 PUNTOS 1 y 3: MODO GESTIÓN Y FILTRADO
     const [viewAllMode, setViewAllMode] = useState(false);
 
-    // 🔥 ESTADO EDICIÓN
+    // Estados Edición
     const [showEditModal, setShowEditModal] = useState(false);
     const [missionToEdit, setMissionToEdit] = useState(null);
+    const [editSelectedDays, setEditSelectedDays] = useState([]);
 
-    const DEFAULTS = {
-        title: '', frequency: 'daily', type: 'habit', difficulty: 'easy', target: 1, unit: '', isCoop: false, friendId: ''
-    };
-
+    const DEFAULTS = { title: '', frequency: 'daily', type: 'habit', difficulty: 'easy', target: 1, unit: '', isCoop: false, friendId: '' };
     const [newMission, setNewMission] = useState(DEFAULTS);
     const [selectedDays, setSelectedDays] = useState([]);
+    const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
 
     useEffect(() => {
-        if (!showCreator) {
-            setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab }));
-        }
-        fetchMissions();
-        fetchFriends();
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (!showCreator) setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab }));
+        fetchMissions(); fetchFriends();
     }, [activeTab, showCreator]);
 
-    const fetchMissions = async () => {
-        try {
-            const res = await api.get('/missions');
-            setMissions(res.data);
-        } catch (e) { setMissions([]); } finally { setLoading(false); }
-    };
+    const fetchMissions = async () => { try { const res = await api.get('/missions'); setMissions(res.data); } catch (e) { setMissions([]); } finally { setLoading(false); } };
     const fetchFriends = async () => { try { const res = await api.get('/social/friends'); setFriends(res.data.friends); } catch (e) { } };
     const showToast = (message, type = 'success') => setToast({ message, type });
 
-    const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
     const toggleDay = (dayValue) => setSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
+    const toggleEditDay = (dayValue) => setEditSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
 
-    const getRewardValues = (freq, diff) => {
-        const baseXP = 10; const baseCoins = 5;
-        const diffMult = { easy: 1, medium: 2, hard: 3, epic: 5 };
-        const freqMult = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
-        const m1 = diffMult[diff] || 1; const m2 = freqMult[freq] || 1;
-        let mult = m1 * m2;
-        if (newMission.isCoop) mult *= 1.5;
-
-        return { xp: Math.round(baseXP * mult), coins: Math.round(baseCoins * mult), gameCoins: Math.round(baseCoins * mult * 2) };
-    };
-
-    // 🔥 FIX PUNTO 3: LOGICA DE FILTRADO CORREGIDA
     const getFilteredMissions = () => {
-        // Si activamos el "Ojo", mostramos TODO (incluidas completadas y de otros días) para gestionar
         if (viewAllMode) return missions;
-
         const today = new Date().getDay();
         return missions.filter(m => {
-            // Filtrar por tab activo (diario, semanal...)
             if (activeTab !== 'all' && m.frequency !== activeTab) return false;
-
-            // Si es coop pendiente y no soy yo, ocultar
             if (m.isCoop && m.invitationStatus === 'pending' && m.user !== user._id) return false;
-
-            // 🔥 Filtro de día estricto: Solo mostrar si hoy toca
             if (m.frequency === 'daily' && m.specificDays && m.specificDays.length > 0) {
                 if (!m.specificDays.includes(today)) return false;
             }
-
             return true;
         });
     };
 
     const filteredMissions = getFilteredMissions();
-
-    // Estadísticas
     const completedCount = filteredMissions.filter(m => m.completed).length;
     const totalCount = filteredMissions.length;
     const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-    const handleOpenCreator = () => {
-        setNewMission({ ...DEFAULTS, frequency: activeTab === 'all' ? 'daily' : activeTab });
-        setSelectedDays([]);
-        setShowCreator(true);
-    };
-
+    const handleOpenCreator = () => { setNewMission({ ...DEFAULTS, frequency: activeTab === 'all' ? 'daily' : activeTab }); setSelectedDays([]); setShowCreator(true); };
     const handleCloseCreator = () => setShowCreator(false);
 
     const handleCreate = async () => {
-        if (!newMission.title?.trim()) return showToast("Escribe un título", "error");
-        if (newMission.isCoop && !newMission.friendId) return showToast("Selecciona un amigo", "error");
-
-        const safeUnit = newMission.unit ? newMission.unit.trim() : undefined;
-        const finalFreq = newMission.frequency || 'daily';
-
-        const payload = {
-            title: newMission.title.trim(),
-            frequency: finalFreq,
-            type: newMission.type || 'habit',
-            difficulty: newMission.difficulty || 'easy',
-            target: parseInt(newMission.target) || 1,
-            unit: safeUnit,
-            isCoop: !!newMission.isCoop,
-            specificDays: finalFreq === 'daily' ? selectedDays : []
-        };
-
+        if (!newMission.title?.trim()) return showToast("Falta título", "error");
+        if (newMission.isCoop && !newMission.friendId) return showToast("Falta amigo", "error");
+        const payload = { title: newMission.title.trim(), frequency: newMission.frequency || 'daily', type: newMission.type || 'habit', difficulty: newMission.difficulty || 'easy', target: parseInt(newMission.target) || 1, unit: newMission.unit ? newMission.unit.trim() : undefined, isCoop: !!newMission.isCoop, specificDays: newMission.frequency === 'daily' ? selectedDays : [] };
         if (payload.isCoop) payload.friendId = newMission.friendId;
-
-        try {
-            await api.post('/missions', payload);
-            handleCloseCreator();
-            fetchMissions();
-            showToast("¡Misión creada!", "success");
-        } catch (error) {
-            showToast(error.response?.data?.message || "Error al crear misión.", "error");
-        }
+        try { await api.post('/missions', payload); handleCloseCreator(); fetchMissions(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
     };
 
     const handleUpdateProgress = async (mission, amount) => {
         try {
             const res = await api.put(`/missions/${mission._id}/progress`, { amount });
-            if (res.data.progressOnly) {
-                setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
-                return;
-            }
+            if (res.data.progressOnly) { setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m)); return; }
             if (res.data.user) { setUser(res.data.user); localStorage.setItem('user', JSON.stringify(res.data.user)); }
             setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
-            if (res.data.rewards) showToast(`¡Completada! +${res.data.rewards.xp} XP`, "success");
-        } catch (e) { showToast("Error al actualizar", "error"); }
+            if (res.data.rewards) showToast(`+${res.data.rewards.xp} XP`, "success");
+        } catch (e) { showToast("Error", "error"); }
     };
 
-    const handleDelete = async (id) => {
-        try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Misión eliminada", "info"); } catch (e) { }
+    const handleDelete = async (id) => { try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Eliminada", "info"); } catch (e) { } };
+
+    const openEditModal = (mission) => {
+        setMissionToEdit(mission);
+        setEditSelectedDays(mission.specificDays || []);
+        setShowEditModal(true);
     };
 
-    // 🔥 HANDLE EDITAR (PUNTO 1)
     const handleEditMission = async () => {
         if (!missionToEdit || !missionToEdit.title.trim()) return;
         try {
             await api.put(`/missions/${missionToEdit._id}/progress`, {
                 editMode: true,
-                title: missionToEdit.title,
-                target: missionToEdit.target
+                title: missionToEdit.title, target: missionToEdit.target, frequency: missionToEdit.frequency, difficulty: missionToEdit.difficulty, unit: missionToEdit.unit,
+                specificDays: missionToEdit.frequency === 'daily' ? editSelectedDays : []
             });
-            setShowEditModal(false);
-            fetchMissions();
-            showToast("Misión actualizada");
-        } catch (e) {
-            showToast("Error al editar", "error");
-        }
+            setShowEditModal(false); fetchMissions(); showToast("Actualizada");
+        } catch (e) { showToast("Error", "error"); }
     };
-
-    const previewRewards = getRewardValues(newMission.frequency, newMission.difficulty);
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" size={32} /></div>;
 
@@ -16078,186 +15660,68 @@ export default function Missions() {
                         Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
                     </h1>
                     <div className="flex gap-2">
-                        {/* 🔥 BOTÓN OJO (GESTIÓN) */}
-                        <button
-                            onClick={() => setViewAllMode(!viewAllMode)}
-                            className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}
-                        >
-                            {viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}
-                        </button>
-
+                        <button onClick={() => setViewAllMode(!viewAllMode)} className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}>{viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}</button>
                         <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
                     </div>
                 </div>
-
-                {viewAllMode ? (
-                    <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2">
-                        <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Viendo todas las misiones (Histórico)</p>
-                    </div>
-                ) : (
+                {!viewAllMode && (
                     <>
                         <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
                             {['daily', 'weekly', 'monthly', 'yearly'].map(freq => (
-                                <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                                    {freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANAL' : freq === 'monthly' ? 'MENSUAL' : 'ANUAL'}
-                                </button>
+                                <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>{freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANA' : freq === 'monthly' ? 'MES' : 'AÑO'}</button>
                             ))}
                         </div>
-                        <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
-                            <div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} />
-                        </div>
+                        <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800"><div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} /></div>
                     </>
                 )}
+                {viewAllMode && <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2"><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Toca una misión para editarla</p></div>}
             </div>
 
             {/* LISTA */}
             <div className="px-4 mt-4 space-y-4">
                 {filteredMissions.length === 0 ? (
-                    <div className="py-20 text-center opacity-60">
-                        <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div>
-                        <p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p>
-                    </div>
+                    <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p></div>
                 ) : (
                     <>
-                        {filteredMissions.map(m => (
-                            <MissionCard
-                                key={m._id}
-                                mission={m}
-                                onUpdateProgress={handleUpdateProgress}
-                                onDelete={handleDelete}
-                                currentUserId={user._id}
-                                onEdit={(m) => { setMissionToEdit(m); setShowEditModal(true); }} // PASAR EL CLICK DE EDITAR
-                            />
-                        ))}
-
-                        {!viewAllMode && (
-                            <div className="text-center mt-8 mb-4">
-                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 flex items-center justify-center gap-2 mx-auto w-fit">
-                                    <Clock size={12} /> DISPONIBLE HASTA: <span className="text-zinc-300">{getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}</span>
-                                </span>
-                            </div>
-                        )}
+                        {filteredMissions.map(m => <MissionCard key={m._id} mission={m} onUpdateProgress={handleUpdateProgress} onDelete={handleDelete} currentUserId={user._id} onEdit={openEditModal} viewAllMode={viewAllMode} />)}
+                        {!viewAllMode && <div className="text-center mt-8 mb-4"><span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 flex items-center justify-center gap-2 mx-auto w-fit"><Clock size={12} /> HASTA: <span className="text-zinc-300">{getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}</span></span></div>}
                     </>
                 )}
             </div>
 
-            {/* MODAL EDITAR (PUNTO 1) */}
+            {/* MODAL EDITAR */}
             {showEditModal && missionToEdit && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
-                    <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2"><Edit size={18} className="text-yellow-500" /> Editar Misión</h2>
-                            <button onClick={() => setShowEditModal(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><X size={18} /></button>
-                        </div>
-
+                    <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2"><Edit size={18} className="text-yellow-500" /> Editar</h2><button onClick={() => setShowEditModal(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><X size={18} /></button></div>
                         <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label>
-                                <input type="text" value={missionToEdit.title} onChange={e => setMissionToEdit({ ...missionToEdit, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label>
-                                <input type="number" value={missionToEdit.target} onChange={e => setMissionToEdit({ ...missionToEdit, target: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" />
-                            </div>
-
-                            <div className="pt-4 flex gap-2">
-                                <button onClick={() => setShowEditModal(false)} className="flex-1 bg-zinc-800 text-zinc-300 py-3 rounded-xl font-bold text-xs uppercase">Cancelar</button>
-                                <button onClick={handleEditMission} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2"><Save size={16} /> Guardar</button>
-                            </div>
+                            <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label><input type="text" value={missionToEdit.title} onChange={e => setMissionToEdit({ ...missionToEdit, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div>
+                            <div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label><input type="number" value={missionToEdit.target} onChange={e => setMissionToEdit({ ...missionToEdit, target: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div><div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Unidad</label><input type="text" value={missionToEdit.unit || ''} onChange={e => setMissionToEdit({ ...missionToEdit, unit: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" placeholder="Págs, Km..." /></div></div>
+                            <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Frecuencia</label><select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.frequency} onChange={e => setMissionToEdit({ ...missionToEdit, frequency: e.target.value })}><option value="daily">Diaria</option><option value="weekly">Semanal</option><option value="monthly">Mensual</option><option value="yearly">Anual</option></select></div>
+                            {missionToEdit.frequency === 'daily' && (<div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl"><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label><div className="flex justify-between">{daysOptions.map(d => (<button key={d.value} onClick={() => toggleEditDay(d.value)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all border ${editSelectedDays.includes(d.value) ? 'bg-white text-black border-white scale-110' : 'bg-black text-zinc-600 border-zinc-800'}`}>{d.label}</button>))}</div></div>)}
+                            <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Dificultad</label><select className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={missionToEdit.difficulty} onChange={e => setMissionToEdit({ ...missionToEdit, difficulty: e.target.value })}><option value="easy">Fácil</option><option value="medium">Media</option><option value="hard">Difícil</option><option value="epic">Épica</option></select></div>
+                            <div className="pt-4 flex gap-2"><button onClick={() => setShowEditModal(false)} className="flex-1 bg-zinc-800 text-zinc-300 py-3 rounded-xl font-bold text-xs uppercase">Cancelar</button><button onClick={handleEditMission} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2"><Save size={16} /> Guardar</button></div>
                         </div>
                     </div>
                 </div>, document.body
             )}
 
-            {/* MODAL CREAR (MANTENIDO) */}
+            {/* MODAL CREAR */}
             {showCreator && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">
-                        <div className="flex justify-between items-center p-5 border-b border-zinc-800/50 bg-[#09090b] shrink-0 z-10">
-                            <h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2"><Plus size={18} className="text-yellow-500" /> Nueva Misión</h2>
-                            <button onClick={handleCloseCreator} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={18} /></button>
-                        </div>
-
+                        <div className="flex justify-between items-center p-5 border-b border-zinc-800/50 bg-[#09090b] shrink-0 z-10"><h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2"><Plus size={18} className="text-yellow-500" /> Nueva Misión</h2><button onClick={handleCloseCreator} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={18} /></button></div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4 bg-black/20">
-                            {/* ... FORMULARIO DE CREAR (Ya estaba bien) ... */}
-                            <div className="mt-2">
-                                <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label>
-                                <input type="text" placeholder="Ej: Leer 10 páginas" autoFocus value={newMission.title} onChange={e => setNewMission({ ...newMission, title: e.target.value })} className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-white placeholder-zinc-700 outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all font-bold text-sm" />
-                            </div>
-
-                            <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
-                                <button onClick={() => setNewMission({ ...newMission, type: 'habit' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'habit' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Hábito (Recurrente)</button>
-                                <button onClick={() => setNewMission({ ...newMission, type: 'quest' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'quest' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Misión Puntual</button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label>
-                                    <input type="number" inputMode="numeric" pattern="[0-9]*" min="1" className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-center text-white font-mono font-bold text-sm outline-none focus:border-blue-500/50 transition-all" value={newMission.target} onChange={e => setNewMission({ ...newMission, target: e.target.value === '' ? '' : parseInt(e.target.value) })} />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Unidad</label>
-                                    <input type="text" placeholder="km, pags, min..." className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-center text-white font-medium text-sm outline-none focus:border-blue-500/50 transition-all placeholder-zinc-700" value={newMission.unit} onChange={e => setNewMission({ ...newMission, unit: e.target.value })} />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Frecuencia</label>
-                                    <select className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={newMission.frequency} onChange={e => setNewMission({ ...newMission, frequency: e.target.value })}>
-                                        <option value="daily">Diaria</option>
-                                        <option value="weekly">Semanal</option>
-                                        <option value="monthly">Mensual</option>
-                                        <option value="yearly">Anual</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Dificultad</label>
-                                    <select className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={newMission.difficulty} onChange={e => setNewMission({ ...newMission, difficulty: e.target.value })}>
-                                        <option value="easy">Fácil</option>
-                                        <option value="medium">Media</option>
-                                        <option value="hard">Difícil</option>
-                                        <option value="epic">Épica</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {newMission.frequency === 'daily' && (
-                                <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl">
-                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label>
-                                    <div className="flex justify-between">
-                                        {daysOptions.map(d => (
-                                            <button key={d.value} onClick={() => toggleDay(d.value)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all border ${selectedDays.includes(d.value) ? 'bg-white text-black border-white scale-110' : 'bg-black text-zinc-600 border-zinc-800'}`}>{d.label}</button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className={`p-3 rounded-xl border transition-all ${newMission.isCoop ? 'bg-purple-900/10 border-purple-500/30' : 'bg-zinc-900/30 border-zinc-800'}`}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`p-1.5 rounded-lg ${newMission.isCoop ? 'bg-purple-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}><Users size={14} /></div>
-                                        <span className="text-xs font-bold uppercase text-zinc-400">Cooperativo</span>
-                                    </div>
-                                    <div onClick={() => setNewMission({ ...newMission, isCoop: !newMission.isCoop })} className={`w-8 h-5 rounded-full relative cursor-pointer transition-colors ${newMission.isCoop ? 'bg-purple-500' : 'bg-zinc-700'}`}>
-                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${newMission.isCoop ? 'left-4' : 'left-1'}`}></div>
-                                    </div>
-                                </div>
-                                {newMission.isCoop && (
-                                    <select className="w-full bg-black border border-purple-500/30 rounded-xl p-2 text-white text-xs font-bold outline-none mt-2" value={newMission.friendId} onChange={e => setNewMission({ ...newMission, friendId: e.target.value })}>
-                                        <option value="">Invitar a...</option>
-                                        {friends.map(f => <option key={f._id} value={f._id}>{f.username}</option>)}
-                                    </select>
-                                )}
-                            </div>
+                            <div className="mt-2"><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label><input type="text" placeholder="Ej: Leer 10 páginas" autoFocus value={newMission.title} onChange={e => setNewMission({ ...newMission, title: e.target.value })} className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-white placeholder-zinc-700 outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all font-bold text-sm" /></div>
+                            <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-zinc-800"><button onClick={() => setNewMission({ ...newMission, type: 'habit' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'habit' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Hábito</button><button onClick={() => setNewMission({ ...newMission, type: 'quest' })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${newMission.type === 'quest' ? 'bg-white text-black shadow' : 'text-zinc-500'}`}>Puntual</button></div>
+                            <div className="grid grid-cols-2 gap-3"><div><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Objetivo</label><input type="number" inputMode="numeric" min="1" className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-center text-white font-mono font-bold text-sm outline-none focus:border-blue-500/50 transition-all" value={newMission.target} onChange={e => setNewMission({ ...newMission, target: e.target.value === '' ? '' : parseInt(e.target.value) })} /></div><div><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Unidad</label><input type="text" placeholder="km, pags..." className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-center text-white font-medium text-sm outline-none focus:border-blue-500/50 transition-all placeholder-zinc-700" value={newMission.unit} onChange={e => setNewMission({ ...newMission, unit: e.target.value })} /></div></div>
+                            <div className="grid grid-cols-2 gap-3"><div><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Frecuencia</label><select className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={newMission.frequency} onChange={e => setNewMission({ ...newMission, frequency: e.target.value })}><option value="daily">Diaria</option><option value="weekly">Semanal</option><option value="monthly">Mensual</option><option value="yearly">Anual</option></select></div><div><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Dificultad</label><select className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 text-white text-xs font-bold outline-none" value={newMission.difficulty} onChange={e => setNewMission({ ...newMission, difficulty: e.target.value })}><option value="easy">Fácil</option><option value="medium">Media</option><option value="hard">Difícil</option><option value="epic">Épica</option></select></div></div>
+                            {newMission.frequency === 'daily' && (<div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-xl"><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Días Específicos</label><div className="flex justify-between">{daysOptions.map(d => (<button key={d.value} onClick={() => toggleDay(d.value)} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all border ${selectedDays.includes(d.value) ? 'bg-white text-black border-white scale-110' : 'bg-black text-zinc-600 border-zinc-800'}`}>{d.label}</button>))}</div></div>)}
+                            <div className={`p-3 rounded-xl border transition-all ${newMission.isCoop ? 'bg-purple-900/10 border-purple-500/30' : 'bg-zinc-900/30 border-zinc-800'}`}><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className={`p-1.5 rounded-lg ${newMission.isCoop ? 'bg-purple-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}><Users size={14} /></div><span className="text-xs font-bold uppercase text-zinc-400">Cooperativo</span></div><div onClick={() => setNewMission({ ...newMission, isCoop: !newMission.isCoop })} className={`w-8 h-5 rounded-full relative cursor-pointer transition-colors ${newMission.isCoop ? 'bg-purple-500' : 'bg-zinc-700'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${newMission.isCoop ? 'left-4' : 'left-1'}`}></div></div></div>{newMission.isCoop && (<select className="w-full bg-black border border-purple-500/30 rounded-xl p-2 text-white text-xs font-bold outline-none mt-2" value={newMission.friendId} onChange={e => setNewMission({ ...newMission, friendId: e.target.value })}><option value="">Invitar a...</option>{friends.map(f => <option key={f._id} value={f._id}>{f.username}</option>)}</select>)}</div>
                         </div>
-
-                        <div className="p-5 border-t border-zinc-800 bg-[#09090b] shrink-0 z-10">
-                            <button onClick={handleCreate} className="w-full bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition-all shadow-lg">Crear Misión</button>
-                        </div>
+                        <div className="p-5 border-t border-zinc-800 bg-[#09090b] shrink-0 z-10"><button onClick={handleCreate} className="w-full bg-yellow-500 text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition-all shadow-lg">Crear Misión</button></div>
                     </div>
-                </div>,
-                document.body
+                </div>, document.body
             )}
         </div>
     );
