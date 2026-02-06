@@ -3,11 +3,10 @@ import { createPortal } from 'react-dom';
 import { useOutletContext } from 'react-router-dom';
 import {
     Settings, X, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf,
-    Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Sparkles, BrainCircuit
+    Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Sparkles, BrainCircuit, Camera, Image as ImageIcon, SortAsc, Filter
 } from 'lucide-react';
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
-import FoodWidget from '../components/widgets/FoodWidget'; // 🔥 Importante para la gráfica
 import Toast from '../components/common/Toast';
 
 export default function Food() {
@@ -29,13 +28,13 @@ export default function Food() {
         return { calories: 2100, protein: 158, carbs: 210, fat: 70, fiber: 30 };
     });
 
-    // --- CHAT IA (MODAL CONFIG) ---
+    // --- CHAT IA ---
     const [chatHistory, setChatHistory] = useState([]);
     const [chatInput, setChatInput] = useState('');
     const [chatLoading, setChatLoading] = useState(false);
     const chatEndRef = useRef(null);
 
-    // --- FORMULARIO MANUAL (MACROS) ---
+    // --- FORMULARIO MANUAL ---
     const [manualStats, setManualStats] = useState({
         calories: 2100, protein: 150, carbs: 200, fat: 70, fiber: 30
     });
@@ -53,14 +52,11 @@ export default function Food() {
         fetchLog();
     }, []);
 
-    // Scroll al fondo del chat
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chatHistory]);
 
     // --- FUNCIONES API ---
-
-    // 1. Obtener Log del día (Crucial para actualizar totales)
     const fetchLog = async () => {
         try {
             const res = await api.get('/food/log');
@@ -74,27 +70,24 @@ export default function Food() {
 
     const showToast = (message, type = 'success') => setToast({ message, type });
 
-    // 2. Borrar Alimento
     const handleRemoveFood = async (mealId, foodItemId) => {
         if (!window.confirm("¿Borrar alimento?")) return;
         try {
-            await api.delete(`/food/log/${mealId}/${foodItemId}`); // Endpoint nuevo (verificaste que existe en foodController?)
+            // Intenta endpoint específico o fallback
+            await api.delete(`/food/log/${mealId}/${foodItemId}`);
             showToast("Eliminado", "info");
             fetchLog(); // 🔥 Recargar para actualizar gráfica
         } catch (error) {
-            // Fallback si la ruta delete específica no existe, usar update manual (menos ideal)
-            // Pero asumo que creaste removeFoodFromLog en el backend como pediste anteriormente.
             console.error(error);
             showToast("Error al eliminar", "error");
         }
     };
 
-    // 3. Actualizar Macros Usuario
     const updateGoals = async (newGoals) => {
         try {
             const res = await api.put('/users/macros', newGoals);
             setGoals(res.data.macros);
-            setUser(res.data); // Actualizar contexto global
+            setUser(res.data);
             return true;
         } catch (error) {
             showToast("Error al guardar objetivos", "error");
@@ -102,17 +95,15 @@ export default function Food() {
         }
     };
 
-    // --- LÓGICA FORMULARIO MACROS ---
     const handleCalorieChange = (e) => {
         const kcal = parseInt(e.target.value) || 0;
         if (isAutoMacro) {
-            // Reparto estándar: 30% P / 40% C / 30% G
             setManualStats({
                 calories: kcal,
                 protein: Math.round((kcal * 0.3) / 4),
                 carbs: Math.round((kcal * 0.4) / 4),
                 fat: Math.round((kcal * 0.3) / 9),
-                fiber: Math.round(kcal / 1000 * 14) // 14g por cada 1000kcal
+                fiber: Math.round(kcal / 1000 * 14)
             });
         } else {
             setManualStats(prev => ({ ...prev, calories: kcal }));
@@ -131,7 +122,6 @@ export default function Food() {
         }
     };
 
-    // --- LÓGICA CHAT IA ---
     const handleSendChat = async () => {
         if (!chatInput.trim()) return;
         const userMsg = { role: 'user', content: chatInput };
@@ -161,7 +151,6 @@ export default function Food() {
         }
     };
 
-    // --- UI HELPERS ---
     const handleOpenAdd = (mealId) => {
         setActiveMealId(mealId);
         setShowSearch(true);
@@ -173,21 +162,22 @@ export default function Food() {
         </div>
     );
 
-    // Preparar datos para el Widget
+    // --- CÁLCULOS VISUALES PARA LA TARJETA VERDE ---
     const currentKcal = log?.totalCalories || 0;
     const limitKcal = goals.calories || 2100;
+    const percentage = Math.min((currentKcal / limitKcal) * 100, 100);
+    const radius = 36; // Radio del círculo
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
-    // Convertir array de comidas a objeto para el Widget (si fuera necesario, pero FoodWidget acepta array o keys)
-    // Para simplificar, pasamos las comidas estructuradas si el widget las pide así, 
-    // o simplemente usamos el log.meals para renderizar la lista abajo.
+    const macros = [
+        { label: 'PROT', current: log?.totalProtein || 0, total: goals.protein, color: 'text-blue-500', barColor: 'bg-blue-500', icon: <Flame size={12} className="text-blue-500" /> },
+        { label: 'CARBS', current: log?.totalCarbs || 0, total: goals.carbs, color: 'text-yellow-400', barColor: 'bg-yellow-400', icon: <Wheat size={12} className="text-yellow-400" /> },
+        { label: 'GRASA', current: log?.totalFat || 0, total: goals.fat, color: 'text-red-400', barColor: 'bg-red-400', icon: <Droplet size={12} className="text-red-400" /> },
+        { label: 'FIBRA', current: log?.totalFiber || 0, total: goals.fiber, color: 'text-green-500', barColor: 'bg-green-500', icon: <Leaf size={12} className="text-green-500" /> },
+    ];
+
     const rawMeals = log?.meals || [];
-    const structuredMealsForWidget = {
-        breakfast: rawMeals.find(m => m.name === 'DESAYUNO')?.foods || [],
-        lunch: rawMeals.find(m => m.name === 'COMIDA')?.foods || [],
-        merienda: rawMeals.find(m => m.name === 'MERIENDA')?.foods || [],
-        dinner: rawMeals.find(m => m.name === 'CENA')?.foods || [],
-        snacks: rawMeals.find(m => m.name === 'SNACK')?.foods || []
-    };
 
     return (
         <div className="animate-in fade-in space-y-6 pb-24 bg-black min-h-screen">
@@ -196,7 +186,7 @@ export default function Food() {
             {/* HEADER */}
             <div className="flex justify-between items-center px-4 pt-4">
                 <div>
-                    <h1 className="text-2xl font-black text-white italic uppercase tracking-tighter">Comidas</h1>
+                    <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">COMIDAS</h1>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">
                         <Target size={12} /> Objetivo: {limitKcal} kcal
                     </p>
@@ -209,13 +199,55 @@ export default function Food() {
                 </button>
             </div>
 
-            {/* WIDGET GRÁFICO (Resumen) */}
-            <div className="px-4 h-64">
-                <FoodWidget
-                    currentKcal={currentKcal}
-                    limitKcal={limitKcal}
-                    meals={structuredMealsForWidget}
-                />
+            {/* 🔥 TARJETA PRINCIPAL (RESTAURADA AL DISEÑO ORIGINAL) */}
+            <div className="px-4">
+                <div className="bg-zinc-950 border border-green-500 rounded-[32px] p-6 shadow-[0_0_30px_rgba(34,197,94,0.15)] relative overflow-hidden">
+                    <div className="flex items-center justify-between gap-6">
+
+                        {/* IZQUIERDA: CÍRCULO CALORÍAS */}
+                        <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
+                            {/* SVG Círculo */}
+                            <svg className="transform -rotate-90 w-full h-full">
+                                <circle cx="50%" cy="50%" r={radius} stroke="#27272a" strokeWidth="8" fill="transparent" />
+                                <circle
+                                    cx="50%" cy="50%" r={radius}
+                                    stroke="#22c55e"
+                                    strokeWidth="8"
+                                    fill="transparent"
+                                    strokeDasharray={circumference}
+                                    strokeDashoffset={strokeDashoffset}
+                                    strokeLinecap="round"
+                                    className="transition-all duration-1000 ease-out"
+                                />
+                            </svg>
+                            {/* Texto Central */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-4xl font-black text-white tracking-tighter leading-none">{Math.round(currentKcal)}</span>
+                                <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">DE {limitKcal}</span>
+                            </div>
+                        </div>
+
+                        {/* DERECHA: BARRAS MACROS */}
+                        <div className="flex-1 space-y-3">
+                            {macros.map((m, i) => (
+                                <div key={i}>
+                                    <div className="flex justify-between items-center text-[10px] font-bold mb-1">
+                                        <div className="flex items-center gap-1.5 uppercase text-zinc-400">
+                                            {m.icon} <span>{m.label}</span>
+                                        </div>
+                                        <span className="text-zinc-500">{Math.round(m.current)}/{m.total}</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full ${m.barColor} transition-all duration-500`}
+                                            style={{ width: `${Math.min(((m.current / m.total) * 100), 100)}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* LISTA DE COMIDAS */}
@@ -225,16 +257,16 @@ export default function Food() {
                     return (
                         <div key={meal._id} className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-lg group">
                             {/* Cabecera de la Comida */}
-                            <div className="bg-gradient-to-r from-zinc-900 to-zinc-950 p-4 flex justify-between items-center border-b border-zinc-800/50">
+                            <div className="bg-zinc-900/50 p-4 flex justify-between items-center border-b border-zinc-800/50">
                                 <div>
                                     <h3 className="text-white font-black text-base uppercase tracking-tighter">{meal.name}</h3>
                                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                                        {meal.foods.length} items • <span className="text-zinc-300">{mealKcal} KCAL</span>
+                                        {meal.foods.length} ITEMS • <span className="text-zinc-300">{mealKcal} KCAL</span>
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => handleOpenAdd(meal._id)}
-                                    className="bg-zinc-800 text-zinc-400 p-2 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700"
+                                    className="bg-zinc-800 text-zinc-400 w-10 h-10 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700 flex items-center justify-center"
                                 >
                                     <Plus size={20} />
                                 </button>
@@ -243,8 +275,8 @@ export default function Food() {
                             {/* Lista de Alimentos */}
                             <div className="p-2">
                                 {meal.foods.length === 0 ? (
-                                    <div className="py-6 text-center border border-dashed border-zinc-900 rounded-2xl m-2">
-                                        <p className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest">Sin alimentos</p>
+                                    <div className="py-8 text-center m-2">
+                                        <p className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest">SIN ALIMENTOS</p>
                                     </div>
                                 ) : (
                                     meal.foods.map((item, idx) => (
@@ -259,7 +291,7 @@ export default function Food() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <span className="text-sm font-black text-white whitespace-nowrap bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-800 flex items-center gap-1">
+                                                <span className="text-sm font-black text-white whitespace-nowrap bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800 flex items-center gap-1">
                                                     {Math.round(item.calories)} <span className="text-[9px] text-zinc-500 font-bold">KCAL</span>
                                                 </span>
                                                 <button
@@ -278,16 +310,14 @@ export default function Food() {
                 })}
             </div>
 
-            {/* --- MODAL BUSCADOR / AÑADIR --- */}
+            {/* --- MODALES --- */}
             {showSearch && createPortal(
                 <div className="fixed inset-0 z-[9999] bg-black">
                     <div className="absolute inset-0 top-14 transform bg-zinc-950/50">
                         <FoodSearchModal
                             mealId={activeMealId}
                             onClose={() => setShowSearch(false)}
-                            onFoodAdded={() => {
-                                fetchLog(); // 🔥 Recargar datos al añadir
-                            }}
+                            onFoodAdded={() => fetchLog()}
                             onShowToast={showToast}
                         />
                     </div>
@@ -295,14 +325,12 @@ export default function Food() {
                 document.body
             )}
 
-            {/* --- MODAL CONFIGURACIÓN (MANUAL / IA) --- */}
+            {/* Modal Configuración (IA / Manual) */}
             {configModal.show && createPortal(
                 <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-zinc-950 border border-zinc-800 rounded-[32px] w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
-                        {/* Decoración Top */}
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
 
-                        {/* Header Modal Config */}
                         <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
                             <h3 className="text-lg font-black text-white uppercase italic tracking-wide">
                                 {configModal.mode === 'ai' ? 'Nutricionista IA' : 'Ajustes Macro'}
@@ -312,19 +340,15 @@ export default function Food() {
                             </button>
                         </div>
 
-                        {/* Body Modal Config */}
                         <div className="p-5 overflow-y-auto custom-scrollbar flex-1 bg-black/20">
-
                             {configModal.mode === 'manual' && (
                                 <div className="space-y-6">
-                                    {/* Botón ir a IA */}
                                     <button onClick={() => { setChatHistory([{ role: 'assistant', content: "Dime tus datos: Género, Edad, Peso, Altura, Actividad y Objetivo." }]); setConfigModal({ show: true, mode: 'ai' }); }} className="w-full bg-blue-900/10 p-4 rounded-2xl border border-blue-500/20 flex items-center gap-4 hover:bg-blue-900/20 transition-all group">
                                         <div className="bg-blue-600 p-3 rounded-xl text-white shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform"><Bot size={24} /></div>
                                         <div className="text-left"><h4 className="font-black text-blue-200 text-sm uppercase">Usar IA</h4><p className="text-[10px] text-blue-400/60 font-bold uppercase tracking-wide">Cálculo automático</p></div>
                                         <ChevronRight className="ml-auto text-blue-500" />
                                     </button>
 
-                                    {/* Inputs Manuales */}
                                     <div>
                                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 mb-2 block">Objetivo Calorías</label>
                                         <input type="number" value={manualStats.calories} onChange={handleCalorieChange} className="w-full bg-black text-white text-3xl font-black p-4 rounded-2xl border border-zinc-800 focus:border-white/20 outline-none text-center transition-colors mb-4" />
