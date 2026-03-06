@@ -20,6 +20,7 @@ const challengeRoutes = require('./routes/challenges');
 const pushRoutes = require('./routes/push');
 const eventRoutes = require('./routes/eventRoutes');
 const cronRoutes = require('./routes/cron');
+const gamesRoutes = require('./routes/games');
 
 connectDB();
 
@@ -53,6 +54,7 @@ app.use('/api/challenges', challengeRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/games', gamesRoutes);
 
 // Inicializar Cron Jobs Internos (Como respaldo o para tareas diurnas)
 initScheduledJobs();

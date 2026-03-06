@@ -6,13 +6,17 @@ const searchUsers = async (req, res) => {
     try {
         const query = req.query.q;
         if (!query) return res.json([]);
+
         const users = await User.find({
             $or: [
                 { username: { $regex: query, $options: 'i' } },
                 { email: { $regex: query, $options: 'i' } }
             ],
             _id: { $ne: req.user._id }
-        }).select('username avatar level title frame');
+        })
+            .select('username avatar level title frame')
+            .limit(20); // 🔥 Límite crítico para no tumbar la BBDD si hay miles de usuarios
+
         res.json(users);
     } catch (error) {
         console.error(error);
@@ -20,45 +24,46 @@ const searchUsers = async (req, res) => {
     }
 };
 
-// @desc    Enviar solicitud (VERSIÓN ROBUSTA)
+// @desc    Enviar solicitud (🔥 ATÓMICA Y SIN DUPLICADOS)
 const sendFriendRequest = async (req, res) => {
     try {
         const { targetId } = req.body;
-        const senderId = req.user._id.toString(); // Convertimos mi ID a texto
+        const senderId = req.user._id;
 
-        // 1. Validación básica
-        if (senderId === targetId) {
+        if (senderId.toString() === targetId.toString()) {
             return res.status(400).json({ message: 'No puedes añadirte a ti mismo' });
         }
 
-        const targetUser = await User.findById(targetId);
-        const currentUser = await User.findById(senderId);
+        const currentUser = await User.findById(senderId).select('friends friendRequests');
+        if (!currentUser) return res.status(404).json({ message: 'Usuario no encontrado' });
 
-        if (!targetUser) return res.status(404).json({ message: 'Usuario no encontrado' });
-
-        // 2. CONVERTIR ARRAYS A TEXTO PARA COMPARAR (Esto arregla el error 400 falso)
-        const myFriends = currentUser.friends.map(id => id.toString());
-        const myRequests = currentUser.friendRequests.map(id => id.toString());
-        const targetRequests = targetUser.friendRequests.map(id => id.toString());
-
-        // 3. Validaciones lógicas
-        if (myFriends.includes(targetId)) {
+        // Validaciones locales rápidas
+        if (currentUser.friends.includes(targetId)) {
             return res.status(400).json({ message: 'Ya sois amigos' });
         }
-
-        if (targetRequests.includes(senderId)) {
-            return res.status(400).json({ message: 'Ya enviaste una solicitud' });
-        }
-
-        if (myRequests.includes(targetId)) {
+        if (currentUser.friendRequests.includes(targetId)) {
             return res.status(400).json({ message: 'Él ya te envió solicitud. ¡Acéptala en tu buzón!' });
         }
 
-        // 4. Enviar solicitud (Guardar ID puro)
-        targetUser.friendRequests.push(senderId);
-        await targetUser.save();
+        // 🚀 Operación Atómica: Busca al usuario SOLO si no te tiene ya agregado ni en espera
+        const targetUser = await User.findOneAndUpdate(
+            {
+                _id: targetId,
+                friends: { $ne: senderId },
+                friendRequests: { $ne: senderId }
+            },
+            {
+                $addToSet: { friendRequests: senderId } // $addToSet es inmune a los multiclics
+            },
+            { new: true }
+        );
 
-        res.json({ message: 'Solicitud enviada' });
+        if (!targetUser) {
+            // Si devuelve null, es porque la solicitud ya existe, ya sois amigos, o el ID es inválido.
+            return res.status(400).json({ message: 'No se pudo enviar (solicitud duplicada o ya sois amigos)' });
+        }
+
+        res.json({ message: 'Solicitud enviada con éxito' });
 
     } catch (error) {
         console.error("Error enviando solicitud:", error);
@@ -77,7 +82,6 @@ const getFriends = async (req, res) => {
         const now = new Date();
         const todayStr = now.toISOString().split('T')[0];
 
-        // Obtener logs de amigos para la barra de misiones
         const friendIds = user.friends.map(f => f._id);
         const dailyLogs = await DailyLog.find({
             user: { $in: friendIds },
@@ -125,38 +129,32 @@ const getFriends = async (req, res) => {
     }
 };
 
-// @desc    Responder solicitud
+// @desc    Responder solicitud (🔥 ATÓMICA)
 const respondToRequest = async (req, res) => {
     try {
         const { requesterId, action } = req.body;
         const userId = req.user._id;
-        const user = await User.findById(userId);
-        const requester = await User.findById(requesterId);
 
-        // Convertir a Strings para buscar seguro
-        const currentRequests = user.friendRequests.map(id => id.toString());
+        // 1. Quitar la solicitud de forma atómica
+        const userUpdate = await User.findOneAndUpdate(
+            { _id: userId, friendRequests: requesterId },
+            { $pull: { friendRequests: requesterId } },
+            { new: true }
+        );
 
-        if (!currentRequests.includes(requesterId)) {
+        if (!userUpdate) {
             return res.status(404).json({ message: 'Solicitud no encontrada o ya procesada' });
         }
 
-        // Eliminar usando filtro de Strings
-        user.friendRequests = user.friendRequests.filter(id => id.toString() !== requesterId);
-
         if (action === 'accept') {
-            // Verificar duplicados antes de empujar
-            const myFriends = user.friends.map(id => id.toString());
-            const theirFriends = requester.friends.map(id => id.toString());
-
-            if (!myFriends.includes(requesterId)) user.friends.push(requesterId);
-            if (!theirFriends.includes(userId.toString())) requester.friends.push(userId);
-
-            await requester.save();
-            await user.save();
+            // 2. Si acepta, añadimos a ambos de forma paralela y segura con $addToSet
+            await Promise.all([
+                User.findByIdAndUpdate(userId, { $addToSet: { friends: requesterId } }),
+                User.findByIdAndUpdate(requesterId, { $addToSet: { friends: userId } })
+            ]);
             return res.json({ message: 'Solicitud aceptada' });
         }
 
-        await user.save();
         res.json({ message: 'Solicitud rechazada' });
 
     } catch (error) {

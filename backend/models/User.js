@@ -2,13 +2,13 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs'); // Asegúrate de tener: npm install bcryptjs
 
 const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
+    username: { type: String, required: true, unique: true, trim: true },
     avatar: { type: String, default: null },
     frame: { type: String, default: null },
     pet: { type: String, default: null },
     title: { type: String, default: 'Principiante' },
     theme: { type: String, default: 'dark' },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, select: false }, // Protegido
 
     // Clan System
@@ -83,7 +83,14 @@ const userSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
-// --- 🔥 LÓGICA DE BACKEND AÑADIDA (No borres esto) ---
+// --- 🔥 ÍNDICES CRÍTICOS PARA RENDIMIENTO (NUEVO) 🔥 ---
+// 1. Índice Compuesto para el Leaderboard (Ordena instantáneamente sin colapsar la BD)
+userSchema.index({ level: -1, currentXP: -1 });
+
+// 2. Índice de Texto para buscar amigos rapidísimo por nombre
+userSchema.index({ username: 1 });
+
+// --- LÓGICA DE BACKEND ---
 
 // 1. Hash Password
 userSchema.pre('save', async function (next) {
@@ -106,8 +113,8 @@ userSchema.methods.gainXp = function (amount) {
     while (this.currentXP >= this.nextLevelXP) {
         this.currentXP -= this.nextLevelXP;
         this.level += 1;
-        this.nextLevelXP = Math.floor(this.nextLevelXP * 1.2); // Curva de dificultad 20%
-        this.hp = this.maxHp; // Curar al subir nivel
+        this.nextLevelXP = Math.floor(this.nextLevelXP * 1.2);
+        this.hp = this.maxHp;
         leveledUp = true;
     }
     return leveledUp;

@@ -5,7 +5,7 @@ const DailyLog = require('../models/DailyLog');
 const levelService = require('../services/levelService');
 const fs = require('fs');
 
-// --- CONFIGURACIÓN OPENROUTER (CASCADA) ---
+// --- CONFIGURACIÓN OPENROUTER ---
 const OpenAI = require("openai");
 const openrouter = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
@@ -19,6 +19,26 @@ const openrouter = new OpenAI({
 const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
 // ==========================================
+// ⏱️ HELPER: TIMEOUT PARA IA
+// ==========================================
+const fetchWithTimeout = async (config, timeoutMs = 5000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await openrouter.chat.completions.create(
+            config,
+            { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+};
+
+// ==========================================
 // 1. OBTENER RUTINAS
 // ==========================================
 const getRoutines = async (req, res) => {
@@ -26,43 +46,28 @@ const getRoutines = async (req, res) => {
         const routines = await Routine.find({ user: req.user._id }).sort({ createdAt: -1 });
         res.json(routines);
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error al cargar rutinas' });
     }
 };
 
-// 2. CREAR RUTINA
 const createRoutine = async (req, res) => {
     try {
         const { name, exercises, difficulty, color } = req.body;
         const routine = await Routine.create({
-            user: req.user._id,
-            name,
-            color: color || 'blue',
-            exercises,
-            difficulty: difficulty || 'Guerrero'
+            user: req.user._id, name, color: color || 'blue', exercises, difficulty: difficulty || 'Guerrero'
         });
         res.status(201).json(routine);
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error creando rutina' });
     }
 };
 
-// 2.5 ACTUALIZAR RUTINA
 const updateRoutine = async (req, res) => {
     try {
         const { name, exercises, difficulty, color } = req.body;
-
         let routine = await Routine.findById(req.params.id);
-
-        if (!routine) {
-            return res.status(404).json({ message: 'Rutina no encontrada' });
-        }
-
-        if (routine.user.toString() !== req.user.id) {
-            return res.status(401).json({ message: 'No autorizado' });
-        }
+        if (!routine) return res.status(404).json({ message: 'Rutina no encontrada' });
+        if (routine.user.toString() !== req.user.id) return res.status(401).json({ message: 'No autorizado' });
 
         routine.name = name || routine.name;
         routine.exercises = exercises || routine.exercises;
@@ -71,25 +76,20 @@ const updateRoutine = async (req, res) => {
 
         const updatedRoutine = await routine.save();
         res.json(updatedRoutine);
-
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error actualizando rutina' });
     }
 };
 
-// 3. BORRAR RUTINA
 const deleteRoutine = async (req, res) => {
     try {
         await Routine.deleteOne({ _id: req.params.id, user: req.user._id });
         res.json({ message: 'Rutina eliminada' });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error eliminando rutina' });
     }
 };
 
-// 4. OBTENER EJERCICIOS
 const getAllExercises = async (req, res) => {
     try {
         const { muscle } = req.query;
@@ -99,38 +99,25 @@ const getAllExercises = async (req, res) => {
         const exercises = await Exercise.find({
             ...query,
             $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
-        }).sort({ name: 1 });
+        }).sort({ name: 1 }).lean(); // .lean() para que sea ultrarrápido
 
         res.json(exercises);
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error cargando ejercicios' });
     }
 };
 
-// 5. CREAR EJERCICIO CUSTOM
 const createCustomExercise = async (req, res) => {
     try {
         const { name, muscle } = req.body;
-        if (!name || !muscle) {
-            res.status(400);
-            throw new Error('Faltan datos');
-        }
-        const exercise = await Exercise.create({
-            name,
-            muscle,
-            category: 'strength',
-            user: req.user._id,
-            isCustom: true
-        });
+        if (!name || !muscle) { res.status(400); throw new Error('Faltan datos'); }
+        const exercise = await Exercise.create({ name, muscle, category: 'strength', user: req.user._id, isCustom: true });
         res.status(201).json(exercise);
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error creando ejercicio' });
     }
 };
 
-// 6. SEED
 const seedExercises = async (req, res) => {
     try {
         const count = await Exercise.countDocuments();
@@ -149,34 +136,27 @@ const seedExercises = async (req, res) => {
         await Exercise.insertMany(basics);
         res.json({ message: 'Ejercicios base creados' });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error en seed' });
     }
 };
 
 // ==========================================
-// 7. GUARDAR LOG DE GYM (MODIFICADO: RECOMPENSAS DINÁMICAS)
+// 7. GUARDAR LOG DE GYM (IA OPTIMIZADA)
 // ==========================================
 const saveWorkoutLog = async (req, res) => {
     try {
         const { routineId, routineName, duration, exercises, intensity } = req.body;
 
-        // 1. OBTENER PESO REAL
-        const lastWeightLog = await DailyLog.findOne({
-            user: req.user._id,
-            weight: { $gt: 0 }
-        }).sort({ date: -1 });
+        const lastWeightLog = await DailyLog.findOne({ user: req.user._id, weight: { $gt: 0 } }).sort({ date: -1 }).lean();
         const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
 
         let caloriesBurned = 0;
 
-        // 2. PREPARAR DATOS PARA LA IA
         const exercisesDescription = exercises.map(ex => {
             const setsDesc = ex.sets.map(s => `${s.weight}kg x ${s.reps}`).join(', ');
             return `- ${ex.name}: [${setsDesc}]`;
         }).join('\n');
 
-        // --- CASCADA DE IA PARA CALORÍAS ---
         const MODELS = ["google/gemini-2.0-flash-exp:free", "google/gemini-flash-1.5", "mistralai/mistral-nemo:free"];
         let calculated = false;
 
@@ -194,21 +174,21 @@ const saveWorkoutLog = async (req, res) => {
 
         for (const model of MODELS) {
             try {
-                const completion = await openrouter.chat.completions.create({
+                const completion = await fetchWithTimeout({
                     model: model,
                     messages: [{ role: "user", content: prompt }],
                     temperature: 0.1,
                     response_format: { type: "json_object" }
-                });
+                }, 4000);
+
                 let txt = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
                 const data = JSON.parse(txt);
                 caloriesBurned = Math.round(data.calories);
                 calculated = true;
                 break;
-            } catch (e) { }
+            } catch (e) { console.warn(`IA ${model} falló o tardó mucho. Probando siguiente...`); }
         }
 
-        // FALLBACK MANUAL SI IA FALLA
         if (!calculated) {
             const durationMin = duration / 60;
             let factor = 3.5;
@@ -217,20 +197,11 @@ const saveWorkoutLog = async (req, res) => {
             caloriesBurned = Math.round(durationMin * factor * (userWeight / 75));
         }
 
-        // 3. Guardar en Historial General
         const log = await WorkoutLog.create({
-            user: req.user._id,
-            routine: routineId,
-            routineName: routineName || 'Entrenamiento Libre',
-            duration,
-            exercises,
-            type: 'gym',
-            intensity: intensity || 'Media',
-            caloriesBurned,
-            date: new Date()
+            user: req.user._id, routine: routineId, routineName: routineName || 'Entrenamiento Libre',
+            duration, exercises, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date()
         });
 
-        // 4. Guardar en DailyLog
         const today = getTodayDateString();
 
         await DailyLog.findOneAndUpdate(
@@ -238,14 +209,8 @@ const saveWorkoutLog = async (req, res) => {
             {
                 $push: {
                     gymWorkouts: {
-                        name: routineName,
-                        duration: duration,
-                        caloriesBurned: caloriesBurned,
-                        intensity: intensity || 'Media',
-                        exercises: exercises.map(ex => ({
-                            name: ex.name,
-                            sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps }))
-                        })),
+                        name: routineName, duration: duration, caloriesBurned: caloriesBurned, intensity: intensity || 'Media',
+                        exercises: exercises.map(ex => ({ name: ex.name, sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps })) })),
                         timestamp: new Date()
                     }
                 }
@@ -253,149 +218,70 @@ const saveWorkoutLog = async (req, res) => {
             { upsert: true }
         );
 
-        // 🔥🔥🔥 RECOMPENSAS DINÁMICAS (AJUSTE FINAL) 🔥🔥🔥
-        // Fórmula:
-        // XP = 50% de las calorías
-        // Fichas (GameCoins) = 35% de las calorías
-        // Monedas (Reales) = 0
+        const xpReward = Math.max(5, Math.ceil(caloriesBurned * 0.50));
+        const gameCoinsReward = Math.max(5, Math.ceil(caloriesBurned * 0.35));
 
-        const xpReward = Math.ceil(caloriesBurned * 0.50);
-        const gameCoinsReward = Math.ceil(caloriesBurned * 0.35);
-        const coinsReward = 0;
+        const result = await levelService.addRewards(req.user._id, xpReward, 0, gameCoinsReward);
 
-        // Aseguramos un mínimo para motivar (al menos 5 de cada)
-        const finalXp = Math.max(5, xpReward);
-        const finalGameCoins = Math.max(5, gameCoinsReward);
-
-        const result = await levelService.addRewards(req.user._id, finalXp, coinsReward, finalGameCoins);
-
-        res.status(201).json({
-            message: `Entreno guardado: ${caloriesBurned} kcal`,
-            log,
-            user: result.user,
-            leveledUp: result.leveledUp
-        });
-
+        res.status(201).json({ message: `Entreno guardado: ${caloriesBurned} kcal`, log, user: result.user, leveledUp: result.leveledUp });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error guardando entrenamiento' });
     }
 };
 
-// ==========================================
-// 8. GUARDAR LOG DE DEPORTE (MODIFICADO: RECOMPENSAS DINÁMICAS)
-// ==========================================
 const saveSportLog = async (req, res) => {
     try {
         const { name, time, intensity, distance } = req.body;
-
-        const lastWeightLog = await DailyLog.findOne({
-            user: req.user._id,
-            weight: { $gt: 0 }
-        }).sort({ date: -1 });
-
+        const lastWeightLog = await DailyLog.findOne({ user: req.user._id, weight: { $gt: 0 } }).sort({ date: -1 }).lean();
         const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
         let caloriesBurned = 0;
 
-        // --- CASCADA DE IA ---
         const MODELS = ["google/gemini-2.0-flash-exp:free", "google/gemini-flash-1.5", "mistralai/mistral-nemo:free"];
         let calculated = false;
 
-        const prompt = `
-            Calcula calorías NETAS (sin basal) para:
-            - Actividad: "${name}"
-            - Tiempo: ${time} min
-            - Intensidad: ${intensity}
-            - Peso: ${userWeight} kg
-            - Distancia: ${distance || 'N/A'}
-            Responde SOLO JSON: { "calories": numero_entero }
-        `;
+        const prompt = `Calcula calorías NETAS (sin basal) para:
+            - Actividad: "${name}" - Tiempo: ${time} min - Intensidad: ${intensity} - Peso: ${userWeight} kg - Distancia: ${distance || 'N/A'}
+            Responde SOLO JSON: { "calories": numero_entero }`;
 
         for (const model of MODELS) {
             try {
-                const completion = await openrouter.chat.completions.create({
-                    model: model,
-                    messages: [{ role: "user", content: prompt }],
-                    temperature: 0.1,
-                    response_format: { type: "json_object" }
-                });
+                const completion = await fetchWithTimeout({
+                    model: model, messages: [{ role: "user", content: prompt }], temperature: 0.1, response_format: { type: "json_object" }
+                }, 4000);
+
                 let txt = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
                 const data = JSON.parse(txt);
                 caloriesBurned = Math.round(data.calories);
-                calculated = true;
-                break;
+                calculated = true; break;
             } catch (e) { }
         }
 
-        // FALLBACK MANUAL
         if (!calculated) {
-            let mets = 4;
-            if (intensity === 'Media') mets = 6;
-            if (intensity === 'Alta') mets = 8;
-            const hours = time / 60;
-            caloriesBurned = Math.round(mets * userWeight * hours);
+            let mets = intensity === 'Media' ? 6 : intensity === 'Alta' ? 8 : 4;
+            caloriesBurned = Math.round(mets * userWeight * (time / 60));
         }
 
-        // 2. Historial General
         const log = await WorkoutLog.create({
-            user: req.user._id,
-            routineName: name,
-            duration: time * 60,
-            intensity,
-            distance,
-            type: 'sport',
-            caloriesBurned: caloriesBurned,
-            date: new Date()
+            user: req.user._id, routineName: name, duration: time * 60, intensity, distance, type: 'sport', caloriesBurned, date: new Date()
         });
 
-        // 3. Daily Log
-        const today = getTodayDateString();
-
         await DailyLog.findOneAndUpdate(
-            { user: req.user._id, date: today },
-            {
-                $push: {
-                    sportWorkouts: {
-                        routineName: name,
-                        duration: time,
-                        intensity,
-                        distance,
-                        caloriesBurned: caloriesBurned,
-                        timestamp: new Date()
-                    }
-                }
-            },
+            { user: req.user._id, date: getTodayDateString() },
+            { $push: { sportWorkouts: { routineName: name, duration: time, intensity, distance, caloriesBurned, timestamp: new Date() } } },
             { upsert: true }
         );
 
-        // 🔥🔥🔥 RECOMPENSAS DINÁMICAS (AJUSTE FINAL) 🔥🔥🔥
-        // Fórmula idéntica:
-        // XP = 50% de las calorías
-        // Fichas (GameCoins) = 35% de las calorías
+        const xpReward = Math.max(5, Math.ceil(caloriesBurned * 0.50));
+        const gameCoinsReward = Math.max(5, Math.ceil(caloriesBurned * 0.35));
+        const result = await levelService.addRewards(req.user._id, xpReward, 0, gameCoinsReward);
 
-        const xpReward = Math.ceil(caloriesBurned * 0.50);
-        const gameCoinsReward = Math.ceil(caloriesBurned * 0.35);
-        const coinsReward = 0;
-
-        const finalXp = Math.max(5, xpReward);
-        const finalGameCoins = Math.max(5, gameCoinsReward);
-
-        const result = await levelService.addRewards(req.user._id, finalXp, coinsReward, finalGameCoins);
-
-        res.status(201).json({
-            message: `Registrado: ${caloriesBurned} kcal`,
-            log,
-            user: result.user,
-            leveledUp: result.leveledUp
-        });
-
+        res.status(201).json({ message: `Registrado: ${caloriesBurned} kcal`, log, user: result.user, leveledUp: result.leveledUp });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error registrando deporte' });
     }
 };
 
-// 9. CALCULAR PROGRESO SEMANAL
 const getWeeklyStats = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -432,12 +318,13 @@ const getWeeklyStats = async (req, res) => {
         res.json({ currentVolume: result.currentVolume, percentage: Math.round(percentage) });
 
     } catch (error) {
-        console.error("Error en Aggregation:", error);
         res.status(500).json({ message: 'Error calculando stats semanales' });
     }
 };
 
-// 10. DETALLE POR MÚSCULO
+// ==========================================
+// 🔥 OPTIMIZACIÓN DE MEMORIA: .lean() y .select()
+// ==========================================
 const getMuscleProgress = async (req, res) => {
     try {
         const { muscle } = req.query;
@@ -446,14 +333,18 @@ const getMuscleProgress = async (req, res) => {
         const exercises = await Exercise.find({
             muscle: muscle,
             $or: [{ user: userId }, { isCustom: false }, { user: null }]
-        }).select('name');
+        }).select('name').lean();
 
         const exerciseNames = exercises.map(e => e.name);
 
+        // SOLO traemos fecha y los sets de los ejercicios específicos, nada de documentos completos
         const logs = await WorkoutLog.find({
             user: userId,
             'exercises.name': { $in: exerciseNames }
-        }).sort({ date: 1 });
+        })
+            .select('date exercises.name exercises.sets')
+            .sort({ date: 1 })
+            .lean();
 
         const history = logs.map(log => {
             let sessionVolume = 0;
@@ -471,12 +362,11 @@ const getMuscleProgress = async (req, res) => {
         res.json(history.slice(-10));
 
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error cargando progreso muscular' });
     }
 };
 
-// 11. OBTENER HISTORIAL (RESTAURADO)
+// 11. OBTENER HISTORIAL (🔥 BLINDADO CONTRA OOM)
 const getRoutineHistory = async (req, res) => {
     try {
         const { exercises } = req.body;
@@ -489,36 +379,31 @@ const getRoutineHistory = async (req, res) => {
             return Math.round(w / (1.0278 - 0.0278 * r));
         };
 
+        // 🔥 CRÍTICO: .lean() evita que Node.js colapse con miles de registros
         const logs = await WorkoutLog.find({
             user: userId,
             'exercises.name': { $in: exercises }
-        }).sort({ date: 1 });
+        })
+            .select('date exercises.name exercises.sets')
+            .sort({ date: 1 })
+            .lean();
 
         logs.forEach(log => {
             log.exercises.forEach(ex => {
                 if (exercises.includes(ex.name)) {
                     if (!stats[ex.name]) {
-                        stats[ex.name] = {
-                            lastSets: [],
-                            bestSet: { weight: 0, reps: 0, value1RM: 0 }
-                        };
+                        stats[ex.name] = { lastSets: [], bestSet: { weight: 0, reps: 0, value1RM: 0 } };
                     }
 
-                    // 1. Guardar última sesión
                     const validSets = ex.sets.map(s => ({ weight: s.weight, reps: s.reps }));
                     if (validSets.length > 0) {
                         stats[ex.name].lastSets = validSets;
                     }
 
-                    // 2. Calcular PR
                     ex.sets.forEach(set => {
                         const rm = calc1RM(set.weight, set.reps);
                         if (rm > stats[ex.name].bestSet.value1RM) {
-                            stats[ex.name].bestSet = {
-                                weight: set.weight,
-                                reps: set.reps,
-                                value1RM: rm
-                            };
+                            stats[ex.name].bestSet = { weight: set.weight, reps: set.reps, value1RM: rm };
                         }
                     });
                 }
@@ -528,12 +413,10 @@ const getRoutineHistory = async (req, res) => {
         res.json(stats);
 
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: 'Error obteniendo historial' });
     }
 };
 
-// 12. SEED FAKE HISTORY
 const seedFakeHistory = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -556,14 +439,17 @@ const seedFakeHistory = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error en seed: ' + error.message }); }
 };
 
-// 13. ESTADÍSTICAS DETALLADAS DE UN EJERCICIO
+// 13. ESTADÍSTICAS DETALLADAS (🔥 BLINDADO)
 const getExerciseHistory = async (req, res) => {
     try {
         const { exerciseName } = req.query;
         const userId = req.user._id;
-        if (!exerciseName) return res.status(400).json({ message: 'Falta el nombre del ejercicio' });
+        if (!exerciseName) return res.status(400).json({ message: 'Falta nombre' });
 
-        const logs = await WorkoutLog.find({ user: userId, 'exercises.name': exerciseName }).sort({ date: 1 });
+        const logs = await WorkoutLog.find({ user: userId, 'exercises.name': exerciseName })
+            .select('date exercises.name exercises.sets')
+            .sort({ date: 1 })
+            .lean();
 
         const data = logs.map(log => {
             const exData = log.exercises.find(e => e.name === exerciseName);
@@ -586,13 +472,17 @@ const getExerciseHistory = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error cargando stats' }); }
 };
 
-// 14. ESTADO DEL CUERPO
 const getBodyStatus = async (req, res) => {
     try {
         const userId = req.user._id;
         const sinceDate = new Date(); sinceDate.setDate(sinceDate.getDate() - 30);
-        const logs = await WorkoutLog.find({ user: userId, type: 'gym', date: { $gte: sinceDate } });
-        const allExercises = await Exercise.find({ $or: [{ user: userId }, { isCustom: false }, { user: null }] });
+
+        const logs = await WorkoutLog.find({ user: userId, type: 'gym', date: { $gte: sinceDate } })
+            .select('exercises.name exercises.sets')
+            .lean();
+
+        const allExercises = await Exercise.find({ $or: [{ user: userId }, { isCustom: false }, { user: null }] }).lean();
+
         const exerciseToMuscle = {};
         allExercises.forEach(ex => { exerciseToMuscle[ex.name] = ex.muscle; });
 
@@ -605,48 +495,35 @@ const getBodyStatus = async (req, res) => {
             });
         });
         res.json(muscleStats);
-    } catch (error) { res.status(500).json({ message: 'Error cargando estado del cuerpo' }); }
+    } catch (error) { res.status(500).json({ message: 'Error estado del cuerpo' }); }
 };
 
-// 15. CHAT ENTRENADOR IA (CASCADA)
 const chatRoutineGenerator = async (req, res) => {
     const { prompt } = req.body;
     const TEXT_MODELS_CASCADE = ["google/gemini-2.0-flash-exp:free", "google/gemini-flash-1.5", "mistralai/mistral-nemo:free"];
     const SYSTEM_PROMPT = `
-    Eres un Entrenador Personal de Élite.
-    TU OBJETIVO: Crear una rutina basada en: "${prompt}".
+    Eres un Entrenador Personal de Élite. TU OBJETIVO: Crear una rutina basada en: "${prompt}".
     REGLAS:
     1. Genera 5-7 ejercicios lógicos.
-    2. IMPORTANTE: Para cada ejercicio, DEBES especificar el grupo muscular ("muscle").
-    3. Los músculos válidos son: 'Pecho', 'Espalda', 'Pierna', 'Hombro', 'Bíceps', 'Tríceps', 'Abdomen', 'Cardio'.
-    4. Devuelve SOLO UN JSON VÁLIDO.
-    
-    FORMATO JSON:
-    {
-        "name": "Nombre Epico",
-        "difficulty": "Novato" | "Guerrero" | "Leyenda",
-        "exercises": [
-            { "name": "Press Banca", "muscle": "Pecho", "sets": 4, "reps": "8-10", "rest": 90 }
-        ],
-        "message": "Frase motivadora"
-    }
+    2. Especifica el grupo muscular ("muscle") de entre: 'Pecho', 'Espalda', 'Pierna', 'Hombro', 'Bíceps', 'Tríceps', 'Abdomen', 'Cardio'.
+    3. Devuelve SOLO JSON. FORMATO: { "name": "Nombre", "difficulty": "Novato|Guerrero|Leyenda", "exercises": [{ "name": "Press", "muscle": "Pecho", "sets": 4, "reps": "8-10", "rest": 90 }], "message": "Motivación" }
     `;
 
     for (const model of TEXT_MODELS_CASCADE) {
         try {
-            const completion = await openrouter.chat.completions.create({
+            const completion = await fetchWithTimeout({
                 model: model,
                 messages: [{ role: "system", content: SYSTEM_PROMPT }],
                 temperature: 0.7,
                 response_format: { type: "json_object" }
-            });
+            }, 8000);
+
             let content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
             const jsonResponse = JSON.parse(content);
             return res.json(jsonResponse);
-        } catch (error) { }
+        } catch (error) { console.warn(`IA ${model} falló.`); }
     }
-    // Fallback
-    return res.json({ name: "Rutina de Emergencia", exercises: [{ name: "Flexiones", muscle: "Pecho", sets: 3, reps: "15", rest: 60 }], difficulty: "Novato", message: "Sistemas IA caídos. Aquí tienes algo básico." });
+    return res.json({ name: "Rutina de Emergencia", exercises: [{ name: "Flexiones", muscle: "Pecho", sets: 3, reps: "15", rest: 60 }], difficulty: "Novato", message: "Sistemas IA caídos." });
 };
 
 module.exports = {

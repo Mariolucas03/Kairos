@@ -5,7 +5,7 @@ const User = require('../models/User');
 const levelService = require('../services/levelService');
 const mongoose = require('mongoose');
 
-// 🔥 NUEVA TABLA DE RECOMPENSAS
+// 🔥 TABLA DE RECOMPENSAS
 const REWARD_TABLE = {
     easy: { xp: 50, gameCoins: 100, coins: 10 },
     medium: { xp: 75, gameCoins: 150, coins: 30 },
@@ -120,6 +120,7 @@ const updateProgress = asyncHandler(async (req, res) => {
     const { amount, editMode, title, target, frequency, difficulty, unit, specificDays } = req.body;
     const userId = req.user._id;
 
+    // 1. VALIDACIÓN INICIAL
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('Misión no encontrada'); }
 
@@ -128,6 +129,7 @@ const updateProgress = asyncHandler(async (req, res) => {
 
     if (!isParticipant && !isOwner) { res.status(401); throw new Error('No tienes permiso'); }
 
+    // 2. MODO EDICIÓN
     if (editMode) {
         if (title) mission.title = title.trim();
         if (target) mission.target = Number(target);
@@ -140,9 +142,10 @@ const updateProgress = asyncHandler(async (req, res) => {
         }
 
         if (frequency || difficulty) {
+            // 🔥 BUG FIX: El orden correcto era difficulty, frequency, isCoop
             const r = calculateRewards(
-                frequency || mission.frequency,
                 difficulty || mission.difficulty,
+                frequency || mission.frequency,
                 mission.isCoop
             );
             mission.xpReward = r.xpReward;
@@ -156,44 +159,102 @@ const updateProgress = asyncHandler(async (req, res) => {
         return res.json({ message: "Misión actualizada", mission });
     }
 
+    // 3. MODO PROGRESO (🔥 BLINDADO CON ATOMICIDAD)
     if (mission.isCoop && mission.invitationStatus === 'pending') {
         res.status(400); throw new Error('Tu compañero aún no ha aceptado.');
     }
+
     const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    // Resetear hábitos si es un nuevo día
     if (mission.type === 'habit' && mission.completed) {
         const last = new Date(mission.lastUpdated);
-        if (last.toDateString() === today.toDateString()) return res.status(200).json({ message: 'Ya completada hoy', alreadyCompleted: true });
-        mission.progress = 0; mission.completed = false;
-        if (mission.contributions) mission.participants.forEach(p => mission.contributions.set(p.toString(), 0));
+        if (last.toDateString() === today.toDateString()) {
+            return res.status(200).json({ message: 'Ya completada hoy', alreadyCompleted: true });
+        }
+
+        // Reset atómico
+        await Mission.findByIdAndUpdate(mission._id, {
+            $set: { progress: 0, completed: false, lastUpdated: today }
+        });
+        mission.progress = 0;
+        mission.completed = false;
     }
 
     const addAmount = Number(amount) || 1;
-
-    const linkedMissions = await Mission.find({ user: userId, title: mission.title, unit: mission.unit, _id: { $ne: mission._id }, completed: false });
-    for (let linked of linkedMissions) {
-        linked.progress += addAmount; linked.lastUpdated = today;
-        if (linked.progress >= linked.target) {
-            linked.completed = true; linked.progress = linked.target;
-            await levelService.addRewards(userId, linked.xpReward, linked.coinReward, linked.gameCoinReward);
-            await DailyLog.findOneAndUpdate({ user: userId, date: today.toISOString().split('T')[0] }, { $inc: { 'missionStats.completed': 1 }, $push: { 'missionStats.listCompleted': { title: linked.title, coinReward: linked.coinReward, xpReward: linked.xpReward, type: linked.type } } }, { upsert: true });
-        }
-        await linked.save();
-    }
-
-    mission.progress += addAmount;
-    mission.lastUpdated = today;
     let rewards = null, leveledUp = false, userResult = null;
 
-    if (mission.progress >= mission.target) {
-        mission.completed = true; mission.progress = mission.target;
-        for (const pId of mission.participants) {
-            const r = await levelService.addRewards(pId, mission.xpReward, mission.coinReward, mission.gameCoinReward);
-            if (pId.toString() === userId.toString()) { userResult = r.user; leveledUp = r.leveledUp; rewards = { xp: mission.xpReward, coins: mission.coinReward, gameCoins: mission.gameCoinReward }; }
+    // Función Helper para progresar y premiar sin Race Conditions
+    const processMissionCompletion = async (targetMission, isMain) => {
+        // Incrementamos de forma segura
+        const updated = await Mission.findOneAndUpdate(
+            { _id: targetMission._id, completed: false },
+            {
+                $inc: { progress: addAmount },
+                $set: { lastUpdated: today }
+            },
+            { new: true }
+        );
+
+        if (!updated) return null; // Ya estaba completada
+
+        if (updated.progress >= updated.target) {
+            // ATÓMICO: Solo el primer hilo que haga coincidir {completed: false} podrá cerrarla y dar el premio
+            const completedDoc = await Mission.findOneAndUpdate(
+                { _id: updated._id, completed: false },
+                { $set: { completed: true, progress: updated.target } },
+                { new: true }
+            );
+
+            if (completedDoc) {
+                // ESTE HILO ES EL GANADOR: REPARTE PREMIOS
+                for (const pId of completedDoc.participants) {
+                    const r = await levelService.addRewards(pId, completedDoc.xpReward, completedDoc.coinReward, completedDoc.gameCoinReward);
+                    if (isMain && pId.toString() === userId.toString()) {
+                        userResult = r.user;
+                        leveledUp = r.leveledUp;
+                        rewards = { xp: completedDoc.xpReward, coins: completedDoc.coinReward, gameCoins: completedDoc.gameCoinReward };
+                    }
+                }
+
+                await DailyLog.findOneAndUpdate(
+                    { user: userId, date: todayStr },
+                    {
+                        $inc: { 'missionStats.completed': 1 },
+                        $push: { 'missionStats.listCompleted': { title: completedDoc.title, coinReward: completedDoc.coinReward, xpReward: completedDoc.xpReward, type: completedDoc.type } }
+                    },
+                    { upsert: true }
+                );
+                return completedDoc;
+            }
         }
-        await DailyLog.findOneAndUpdate({ user: userId, date: today.toISOString().split('T')[0] }, { $inc: { 'missionStats.completed': 1 }, $push: { 'missionStats.listCompleted': { title: mission.title, coinReward: mission.coinReward, xpReward: mission.xpReward, type: mission.type } } }, { upsert: true });
+        return updated;
+    };
+
+    // Procesar Misiones Enlazadas (Con mismo nombre y unidad)
+    const linkedMissions = await Mission.find({ user: userId, title: mission.title, unit: mission.unit, _id: { $ne: mission._id }, completed: false });
+    for (let linked of linkedMissions) {
+        await processMissionCompletion(linked, false);
     }
-    await mission.save();
-    res.json({ message: mission.completed ? '¡Completada!' : 'Actualizada', mission, user: userResult, leveledUp, rewards, progressOnly: !mission.completed });
+
+    // Procesar Misión Principal
+    const finalMainMission = await processMissionCompletion(mission, true);
+
+    if (!finalMainMission) {
+        // La misión ya fue procesada por otro clic concurrente
+        const current = await Mission.findById(mission._id);
+        return res.json({ message: 'Ya procesado', mission: current, progressOnly: true });
+    }
+
+    res.json({
+        message: finalMainMission.completed ? '¡Completada!' : 'Actualizada',
+        mission: finalMainMission,
+        user: userResult,
+        leveledUp,
+        rewards,
+        progressOnly: !finalMainMission.completed
+    });
 });
 
 const deleteMission = asyncHandler(async (req, res) => {

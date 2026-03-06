@@ -1,23 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Zap, Info, X } from 'lucide-react';
 import api from '../../services/api';
 
 // --- RUTA DE LA IMAGEN DEL REVERSO ---
 const CARD_BACK_IMG = '/assets/images/reverso-carta.png';
 
-// --- CONFIGURACIÓN DE SÍMBOLOS Y PESOS ---
-// 'weight' define qué tan frecuente aparece como "relleno" en el cartón
+// --- CONFIGURACIÓN VISUAL DE SÍMBOLOS (Para el Frontend) ---
 const SYMBOLS = {
-    DIAMOND: { id: 'd', icon: '💎', prize: 500, type: 'coins', label: '500', weight: 2 },
-    XP: { id: 'x', icon: '⚡', prize: 200, type: 'xp', label: '200 XP', weight: 8 },
-    COIN: { id: 'c', icon: '🪙', prize: 100, type: 'coins', label: '100', weight: 15 },
-    LEMON: { id: 'l', icon: '🍋', prize: 50, type: 'coins', label: '50', weight: 25 },
-    SKULL: { id: 's', icon: '💀', prize: 0, type: 'none', label: '', weight: 25 },
-    POOP: { id: 'p', icon: '💩', prize: 0, type: 'none', label: '', weight: 25 }
+    DIAMOND: { id: 'd', icon: '💎', prize: 500, type: 'coins', label: '500' },
+    XP: { id: 'x', icon: '⚡', prize: 200, type: 'xp', label: '200 XP' },
+    COIN: { id: 'c', icon: '🪙', prize: 100, type: 'coins', label: '100' },
+    LEMON: { id: 'l', icon: '🍋', prize: 50, type: 'coins', label: '50' },
+    SKULL: { id: 's', icon: '💀', prize: 0, type: 'none', label: '' },
+    POOP: { id: 'p', icon: '💩', prize: 0, type: 'none', label: '' }
 };
-
-const SYMBOL_KEYS = Object.keys(SYMBOLS);
 
 // --- COMPONENTE DE CATARATA DE FICHAS ---
 const ChipRain = ({ isFading }) => {
@@ -62,7 +59,7 @@ export default function ScratchGame() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [grid, setGrid] = useState(Array(9).fill(null));
     const [revealed, setRevealed] = useState(Array(9).fill(false));
-    const [result, setResult] = useState(null);
+    const [result, setResult] = useState(null); // Guardaremos el resultado del backend aquí
 
     // UI
     const [showInfo, setShowInfo] = useState(false);
@@ -71,154 +68,74 @@ export default function ScratchGame() {
 
     const COST = 10;
 
-    // --- LOGICA DE PROBABILIDAD (CORE) ---
-
-    // Función auxiliar para obtener símbolo aleatorio basado en peso
-    const getRandomFiller = () => {
-        const totalWeight = Object.values(SYMBOLS).reduce((acc, s) => acc + s.weight, 0);
-        let random = Math.random() * totalWeight;
-        for (const key of SYMBOL_KEYS) {
-            if (random < SYMBOLS[key].weight) return SYMBOLS[key];
-            random -= SYMBOLS[key].weight;
-        }
-        return SYMBOLS.SKULL;
-    };
-
-    const generateGrid = () => {
-        // 1. Determinar si gana o pierde (35% Win Rate)
-        const isWin = Math.random() < 0.35;
-        let items = [];
-
-        if (isWin) {
-            // --- ESCENARIO: GANADOR ---
-            // Elegir premio
-            const prizeRand = Math.random();
-            let winSym;
-            if (prizeRand < 0.05) winSym = SYMBOLS.DIAMOND;      // 5% 
-            else if (prizeRand < 0.20) winSym = SYMBOLS.XP;      // 15%
-            else if (prizeRand < 0.50) winSym = SYMBOLS.COIN;    // 30%
-            else winSym = SYMBOLS.LEMON;                         // 50%
-
-            // Insertar 3 copias del ganador
-            items.push(winSym, winSym, winSym);
-
-            // Rellenar los otros 6 huecos con aleatorios (para despistar)
-            while (items.length < 9) {
-                const filler = getRandomFiller();
-                // Evitar accidentalmente crear otro premio de 3 (doble premio es raro pero posible, lo limitamos para control)
-                const count = items.filter(x => x.id === filler.id).length;
-                if (count < 2) {
-                    items.push(filler);
-                } else {
-                    items.push(SYMBOLS.SKULL); // Fallback seguro
-                }
-            }
-
-        } else {
-            // --- ESCENARIO: PERDEDOR (EL "CASI") ---
-            // Rellenamos aleatoriamente
-            for (let i = 0; i < 9; i++) {
-                items.push(getRandomFiller());
-            }
-
-            // VALIDACIÓN CRÍTICA: Asegurar que NO haya ganadores
-            // Esto permite que haya 2 Diamantes (Casi gano!), pero rompe el tercero.
-            const counts = {};
-            items.forEach(item => { counts[item.id] = (counts[item.id] || 0) + 1; });
-
-            Object.keys(counts).forEach(key => {
-                if (counts[key] >= 3) {
-                    // Si hay 3 iguales en un cartón perdedor, cambiamos los sobrantes por Calaveras
-                    // Dejamos 2 para crear el efecto "Casi"
-                    let removed = 0;
-                    items = items.map(item => {
-                        if (item.id === key && item.type !== 'none') {
-                            removed++;
-                            if (removed > 2) return Math.random() > 0.5 ? SYMBOLS.SKULL : SYMBOLS.POOP;
-                        }
-                        return item;
-                    });
-                }
-            });
-        }
-
-        // Barajar el array final para que los premios no estén siempre al principio
-        return items.sort(() => Math.random() - 0.5);
-    };
-
-    // --- GESTIÓN DE SALDO ---
-    const syncUserWithServer = (serverUser) => {
-        if (serverUser) {
-            setUser(prev => {
-                const updated = { ...prev, ...serverUser };
-                if (serverUser.gameCoins !== undefined) {
-                    updated.stats = { ...updated.stats, gameCoins: serverUser.gameCoins };
-                }
-                localStorage.setItem('user', JSON.stringify(updated));
-                return updated;
-            });
-            setVisualBalance(serverUser.gameCoins ?? serverUser.stats?.gameCoins ?? 0);
-        }
-    };
-
+    // --- ACTUALIZACIÓN DE SALDO ---
     const updateBalanceInstant = (amountToAdd) => {
         setVisualBalance(prev => Math.max(0, prev + amountToAdd));
         setUser(prevUser => {
             const current = prevUser.stats?.gameCoins ?? prevUser.gameCoins ?? 0;
             const newBalance = Math.max(0, current + amountToAdd);
             const updatedUser = { ...prevUser, gameCoins: newBalance, stats: { ...prevUser.stats, gameCoins: newBalance } };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
             return updatedUser;
         });
     };
 
-    // --- JUGAR ---
+    // --- JUGAR (CONEXIÓN AL BACKEND) ---
     const play = async () => {
         if (visualBalance < COST) { alert("No tienes suficientes fichas"); return; }
 
-        updateBalanceInstant(-COST);
-        api.post('/users/reward', { gameCoins: -COST })
-            .then(res => syncUserWithServer(res.data.user))
-            .catch(err => updateBalanceInstant(COST));
-
+        // 1. Cobrar visualmente al instante
+        setVisualBalance(prev => prev - COST);
         setIsPlaying(true);
         setRevealed(Array(9).fill(false));
         setResult(null);
         setShowRain(false);
         setIsRainFading(false);
 
-        // Generar grid con la nueva lógica orgánica
-        setGrid(generateGrid());
+        try {
+            // 2. Pedir resultado al backend (Inhackeable)
+            const res = await api.post('/games/scratch');
+
+            // 3. Cargar la matriz devuelta por el servidor (oculta hasta rascar)
+            setGrid(res.data.grid);
+
+            // 4. Guardar el resultado en memoria para cuando termine de rascar
+            setResult({
+                won: res.data.won,
+                prize: res.data.prize,
+                type: res.data.prizeType,
+                user: res.data.user // Usuario actualizado con el premio (si lo hubo)
+            });
+
+        } catch (error) {
+            console.error("Error comprando cartón:", error);
+            alert(error.response?.data?.message || "Error al comprar el cartón");
+            setIsPlaying(false);
+            setVisualBalance(currentFichas); // Rollback
+        }
     };
 
     const reveal = (i) => {
-        if (!isPlaying || revealed[i]) return;
+        if (!isPlaying || revealed[i] || !grid[i]) return;
         const newRev = [...revealed];
         newRev[i] = true;
         setRevealed(newRev);
 
-        if (newRev.every(Boolean)) checkWin(grid);
-    };
+        // Si es la última casilla rascada, mostramos el resultado
+        if (newRev.every(Boolean) && result) {
+            setIsPlaying(false);
 
-    const checkWin = async (finalGrid) => {
-        setIsPlaying(false);
-        const counts = {};
-        finalGrid.forEach(i => counts[i.id] = (counts[i.id] || 0) + 1);
+            if (result.won) {
+                setShowRain(true);
+                setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
+            }
 
-        const winSym = Object.values(SYMBOLS).find(s => counts[s.id] >= 3 && s.type !== 'none');
-
-        if (winSym) {
-            setResult({ won: true, prize: winSym.prize, label: winSym.icon });
-            setShowRain(true);
-            setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
-
-            const prize = winSym.prize;
-            updateBalanceInstant(prize);
-            api.post('/users/reward', { gameCoins: prize })
-                .then(res => syncUserWithServer(res.data.user))
-                .catch(console.error);
-        } else {
-            setResult({ won: false });
-            api.get('/auth/me').then(res => syncUserWithServer(res.data)).catch(() => { });
+            // Sincronizar el usuario con los datos que nos dio el servidor
+            if (result.user) {
+                setUser(result.user);
+                localStorage.setItem('user', JSON.stringify(result.user));
+                setVisualBalance(result.user.gameCoins ?? result.user.stats?.gameCoins ?? 0);
+            }
         }
     };
 
@@ -265,8 +182,8 @@ export default function ScratchGame() {
                                     `}
                                 >
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                        {revealed[i] ? (
-                                            <span className="text-5xl animate-in zoom-in duration-300 drop-shadow-md filter leading-none select-none">{item?.icon}</span>
+                                        {revealed[i] && item ? (
+                                            <span className="text-5xl animate-in zoom-in duration-300 drop-shadow-md filter leading-none select-none">{item.icon}</span>
                                         ) : (
                                             <img
                                                 src={CARD_BACK_IMG}
@@ -281,7 +198,7 @@ export default function ScratchGame() {
 
                         {/* CONTROLES / RESULTADO */}
                         <div className="relative z-10 min-h-[60px] flex items-center justify-center">
-                            {result ? (
+                            {revealed.every(Boolean) && result ? (
                                 <div className="text-center w-full animate-in zoom-in">
                                     <div className="mb-4">
                                         {result.won ? (
@@ -289,7 +206,7 @@ export default function ScratchGame() {
                                                 <span className="font-black text-2xl uppercase tracking-widest text-green-400 animate-pulse">¡PREMIO!</span>
                                                 <div className="flex items-center gap-2 bg-green-900/40 px-4 py-1 rounded-full border border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.3)]">
                                                     <span className="font-black text-white text-xl">+{result.prize}</span>
-                                                    <img src="/assets/icons/ficha.png" alt="f" className="w-5 h-5 object-contain" />
+                                                    {result.type === 'xp' ? <Zap size={20} className="text-blue-400" /> : <img src="/assets/icons/ficha.png" alt="f" className="w-5 h-5 object-contain" />}
                                                 </div>
                                             </div>
                                         ) : (
@@ -300,7 +217,7 @@ export default function ScratchGame() {
                                     <button
                                         onClick={play}
                                         disabled={visualBalance < COST}
-                                        className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-black py-4 rounded-xl uppercase transition-all shadow-lg shadow-yellow-900/20 active:scale-95 text-lg border-b-4 border-yellow-700 flex items-center justify-center gap-2"
+                                        className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-black py-4 rounded-xl uppercase transition-all shadow-lg shadow-yellow-900/20 active:scale-95 text-lg border-b-4 border-yellow-700 flex items-center justify-center gap-2 disabled:grayscale disabled:opacity-50"
                                     >
                                         <span>Jugar de nuevo</span>
                                         <div className="flex items-center bg-black/20 px-2 py-0.5 rounded text-sm">
@@ -365,7 +282,6 @@ export default function ScratchGame() {
                     </div>
                 </div>
             )}
-
         </div>
     );
 }

@@ -17,6 +17,26 @@ const openrouter = new OpenAI({
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 
 // ==========================================
+// ⏱️ HELPER: TIMEOUT PARA IA (EVITA BLOQUEOS)
+// ==========================================
+const fetchWithTimeout = async (config, timeoutMs = 8000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await openrouter.chat.completions.create(
+            config,
+            { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+};
+
+// ==========================================
 // 🧠 CÁLCULO MATEMÁTICO LOCAL (PLAN Z)
 // ==========================================
 const calculateLocalMacros = (text) => {
@@ -50,20 +70,22 @@ const chatMacroCalculator = async (req, res) => {
 
     for (const model of TEXT_MODELS_CASCADE) {
         try {
-            const completion = await openrouter.chat.completions.create({
+            // Usamos el helper con 8 segundos de límite
+            const completion = await fetchWithTimeout({
                 model: model,
                 messages: messages,
                 temperature: 0.5,
                 response_format: { type: "json_object" }
-            });
+            }, 8000);
+
             let content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
             const jsonResponse = JSON.parse(content);
             return res.json(jsonResponse);
         } catch (error) {
-            console.error(`❌ Falló ${model}: ${error.message}`);
+            console.error(`❌ Falló o tardó demasiado ${model}: ${error.message}`);
         }
     }
-    return res.json({ type: 'question', message: "No pude procesar los datos." });
+    return res.json({ type: 'question', message: "No pude procesar los datos por alta demanda. Intenta en unos minutos." });
 };
 
 // ==========================================
@@ -104,14 +126,13 @@ const analyzeFoodText = async (req, res) => {
         try {
             console.log(`🤖 Analizando comida con: ${model}...`);
 
-            const completion = await openrouter.chat.completions.create({
+            // Usamos el helper con 8 segundos de límite
+            const completion = await fetchWithTimeout({
                 model: model,
-                messages: [
-                    { role: "system", content: SYSTEM_PROMPT }
-                ],
+                messages: [{ role: "system", content: SYSTEM_PROMPT }],
                 temperature: 0.1,
                 response_format: { type: "json_object" }
-            });
+            }, 8000);
 
             let content = completion.choices[0].message.content;
             content = content.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -125,27 +146,26 @@ const analyzeFoodText = async (req, res) => {
             return res.json({ type: 'success', data: jsonResponse });
 
         } catch (error) {
-            console.error(`❌ Falló ${model}: ${error.message}. Probando siguiente...`);
+            console.error(`❌ Falló visión ${model}: ${error.message}. Probando siguiente...`);
         }
     }
 
-    return res.status(500).json({ message: "No se pudo calcular. Intenta ponerlo manual." });
+    return res.status(503).json({ message: "Sistemas IA saturados. Por favor, añádelo manualmente." });
 };
 
 // ==========================================
 // 📷 ANÁLISIS DE IMAGEN (MEGA CASCADA)
 // ==========================================
 const analyzeImage = async (req, res) => {
-    // 🔥 LISTA MASIVA DE MODELOS DE VISIÓN (Prioridad: Calidad -> Velocidad)
     const VISION_MODELS = [
-        "google/gemini-2.0-flash-exp:free",            // Top tier
-        "google/gemini-2.0-pro-exp-02-05:free",        // Experimental potente
-        "qwen/qwen-2.5-vl-72b-instruct:free",          // Excelente open source
-        "meta-llama/llama-3.2-90b-vision-instruct:free", // Llama Vision Grande
-        "meta-llama/llama-3.2-11b-vision-instruct:free", // Llama Vision Rápida
-        "mistralai/pixtral-12b:free",                  // Mistral Vision
-        "microsoft/phi-3.5-vision-instruct:free",      // Microsoft Vision
-        "google/gemini-flash-1.5-8b:free"              // Gemini Ligero
+        "google/gemini-2.0-flash-exp:free",
+        "google/gemini-2.0-pro-exp-02-05:free",
+        "qwen/qwen-2.5-vl-72b-instruct:free",
+        "meta-llama/llama-3.2-90b-vision-instruct:free",
+        "meta-llama/llama-3.2-11b-vision-instruct:free",
+        "mistralai/pixtral-12b:free",
+        "microsoft/phi-3.5-vision-instruct:free",
+        "google/gemini-flash-1.5-8b:free"
     ];
 
     try {
@@ -177,13 +197,14 @@ const analyzeImage = async (req, res) => {
             try {
                 console.log(`👁️ Intentando analizar imagen con: ${modelName}...`);
 
-                const completion = await openrouter.chat.completions.create({
+                // Usamos el helper con 12 segundos de límite (visión tarda más)
+                const completion = await fetchWithTimeout({
                     model: modelName,
                     messages: [
                         { role: "user", content: [{ type: "text", text: finalPrompt }, { type: "image_url", image_url: { url: base64Image } }] }
                     ],
                     temperature: 0.1
-                });
+                }, 12000);
 
                 let text = completion.choices[0].message.content;
                 const startIndex = text.indexOf('{');
@@ -193,10 +214,9 @@ const analyzeImage = async (req, res) => {
                     const jsonStr = text.substring(startIndex, endIndex + 1);
                     foodData = JSON.parse(jsonStr);
 
-                    // Validación simple para saber si la IA funcionó
                     if (foodData.name && (typeof foodData.calories === 'number')) {
                         console.log(`✅ ÉXITO con ${modelName}`);
-                        break; // Salimos del bucle si encontramos datos válidos
+                        break;
                     }
                 }
             } catch (e) {
@@ -204,11 +224,9 @@ const analyzeImage = async (req, res) => {
             }
         }
 
-        // Borramos la imagen temporal del servidor
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
         if (foodData) {
-            // Aseguramos enteros
             foodData.calories = Math.round(foodData.calories || 0);
             foodData.protein = Math.round(foodData.protein || 0);
             foodData.carbs = Math.round(foodData.carbs || 0);
@@ -217,7 +235,7 @@ const analyzeImage = async (req, res) => {
 
             return res.json(foodData);
         } else {
-            return res.status(503).json({ message: 'Ninguna IA pudo leer la imagen. Inténtalo de nuevo.' });
+            return res.status(503).json({ message: 'Ninguna IA pudo leer la imagen. Inténtalo de nuevo o usa texto.' });
         }
     } catch (error) {
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -313,7 +331,6 @@ const addFoodToLog = async (req, res) => {
     }
 };
 
-// 🔥 NUEVA FUNCIÓN: ELIMINAR COMIDA DE UN LOG (Punto 5)
 const removeFoodFromLog = async (req, res) => {
     try {
         const { mealId, foodItemId } = req.params;
@@ -325,23 +342,19 @@ const removeFoodFromLog = async (req, res) => {
         const meal = log.meals.id(mealId);
         if (!meal) return res.status(404).json({ message: 'Comida no encontrada' });
 
-        // Encontrar el alimento y restar sus macros
         const foodItem = meal.foods.id(foodItemId);
         if (!foodItem) return res.status(404).json({ message: 'Alimento no encontrado' });
 
-        // Restamos con cuidado de no bajar de 0
         log.totalCalories = Math.max(0, Math.round(log.totalCalories - foodItem.calories));
         log.totalProtein = Math.max(0, Math.round(log.totalProtein - foodItem.protein));
         log.totalCarbs = Math.max(0, Math.round(log.totalCarbs - foodItem.carbs));
         log.totalFat = Math.max(0, Math.round(log.totalFat - foodItem.fat));
         log.totalFiber = Math.max(0, Math.round(log.totalFiber - foodItem.fiber));
 
-        // Eliminar del array usando pull
         meal.foods.pull(foodItemId);
 
         await log.save();
 
-        // Sincronizar con DailyLog para que el widget del home se actualice
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: today },
             { $set: { "nutrition.totalKcal": log.totalCalories } }
@@ -375,7 +388,6 @@ const getSavedFoods = async (req, res) => {
 
 const saveCustomFood = async (req, res) => {
     try {
-        // 🔥 FIX PUNTO 13: Recibir y guardar la carpeta (folder)
         const { name, calories, protein, carbs, fat, fiber, servingSize, folder } = req.body;
 
         const newFood = await Food.create({
@@ -388,7 +400,7 @@ const saveCustomFood = async (req, res) => {
             fiber: fiber || 0,
             servingSize: servingSize || '1 ración',
             icon: '🍽️',
-            folder: folder || 'General' // Por defecto General si no se envía
+            folder: folder || 'General'
         });
         res.status(201).json(newFood);
     } catch (error) { res.status(500).json({ message: 'Error guardando comida' }); }
@@ -417,6 +429,5 @@ module.exports = {
     updateSavedFood, chatMacroCalculator,
     addFoodToLog, searchFoods, addFoodEntry,
     analyzeFoodText,
-    removeFoodFromLog // 🔥 Exportamos la nueva función
+    removeFoodFromLog
 };
-

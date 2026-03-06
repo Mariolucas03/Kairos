@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Info, X, Trash2, Undo2, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush } from 'lucide-react';
+import { ChevronLeft, Info, X, Trash2, Undo2, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import api from '../../services/api';
 
@@ -34,12 +34,10 @@ export default function Roulette() {
     const navigate = useNavigate();
 
     // SALDO VISUAL
-    const [visualBalance, setVisualBalance] = useState(user?.stats?.gameCoins ?? user?.gameCoins ?? 0);
+    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
+    const [visualBalance, setVisualBalance] = useState(currentFichas);
 
-    useEffect(() => {
-        setVisualBalance(user?.stats?.gameCoins ?? user?.gameCoins ?? 0);
-    }, [user?.stats?.gameCoins]);
-
+    useEffect(() => { setVisualBalance(currentFichas); }, [currentFichas]);
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
     // Estados Juego
@@ -64,25 +62,22 @@ export default function Roulette() {
     const [showRain, setShowRain] = useState(false);
     const [isRainFading, setIsRainFading] = useState(false);
 
-    // --- SYNC ---
-    const syncUserWithServer = (serverUser) => {
-        if (serverUser) {
-            setUser(prev => {
-                const updated = { ...prev, ...serverUser };
-                if (serverUser.gameCoins !== undefined) {
-                    updated.stats = { ...updated.stats, gameCoins: serverUser.gameCoins };
-                }
-                localStorage.setItem('user', JSON.stringify(updated));
-                return updated;
-            });
-        }
+    // --- ACTUALIZACIÓN DE SALDO ---
+    const updateBalanceInstant = (amountToAdd) => {
+        setVisualBalance(prev => Math.max(0, prev + amountToAdd));
+        setUser(prevUser => {
+            const current = prevUser.stats?.gameCoins ?? prevUser.gameCoins ?? 0;
+            const newBalance = Math.max(0, current + amountToAdd);
+            const updatedUser = { ...prevUser, gameCoins: newBalance, stats: { ...prevUser.stats, gameCoins: newBalance } };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            return updatedUser;
+        });
     };
 
     // --- APUESTAS ---
     const placeBet = (type, value, numbersCovered, multiplier) => {
         if (spinning) return;
         if (visualBalance < selectedChip) return;
-
         setVisualBalance(prev => prev - selectedChip);
         const newBet = { id: Math.random(), amount: selectedChip, type, value, numbers: numbersCovered, multiplier };
         setBets(prev => [...prev, newBet]);
@@ -106,12 +101,8 @@ export default function Roulette() {
     // --- PINTAR ---
     const handleInteractionStart = (num) => {
         setIsPointerDown(true);
-        if (paintMode || !isPointerDown) {
-            placeBet('number', num, [num], 36);
-            lastPaintedNumber.current = num;
-        }
+        if (paintMode || !isPointerDown) { placeBet('number', num, [num], 36); lastPaintedNumber.current = num; }
     };
-
     const handleInteractionMove = (e) => {
         if (!paintMode || !isPointerDown) return;
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -119,37 +110,16 @@ export default function Roulette() {
         const element = document.elementFromPoint(clientX, clientY);
         if (element && element.dataset.number) {
             const num = parseInt(element.dataset.number);
-            if (num !== lastPaintedNumber.current) {
-                placeBet('number', num, [num], 36);
-                lastPaintedNumber.current = num;
-            }
+            if (num !== lastPaintedNumber.current) { placeBet('number', num, [num], 36); lastPaintedNumber.current = num; }
         }
     };
-
-    const handleInteractionEnd = () => {
-        setIsPointerDown(false);
-        lastPaintedNumber.current = null;
-    };
-
+    const handleInteractionEnd = () => { setIsPointerDown(false); lastPaintedNumber.current = null; };
     const handleNumberClick = (num) => !paintMode && placeBet('number', num, [num], 36);
 
-    // --- JUGAR ---
+    // --- JUGAR (BACKEND CONECTADO) ---
     const spin = async () => {
-        if (bets.length === 0) {
-            if (!isTableOpen) setIsTableOpen(true);
-            return;
-        }
+        if (bets.length === 0) { if (!isTableOpen) setIsTableOpen(true); return; }
         if (spinning) return;
-
-        api.post('/users/reward', { gameCoins: -currentBetTotal })
-            .then(res => syncUserWithServer(res.data.user))
-            .catch(err => {
-                console.error(err);
-                setVisualBalance(prev => prev + currentBetTotal);
-                setBets([]);
-                alert("Error de conexión");
-                return;
-            });
 
         setIsTableOpen(false);
         setSpinning(true);
@@ -158,53 +128,52 @@ export default function Roulette() {
         setIsRainFading(false);
         setBallDistance(100);
 
-        const winIndex = Math.floor(Math.random() * WHEEL_NUMBERS.length);
-        const winNum = WHEEL_NUMBERS[winIndex];
+        try {
+            // 1. Pedir resultado al servidor
+            const res = await api.post('/games/roulette', { bets });
+            const { winNum, totalWin, user: updatedUser } = res.data;
 
-        // Animación
-        const wheelSpins = 5;
-        const segmentCenterOffset = SEGMENT_ANGLE / 2;
-        const currentRotationNormalized = wheelRotation % 360;
-        const targetAngle = winIndex * SEGMENT_ANGLE;
+            // 2. Calcular animación exacta para que caiga en winNum
+            const winIndex = WHEEL_NUMBERS.indexOf(winNum);
+            const wheelSpins = 5;
+            const currentRotationNormalized = wheelRotation % 360;
+            const targetAngle = winIndex * SEGMENT_ANGLE;
+            const newWheelRotation = wheelRotation + (360 * wheelSpins) + (targetAngle - currentRotationNormalized);
 
-        const newWheelRotation = wheelRotation + (360 * wheelSpins) + (targetAngle - currentRotationNormalized);
-        setWheelRotation(newWheelRotation);
+            setWheelRotation(newWheelRotation);
+            setBallRotation(ballRotation + (8 * 360));
+            setTimeout(() => setBallDistance(54), SPIN_DURATION - 800);
 
-        const ballSpins = 8 * 360;
-        setBallRotation(ballRotation + ballSpins);
+            // 3. Finalizar y mostrar premios
+            setTimeout(() => {
+                setSpinning(false);
+                setBets([]);
 
-        setTimeout(() => setBallDistance(54), SPIN_DURATION - 800);
+                const isRed = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(winNum);
+                const winColor = winNum === 0 ? 'green' : isRed ? 'red' : 'black';
 
-        setTimeout(() => {
+                setResultModal({ won: totalWin > 0, num: winNum, color: winColor, payout: totalWin });
+
+                if (totalWin > 0) {
+                    setShowRain(true);
+                    setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
+                    confetti();
+                }
+
+                // Sincronizar el saldo devuelto por el servidor
+                setUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                setVisualBalance(updatedUser.gameCoins ?? updatedUser.stats?.gameCoins ?? 0);
+
+            }, SPIN_DURATION);
+
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.message || "Error al tirar");
             setSpinning(false);
-            resolveGame(winNum, [...bets]);
-        }, SPIN_DURATION);
-    };
-
-    const resolveGame = (winNum, playedBets) => {
-        let totalWin = 0;
-        playedBets.forEach(bet => {
-            if (bet.numbers.includes(winNum)) totalWin += bet.amount * bet.multiplier;
-        });
-
-        setBets([]);
-
-        const isRed = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(winNum);
-        const winColor = winNum === 0 ? 'green' : isRed ? 'red' : 'black';
-
-        if (totalWin > 0) {
-            setVisualBalance(prev => prev + totalWin);
-            setShowRain(true);
-            setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
-            confetti();
-            api.post('/users/reward', { gameCoins: totalWin })
-                .then(res => syncUserWithServer(res.data.user))
-                .catch(console.error);
-        } else {
-            api.get('/auth/me').then(res => syncUserWithServer(res.data)).catch(() => { });
+            setVisualBalance(prev => prev + currentBetTotal); // Rollback
+            setBets([]);
         }
-
-        setResultModal({ won: totalWin > 0, num: winNum, color: winColor, payout: totalWin });
     };
 
     // --- ESTILOS ---
@@ -243,13 +212,7 @@ export default function Roulette() {
     };
 
     return (
-        <div
-            className="fixed inset-0 bg-black flex flex-col items-center pt-20 overflow-hidden select-none font-sans"
-            onMouseUp={handleInteractionEnd}
-            onMouseLeave={handleInteractionEnd}
-            onTouchEnd={handleInteractionEnd}
-            onTouchMove={handleInteractionMove}
-        >
+        <div className="fixed inset-0 bg-black flex flex-col items-center pt-20 overflow-hidden select-none font-sans" onMouseUp={handleInteractionEnd} onMouseLeave={handleInteractionEnd} onTouchEnd={handleInteractionEnd} onTouchMove={handleInteractionMove}>
             {showRain && <ChipRain isFading={isRainFading} />}
 
             {/* HEADER */}
@@ -262,11 +225,10 @@ export default function Roulette() {
                 <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
             </div>
 
-            {/* RUEDA (CENTRADA ARRIBA) */}
+            {/* RUEDA */}
             <div className="flex-1 w-full flex flex-col items-center justify-start py-6 relative z-10 transition-all duration-500" style={{ opacity: isTableOpen ? 0.3 : 1, transform: isTableOpen ? 'scale(0.9) translateY(-20px)' : 'scale(1) translateY(0)' }}>
                 <div className="relative w-72 h-72 md:w-80 md:h-80">
-                    <div className="w-full h-full rounded-full border-[6px] border-zinc-800 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden"
-                        style={{ transform: `rotate(-${wheelRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.25, 0.1, 0.25, 1)` : 'none' }}>
+                    <div className="w-full h-full rounded-full border-[6px] border-zinc-800 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden" style={{ transform: `rotate(-${wheelRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.25, 0.1, 0.25, 1)` : 'none' }}>
                         <div className="absolute inset-0" style={{ background: `conic-gradient(${WHEEL_NUMBERS.map((n, i) => { const color = n === 0 ? '#15803d' : [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n) ? '#b91c1c' : '#18181b'; return `${color} ${i * SEGMENT_ANGLE}deg ${(i + 1) * SEGMENT_ANGLE}deg`; }).join(', ')})` }}></div>
                         {WHEEL_NUMBERS.map((num, i) => (
                             <div key={i} className="absolute top-0 left-1/2 -ml-[1px] w-[2px] h-[50%] flex flex-col items-center pt-2 origin-bottom" style={{ transform: `rotate(${i * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2)}deg)` }}>
@@ -283,12 +245,8 @@ export default function Roulette() {
                 </div>
             </div>
 
-            {/* --- PANEL DESLIZANTE (BOTTOM SHEET) --- */}
-            <div
-                className={`fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_60px_rgba(0,0,0,0.9)] z-30 flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)`}
-                style={{ height: isTableOpen ? '65%' : '140px' }}
-            >
-                {/* 1. BARRA CONTROL (Siempre visible) */}
+            {/* PANEL DESLIZANTE MESA */}
+            <div className={`fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_60px_rgba(0,0,0,0.9)] z-30 flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)`} style={{ height: isTableOpen ? '65%' : '140px' }}>
                 <div className="px-3 pt-3 pb-2 flex items-center justify-between gap-2 border-b border-white/5 bg-zinc-900 rounded-t-[2rem]">
                     <button onClick={() => setPaintMode(!paintMode)} disabled={spinning} className={`p-2 rounded-xl border transition-all ${paintMode ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-zinc-800 border-zinc-600 text-zinc-400'}`}>
                         <Paintbrush size={18} />
@@ -303,33 +261,27 @@ export default function Roulette() {
                     </button>
                 </div>
 
-                {/* 2. MESA (Visible solo abierta) */}
                 <div className={`flex-1 overflow-hidden relative flex items-center justify-center bg-zinc-950/50 transition-opacity duration-300 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                     <div className="transform scale-[0.65] origin-center w-full flex flex-col items-center">
-                        {/* TABLERO */}
                         <div className="grid grid-cols-[50px_1fr_40px] gap-1 select-none min-w-[600px]">
                             <button onMouseDown={() => !paintMode && placeBet('number', 0, [0], 36)} onPointerDown={() => paintMode && handleInteractionStart(0)} onMouseEnter={(e) => paintMode && isPointerDown && handleInteractionMove(e)} data-number="0" className="rounded-l-lg border border-green-700 bg-green-900/60 flex items-center justify-center text-white font-black text-xl hover:bg-green-800 relative touch-none" style={{ gridRow: '1 / span 3' }}>
-                                <span className="-rotate-90">0</span>
-                                {renderBoardChip(b => b.value === 0)}
+                                <span className="-rotate-90">0</span>{renderBoardChip(b => b.value === 0)}
                             </button>
                             <div className="grid grid-cols-12 grid-rows-3 gap-[1px]">
                                 {TABLE_ROWS.map((row) => row.map((num) => (
                                     <button key={num} onMouseDown={() => !paintMode && handleNumberClick(num)} onPointerDown={() => paintMode && handleInteractionStart(num)} onMouseEnter={(e) => paintMode && isPointerDown && handleInteractionMove(e)} data-number={num} className={`h-12 border flex items-center justify-center text-white font-bold text-lg relative ${getNumColor(num)} hover:brightness-125 touch-none`}>
-                                        {num}
-                                        {renderBoardChip(b => b.type === 'number' && b.value === num)}
+                                        {num}{renderBoardChip(b => b.type === 'number' && b.value === num)}
                                     </button>
                                 )))}
                             </div>
                             <div className="grid grid-rows-3 gap-[1px]">
                                 {[3, 2, 1].map((colNum, i) => (
                                     <button key={i} onClick={() => placeBet('column', colNum, TABLE_ROWS[i], 3)} className="border border-zinc-600 bg-zinc-800/50 text-[10px] text-zinc-300 font-bold hover:bg-zinc-700 flex items-center justify-center relative rounded-r-lg">
-                                        <span className="-rotate-90">2:1</span>
-                                        {renderBoardChip(b => b.type === 'column' && b.value === colNum)}
+                                        <span className="-rotate-90">2:1</span>{renderBoardChip(b => b.type === 'column' && b.value === colNum)}
                                     </button>
                                 ))}
                             </div>
                         </div>
-                        {/* EXTERNAS */}
                         <div className="mt-1 grid grid-cols-[50px_1fr_40px] gap-1 min-w-[600px]">
                             <div></div>
                             <div className="grid grid-rows-2 gap-1">
@@ -352,21 +304,12 @@ export default function Roulette() {
                     </div>
                 </div>
 
-                {/* 3. FOOTER (Botones siempre visibles) */}
                 <div className="px-4 pb-6 pt-2 flex gap-3 items-center border-t border-white/5 bg-zinc-900 mt-auto">
                     <div className="flex gap-1">
                         <button onClick={undoLastBet} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-zinc-400 disabled:opacity-30"><Undo2 size={20} /></button>
                         <button onClick={clearBets} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-red-400 disabled:opacity-30"><Trash2 size={20} /></button>
                     </div>
-
-                    <button
-                        onClick={() => {
-                            if (bets.length === 0 && !isTableOpen) setIsTableOpen(true);
-                            else spin();
-                        }}
-                        disabled={spinning}
-                        className={`flex-1 font-black py-4 rounded-xl text-xl uppercase tracking-widest shadow-xl border-b-4 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center gap-2 ${bets.length === 0 && !isTableOpen ? 'bg-zinc-700 text-white border-zinc-900' : 'bg-gradient-to-r from-yellow-500 to-yellow-700 text-black border-yellow-900'}`}
-                    >
+                    <button onClick={() => { if (bets.length === 0 && !isTableOpen) setIsTableOpen(true); else spin(); }} disabled={spinning} className={`flex-1 font-black py-4 rounded-xl text-xl uppercase tracking-widest shadow-xl border-b-4 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center gap-2 ${bets.length === 0 && !isTableOpen ? 'bg-zinc-700 text-white border-zinc-900' : 'bg-gradient-to-r from-yellow-500 to-yellow-700 text-black border-yellow-900'}`}>
                         {spinning ? 'GIRANDO...' : (bets.length === 0 && !isTableOpen) ? 'APOSTAR' : 'GIRAR'}
                         {bets.length > 0 && <span className="text-sm font-bold bg-black/20 px-2 py-0.5 rounded text-yellow-900">{currentBetTotal}</span>}
                     </button>
@@ -375,8 +318,8 @@ export default function Roulette() {
 
             {/* MODAL RESULTADO */}
             {resultModal && (
-                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-200" onClick={() => setResultModal(null)}>
-                    <div className={`w-full max-w-xs rounded-[32px] p-8 text-center border-2 shadow-2xl relative ${resultModal.won ? 'bg-green-900/40 border-green-500' : 'bg-red-900/40 border-red-500'}`} onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
+                    <div className={`w-full max-w-xs rounded-[32px] p-8 text-center border-2 shadow-2xl relative ${resultModal.won ? 'bg-green-900/40 border-green-500' : 'bg-red-900/40 border-red-500'}`}>
                         <div className="mb-4 flex justify-center">
                             <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl font-black text-white shadow-xl border-4 ${resultModal.color === 'red' ? 'bg-red-600 border-red-400' : resultModal.color === 'black' ? 'bg-black border-zinc-500' : 'bg-green-600 border-green-400'}`}>
                                 {resultModal.num}
@@ -389,14 +332,14 @@ export default function Roulette() {
                                 <img src="/assets/icons/ficha.png" className="w-8 h-8" alt="f" />
                             </div>
                         )}
-                        <button onClick={() => setResultModal(null)} className="w-full py-4 bg-white text-black font-black rounded-2xl uppercase tracking-widest shadow-lg active:scale-95 transition-transform hover:bg-zinc-200">CONTINUAR</button>
+                        <button onClick={() => setResultModal(null)} className="w-full mt-4 py-4 bg-white text-black font-black rounded-2xl uppercase tracking-widest shadow-lg active:scale-95 transition-transform hover:bg-zinc-200">CONTINUAR</button>
                     </div>
                 </div>
             )}
 
             {/* MODAL INFO */}
             {showInfo && (
-                <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
+                <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
                     <div className="bg-zinc-900 w-full max-w-xs rounded-3xl border border-white/10 p-6 relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
                         <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">Pagos</h3>

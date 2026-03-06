@@ -3,49 +3,30 @@ import { useOutletContext, Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Spade, Club, Heart, Diamond, Info, X, Trophy, Frown, Handshake } from 'lucide-react';
 import api from '../../services/api';
 
-// --- UTILIDAD PARA PAUSAS ---
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// --- COMPONENTE CARTA ---
+const Card = ({ card, hidden, small }) => (
+    <div className={`
+        flex-shrink-0 animate-in fade-in zoom-in slide-in-from-top-4 duration-500
+        ${small ? 'w-12 h-16 md:w-14 md:h-20 text-xs' : 'w-16 h-24 md:w-20 md:h-28 text-base'}
+        rounded-xl shadow-xl flex flex-col items-center justify-center relative transition-all select-none overflow-hidden
+        ${hidden ? 'border-2 border-white/20 bg-black' : 'bg-white border border-zinc-300'}
+    `}>
+        {hidden ? (
+            <img src="/assets/images/reverso-carta.png" alt="Hidden" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+            <>
+                <span className={`font-black absolute top-1 left-1.5 leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.value}</span>
+                <span className={`text-2xl md:text-4xl ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.suit}</span>
+                <span className={`font-black absolute bottom-1 right-1.5 rotate-180 leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.value}</span>
+            </>
+        )}
+    </div>
+);
 
-// --- COMPONENTE DE CATARATA DE FICHAS ---
-const ChipRain = ({ isFading }) => {
-    const [drops] = useState(() => Array.from({ length: 200 }).map((_, i) => ({
-        id: i,
-        left: Math.random() * 100,
-        startTop: -(Math.random() * 150 + 10),
-        delay: Math.random() * 1,
-        duration: 1.2 + Math.random(),
-        size: 15 + Math.random() * 60,
-        opacity: 0.3 + Math.random() * 0.7
-    })));
-
-    return (
-        <div className={`fixed inset-0 pointer-events-none z-[9999] overflow-hidden transition-opacity duration-1000 ease-out ${isFading ? 'opacity-0' : 'opacity-100'}`}>
-            <style>{`@keyframes cascadeFall { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(150vh) rotate(720deg); } }`}</style>
-            {drops.map((drop) => (
-                <img key={drop.id} src="/assets/icons/ficha.png" alt="ficha" className="absolute will-change-transform" style={{ left: `${drop.left}%`, top: `${drop.startTop}vh`, width: `${drop.size}px`, height: `${drop.size}px`, opacity: drop.opacity, animation: `cascadeFall ${drop.duration}s linear ${drop.delay}s infinite` }} />
-            ))}
-        </div>
-    );
-};
-
-// LÓGICA DE BARAJA
-const SUITS = ['♠', '♥', '♣', '♦'];
-const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-
-const createDeck = () => {
-    let deck = [];
-    for (let suit of SUITS) for (let value of VALUES) {
-        let weight = parseInt(value);
-        if (['J', 'Q', 'K'].includes(value)) weight = 10;
-        if (value === 'A') weight = 11;
-        deck.push({ suit, value, weight, id: Math.random() });
-    }
-    return deck.sort(() => Math.random() - 0.5);
-};
-
+// Calcular score visualmente en frontend (el servidor ya validó la lógica)
 const calculateScore = (hand) => {
     let score = 0, aces = 0;
-    hand.forEach(c => { score += c.weight; if (c.value === 'A') aces++; });
+    hand.forEach(c => { if (c.hidden) return; score += c.weight; if (c.value === 'A') aces++; });
     while (score > 21 && aces > 0) { score -= 10; aces--; }
     return score;
 };
@@ -59,359 +40,76 @@ export default function BlackJack() {
     const [visualBalance, setVisualBalance] = useState(currentFichas);
 
     useEffect(() => { setVisualBalance(currentFichas); }, [currentFichas]);
+    useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
-    // Ocultar UI global
-    useEffect(() => {
-        setIsUiHidden(true);
-        return () => setIsUiHidden(false);
-    }, [setIsUiHidden]);
+    // Estados JWT y Backend
+    const [sessionToken, setSessionToken] = useState(null);
+    const [gameState, setGameState] = useState(null); // {pHands, dHand, activeHand, status, payout}
 
-    const [deck, setDeck] = useState([]);
-    const [dealerHand, setDealerHand] = useState([]);
-    const [playerHands, setPlayerHands] = useState([]);
-    const [currentHandIndex, setCurrentHandIndex] = useState(0);
-
-    const [gameState, setGameState] = useState('betting');
     const [bet, setBet] = useState(20);
     const [isProcessing, setIsProcessing] = useState(false);
-
-    // Estados UI
-    const [showRain, setShowRain] = useState(false);
-    const [isRainFading, setIsRainFading] = useState(false);
-    const [showInfo, setShowInfo] = useState(false);
     const [resultModal, setResultModal] = useState(null);
+    const [showInfo, setShowInfo] = useState(false);
 
-    useEffect(() => { setDeck(createDeck()); }, []);
-
-    // --- FUNCIÓN CRÍTICA: SINCRONIZAR CON HEADER ---
-    const syncUserWithServer = (serverUser) => {
-        if (serverUser) {
-            setUser(prev => {
-                const updated = { ...prev, ...serverUser };
-                if (serverUser.gameCoins !== undefined) {
-                    updated.stats = { ...updated.stats, gameCoins: serverUser.gameCoins };
-                }
-                localStorage.setItem('user', JSON.stringify(updated));
-                return updated;
-            });
-            setVisualBalance(serverUser.gameCoins ?? serverUser.stats?.gameCoins ?? 0);
-        }
-    };
-
-    // --- PAGO INSTANTÁNEO (OPTIMISTA) ---
+    // --- SINCRONIZACIÓN ---
     const updateBalanceInstant = (amountToAdd) => {
         setVisualBalance(prev => Math.max(0, prev + amountToAdd));
-        setUser(prevUser => {
-            const current = prevUser.stats?.gameCoins ?? prevUser.gameCoins ?? 0;
-            const newBalance = Math.max(0, current + amountToAdd);
-            const updatedUser = { ...prevUser, gameCoins: newBalance, stats: { ...prevUser.stats, gameCoins: newBalance } };
-            return updatedUser;
-        });
     };
 
-    // --- REPARTIR INICIAL ---
-    const dealGame = async () => {
-        if (visualBalance < bet) { alert("No tienes suficientes fichas"); return; }
+    // --- ACCIÓN CENTRALIZADA HACIA EL BACKEND ---
+    const handleAction = async (action) => {
         if (isProcessing) return;
-        setIsProcessing(true);
 
+        // Validaciones pre-vuelo
+        if (action === 'deal' && visualBalance < bet) return alert("Fichas insuficientes");
+        if (action === 'double' && visualBalance < gameState.pHands[gameState.activeHand].bet) return alert("Fichas insuficientes para doblar");
+
+        setIsProcessing(true);
+        if (action === 'deal') { setResultModal(null); updateBalanceInstant(-bet); }
+
+        try {
+            const res = await api.post('/games/blackjack', { action, bet, token: sessionToken });
+            const { state, token, user: updatedUser } = res.data;
+
+            setSessionToken(token);
+            setGameState(state);
+
+            // Si el estado es ended, mostrar modal de resultado
+            if (state.status === 'ended') {
+                setTimeout(() => {
+                    const won = state.payout > 0;
+                    const isPush = state.payout > 0 && state.payout === state.pHands.reduce((acc, h) => acc + h.bet, 0); // Lógica simple para UI de empate
+
+                    if (updatedUser) {
+                        setUser(updatedUser);
+                        localStorage.setItem('user', JSON.stringify(updatedUser));
+                        setVisualBalance(updatedUser.gameCoins ?? updatedUser.stats?.gameCoins ?? 0);
+                    }
+
+                    setResultModal({
+                        type: won ? (isPush ? 'push' : 'win') : 'lose',
+                        amount: state.payout
+                    });
+                }, 1000); // 1 segundo de suspense al levantar carta del dealer
+            }
+
+        } catch (error) {
+            console.error("BJ Error:", error);
+            alert(error.response?.data?.message || "Error conectando al casino.");
+            if (action === 'deal') updateBalanceInstant(bet); // Rollback
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const resetGame = () => {
+        setGameState(null);
+        setSessionToken(null);
         setResultModal(null);
-        setShowRain(false); setIsRainFading(false);
-
-        // 1. Cobro Instantáneo Visual
-        updateBalanceInstant(-bet);
-
-        // 2. Cobro Real en Backend
-        api.post('/users/reward', { gameCoins: -bet })
-            .then(res => syncUserWithServer(res.data.user))
-            .catch(err => {
-                console.error(err);
-                updateBalanceInstant(bet); // Rollback
-            });
-
-        setGameState('dealing');
-        setDealerHand([]);
-        setPlayerHands([]);
-        setCurrentHandIndex(0);
-
-        let currentDeck = [...deck];
-        if (currentDeck.length < 15) currentDeck = createDeck();
-
-        // Reparto animación
-        const p1 = currentDeck.pop();
-        setPlayerHands([{ cards: [p1], bet: bet, isDone: false, isDoubled: false }]);
-        setDeck([...currentDeck]);
-        await sleep(400);
-
-        const d1 = currentDeck.pop();
-        setDealerHand([d1]);
-        setDeck([...currentDeck]);
-        await sleep(400);
-
-        const p2 = currentDeck.pop();
-        setPlayerHands(prev => {
-            const newHands = [...prev];
-            const updatedHand = { ...newHands[0] };
-            updatedHand.cards = [...updatedHand.cards, p2];
-            newHands[0] = updatedHand;
-            return newHands;
-        });
-        setDeck([...currentDeck]);
-        await sleep(400);
-
-        const d2 = currentDeck.pop();
-        setDealerHand([d1, d2]);
-        setDeck([...currentDeck]);
-        await sleep(400);
-
-        setGameState('playing');
-        setIsProcessing(false);
-
-        // Check Blackjack Natural
-        if (calculateScore([p1, p2]) === 21) {
-            setPlayerHands([{ cards: [p1, p2], bet: bet, isDone: true, isDoubled: false }]);
-            await sleep(500);
-            resolveGame([d1, d2], [{ cards: [p1, p2], bet: bet, isDone: true }]);
-        }
     };
-
-    // --- ACCIONES ---
-    const hit = async () => {
-        if (isProcessing) return;
-        setIsProcessing(true);
-
-        const newDeck = [...deck];
-        const card = newDeck.pop();
-        setDeck(newDeck);
-
-        let busted = false;
-
-        setPlayerHands(prev => {
-            const newHands = [...prev];
-            const currentHand = { ...newHands[currentHandIndex], cards: [...newHands[currentHandIndex].cards] };
-            currentHand.cards.push(card);
-            newHands[currentHandIndex] = currentHand;
-
-            if (calculateScore(currentHand.cards) > 21) {
-                currentHand.isDone = true;
-                busted = true;
-            }
-            return newHands;
-        });
-
-        await sleep(500);
-
-        if (busted) {
-            nextHand(playerHands);
-        }
-        setIsProcessing(false);
-    };
-
-    const stand = () => {
-        if (isProcessing) return;
-        setPlayerHands(prev => {
-            const newHands = [...prev];
-            newHands[currentHandIndex] = { ...newHands[currentHandIndex], isDone: true };
-            setTimeout(() => nextHand(newHands), 0);
-            return newHands;
-        });
-    };
-
-    const doubleDown = () => {
-        const currentHand = playerHands[currentHandIndex];
-        if (visualBalance < currentHand.bet) { alert("No tienes fichas para doblar"); return; }
-        if (isProcessing) return;
-        setIsProcessing(true);
-
-        updateBalanceInstant(-currentHand.bet);
-        api.post('/users/reward', { gameCoins: -currentHand.bet })
-            .then(res => syncUserWithServer(res.data.user))
-            .catch(err => updateBalanceInstant(currentHand.bet));
-
-        const newDeck = [...deck];
-        const card = newDeck.pop();
-        setDeck(newDeck);
-
-        setPlayerHands(prev => {
-            const newHands = [...prev];
-            const handCopy = { ...newHands[currentHandIndex], cards: [...newHands[currentHandIndex].cards] };
-            handCopy.bet *= 2;
-            handCopy.isDoubled = true;
-            handCopy.cards.push(card);
-            handCopy.isDone = true;
-            newHands[currentHandIndex] = handCopy;
-
-            setTimeout(() => {
-                nextHand(newHands);
-                setIsProcessing(false);
-            }, 1000);
-            return newHands;
-        });
-    };
-
-    const split = async () => {
-        const currentHand = playerHands[currentHandIndex];
-        if (visualBalance < currentHand.bet) { alert("No tienes fichas para dividir"); return; }
-        if (isProcessing) return;
-        setIsProcessing(true);
-
-        updateBalanceInstant(-currentHand.bet);
-        api.post('/users/reward', { gameCoins: -currentHand.bet })
-            .then(res => syncUserWithServer(res.data.user))
-            .catch(err => updateBalanceInstant(currentHand.bet));
-
-        let currentDeck = [...deck];
-        const splitCard1 = currentHand.cards[0];
-        const splitCard2 = currentHand.cards[1];
-
-        const hand1Base = { cards: [splitCard1], bet: currentHand.bet, isDone: false };
-        const hand2Base = { cards: [splitCard2], bet: currentHand.bet, isDone: false };
-
-        let tempHands = [...playerHands];
-        tempHands.splice(currentHandIndex, 1, hand1Base, hand2Base);
-        setPlayerHands(tempHands);
-        await sleep(500);
-
-        const card1 = currentDeck.pop();
-        tempHands = [...tempHands];
-        tempHands[currentHandIndex].cards = [splitCard1, card1];
-        setPlayerHands([...tempHands]);
-        setDeck([...currentDeck]);
-        await sleep(500);
-
-        const card2 = currentDeck.pop();
-        tempHands = [...tempHands];
-        tempHands[currentHandIndex + 1].cards = [splitCard2, card2];
-        setPlayerHands([...tempHands]);
-        setDeck([...currentDeck]);
-
-        setIsProcessing(false);
-    };
-
-    const nextHand = (currentHandsState) => {
-        const handsToCheck = currentHandsState || playerHands;
-        const nextIndex = handsToCheck.findIndex(h => !h.isDone);
-
-        if (nextIndex !== -1) {
-            setCurrentHandIndex(nextIndex);
-        } else {
-            setGameState('dealerTurn');
-            playDealer(handsToCheck);
-        }
-    };
-
-    const playDealer = async (finalPlayerHands) => {
-        const allBusted = finalPlayerHands.every(h => calculateScore(h.cards) > 21);
-
-        if (allBusted) {
-            await sleep(500);
-            resolveGame(dealerHand, finalPlayerHands);
-            return;
-        }
-
-        let dHand = [...dealerHand];
-        let currentDeck = [...deck];
-
-        while (calculateScore(dHand) < 17) {
-            await sleep(1000);
-            dHand.push(currentDeck.pop());
-            setDealerHand([...dHand]);
-            setDeck([...currentDeck]);
-        }
-
-        await sleep(800);
-        resolveGame(dHand, finalPlayerHands);
-    };
-
-    const resolveGame = (finalDealerHand, finalPlayerHands) => {
-        setGameState('ended');
-        const dScore = calculateScore(finalDealerHand);
-        let totalWin = 0;
-        let anyWin = false;
-        let anyPush = false;
-
-        finalPlayerHands.forEach(hand => {
-            const pScore = calculateScore(hand.cards);
-            let handWin = 0;
-
-            if (pScore > 21) {
-                handWin = 0;
-            } else if (dScore > 21 || pScore > dScore) {
-                if (pScore === 21 && hand.cards.length === 2 && !hand.isDoubled && finalPlayerHands.length === 1) {
-                    handWin = hand.bet * 2.5;
-                } else {
-                    handWin = hand.bet * 2;
-                }
-                anyWin = true;
-            } else if (pScore === dScore) {
-                handWin = hand.bet;
-                anyPush = true;
-            }
-            totalWin += handWin;
-        });
-
-        if (anyWin) {
-            setResultModal({ type: 'win', amount: totalWin });
-            updateBalanceInstant(totalWin);
-            api.post('/users/reward', { gameCoins: totalWin })
-                .then(res => syncUserWithServer(res.data.user))
-                .catch(console.error);
-
-            const totalBet = finalPlayerHands.reduce((acc, h) => acc + h.bet, 0);
-            if (totalWin > totalBet) {
-                setShowRain(true);
-                setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
-            }
-        } else if (anyPush && totalWin > 0) {
-            setResultModal({ type: 'push', amount: totalWin });
-            updateBalanceInstant(totalWin);
-            api.post('/users/reward', { gameCoins: totalWin })
-                .then(res => syncUserWithServer(res.data.user))
-                .catch(console.error);
-        } else {
-            setResultModal({ type: 'lose', amount: 0 });
-            api.get('/auth/me').then(res => syncUserWithServer(res.data)).catch(() => { });
-        }
-    };
-
-    // --- VARIABLES DE ESTADO ---
-    const canDouble = gameState === 'playing' && playerHands[currentHandIndex]?.cards.length === 2;
-    const canSplit = gameState === 'playing' &&
-        playerHands[currentHandIndex]?.cards.length === 2 &&
-        playerHands[currentHandIndex].cards[0].weight === playerHands[currentHandIndex].cards[1].weight;
-
-    // --- COMPONENTE VISUAL CARTA (TAMAÑO ORIGINAL RESTAURADO) ---
-    const Card = ({ card, hidden, small }) => (
-        <div
-            className={`
-                flex-shrink-0
-                animate-in fade-in zoom-in slide-in-from-top-4 duration-500
-                ${/* 🔥 TAMAÑO ESTÁNDAR RESTAURADO 🔥 */ ''}
-                ${small ? 'w-12 h-16 md:w-14 md:h-20 text-xs' : 'w-16 h-24 md:w-20 md:h-28 text-base'}
-                rounded-xl shadow-xl flex flex-col items-center justify-center relative transition-all select-none overflow-hidden
-                ${hidden ? 'border-2 border-white/20' : 'bg-white border border-zinc-300'}
-            `}
-        >
-            {hidden ? (
-                <img
-                    src="/assets/images/reverso-carta.png"
-                    alt="Hidden"
-                    className="absolute inset-0 w-full h-full object-cover"
-                />
-            ) : (
-                <>
-                    <span className={`font-black absolute top-1 left-1.5 leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.value}</span>
-                    <span className={`text-2xl md:text-4xl ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.suit}</span>
-                    <span className={`font-black absolute bottom-1 right-1.5 rotate-180 leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.value}</span>
-                </>
-            )}
-        </div>
-    );
 
     return (
-        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-40 pb-4 overflow-hidden select-none">
-
-            {showRain && <ChipRain isFading={isRainFading} />}
+        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-40 pb-4 overflow-hidden select-none font-sans">
 
             {/* HEADER FLOTANTE */}
             <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
@@ -434,29 +132,30 @@ export default function BlackJack() {
                     <div className="flex flex-col items-center relative z-10 pt-4">
                         <div className="bg-black/60 px-4 py-1.5 rounded-full border border-white/10 mb-3 backdrop-blur-sm shadow-lg">
                             <span className="text-[10px] font-black text-zinc-200 uppercase tracking-widest">
-                                Crupier: {(gameState === 'playing' || gameState === 'dealing') ? '?' : calculateScore(dealerHand)}
+                                Crupier: {gameState ? calculateScore(gameState.dHand) : '?'}
                             </span>
                         </div>
                         <div className="flex -space-x-8 h-28 items-center justify-center">
-                            {dealerHand.map((c, i) => (
-                                <Card key={c.id} card={c} hidden={i === 1 && (gameState === 'playing' || gameState === 'dealing')} />
-                            ))}
-                            {dealerHand.length === 0 && <div className="w-16 h-24 border-2 border-white/20 rounded-xl border-dashed opacity-30"></div>}
+                            {gameState?.dHand ? gameState.dHand.map((c, i) => (
+                                <Card key={i} card={c} hidden={c.hidden} />
+                            )) : (
+                                <div className="w-16 h-24 border-2 border-white/20 rounded-xl border-dashed opacity-30"></div>
+                            )}
                         </div>
                     </div>
 
                     {/* JUGADOR */}
                     <div className="flex justify-center gap-4 relative z-10 pb-4">
-                        {playerHands.length === 0 ? (
+                        {!gameState ? (
                             <div className="w-16 h-24 border-2 border-white/20 rounded-xl border-dashed opacity-30"></div>
                         ) : (
-                            playerHands.map((hand, index) => {
-                                const isActive = gameState === 'playing' && index === currentHandIndex;
+                            gameState.pHands.map((hand, index) => {
+                                const isActive = gameState.status === 'playing' && index === gameState.activeHand;
                                 const score = calculateScore(hand.cards);
                                 return (
                                     <div key={index} className={`flex flex-col items-center transition-all duration-300 ${isActive ? 'scale-105 z-20' : 'opacity-80 scale-95 z-10'}`}>
                                         <div className="flex -space-x-8 mb-2">
-                                            {hand.cards.map((c) => <Card key={c.id} card={c} small={playerHands.length > 1} />)}
+                                            {hand.cards.map((c, idx) => <Card key={idx} card={c} small={gameState.pHands.length > 1} />)}
                                         </div>
                                         <div className={`px-3 py-1 rounded-full border text-xs font-black shadow-xl ${isActive ? 'bg-yellow-500 text-black border-yellow-400' : 'bg-black/70 text-white border-white/20'}`}>
                                             {score}
@@ -470,18 +169,14 @@ export default function BlackJack() {
 
                 {/* CONTROLES */}
                 <div className="w-full bg-zinc-900/90 backdrop-blur-md rounded-[2.5rem] border border-white/10 p-5 shadow-2xl flex flex-col gap-4">
-
-                    {gameState === 'playing' && (
+                    {gameState?.status === 'playing' ? (
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={hit} disabled={isProcessing} className="bg-green-600 hover:bg-green-500 text-white py-4 rounded-2xl font-black text-lg shadow-[0_4px_0_#14532d] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest">PEDIR</button>
-                            <button onClick={stand} disabled={isProcessing} className="bg-red-600 hover:bg-red-500 text-white py-4 rounded-2xl font-black text-lg shadow-[0_4px_0_#7f1d1d] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest">PLANTAR</button>
+                            <button onClick={() => handleAction('hit')} disabled={isProcessing} className="bg-green-600 hover:bg-green-500 text-white py-4 rounded-2xl font-black text-lg shadow-[0_4px_0_#14532d] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50">PEDIR</button>
+                            <button onClick={() => handleAction('stand')} disabled={isProcessing} className="bg-red-600 hover:bg-red-500 text-white py-4 rounded-2xl font-black text-lg shadow-[0_4px_0_#7f1d1d] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50">PLANTAR</button>
 
-                            <button onClick={doubleDown} disabled={isProcessing || !canDouble || visualBalance < playerHands[currentHandIndex]?.bet} className="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-2xl font-bold text-xs shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-1 transition-all uppercase disabled:opacity-50 disabled:grayscale">DOBLAR</button>
-                            <button onClick={split} disabled={isProcessing || !canSplit || visualBalance < playerHands[currentHandIndex]?.bet} className="bg-purple-600 hover:bg-purple-500 text-white py-3 rounded-2xl font-bold text-xs shadow-[0_3px_0_#581c87] active:shadow-none active:translate-y-1 transition-all uppercase disabled:opacity-50 disabled:grayscale">DIVIDIR</button>
+                            <button onClick={() => handleAction('double')} disabled={isProcessing || visualBalance < gameState.pHands[gameState.activeHand].bet || gameState.pHands[gameState.activeHand].cards.length !== 2} className="col-span-2 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-2xl font-bold text-sm shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-1 transition-all uppercase disabled:opacity-50 disabled:grayscale">DOBLAR APUESTA</button>
                         </div>
-                    )}
-
-                    {(gameState === 'betting' || gameState === 'ended' || gameState === 'dealerTurn') && (
+                    ) : (
                         <div className="flex items-center gap-3">
                             <div className="bg-black rounded-2xl flex items-center p-1 border border-zinc-800 shrink-0 shadow-inner">
                                 <button onClick={() => setBet(Math.max(10, bet - 10))} className="w-12 h-12 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 active:scale-95 transition-transform">-</button>
@@ -493,16 +188,15 @@ export default function BlackJack() {
                             </div>
 
                             <button
-                                onClick={dealGame}
-                                disabled={visualBalance < bet}
+                                onClick={() => handleAction('deal')}
+                                disabled={visualBalance < bet || isProcessing}
                                 className="flex-1 h-14 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black text-xl rounded-2xl shadow-[0_4px_0_#b45309] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
                             >
-                                {gameState === 'ended' ? 'REPETIR' : 'REPARTIR'}
+                                REPARTIR
                             </button>
                         </div>
                     )}
                 </div>
-
             </div>
 
             {/* MODAL RESULTADO */}
@@ -528,8 +222,8 @@ export default function BlackJack() {
                             <img src="/assets/icons/ficha.png" className="w-8 h-8" alt="f" />
                         </div>
 
-                        <button onClick={() => setResultModal(null)} className="w-full py-4 bg-white text-black font-black rounded-2xl uppercase tracking-widest shadow-lg active:scale-95 transition-transform hover:bg-zinc-200">
-                            CONTINUAR
+                        <button onClick={resetGame} className="w-full py-4 bg-white text-black font-black rounded-2xl uppercase tracking-widest shadow-lg active:scale-95 transition-transform hover:bg-zinc-200">
+                            NUEVA RONDA
                         </button>
                     </div>
                 </div>

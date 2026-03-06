@@ -9,19 +9,94 @@ import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 import ExerciseSelector from './ExerciseSelector';
 
+// ==========================================
+// SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
+// (Solo esto se re-renderiza cada segundo)
+// ==========================================
+const GlobalTimerDisplay = ({ startTime, isMinimized }) => {
+    const [seconds, setSeconds] = useState(() => Math.floor((Date.now() - startTime) / 1000));
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setSeconds(Math.floor((Date.now() - startTime) / 1000));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [startTime]);
+
+    const formatTime = (total) => {
+        const m = Math.floor(total / 60).toString().padStart(2, '0');
+        const s = (total % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
+
+    if (isMinimized) {
+        return <span className="font-mono text-lg font-bold text-zinc-300 tabular-nums">{formatTime(seconds)}</span>;
+    }
+
+    return <div className="font-mono text-5xl font-black text-white tracking-tighter leading-none tabular-nums">{formatTime(seconds)}</div>;
+};
+
+// ==========================================
+// SUB-COMPONENTE: MODAL DE DESCANSO AISLADO
+// ==========================================
+const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaultRest }) => {
+    const [remaining, setRemaining] = useState(() => Math.max(0, Math.ceil((targetTime - Date.now()) / 1000)));
+    const [localRest, setLocalRest] = useState(initialDefaultRest);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const diff = Math.ceil((targetTime - Date.now()) / 1000);
+            if (diff <= 0) {
+                clearInterval(interval);
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                onSkip(); // Cierra el modal automáticamente
+            } else {
+                setRemaining(diff);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [targetTime, onSkip]);
+
+    const handleChange = (e) => {
+        const val = e.target.value;
+        if (val === '') { setLocalRest(''); return; }
+        const num = parseInt(val);
+        if (!isNaN(num)) {
+            setLocalRest(num);
+            onUpdateDefaultRest(num);
+        }
+    };
+
+    return (
+        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 flex items-center justify-between ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
+            <div className="flex items-center gap-4 pl-2">
+                <div className="flex flex-col items-center min-w-[60px]">
+                    <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{remaining}</span>
+                    <span className="text-[8px] text-zinc-500 font-bold uppercase mt-0.5">Segundos</span>
+                </div>
+                <div className="h-8 w-[1px] bg-zinc-700"></div>
+                <div className="flex flex-col">
+                    <span className="text-[9px] text-zinc-400 font-bold uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Tiempo fijo</span>
+                    <input type="number" inputMode="decimal" value={localRest} onChange={handleChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 outline-none" />
+                </div>
+            </div>
+            <button onClick={onSkip} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} /></button>
+        </div>
+    );
+};
+
+// ==========================================
+// COMPONENTE PRINCIPAL (RUTINA)
+// ==========================================
 export default function ActiveWorkout({ routine, onFinish }) {
-    // Contexto Global para minimizar/maximizar
     const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
 
     const STORAGE_KEY = `workout_active_${routine._id}`;
     const REST_KEY = `workout_rest_target_${routine._id}`;
 
     // --- ESTADOS INICIALES ---
-
-    // 1. Tiempo de Inicio (Persistente para que no se reinicie al recargar)
     const [startTime] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
-        // Si ya había una sesión guardada, usamos su hora de inicio. Si no, ahora.
         return saved ? JSON.parse(saved).startTime : Date.now();
     });
 
@@ -29,26 +104,22 @@ export default function ActiveWorkout({ routine, onFinish }) {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved).exercises;
 
-        // Estructura inicial limpia
         return routine.exercises.map(ex => ({
             ...ex,
-            setsData: Array.from({ length: ex.sets || 3 }, () => ({
-                kg: '',
-                reps: '',
-                completed: false,
-                type: 'N'
-            })),
-            pr: null,         // Se llenará con la API
-            lastWeights: []   // Se llenará con la API
+            setsData: Array.from({ length: ex.sets || 3 }, () => ({ kg: '', reps: '', completed: false, type: 'N' })),
+            pr: null,
+            lastWeights: []
         }));
     });
 
     const [intensity, setIntensity] = useState('Media');
-    const [seconds, setSeconds] = useState(0);
 
-    // Lógica de Descanso
-    const [isResting, setIsResting] = useState(false);
-    const [restRemaining, setRestRemaining] = useState(0);
+    // Lógica de Descanso (Optimizada)
+    const [restTargetTime, setRestTargetTime] = useState(() => {
+        const saved = localStorage.getItem(REST_KEY);
+        return saved ? parseInt(saved) : null;
+    });
+
     const [defaultRest, setDefaultRest] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved && JSON.parse(saved).defaultRest ? JSON.parse(saved).defaultRest : 60;
@@ -66,19 +137,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // --- EFECTOS ---
 
-    // 1. Cronómetro Global (Delta Time para precisión)
-    useEffect(() => {
-        const timer = setInterval(() => {
-            const now = Date.now();
-            setSeconds(Math.floor((now - startTime) / 1000));
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [startTime]);
-
-    // 2. 🔥 FIX PUNTO 11: CARGAR HISTORIAL Y PRs AL INICIO
+    // 1. Cargar Historial y PRs al inicio
     useEffect(() => {
         const fetchHistory = async () => {
-            // Solo cargamos si los ejercicios NO tienen datos de PR aún (evitar recargas innecesarias)
             const needsData = exercises.some(ex => ex.pr === null);
             if (!needsData) return;
 
@@ -91,110 +152,55 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     const stats = historyData[ex.name];
                     if (!stats) return ex;
 
-                    // Si los inputs están vacíos, rellenamos con la última sesión (Auto-fill inteligente)
                     const isClean = ex.setsData.every(s => s.kg === '' && s.reps === '');
                     let newSetsData = ex.setsData;
 
                     if (isClean && stats.lastSets && stats.lastSets.length > 0) {
                         newSetsData = ex.setsData.map((set, index) => {
-                            // Mapear set actual con el histórico correspondiente
                             const historySet = stats.lastSets[index] || stats.lastSets[stats.lastSets.length - 1];
-                            if (historySet) {
-                                return { ...set, kg: historySet.weight, reps: historySet.reps };
-                            }
+                            if (historySet) return { ...set, kg: historySet.weight, reps: historySet.reps };
                             return set;
                         });
                     }
 
-                    return {
-                        ...ex,
-                        setsData: newSetsData,
-                        pr: stats.bestSet // Guardamos el récord personal
-                    };
+                    return { ...ex, setsData: newSetsData, pr: stats.bestSet };
                 }));
             } catch (e) { console.error("Error cargando historial", e); }
         };
 
         fetchHistory();
-    }, []); // Se ejecuta solo al montar
+    }, []);
 
-    // 3. Auto-save (Persistencia Local)
+    // 2. Auto-save (Persistencia Local solo cuando cambian los datos importantes)
     useEffect(() => {
         const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }, [exercises, intensity, startTime, routine._id, routine.name, defaultRest, STORAGE_KEY]);
-
-    // 4. 🔥 FIX PUNTO 11: TEMPORIZADOR DE DESCANSO ROBUSTO
-    // Al iniciar descanso, guardamos el TIMESTAMP de fin. Así si sales y entras, calcula la diferencia.
-    useEffect(() => {
-        let interval = null;
-
-        const checkRest = () => {
-            const target = localStorage.getItem(REST_KEY);
-            if (!target) {
-                if (isResting) setIsResting(false); // Si no hay target pero el estado dice resting, corregimos
-                return;
-            }
-
-            const diff = Math.ceil((parseInt(target) - Date.now()) / 1000);
-
-            if (diff <= 0) {
-                setIsResting(false);
-                setRestRemaining(0);
-                localStorage.removeItem(REST_KEY);
-                // Vibración al terminar
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            } else {
-                if (!isResting) setIsResting(true); // Recuperar estado visual
-                setRestRemaining(diff);
-            }
-        };
-
-        // Chequeo inicial al montar
-        checkRest();
-
-        // Intervalo
-        interval = setInterval(checkRest, 1000);
-
-        return () => clearInterval(interval);
-    }, []); // Dependencias vacías para que el interval maneje todo leyendo LS
+    }, [exercises, intensity, defaultRest, startTime, routine._id, routine.name, STORAGE_KEY]);
 
     // --- FUNCIONES DESCANSO ---
     const startRest = () => {
         if (defaultRest > 0) {
             const targetTime = Date.now() + (defaultRest * 1000);
             localStorage.setItem(REST_KEY, targetTime.toString());
-            setIsResting(true);
-            setRestRemaining(defaultRest);
+            setRestTargetTime(targetTime);
         }
     };
 
-    const skipRest = () => {
-        setIsResting(false);
-        setRestRemaining(0);
+    const handleSkipRest = () => {
         localStorage.removeItem(REST_KEY);
+        setRestTargetTime(null);
     };
 
-    const handleRestInputChange = (e) => {
-        const val = e.target.value;
-        if (val === '') { setDefaultRest(''); return; }
-        const num = parseInt(val);
-        if (!isNaN(num)) {
-            setDefaultRest(num);
-            // Si cambiamos el tiempo mientras descansamos, ajustamos el target actual
-            if (isResting) {
-                const targetTime = Date.now() + (num * 1000);
-                localStorage.setItem(REST_KEY, targetTime.toString());
-                setRestRemaining(num);
-            }
-        }
+    const handleUpdateDefaultRest = (newRestValue) => {
+        setDefaultRest(newRestValue);
+        // Ajustamos el target de descanso actual al vuelo
+        const targetTime = Date.now() + (newRestValue * 1000);
+        localStorage.setItem(REST_KEY, targetTime.toString());
+        setRestTargetTime(targetTime);
     };
 
-    // --- SWAP LOGIC ---
-    const handleOpenSwap = (index) => {
-        setSwapIndex(index);
-        setShowSelector(true);
-    };
+    // --- LOGICA DE SERIES Y SWAP ---
+    const handleOpenSwap = (index) => { setSwapIndex(index); setShowSelector(true); };
 
     const handleSwapComplete = async (selectedList) => {
         if (!selectedList || selectedList.length === 0) { setShowSelector(false); return; }
@@ -202,23 +208,20 @@ export default function ActiveWorkout({ routine, onFinish }) {
         const newExData = selectedList[0];
         const currentIndex = swapIndex;
 
-        // Actualización Optimista
         setExercises(prev => prev.map((ex, i) => {
             if (i !== currentIndex) return ex;
-            const currentSetsCount = ex.setsData.length;
             return {
                 ...ex,
                 name: newExData.name,
                 muscle: newExData.muscle,
-                setsData: Array.from({ length: currentSetsCount }, () => ({ kg: '', reps: '', completed: false, type: 'N' })),
-                pr: null // Reseteamos PR hasta cargar el nuevo
+                setsData: Array.from({ length: ex.setsData.length }, () => ({ kg: '', reps: '', completed: false, type: 'N' })),
+                pr: null
             };
         }));
 
         setShowSelector(false);
         setSwapIndex(null);
 
-        // Fetch historial del nuevo ejercicio
         try {
             const res = await api.post('/gym/history-stats', { exercises: [newExData.name] });
             const history = res.data[newExData.name];
@@ -226,30 +229,22 @@ export default function ActiveWorkout({ routine, onFinish }) {
             if (history) {
                 setExercises(prev => prev.map((ex, i) => {
                     if (i !== currentIndex) return ex;
-
-                    // Rellenar con historial nuevo
                     const updatedSets = ex.setsData.map((set, setIdx) => {
                         const lastSet = history.lastSets[setIdx] || history.lastSets[history.lastSets.length - 1];
                         return lastSet ? { ...set, kg: lastSet.weight, reps: lastSet.reps } : set;
                     });
-
                     return { ...ex, pr: history.bestSet, setsData: updatedSets };
                 }));
                 setToast({ message: 'Ejercicio cambiado', type: 'success' });
             }
-        } catch (error) {
-            console.error("Error swap history:", error);
-        }
+        } catch (error) { console.error("Error swap history:", error); }
     };
 
-    // --- LOGIC SETS ---
     const getSetDisplayInfo = (allSets, currentIndex) => {
         const type = allSets[currentIndex].type || 'N';
         if (type === 'W') return { label: 'C', style: 'bg-orange-900/20 text-orange-500 border border-orange-500/50 rounded-lg', containerClass: 'justify-center' };
-
         let normalCount = 0;
         for (let i = 0; i <= currentIndex; i++) { if (allSets[i].type !== 'D' && allSets[i].type !== 'W') normalCount++; }
-
         if (type === 'D') {
             let dropDepth = 0;
             for (let i = currentIndex; i >= 0; i--) { if (allSets[i].type !== 'D') break; dropDepth++; }
@@ -291,8 +286,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
             };
         }));
 
-        // Si completamos (y no desmarcamos), activamos descanso
-        // Excepción: Dropsets no suelen tener descanso entre medias
         if (!currentSet.completed && currentSet.type !== 'D') {
             startRest();
         }
@@ -316,10 +309,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
             if (i !== exIdx) return ex;
             const last = ex.setsData[ex.setsData.length - 1];
             const nextType = last?.type === 'D' ? 'D' : 'N';
-            return {
-                ...ex,
-                setsData: [...ex.setsData, { kg: last?.kg || '', reps: last?.reps || '', completed: false, type: nextType }]
-            };
+            return { ...ex, setsData: [...ex.setsData, { kg: last?.kg || '', reps: last?.reps || '', completed: false, type: nextType }] };
         }));
     };
 
@@ -335,10 +325,13 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
         setFinishing(true);
         try {
+            // Calculamos los segundos exactos en el momento de guardar
+            const finalSeconds = Math.floor((Date.now() - startTime) / 1000);
+
             const logData = {
                 routineId: routine._id,
                 routineName: routine.name,
-                duration: seconds > 0 ? seconds : 1,
+                duration: finalSeconds > 0 ? finalSeconds : 1,
                 intensity,
                 exercises: exercises.map(ex => ({
                     name: ex.name,
@@ -352,15 +345,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             const res = await api.post('/gym/log', logData);
 
-            // Actualizar plantilla con nuevos valores por defecto
             const updatedStructure = exercises.map(ex => ({
-                name: ex.name,
-                muscle: ex.muscle || 'Global',
-                sets: ex.setsData.length,
-                reps: "10-12",
-                targetWeight: 0
+                name: ex.name, muscle: ex.muscle || 'Global', sets: ex.setsData.length, reps: "10-12", targetWeight: 0
             }));
-
             await api.put(`/gym/routines/${routine._id}`, { exercises: updatedStructure });
 
             localStorage.removeItem(STORAGE_KEY);
@@ -381,12 +368,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
         endWorkout();
     };
 
-    const formatTime = (total) => {
-        const m = Math.floor(total / 60).toString().padStart(2, '0');
-        const s = (total % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
-
     const intensityOptions = [
         { id: 'Baja', label: 'Fuerza', color: 'bg-blue-600' },
         { id: 'Media', label: 'Hipertrofia', color: 'bg-yellow-500' },
@@ -395,20 +376,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // --- RENDER ---
     if (showSelector) {
-        return createPortal(
-            <div className="fixed inset-0 z-[250] bg-black">
-                <ExerciseSelector onSelect={handleSwapComplete} onClose={() => setShowSelector(false)} />
-            </div>, document.body
-        );
+        return createPortal(<div className="fixed inset-0 z-[250] bg-black"><ExerciseSelector onSelect={handleSwapComplete} onClose={() => setShowSelector(false)} /></div>, document.body);
     }
 
-    // MODO MINIMIZADO
     if (isMinimized) {
         return createPortal(
             <div onClick={maximizeWorkout} className="fixed bottom-[70px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10">
                 <div className="flex items-center gap-3">
                     <div className="relative w-10 h-10 flex items-center justify-center bg-black rounded-xl border border-yellow-500/20">
-                        {isResting ? <span className="text-sm font-black text-blue-400 animate-pulse">{restRemaining}s</span> : <div className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>}
+                        {restTargetTime ? <span className="text-xs font-black text-blue-400 animate-pulse"><Timer size={16} /></span> : <div className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>}
                     </div>
                     <div className="flex flex-col">
                         <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">En curso</span>
@@ -416,23 +392,22 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="font-mono text-lg font-bold text-zinc-300 tabular-nums">{formatTime(seconds)}</span>
+                    <GlobalTimerDisplay startTime={startTime} isMinimized={true} />
                     <button className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400"><Maximize2 size={18} /></button>
                 </div>
             </div>, document.body
         );
     }
 
-    // MODO MAXIMIZADO
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-black flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom duration-300 select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER */}
+            {/* HEADER CON RELOJ AISLADO */}
             <div className="pt-6 pb-4 px-6 bg-black border-b border-zinc-900 flex justify-between items-end shrink-0 safe-top z-20">
                 <div>
                     <h2 className="text-zinc-500 font-bold text-[10px] uppercase tracking-widest mb-1">En curso</h2>
-                    <div className="font-mono text-5xl font-black text-white tracking-tighter leading-none tabular-nums">{formatTime(seconds)}</div>
+                    <GlobalTimerDisplay startTime={startTime} isMinimized={false} />
                 </div>
                 <div className="flex gap-2">
                     <button onClick={minimizeWorkout} className="bg-zinc-900 text-zinc-400 p-3 rounded-full hover:text-white border border-zinc-800 transition-colors active:scale-95"><ChevronDown size={24} /></button>
@@ -449,7 +424,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 <span className="text-yellow-500 text-sm shrink-0">#{exIdx + 1}</span> {ex.name}
                             </h3>
                             <div className="flex items-center gap-2">
-                                {/* 🔥 ETIQUETA PR (SI EXISTE) */}
                                 {ex.pr && ex.pr.value1RM > 0 && (
                                     <div className="flex items-center gap-1 bg-zinc-900/50 px-2 py-1.5 rounded-lg border border-zinc-800">
                                         <Trophy size={14} className="text-yellow-600" />
@@ -496,22 +470,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 </div>
             </div>
 
-            {/* MODAL DESCANSO (Restaurado) */}
-            {isResting && (
-                <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 flex items-center justify-between ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
-                    <div className="flex items-center gap-4 pl-2">
-                        <div className="flex flex-col items-center min-w-[60px]">
-                            <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{restRemaining}</span>
-                            <span className="text-[8px] text-zinc-500 font-bold uppercase mt-0.5">Segundos</span>
-                        </div>
-                        <div className="h-8 w-[1px] bg-zinc-700"></div>
-                        <div className="flex flex-col">
-                            <span className="text-[9px] text-zinc-400 font-bold uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Tiempo fijo</span>
-                            <input type="number" inputMode="decimal" value={defaultRest} onChange={handleRestInputChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 outline-none" />
-                        </div>
-                    </div>
-                    <button onClick={skipRest} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} /></button>
-                </div>
+            {/* MODAL DESCANSO AISLADO */}
+            {restTargetTime && (
+                <RestTimerModal
+                    targetTime={restTargetTime}
+                    initialDefaultRest={defaultRest}
+                    onSkip={handleSkipRest}
+                    onUpdateDefaultRest={handleUpdateDefaultRest}
+                />
             )}
 
             {/* FOOTER */}

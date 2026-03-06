@@ -35,7 +35,7 @@ const getCurrentEventType = (weekStartDate) => {
     return EVENT_ROTATION[weekIndex % 4];
 };
 
-// Helper: Calcular métricas
+// Helper: Calcular métricas usando Aggregation Framework
 const getClanMetrics = async (clanMemberIds, weekStart, eventType) => {
     let stats = [];
 
@@ -82,7 +82,6 @@ const getMyClan = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id).populate('clan');
     if (!user.clan) return res.json(null);
 
-    // 🔥 AÑADIDO 'frame' AL POPULATE
     const clan = await Clan.findById(user.clan._id)
         .populate('members', 'username level avatar title frame streak clanRank pet');
 
@@ -92,9 +91,9 @@ const getMyClan = asyncHandler(async (req, res) => {
     const eventType = getCurrentEventType(weekStart);
     const goal = EVENT_GOALS[eventType];
 
-    // Resetear si cambió la semana
+    // Resetear si cambió la semana (Operación Segura)
     if (!clan.weeklyEvent || !clan.weeklyEvent.startDate || new Date(clan.weeklyEvent.startDate).getTime() !== weekStart.getTime()) {
-        clan.weeklyEvent = { startDate: weekStart, claims: [] };
+        clan.weeklyEvent = { startDate: weekStart, type: eventType, claims: [] };
         await clan.save();
     }
 
@@ -122,7 +121,7 @@ const getMyClan = asyncHandler(async (req, res) => {
     res.json(clanObj);
 });
 
-// @desc    Reclamar Recompensa
+// @desc    Reclamar Recompensa (🔥 BLINDADO CONTRA DOBLE CLIC)
 const claimEventReward = asyncHandler(async (req, res) => {
     const { tier } = req.body;
     const userId = req.user._id;
@@ -133,46 +132,50 @@ const claimEventReward = asyncHandler(async (req, res) => {
     const clan = await Clan.findById(user.clan);
     const weekStart = getCurrentWeekStart();
 
-    if (!clan.weeklyEvent || !clan.weeklyEvent.startDate || new Date(clan.weeklyEvent.startDate).getTime() !== weekStart.getTime()) {
+    if (!clan.weeklyEvent || new Date(clan.weeklyEvent.startDate).getTime() !== weekStart.getTime()) {
         res.status(400); throw new Error('El evento se ha reiniciado.');
     }
-
-    const alreadyClaimed = clan.weeklyEvent.claims.find(
-        c => c.user.toString() === userId.toString() && c.tier === tier
-    );
-    if (alreadyClaimed) { res.status(400); throw new Error('Ya reclamado'); }
 
     const eventType = getCurrentEventType(weekStart);
     const goal = EVENT_GOALS[eventType];
     const { clanTotal } = await getClanMetrics(clan.members, weekStart, eventType);
 
-    // 🔥 NUEVOS TIERS DE RECOMPENSA
     const targets = {
         1: goal * 0.1,
         2: goal * 0.5,
         3: goal,
-        4: goal * 1.5, // Platino
-        5: goal * 2.0  // Diamante
+        4: goal * 1.5,
+        5: goal * 2.0
     };
 
     if (clanTotal < targets[tier]) { res.status(400); throw new Error('Meta no alcanzada'); }
 
-    // 🔥 PREMIOS AUMENTADOS
+    // 🔥 ATÓMICO: Añadimos el claim SOLO si no existe (evita doble recompensa)
+    const clanUpdate = await Clan.findOneAndUpdate(
+        {
+            _id: clan._id,
+            "weeklyEvent.claims": { $not: { $elemMatch: { user: userId, tier: tier } } }
+        },
+        {
+            $push: { "weeklyEvent.claims": { user: userId, tier, claimedAt: new Date() } }
+        },
+        { new: true }
+    );
+
+    if (!clanUpdate) {
+        res.status(400); throw new Error('Ya has reclamado esta recompensa.');
+    }
+
     const REWARDS = {
-        1: { xp: 50, coins: 100, chips: 200 },    // Bronce
-        2: { xp: 150, coins: 300, chips: 600 },   // Plata
-        3: { xp: 500, coins: 1000, chips: 2000 }, // Oro
-        4: { xp: 1000, coins: 2500, chips: 5000 },// Platino
-        5: { xp: 2500, coins: 5000, chips: 10000 }// Diamante
+        1: { xp: 50, coins: 100, chips: 200 },
+        2: { xp: 150, coins: 300, chips: 600 },
+        3: { xp: 500, coins: 1000, chips: 2000 },
+        4: { xp: 1000, coins: 2500, chips: 5000 },
+        5: { xp: 2500, coins: 5000, chips: 10000 }
     };
 
     const prize = REWARDS[tier];
-    if (!prize) { res.status(400); throw new Error('Tier inválido'); }
-
     const result = await levelService.addRewards(userId, prize.xp, prize.coins, prize.chips);
-
-    clan.weeklyEvent.claims.push({ user: userId, tier, claimedAt: new Date() });
-    await clan.save();
 
     res.json({ message: `¡Recompensa Tier ${tier} obtenida!`, user: result.user, leveledUp: result.leveledUp });
 });
@@ -220,7 +223,7 @@ const createClan = asyncHandler(async (req, res) => {
     res.status(201).json(clan);
 });
 
-// @desc    Unirse a un clan
+// @desc    Unirse a un clan (🔥 BLINDADO CONTRA OVERBOOKING)
 const joinClan = asyncHandler(async (req, res) => {
     const clanId = req.params.id;
     const userId = req.user._id;
@@ -228,84 +231,108 @@ const joinClan = asyncHandler(async (req, res) => {
     const user = await User.findById(userId);
     if (user.clan) { res.status(400); throw new Error('Sal de tu clan primero'); }
 
-    const clan = await Clan.findById(clanId);
-    if (!clan) { res.status(404); throw new Error('Clan no encontrado'); }
+    const clanData = await Clan.findById(clanId);
+    if (!clanData) { res.status(404); throw new Error('Clan no encontrado'); }
 
-    if (clan.members.length >= 10) { res.status(400); throw new Error('Clan lleno'); }
-
-    // Validar nivel mínimo
-    if (clan.minLevel && user.level < clan.minLevel) {
-        res.status(400); throw new Error(`Nivel insuficiente. Necesitas nivel ${clan.minLevel}`);
+    if (clanData.minLevel && user.level < clanData.minLevel) {
+        res.status(400); throw new Error(`Nivel insuficiente. Necesitas nivel ${clanData.minLevel}`);
     }
 
-    clan.members.push(userId);
-    clan.totalPower += (user.level || 1) * 100;
-    await clan.save();
+    const powerToAdd = (user.level || 1) * 100;
 
-    user.clan = clan._id;
+    // 🔥 ATÓMICO: Intenta añadir si el miembro no está y si NO existe el elemento índice 9 (Max 10)
+    const clanUpdate = await Clan.findOneAndUpdate(
+        {
+            _id: clanId,
+            members: { $ne: userId },
+            "members.9": { $exists: false } // Asegura que haya menos de 10 miembros
+        },
+        {
+            $addToSet: { members: userId },
+            $inc: { totalPower: powerToAdd }
+        },
+        { new: true }
+    );
+
+    if (!clanUpdate) {
+        res.status(400); throw new Error('El clan está lleno (Máx 10) o ya estás dentro.');
+    }
+
+    user.clan = clanUpdate._id;
     user.clanRank = 'esclavo';
     await user.save();
 
-    res.json({ message: `Unido a ${clan.name}`, clan });
+    res.json({ message: `Unido a ${clanUpdate.name}`, clan: clanUpdate });
 });
 
-// @desc    Salir del clan
+// @desc    Salir del clan (🔥 ATÓMICO)
 const leaveClan = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const user = await User.findById(userId);
     if (!user.clan) { res.status(400); throw new Error('No tienes clan'); }
 
     const clan = await Clan.findById(user.clan);
-    if (clan) {
-        // Lógica líder se va
-        if (clan.leader.toString() === userId.toString()) {
-            if (clan.members.length <= 1) {
-                await User.updateMany({ clan: clan._id }, { $set: { clan: null, clanRank: null } });
-                await Clan.findByIdAndDelete(clan._id);
-                user.clan = null; user.clanRank = null; await user.save();
-                return res.json({ message: 'Clan disuelto.' });
-            } else {
-                // Sucesión
-                const remaining = await User.find({ _id: { $in: clan.members, $ne: userId } });
-                const ranks = { 'esclavo': 0, 'recluta': 1, 'guerrero': 2, 'rey': 3, 'dios': 4 };
-                remaining.sort((a, b) => {
-                    const rA = ranks[a.clanRank || 'esclavo'];
-                    const rB = ranks[b.clanRank || 'esclavo'];
-                    if (rB !== rA) return rB - rA;
-                    return b.level - a.level;
-                });
-                const newLeader = remaining[0];
-                clan.leader = newLeader._id;
-                newLeader.clanRank = 'dios'; await newLeader.save();
-            }
-        }
+    if (!clan) {
+        user.clan = null; user.clanRank = null; await user.save();
+        return res.json({ message: 'Has salido.' });
+    }
 
-        clan.members = clan.members.filter(id => id.toString() !== userId.toString());
-        clan.totalPower -= (user.level || 1) * 100;
-        await clan.save();
+    const powerToSubtract = (user.level || 1) * 100;
+
+    if (clan.leader.toString() === userId.toString()) {
+        if (clan.members.length <= 1) {
+            await User.updateMany({ clan: clan._id }, { $set: { clan: null, clanRank: null } });
+            await Clan.findByIdAndDelete(clan._id);
+        } else {
+            // Sucesión
+            const remaining = await User.find({ _id: { $in: clan.members, $ne: userId } });
+            const ranks = { 'esclavo': 0, 'recluta': 1, 'guerrero': 2, 'rey': 3, 'dios': 4 };
+            remaining.sort((a, b) => {
+                const rA = ranks[a.clanRank || 'esclavo'];
+                const rB = ranks[b.clanRank || 'esclavo'];
+                if (rB !== rA) return rB - rA;
+                return b.level - a.level;
+            });
+            const newLeader = remaining[0];
+
+            await Clan.findByIdAndUpdate(clan._id, {
+                $set: { leader: newLeader._id },
+                $pull: { members: userId },
+                $inc: { totalPower: -powerToSubtract }
+            });
+            newLeader.clanRank = 'dios'; await newLeader.save();
+        }
+    } else {
+        await Clan.findByIdAndUpdate(clan._id, {
+            $pull: { members: userId },
+            $inc: { totalPower: -powerToSubtract }
+        });
     }
 
     user.clan = null; user.clanRank = null; await user.save();
-    res.json({ message: 'Has salido.' });
+    res.json({ message: 'Has abandonado el clan.' });
 });
 
+// @desc    Expulsar miembro
 const kickMember = asyncHandler(async (req, res) => {
     const { memberId } = req.body;
     const requester = await User.findById(req.user._id);
     const target = await User.findById(memberId);
 
-    if (!requester.clan || requester.clan.toString() !== target.clan?.toString()) throw new Error('Error');
+    if (!requester.clan || requester.clan.toString() !== target.clan?.toString()) throw new Error('Error de validación');
 
     const ranks = { 'esclavo': 0, 'recluta': 1, 'guerrero': 2, 'rey': 3, 'dios': 4 };
-    if (ranks[requester.clanRank] <= ranks[target.clanRank]) throw new Error('Rango insuficiente');
+    if (ranks[requester.clanRank] <= ranks[target.clanRank]) throw new Error('Rango insuficiente para expulsar');
 
-    const clan = await Clan.findById(requester.clan);
-    clan.members = clan.members.filter(id => id.toString() !== memberId.toString());
-    clan.totalPower -= (target.level || 1) * 100;
-    await clan.save();
+    const powerToSubtract = (target.level || 1) * 100;
+
+    await Clan.findByIdAndUpdate(requester.clan, {
+        $pull: { members: target._id },
+        $inc: { totalPower: -powerToSubtract }
+    });
 
     target.clan = null; target.clanRank = null; await target.save();
-    res.json({ message: 'Expulsado.' });
+    res.json({ message: 'Miembro expulsado de la alianza.' });
 });
 
 const updateMemberRank = asyncHandler(async (req, res) => {
@@ -316,16 +343,13 @@ const updateMemberRank = asyncHandler(async (req, res) => {
     res.json({ message: 'Rango actualizado' });
 });
 
-// @desc    Previsualizar clan (Para unirse/espiar)
-// @route   GET /api/clans/:id
+// @desc    Previsualizar clan
 const getClanDetails = asyncHandler(async (req, res) => {
     const clanId = req.params.id;
-    // 🔥 AÑADIDO 'frame' PARA QUE SE VEA EN LA PREVIEW
     const clan = await Clan.findById(clanId).populate('members', 'username level avatar frame title clanRank');
 
     if (!clan) { res.status(404); throw new Error('Clan no encontrado'); }
 
-    // Calcular evento para visitantes
     const weekStart = getCurrentWeekStart();
     const eventType = getCurrentEventType(weekStart);
     const goal = EVENT_GOALS[eventType];
@@ -333,7 +357,6 @@ const getClanDetails = asyncHandler(async (req, res) => {
 
     const clanObj = clan.toObject();
 
-    // Inyectar contribuciones para ver el ranking interno
     clanObj.members = clanObj.members.map(m => ({
         ...m,
         weeklyContribution: memberStats[m._id.toString()] || 0
@@ -350,7 +373,6 @@ const getClanDetails = asyncHandler(async (req, res) => {
     res.json(clanObj);
 });
 
-// 🔥 Añadimos la función previewClan (alias de getClanDetails) por si alguna ruta antigua la llama
 const previewClan = getClanDetails;
 
 module.exports = {
