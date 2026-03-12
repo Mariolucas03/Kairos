@@ -1,7 +1,10 @@
 import { NavLink } from 'react-router-dom';
 import { Home, ScrollText, Utensils, Dumbbell, Users } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore'; // 🔥 AÑADIDO
 
-export default function Footer({ user }) {
+export default function Footer() {
+    // Leemos directo de Zustand sin props
+    const user = useAuthStore(state => state.user);
 
     // 🔥 CÁLCULO DE NOTIFICACIONES (PUNTO ROJO)
     const notificationCount = (user?.friendRequests?.length || 0) +

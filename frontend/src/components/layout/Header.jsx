@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import HealthWidget from './HealthWidget';
+import { useAuthStore } from '../../store/useAuthStore'; // 🔥 AÑADIDO
 
 // --- DEFINICIÓN DE ANIMACIÓN CSS SUAVE ---
 const customAnimationsStyle = `
@@ -16,10 +17,7 @@ const customAnimationsStyle = `
 
 // --- HELPER: COLORES DE NIVEL ---
 const getLevelStyle = (level) => {
-    // Nivel 100+ (Cromático Suave - Sin parpadeo)
     if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
-
-    // Rangos normales
     if (level >= 90) return "bg-cyan-900/40 text-cyan-400 border-cyan-500/40 shadow-[0_0_8px_rgba(34,211,238,0.2)]";
     if (level >= 80) return "bg-pink-900/40 text-pink-400 border-pink-500/40";
     if (level >= 70) return "bg-purple-900/40 text-purple-400 border-purple-500/40";
@@ -29,12 +27,14 @@ const getLevelStyle = (level) => {
     if (level >= 30) return "bg-emerald-900/40 text-emerald-400 border-emerald-500/40";
     if (level >= 20) return "bg-blue-900/40 text-blue-400 border-blue-500/40";
     if (level >= 10) return "bg-indigo-900/40 text-indigo-400 border-indigo-500/40";
-
-    // Nivel 1-9 (Básico)
     return "bg-zinc-800 text-zinc-400 border-zinc-700";
 };
 
-export default function Header({ user, setUser }) {
+// 🔥 QUITAMOS LOS PROPS DE LA FUNCIÓN
+export default function Header() {
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+
     if (!user) return null;
 
     // --- DATOS ---
@@ -109,7 +109,7 @@ export default function Header({ user, setUser }) {
                                 {username}
                             </span>
 
-                            {/* 🔥 CAJA DE NIVEL BLINDADA: 'whitespace-nowrap' y 'shrink-0' evitan que se rompa */}
+                            {/* CAJA DE NIVEL BLINDADA */}
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide leading-none whitespace-nowrap shrink-0 ${levelClass}`}>
                                 Lvl {level}
                             </span>
