@@ -11,7 +11,6 @@ import ExerciseSelector from './ExerciseSelector';
 
 // ==========================================
 // SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
-// (Solo esto se re-renderiza cada segundo)
 // ==========================================
 const GlobalTimerDisplay = ({ startTime, isMinimized }) => {
     const [seconds, setSeconds] = useState(() => Math.floor((Date.now() - startTime) / 1000));
@@ -49,7 +48,7 @@ const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaul
             if (diff <= 0) {
                 clearInterval(interval);
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                onSkip(); // Cierra el modal automáticamente
+                onSkip();
             } else {
                 setRemaining(diff);
             }
@@ -114,7 +113,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     const [intensity, setIntensity] = useState('Media');
 
-    // Lógica de Descanso (Optimizada)
     const [restTargetTime, setRestTargetTime] = useState(() => {
         const saved = localStorage.getItem(REST_KEY);
         return saved ? parseInt(saved) : null;
@@ -125,13 +123,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return saved && JSON.parse(saved).defaultRest ? JSON.parse(saved).defaultRest : 60;
     });
 
-    // UI & Alertas
     const [finishing, setFinishing] = useState(false);
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
-
-    // Swap
     const [swapIndex, setSwapIndex] = useState(null);
     const [showSelector, setShowSelector] = useState(false);
 
@@ -171,10 +166,17 @@ export default function ActiveWorkout({ routine, onFinish }) {
         fetchHistory();
     }, []);
 
-    // 2. Auto-save (Persistencia Local solo cuando cambian los datos importantes)
+    // 🔥 2. AUTO-SAVE OPTIMIZADO (DEBOUNCE) 🪄
     useEffect(() => {
-        const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        // En lugar de guardar de inmediato, programamos el guardado para dentro de 1 segundo
+        const timeoutId = setTimeout(() => {
+            const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }, 1000);
+
+        // Si el usuario vuelve a teclear antes de que pase 1 segundo, el timeout anterior se cancela.
+        // ¡Cero tirones al escribir!
+        return () => clearTimeout(timeoutId);
     }, [exercises, intensity, defaultRest, startTime, routine._id, routine.name, STORAGE_KEY]);
 
     // --- FUNCIONES DESCANSO ---
@@ -193,7 +195,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     const handleUpdateDefaultRest = (newRestValue) => {
         setDefaultRest(newRestValue);
-        // Ajustamos el target de descanso actual al vuelo
         const targetTime = Date.now() + (newRestValue * 1000);
         localStorage.setItem(REST_KEY, targetTime.toString());
         setRestTargetTime(targetTime);
@@ -325,7 +326,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
         setFinishing(true);
         try {
-            // Calculamos los segundos exactos en el momento de guardar
             const finalSeconds = Math.floor((Date.now() - startTime) / 1000);
 
             const logData = {

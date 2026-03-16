@@ -1,15 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, UserPlus, User, Mail, Lock, ArrowRight } from 'lucide-react';
 import api from '../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function Register() {
     const navigate = useNavigate();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const setUser = useAuthStore(state => state.setUser);
 
     const [formData, setFormData] = useState({ username: '', email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // 🔥 AUTO-REDIRECCIÓN
+    useEffect(() => {
+        if (localStorage.getItem('token')) {
+            navigate('/home', { replace: true });
+        }
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -25,7 +36,8 @@ export default function Register() {
             const response = await api.post('/auth/register', formData);
 
             localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify(response.data));
+            // 🔥 GUARDAMOS EN ZUSTAND
+            setUser(response.data);
 
             navigate('/home', { replace: true });
         } catch (err) {

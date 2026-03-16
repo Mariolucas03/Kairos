@@ -1,16 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Lock, User, ArrowRight } from 'lucide-react'; // Usamos icono User
+import { Eye, EyeOff, LogIn, Lock, User, ArrowRight } from 'lucide-react';
 import api from '../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function Login() {
     const navigate = useNavigate();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const setUser = useAuthStore(state => state.setUser);
 
-    // 1. Estado inicial con USERNAME
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // 🔥 AUTO-REDIRECCIÓN: Si ya hay sesión, salta el login
+    useEffect(() => {
+        if (localStorage.getItem('token')) {
+            navigate('/home', { replace: true });
+        }
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -29,8 +39,11 @@ export default function Login() {
             const response = await api.post('/auth/login', formData);
 
             if (response.data && response.data.token) {
+                // Guardamos Token clásico para Axios
                 localStorage.setItem('token', response.data.token);
-                localStorage.setItem('user', JSON.stringify(response.data));
+                // 🔥 GUARDAMOS EN EL NUEVO CEREBRO (ZUSTAND)
+                setUser(response.data);
+
                 navigate('/home', { replace: true });
             } else {
                 setError("El servidor no devolvió las credenciales correctas.");
@@ -78,7 +91,6 @@ export default function Login() {
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* 2. CAMPO USUARIO (En vez de Email) */}
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Usuario / Alias</label>
                             <div className="relative group">
@@ -95,7 +107,6 @@ export default function Login() {
                             </div>
                         </div>
 
-                        {/* Password */}
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
                             <div className="relative group">

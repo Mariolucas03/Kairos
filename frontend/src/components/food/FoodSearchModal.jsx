@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 
-// --- COMPONENTE INTERNO: ÍTEM DESLIZABLE (Sin cambios) ---
+// --- COMPONENTE INTERNO: ÍTEM DESLIZABLE ---
 const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -77,7 +77,7 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
 };
 
 // --- COMPONENTE PRINCIPAL ---
-export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
+export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic, onBackgroundSync, onShowToast }) {
     const [mode, setMode] = useState('search');
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
@@ -95,12 +95,11 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
     const [aiDescription, setAiDescription] = useState('');
     const [aiHelperLoading, setAiHelperLoading] = useState(false);
 
-    // 🔥 CONSTANTE DE CARPETAS (ORDEN SOLICITADO)
     const FOLDERS = ['Desayuno', 'Snack', 'Comida', 'Merienda', 'Cena'];
 
     const [manualForm, setManualForm] = useState({
         name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1,
-        folder: 'Desayuno' // Valor por defecto
+        folder: 'Desayuno'
     });
     const searchInputRef = useRef(null);
 
@@ -146,16 +145,26 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
     const processedResults = getProcessedResults();
 
+    // 🔥 FUNCIÓN OPTIMISTA PARA LA LISTA GUARDADA
     const handleAddFood = async (food) => {
+        const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
+
+        // 1. Avisamos a Food.jsx al instante y cerramos
+        onFoodAddedOptimistic(foodData);
+        onClose();
+
+        // 2. Operación real en segundo plano
         try {
-            const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
             await api.post(`/food/log/${mealId}`, foodData);
-            onFoodAdded(); onShowToast("Añadido correctamente", "success"); onClose();
-        } catch (error) { onShowToast("Error al añadir", "error"); }
+            if (onBackgroundSync) onBackgroundSync(); // Recarga silencioca para asentar los IDs de la base de datos
+        } catch (error) {
+            onShowToast("Error de red. El alimento no se guardó en la nube.", "error");
+            if (onBackgroundSync) onBackgroundSync(); // Rollback silencioso
+        }
     };
 
     const handleDeleteSavedFood = async (id) => {
-        try { await api.delete(`/food/saved/${id}`); setResults(prev => prev.filter(item => item._id !== id)); onShowToast("Alimento eliminado", "info"); }
+        try { await api.delete(`/food/saved/${id}`); setResults(prev => prev.filter(item => item._id !== id)); onShowToast("Alimento eliminado de tus guardados", "info"); }
         catch (e) { onShowToast("No se pudo eliminar", "error"); fetchSavedFoods(); }
     };
 
@@ -181,27 +190,38 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 fat: analyzedData.fat || 0,
                 fiber: analyzedData.fiber || 0,
                 quantity: 1,
-                folder: 'Comida' // Default lógico para fotos
+                folder: 'Comida'
             });
 
-            onShowToast("¡Analizado! Elige carpeta y guarda.", "success");
+            onShowToast("¡Analizado! Revisa los datos y guarda.", "success");
             setMode('review');
 
         } catch (error) {
             console.error(error);
-            onShowToast("Error al procesar. Intenta de nuevo.", "error");
+            onShowToast("Error al procesar la imagen. Intenta de nuevo.", "error");
         } finally {
             setAiLoading(false);
         }
     };
 
+    // 🔥 FUNCIÓN OPTIMISTA PARA MANUAL / IA
     const handleAddToMealNow = async () => {
         if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
+
+        const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber) };
+
+        // 1. Avisamos al padre al instante
+        onFoodAddedOptimistic(foodData);
+        onClose();
+
+        // 2. Background Sync
         try {
-            const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber) };
             await api.post(`/food/log/${mealId}`, foodData);
-            onFoodAdded(); onShowToast("Añadido a la comida", "success"); onClose();
-        } catch (e) { onShowToast("Error al añadir", "error"); }
+            if (onBackgroundSync) onBackgroundSync();
+        } catch (e) {
+            onShowToast("Error de conexión al guardar", "error");
+            if (onBackgroundSync) onBackgroundSync();
+        }
     };
 
     const handleSaveToList = async () => {
@@ -212,7 +232,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
             onShowToast("Guardado en carpeta " + manualForm.folder, "success");
             setMode('search');
             setQuery(manualForm.name);
-            fetchSavedFoods(); // Recargar lista para ver el nuevo
+            fetchSavedFoods();
             setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1, folder: 'Desayuno' });
         } catch (e) { onShowToast("Error al guardar", "error"); }
     };
@@ -269,7 +289,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                                 <button onClick={() => setSortBy('calories')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'calories' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>Kcal</button>
                             </div>
 
-                            {/* 🔥 NUEVO ORDEN DE FILTROS: TODOS + LISTA SOLICITADA */}
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
                                     <Filter size={14} className="text-zinc-500" />
@@ -336,7 +355,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             )}
                         </div>
 
-                        {/* 🔥 SELECCIÓN DE CARPETA (Visible en Manual y Review) */}
                         <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800">
                             <label className="text-[10px] font-bold text-zinc-400 mb-2 block pl-2 uppercase tracking-wider flex items-center gap-1"><Folder size={12} /> Guardar en Carpeta</label>
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">

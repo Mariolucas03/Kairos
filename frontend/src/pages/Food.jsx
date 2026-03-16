@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND EN LUGAR DE USEOUTLETCONTEXT
+import { useAuthStore } from '../store/useAuthStore';
 import {
     Settings, X, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf,
     Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Sparkles, BrainCircuit, Camera, Image as ImageIcon, SortAsc, Filter
@@ -10,7 +11,9 @@ import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
 
 export default function Food() {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
 
     // --- ESTADOS DE DATOS ---
     const [log, setLog] = useState(null);
@@ -49,7 +52,7 @@ export default function Food() {
     }, [user]);
 
     useEffect(() => {
-        fetchLog();
+        fetchLog(false);
     }, []);
 
     useEffect(() => {
@@ -57,37 +60,83 @@ export default function Food() {
     }, [chatHistory]);
 
     // --- FUNCIONES API ---
-    const fetchLog = async () => {
+    // isSilent evita que parpadee la pantalla cuando hacemos sincronizaciones de fondo
+    const fetchLog = async (isSilent = false) => {
+        if (!isSilent) setLoading(true);
         try {
             const res = await api.get('/food/log');
             setLog(res.data);
         } catch (error) {
             console.error("Error obteniendo log:", error);
         } finally {
-            setLoading(false);
+            if (!isSilent) setLoading(false);
         }
     };
 
     const showToast = (message, type = 'success') => setToast({ message, type });
 
+    // 🔥 OPTIMISTIC UI: BORRAR
     const handleRemoveFood = async (mealId, foodItemId) => {
         if (!window.confirm("¿Borrar alimento?")) return;
+
+        // 1. Guardamos el estado anterior por si falla la red
+        const previousLog = JSON.parse(JSON.stringify(log));
+
+        // 2. Actualizamos la UI AL INSTANTE
+        setLog(prev => {
+            const newLog = { ...prev };
+            const meal = newLog.meals.find(m => m._id === mealId);
+            if (meal) {
+                const foodIdx = meal.foods.findIndex(f => f._id === foodItemId);
+                if (foodIdx > -1) {
+                    const food = meal.foods[foodIdx];
+                    newLog.totalCalories = Math.max(0, newLog.totalCalories - food.calories);
+                    newLog.totalProtein = Math.max(0, newLog.totalProtein - food.protein);
+                    newLog.totalCarbs = Math.max(0, newLog.totalCarbs - food.carbs);
+                    newLog.totalFat = Math.max(0, newLog.totalFat - food.fat);
+                    newLog.totalFiber = Math.max(0, newLog.totalFiber - food.fiber);
+                    meal.foods.splice(foodIdx, 1);
+                }
+            }
+            return newLog;
+        });
+
+        // 3. Petición en segundo plano
         try {
-            // Intenta endpoint específico o fallback
             await api.delete(`/food/log/${mealId}/${foodItemId}`);
-            showToast("Eliminado", "info");
-            fetchLog(); // 🔥 Recargar para actualizar gráfica
+            // No hacemos showToast para que se sienta fluido y silencioso, solo sincronizamos
+            fetchLog(true);
         } catch (error) {
             console.error(error);
-            showToast("Error al eliminar", "error");
+            setLog(previousLog); // Rollback si falla
+            showToast("Error de conexión. Se han restaurado los datos.", "error");
         }
+    };
+
+    // 🔥 OPTIMISTIC UI: AÑADIR (Llamada desde el Modal)
+    const handleOptimisticAdd = (foodData) => {
+        setLog(prev => {
+            if (!prev) return prev;
+            const newLog = { ...prev };
+            const meal = newLog.meals.find(m => m._id === activeMealId);
+            if (meal) {
+                // Le damos un ID temporal para que React no se queje
+                meal.foods.push({ ...foodData, _id: `temp_${Math.random()}` });
+                newLog.totalCalories += foodData.calories;
+                newLog.totalProtein += foodData.protein;
+                newLog.totalCarbs += foodData.carbs;
+                newLog.totalFat += foodData.fat;
+                newLog.totalFiber += foodData.fiber;
+            }
+            return newLog;
+        });
     };
 
     const updateGoals = async (newGoals) => {
         try {
             const res = await api.put('/users/macros', newGoals);
             setGoals(res.data.macros);
-            setUser(res.data);
+            setUser(res.data); // Sincroniza con Zustand
             return true;
         } catch (error) {
             showToast("Error al guardar objetivos", "error");
@@ -199,7 +248,7 @@ export default function Food() {
                 </button>
             </div>
 
-            {/* 🔥 TARJETA PRINCIPAL (RESTAURADA AL DISEÑO ORIGINAL) */}
+            {/* TARJETA PRINCIPAL */}
             <div className="px-4">
                 <div className="bg-zinc-950 border border-green-500 rounded-[32px] p-6 shadow-[0_0_30px_rgba(34,197,94,0.15)] relative overflow-hidden">
                     <div className="flex items-center justify-between gap-6">
@@ -317,7 +366,9 @@ export default function Food() {
                         <FoodSearchModal
                             mealId={activeMealId}
                             onClose={() => setShowSearch(false)}
-                            onFoodAdded={() => fetchLog()}
+                            // 🔥 LE PASAMOS LA FUNCIÓN OPTIMISTA AL MODAL
+                            onFoodAddedOptimistic={(foodData) => handleOptimisticAdd(foodData)}
+                            onBackgroundSync={() => fetchLog(true)}
                             onShowToast={showToast}
                         />
                     </div>
@@ -327,7 +378,7 @@ export default function Food() {
 
             {/* Modal Configuración (IA / Manual) */}
             {configModal.show && createPortal(
-                <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-zinc-950 border border-zinc-800 rounded-[32px] w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
 

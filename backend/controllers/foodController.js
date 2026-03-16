@@ -1,7 +1,8 @@
 const Food = require('../models/Food');
 const NutritionLog = require('../models/NutritionLog');
 const DailyLog = require('../models/DailyLog');
-const fs = require('fs');
+// Importamos el helper de fecha local (¡Asegúrate de que el archivo utils/dateHelpers.js exista!)
+const { getTodayDateString } = require('../utils/dateHelpers');
 
 // --- CONFIGURACIÓN OPENROUTER ---
 const OpenAI = require("openai");
@@ -14,7 +15,8 @@ const openrouter = new OpenAI({
     }
 });
 
-const getTodayStr = () => new Date().toISOString().split('T')[0];
+// Usamos el helper centralizado en lugar del toISOString() que falla por zona horaria
+const getTodayStr = () => getTodayDateString();
 
 // ==========================================
 // ⏱️ HELPER: TIMEOUT PARA IA (EVITA BLOQUEOS)
@@ -34,14 +36,6 @@ const fetchWithTimeout = async (config, timeoutMs = 8000) => {
         clearTimeout(timeoutId);
         throw error;
     }
-};
-
-// ==========================================
-// 🧠 CÁLCULO MATEMÁTICO LOCAL (PLAN Z)
-// ==========================================
-const calculateLocalMacros = (text) => {
-    console.log("⚠️ IAs caídas. Usando Plan Z (Matemático)...");
-    return null;
 };
 
 // ==========================================
@@ -70,7 +64,6 @@ const chatMacroCalculator = async (req, res) => {
 
     for (const model of TEXT_MODELS_CASCADE) {
         try {
-            // Usamos el helper con 8 segundos de límite
             const completion = await fetchWithTimeout({
                 model: model,
                 messages: messages,
@@ -125,8 +118,6 @@ const analyzeFoodText = async (req, res) => {
     for (const model of TEXT_MODELS_CASCADE) {
         try {
             console.log(`🤖 Analizando comida con: ${model}...`);
-
-            // Usamos el helper con 8 segundos de límite
             const completion = await fetchWithTimeout({
                 model: model,
                 messages: [{ role: "system", content: SYSTEM_PROMPT }],
@@ -154,7 +145,7 @@ const analyzeFoodText = async (req, res) => {
 };
 
 // ==========================================
-// 📷 ANÁLISIS DE IMAGEN (MEGA CASCADA)
+// 📷 ANÁLISIS DE IMAGEN (MEGA CASCADA EN RAM)
 // ==========================================
 const analyzeImage = async (req, res) => {
     const VISION_MODELS = [
@@ -162,18 +153,17 @@ const analyzeImage = async (req, res) => {
         "google/gemini-2.0-pro-exp-02-05:free",
         "qwen/qwen-2.5-vl-72b-instruct:free",
         "meta-llama/llama-3.2-90b-vision-instruct:free",
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
-        "mistralai/pixtral-12b:free",
-        "microsoft/phi-3.5-vision-instruct:free",
-        "google/gemini-flash-1.5-8b:free"
+        "mistralai/pixtral-12b:free"
     ];
 
     try {
         if (!req.file) return res.status(400).json({ message: 'No hay imagen' });
 
         const userContext = req.body.context || "Sin contexto extra.";
-        const imageBuffer = fs.readFileSync(req.file.path);
-        const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+
+        // 🔥 FIX ARQUITECTÓNICO: Leemos directamente de la RAM (req.file.buffer) sin tocar el disco.
+        // Ya NO usamos fs.readFileSync ni req.file.path
+        const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
         let foodData = null;
 
         const finalPrompt = `
@@ -196,8 +186,6 @@ const analyzeImage = async (req, res) => {
         for (const modelName of VISION_MODELS) {
             try {
                 console.log(`👁️ Intentando analizar imagen con: ${modelName}...`);
-
-                // Usamos el helper con 12 segundos de límite (visión tarda más)
                 const completion = await fetchWithTimeout({
                     model: modelName,
                     messages: [
@@ -224,8 +212,6 @@ const analyzeImage = async (req, res) => {
             }
         }
 
-        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-
         if (foodData) {
             foodData.calories = Math.round(foodData.calories || 0);
             foodData.protein = Math.round(foodData.protein || 0);
@@ -238,13 +224,13 @@ const analyzeImage = async (req, res) => {
             return res.status(503).json({ message: 'Ninguna IA pudo leer la imagen. Inténtalo de nuevo o usa texto.' });
         }
     } catch (error) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        res.status(500).json({ message: 'Error interno imagen' });
+        console.error(error);
+        res.status(500).json({ message: 'Error interno procesando la imagen' });
     }
 };
 
 // ==========================================
-// 🔥 CRUD NUTRICIÓN COMPLETO 🔥
+// 🔥 CRUD NUTRICIÓN (REMASTERIZADO Y ATÓMICO) 🔥
 // ==========================================
 
 const getNutritionLog = async (req, res) => {
@@ -287,17 +273,12 @@ const addMealCategory = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error creando categoría' }); }
 };
 
+// 🟢 FIX: AÑADIR ALIMENTO DE FORMA 100% ATÓMICA
 const addFoodToLog = async (req, res) => {
     try {
         const { mealId } = req.params;
         const { name, calories, protein, carbs, fat, fiber, quantity } = req.body;
         const today = getTodayStr();
-
-        let log = await NutritionLog.findOne({ user: req.user._id, date: today });
-        if (!log) return res.status(404).json({ message: 'Registro no encontrado' });
-
-        const meal = log.meals.id(mealId);
-        if (!meal) return res.status(404).json({ message: 'Comida no encontrada' });
 
         const newFood = {
             name,
@@ -309,16 +290,25 @@ const addFoodToLog = async (req, res) => {
             quantity: Number(quantity || 1)
         };
 
-        meal.foods.push(newFood);
+        // Operación atómica de MongoDB: Push al array e incremento de totales matemáticos EN UN SOLO PASO.
+        const log = await NutritionLog.findOneAndUpdate(
+            { user: req.user._id, date: today, "meals._id": mealId },
+            {
+                $push: { "meals.$.foods": newFood },
+                $inc: {
+                    totalCalories: newFood.calories,
+                    totalProtein: newFood.protein,
+                    totalCarbs: newFood.carbs,
+                    totalFat: newFood.fat,
+                    totalFiber: newFood.fiber
+                }
+            },
+            { new: true }
+        );
 
-        log.totalCalories = Math.round(log.totalCalories + newFood.calories);
-        log.totalProtein = Math.round(log.totalProtein + newFood.protein);
-        log.totalCarbs = Math.round(log.totalCarbs + newFood.carbs);
-        log.totalFat = Math.round(log.totalFat + newFood.fat);
-        log.totalFiber = Math.round(log.totalFiber + newFood.fiber);
+        if (!log) return res.status(404).json({ message: 'Registro o categoría no encontrada' });
 
-        await log.save();
-
+        // Sincronizamos el DailyLog también atómicamente
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: today },
             { $set: { "nutrition.totalKcal": log.totalCalories } }
@@ -331,36 +321,46 @@ const addFoodToLog = async (req, res) => {
     }
 };
 
+// 🟢 FIX: ELIMINAR ALIMENTO DE FORMA 100% ATÓMICA
 const removeFoodFromLog = async (req, res) => {
     try {
         const { mealId, foodItemId } = req.params;
         const today = getTodayStr();
 
-        const log = await NutritionLog.findOne({ user: req.user._id, date: today });
-        if (!log) return res.status(404).json({ message: 'Log no encontrado' });
+        // 1. Buscamos usando proyecciones (muy rápido) SOLO para saber cuánto restarle a los totales
+        const logData = await NutritionLog.findOne(
+            { user: req.user._id, date: today, "meals.foods._id": foodItemId },
+            { "meals.$": 1 }
+        ).lean();
 
-        const meal = log.meals.id(mealId);
-        if (!meal) return res.status(404).json({ message: 'Comida no encontrada' });
+        if (!logData) return res.status(404).json({ message: 'Alimento no encontrado' });
 
-        const foodItem = meal.foods.id(foodItemId);
-        if (!foodItem) return res.status(404).json({ message: 'Alimento no encontrado' });
+        const meal = logData.meals[0];
+        const foodItem = meal.foods.find(f => f._id.toString() === foodItemId);
 
-        log.totalCalories = Math.max(0, Math.round(log.totalCalories - foodItem.calories));
-        log.totalProtein = Math.max(0, Math.round(log.totalProtein - foodItem.protein));
-        log.totalCarbs = Math.max(0, Math.round(log.totalCarbs - foodItem.carbs));
-        log.totalFat = Math.max(0, Math.round(log.totalFat - foodItem.fat));
-        log.totalFiber = Math.max(0, Math.round(log.totalFiber - foodItem.fiber));
-
-        meal.foods.pull(foodItemId);
-
-        await log.save();
-
-        await DailyLog.findOneAndUpdate(
-            { user: req.user._id, date: today },
-            { $set: { "nutrition.totalKcal": log.totalCalories } }
+        // 2. Operación Atómica Inversa ($pull para sacar del array, $inc negativo para matemáticas)
+        const updatedLog = await NutritionLog.findOneAndUpdate(
+            { user: req.user._id, date: today, "meals._id": mealId },
+            {
+                $pull: { "meals.$.foods": { _id: foodItemId } },
+                $inc: {
+                    totalCalories: -Math.abs(foodItem.calories),
+                    totalProtein: -Math.abs(foodItem.protein),
+                    totalCarbs: -Math.abs(foodItem.carbs),
+                    totalFat: -Math.abs(foodItem.fat),
+                    totalFiber: -Math.abs(foodItem.fiber)
+                }
+            },
+            { new: true }
         );
 
-        res.json(log);
+        // Sincronizamos el DailyLog
+        await DailyLog.findOneAndUpdate(
+            { user: req.user._id, date: today },
+            { $set: { "nutrition.totalKcal": Math.max(0, updatedLog.totalCalories) } }
+        );
+
+        res.json(updatedLog);
     } catch (error) {
         console.error("Error removeFoodFromLog:", error);
         res.status(500).json({ message: 'Error eliminando alimento' });

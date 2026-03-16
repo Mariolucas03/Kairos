@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useOutletContext } from 'react-router-dom';
 import {
     Trash2, Plus, Check, X, Target, Users,
     Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 // ==========================================
 // 0. CONFIGURACIÓN DE ICONOS
@@ -14,7 +15,7 @@ import Toast from '../components/common/Toast';
 const ICON_XP = "/assets/icons/xp.png";
 const ICON_COIN = "/assets/icons/moneda.png";
 const ICON_CHIP = "/assets/icons/ficha.png";
-const ICON_HEART = "/assets/icons/corazon.png"; // 🔥 CAMBIO 2: Usando tu imagen
+const ICON_HEART = "/assets/icons/corazon.png";
 
 // ==========================================
 // 1. HELPERS VISUALES Y LÓGICOS
@@ -61,7 +62,6 @@ const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
     const label = labels[diff] || diff;
 
-    // 🔥 CAMBIO 3: Estilo Completado "Bloqueado/Metal" (Gris muy oscuro y apagado)
     if (completed) return {
         gradient: 'from-[#18181b] to-[#09090b]', // Zinc-900 to Black
         shadow: 'rgba(0,0,0,0)', // Sin sombra de color
@@ -132,7 +132,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const isBinary = mission.target === 1;
     const damage = getPotentialDamage(mission.difficulty);
 
-    // 🔥 CAMBIO 4: Si estamos en viewAllMode (OJO), NO se puede deslizar
     const canSwipe = !isPending && !viewAllMode;
 
     const handleStart = (clientX) => { if (canSwipe) { setIsDragging(true); startX.current = clientX; } };
@@ -141,9 +140,8 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (!isDragging) return;
         const diff = clientX - startX.current;
 
-        // Bloqueos de lógica:
-        if (mission.completed && diff > 0) return; // No recompletar
-        if (mission.completed && diff < 0 && !viewAllMode) return; // No borrar si está hecha (salvo modo ojo)
+        if (mission.completed && diff > 0) return;
+        if (mission.completed && diff < 0 && !viewAllMode) return;
 
         setDragX(diff);
     };
@@ -153,13 +151,11 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (isPending) { setDragX(0); return; }
 
         if (dragX > THRESHOLD) {
-            // Completar (Derecha)
             if (!mission.completed) {
                 const remaining = mission.target - mission.progress;
                 onUpdateProgress(mission, Math.max(0, remaining));
             }
         } else if (dragX < -THRESHOLD) {
-            // Borrar (Izquierda)
             if (!mission.completed || viewAllMode) {
                 if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión permanentemente?")) {
                     onDelete(mission._id);
@@ -215,7 +211,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
 
     return (
         <div className="relative w-full mb-4 select-none group" onClick={handleCardClick}>
-            {/* Fondo Swipe */}
             {canSwipe && (
                 <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
                     {dragX > 0 && <div className="flex items-center gap-2 text-emerald-400 font-black text-sm"><Check size={24} /> COMPLETAR</div>}
@@ -223,7 +218,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                 </div>
             )}
 
-            {/* Tarjeta Principal */}
             <div
                 style={cardStyle}
                 className={`
@@ -244,13 +238,11 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
             >
                 <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-4 relative overflow-hidden h-full flex flex-col justify-between`}>
 
-                    {/* Brillo ambiental (Apagado si está completada) */}
                     {!mission.completed && (
                         <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
                     )}
 
                     <div className="relative z-10">
-                        {/* HEADER */}
                         <div className="flex justify-between items-start gap-3 mb-1">
                             <div className="flex-1 min-w-0 relative">
                                 <div className="pr-20 mb-1">
@@ -263,8 +255,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                     </div>
 
                                     <div className="flex items-center gap-2 mt-1">
-                                        {/* 🔥 CAMBIO 1: Eliminado Frecuencia visual */}
-                                        {/* 🔥 CAMBIO 5: Contador Gigante */}
                                         <div className="flex items-baseline gap-1">
                                             <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>
                                                 {mission.progress}/{mission.target}
@@ -282,7 +272,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                 </div>
                             </div>
 
-                            {/* 🔥 CAMBIO 6: Botón Check eliminado completamente. Solo queda "+" si es necesario */}
                             <div className="flex flex-col items-center gap-2">
                                 {!isBinary && !mission.completed && !isPending && !viewAllMode && (
                                     <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
@@ -294,26 +283,20 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
 
                         {renderProgressBar()}
 
-                        {/* RECOMPENSAS / RIESGOS */}
                         <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
                             <div className="flex items-center gap-4">
-                                {/* XP */}
                                 {mission.xpReward > 0 && (
                                     <div className="flex items-center gap-1.5">
                                         <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span>
                                         <img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" />
                                     </div>
                                 )}
-
-                                {/* Monedas */}
                                 {(mission.coinReward > 0) && (
                                     <div className="flex items-center gap-1.5">
                                         <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span>
                                         <img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" />
                                     </div>
                                 )}
-
-                                {/* Fichas */}
                                 {(mission.gameCoinReward > 0) && (
                                     <div className="flex items-center gap-1.5">
                                         <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span>
@@ -322,7 +305,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                 )}
                             </div>
 
-                            {/* 🔥 CAMBIO 2: Icono Corazón Imagen */}
                             {!mission.completed && (
                                 <div className="ml-auto flex items-center gap-1.5 opacity-90">
                                     <span className="text-sm font-black text-red-400">-{damage}</span>
@@ -356,7 +338,10 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
 // PÁGINA PRINCIPAL
 // ==========================================
 export default function Missions() {
-    const { user, setUser } = useOutletContext();
+    // 🔥 ZUSTAND: Conectado a la vena
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+
     const [missions, setMissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('daily');
@@ -420,14 +405,58 @@ export default function Missions() {
         try { await api.post('/missions', payload); handleCloseCreator(); fetchMissions(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
     };
 
+    // 🔥 OPTIMISTIC UI 🪄✨
     const handleUpdateProgress = async (mission, amount) => {
+        // 1. GUARDAMOS ESTADO PREVIO (Para rollback si falla)
+        const previousMissions = [...missions];
+        const previousUser = { ...user };
+
+        // 2. ACTUALIZACIÓN OPTIMISTA (Instantánea en la UI)
+        const newProgress = mission.progress + amount;
+        const isCompletedNow = newProgress >= mission.target;
+
+        setMissions(prev => prev.map(m => {
+            if (m._id === mission._id) {
+                return {
+                    ...m,
+                    progress: newProgress > m.target ? m.target : newProgress,
+                    completed: isCompletedNow || m.completed
+                };
+            }
+            return m;
+        }));
+
+        // Si se completa, sumamos recursos visualmente al momento
+        if (isCompletedNow && !mission.completed) {
+            setUser({
+                ...user,
+                currentXP: (user.currentXP || 0) + (mission.xpReward || 0),
+                coins: (user.coins || 0) + (mission.coinReward || 0),
+                gameCoins: (user.gameCoins || 0) + (mission.gameCoinReward || 0)
+            });
+            showToast(`+${mission.xpReward} XP`, "success");
+        }
+
+        // 3. PETICIÓN REAL AL SERVIDOR EN SEGUNDO PLANO
         try {
             const res = await api.put(`/missions/${mission._id}/progress`, { amount });
-            if (res.data.progressOnly) { setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m)); return; }
-            if (res.data.user) { setUser(res.data.user); localStorage.setItem('user', JSON.stringify(res.data.user)); }
+
+            // 4. SINCRONIZACIÓN SILENCIOSA
+            if (res.data.progressOnly) {
+                setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
+                return;
+            }
+            if (res.data.user) {
+                setUser(res.data.user); // Si hubo level up real en backend, lo asienta
+            }
             setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
-            if (res.data.rewards) showToast(`+${res.data.rewards.xp} XP`, "success");
-        } catch (e) { showToast("Error", "error"); }
+
+        } catch (e) {
+            // 5. ROLLBACK EN CASO DE ERROR
+            setMissions(previousMissions);
+            setUser(previousUser);
+            showToast("Error de red. Acción revertida.", "error");
+        }
     };
 
     const handleDelete = async (id) => { try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Eliminada", "info"); } catch (e) { } };
