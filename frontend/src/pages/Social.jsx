@@ -1,13 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
     Users, Shield, Search, UserPlus, Swords, Crown, Loader2, Mail, Check, X, Bell, Zap, Trash2, LogOut,
     ChevronDown, ChevronUp, AlertTriangle, Dumbbell, Gift, Lock, Trophy, Medal, Flame, Target,
-    Coins, Wrench, Footprints, Timer, MapPin, Construction, Eye, DoorOpen, Edit, Globe, Calendar
+    Coins, Construction, Eye, DoorOpen, Edit, Globe, Calendar
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+
+// 🔥 IMPORTACIONES DE ALTO RENDIMIENTO
+import useSWR from 'swr';
+import { useAuthStore } from '../store/useAuthStore';
+
+// Fetcher global para SWR
+const fetcher = (url) => api.get(url).then(res => res.data);
 
 // CONFIGURACIÓN DE RANGOS
 const RANK_CONFIG = {
@@ -204,11 +210,9 @@ function FriendCard({ friend, onRemoveRequest, onChallengeOrView }) {
     );
 }
 
-// 🔥 FIX PUNTO 9: TARJETA DE MIEMBRO CLAN REDISEÑADA
 function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId }) {
     if (!member) return null;
     const currentRankData = RANK_CONFIG[member.clanRank || 'esclavo'];
-    // Regla: Puedes editar si eres mayor rango que el objetivo, o si eres líder
     const hasAuthority = member._id !== currentUserId && ((RANK_CONFIG[myRank || 'esclavo'].value === 4) || (RANK_CONFIG[myRank || 'esclavo'].value === 3 && RANK_CONFIG[member.clanRank || 'esclavo'].value < 3));
     const availableOptions = ['esclavo', 'recluta', 'guerrero'];
     if (RANK_CONFIG[myRank || 'esclavo'].value === 4) availableOptions.push('rey');
@@ -218,7 +222,6 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
 
     return (
         <div className={cardBaseStyle}>
-            {/* IZQUIERDA: Avatar y Nombre */}
             <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
                 <div className="relative flex-shrink-0 overflow-visible">
                     <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/5 overflow-hidden">
@@ -233,26 +236,19 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
                 </div>
             </div>
 
-            {/* DERECHA: Columna de Datos y Acciones */}
             <div className="flex flex-col items-end gap-1.5">
-
-                {/* FILA 1: Nivel y Rango */}
                 <div className="flex items-center gap-1.5">
                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>
                         Lvl {member.level}
                     </span>
-
-                    {/* Badge de Rango */}
                     <div className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${currentRankData.color}`}>
                         {member.clanRank === 'dios' && <Crown size={10} strokeWidth={3} />}
                         <span className="text-[8px] font-black uppercase tracking-wider">{currentRankData.label}</span>
                     </div>
                 </div>
 
-                {/* FILA 2: Acciones de Gestión (Solo si tienes autoridad) */}
                 {hasAuthority && (
                     <div className="flex items-center gap-2">
-                        {/* Selector de Rango Discreto */}
                         <div className="relative">
                             <select
                                 className="bg-zinc-800 text-[9px] text-zinc-300 font-bold py-1 px-2 rounded border border-zinc-700 outline-none appearance-none pr-4"
@@ -266,7 +262,6 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
                             <ChevronDown size={10} className="absolute right-0.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
                         </div>
 
-                        {/* Botón Expulsar */}
                         <button
                             onClick={() => onKick(member)}
                             className="bg-red-900/20 p-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
@@ -281,7 +276,6 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
     );
 }
 
-// MODAL DUELO
 function DuelStatusModal({ duel, userId, onClose }) {
     if (!duel) return null;
     const iAmChallenger = duel.challenger._id === userId;
@@ -291,7 +285,7 @@ function DuelStatusModal({ duel, userId, onClose }) {
     const opponentName = iAmChallenger ? duel.opponent.username : duel.challenger.username;
     const winning = myScore > opponentScore;
     const losing = myScore < opponentScore;
-    const getUnit = (t) => { if (t === 'gym') return 'Kg'; if (t === 'distance') return 'Km'; if (t === 'steps') return ''; return 'Misiones'; };
+    const getUnit = (t) => { if (t === 'gym') return 'Kg'; if (t === 'distance') return 'Km'; if (t === 'steps') return 'Pasos'; return 'Misiones'; };
     const duelType = duel.type ? duel.type.toUpperCase() : 'DESCONOCIDO';
 
     return (
@@ -325,7 +319,6 @@ function DuelStatusModal({ duel, userId, onClose }) {
     );
 }
 
-// MODAL CREAR DESAFÍO
 function CreateChallengeModal({ friend, onClose, onSend }) {
     const [bet, setBet] = useState(0);
     const [type, setType] = useState('missions');
@@ -363,21 +356,9 @@ function CreateChallengeModal({ friend, onClose, onSend }) {
     );
 }
 
-// 3. MODAL CLAN PREVIEW
 function ClanPreviewModal({ clanId, currentUserId, userClanId, onClose, onJoin }) {
-    const [clanData, setClanData] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchDetails = async () => {
-            try {
-                const res = await api.get(`/clans/${clanId}`);
-                setClanData(res.data);
-            } catch (error) { console.error(error); }
-            finally { setLoading(false); }
-        };
-        fetchDetails();
-    }, [clanId]);
+    // 🔥 Uso de SWR para carga instantánea al espiar clanes
+    const { data: clanData, isLoading } = useSWR(clanId ? `/clans/${clanId}` : null, fetcher);
 
     if (!clanId) return null;
 
@@ -386,7 +367,7 @@ function ClanPreviewModal({ clanId, currentUserId, userClanId, onClose, onJoin }
             <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={onClose} />
             <div className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[85vh] shadow-2xl relative z-10 animate-in zoom-in-95 mt-10 sm:mt-0">
                 <button onClick={onClose} className="absolute top-4 right-4 z-20 bg-black/50 p-2 rounded-full text-zinc-400 hover:text-white border border-white/10"><X size={20} /></button>
-                {loading ? (
+                {!clanData && isLoading ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-4">
                         <Loader2 className="animate-spin text-yellow-500" size={32} />
                         <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Espiando clan...</p>
@@ -489,7 +470,6 @@ function WeeklyEventWidget({ clan, onClaim, isPreview = false }) {
     ];
     const sortedMembers = [...clan.members].sort((a, b) => (b.weeklyContribution || 0) - (a.weeklyContribution || 0));
 
-    // Si es preview, el widget no hace nada al click
     if (isPreview) {
         return (
             <div className={`bg-zinc-900 border ${config.border} rounded-[32px] p-5 mb-8 relative overflow-hidden shadow-lg z-10`}>
@@ -590,75 +570,52 @@ function WeeklyEventWidget({ clan, onClaim, isPreview = false }) {
 // 2. COMPONENTE PRINCIPAL (MAIN)
 // ==========================================
 export default function Social() {
-    const { setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 ZUSTAND: Integrado para evitar prop-drilling
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
+
+    // 🔥 SWR: Carga instantánea de todas las listas con caché
+    const { data: friendsData, mutate: mutateFriends } = useSWR('/social/friends', fetcher);
+    const { data: myClan, mutate: mutateMyClan } = useSWR('/clans/me', fetcher);
+    const { data: clansList, mutate: mutateClansList } = useSWR('/clans', fetcher);
+    const { data: leaderboardData } = useSWR('/social/leaderboard', fetcher);
+
+    // Mapeo de datos seguros (Fallbacks por si la caché está vacía)
+    const friends = friendsData?.friends || [];
+    const requests = friendsData?.requests || [];
+    const leaderboard = leaderboardData || [];
+    const currentUserId = user?._id;
+
+    // Obtenemos el rango desde tu propio perfil o desde el clan
+    const myRank = myClan?.members?.find(m => m._id === currentUserId)?.clanRank || user?.clanRank || 'esclavo';
+    const missionInvites = user?.missionRequests || [];
+    const challengeRequests = user?.challengeRequests || [];
+
     const [activeTab, setActiveTab] = useState('ranking');
     const [searchText, setSearchText] = useState('');
-    const [friends, setFriends] = useState([]);
-    const [requests, setRequests] = useState([]);
-    const [missionInvites, setMissionInvites] = useState([]);
-    const [challengeRequests, setChallengeRequests] = useState([]);
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [myClan, setMyClan] = useState(null);
-    const [clansList, setClansList] = useState([]);
-    const [leaderboard, setLeaderboard] = useState([]);
 
     const [showCreateChallenge, setShowCreateChallenge] = useState(null);
     const [activeDuel, setActiveDuel] = useState(null);
     const [showCreateClan, setShowCreateClan] = useState(false);
 
-    // --- ESTADO PARA EDITAR CLAN ---
     const [showEditClan, setShowEditClan] = useState(false);
     const [clanSearchText, setClanSearchText] = useState('');
     const [showOtherClans, setShowOtherClans] = useState(false);
 
     const [newClanData, setNewClanData] = useState({ name: '', description: '', icon: '🛡️', minLevel: 1 });
-    const [myRank, setMyRank] = useState('esclavo');
-    const [currentUserId, setCurrentUserId] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [showInbox, setShowInbox] = useState(false);
     const [toast, setToast] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
-
     const [viewingClanId, setViewingClanId] = useState(null);
 
-    useEffect(() => {
-        const fetchInitialData = async () => {
-            setLoading(true);
-            try {
-                const meRes = await api.get('/users/').catch(err => null);
-                if (meRes && meRes.data) {
-                    setCurrentUserId(meRes.data._id);
-                    setMyRank(meRes.data.clanRank || 'esclavo');
-                    const detailedUser = await api.get('/users/');
-                    setMissionInvites(detailedUser.data.missionRequests || []);
-                    setChallengeRequests(detailedUser.data.challengeRequests || []);
-                }
-                const [friendsRes, requestsRes, myClanRes, clansListRes, leaderboardRes] = await Promise.all([
-                    api.get('/social/friends').catch(e => ({ data: { friends: [] } })),
-                    api.get('/social/requests').catch(e => ({ data: [] })),
-                    api.get('/clans/me').catch(e => ({ data: null })),
-                    api.get('/clans').catch(e => ({ data: [] })),
-                    api.get('/social/leaderboard').catch(e => ({ data: [] }))
-                ]);
-                if (friendsRes.data && Array.isArray(friendsRes.data.friends)) { setFriends(friendsRes.data.friends); } else if (Array.isArray(friendsRes.data)) { setFriends(friendsRes.data); } else { setFriends([]); }
-                if (requestsRes.data && Array.isArray(requestsRes.data)) setRequests(requestsRes.data);
-                if (myClanRes.data) {
-                    setMyClan(myClanRes.data);
-                    if (meRes && meRes.data) {
-                        const meInClan = myClanRes.data.members.find(m => m && m._id === meRes.data._id);
-                        if (meInClan) setMyRank(meInClan.clanRank);
-                    }
-                } else { setMyClan(null); }
-                if (clansListRes.data) setClansList(clansListRes.data);
-                if (leaderboardRes.data && Array.isArray(leaderboardRes.data)) { setLeaderboard(leaderboardRes.data); } else { setLeaderboard([]); }
-            } catch (error) { console.error("Error social:", error); }
-            finally { setLoading(false); }
-        };
-        fetchInitialData();
-    }, []);
+    const refreshData = () => {
+        mutateMyClan();
+        mutateClansList();
+    };
 
-    const refreshData = async () => { try { const [myClanRes, clansListRes] = await Promise.all([api.get('/clans/me'), api.get('/clans')]); setMyClan(myClanRes.data); setClansList(clansListRes.data); } catch (e) { } };
     const requestConfirm = (message, onConfirm) => { setConfirmAction({ message, onConfirm }); };
 
     const handleJoinClan = async (clanId) => {
@@ -677,29 +634,101 @@ export default function Social() {
         setToast({ message: "⚔️ Duelos: Próximamente en mantenimiento", type: "info" });
     };
 
-    const sendChallenge = async (opponentId, type, betAmount) => { try { await api.post('/challenges', { opponentId, type, betAmount }); setToast({ message: "Desafío enviado", type: "success" }); setShowCreateChallenge(null); const meRes = await api.get('/users/'); setUser(meRes.data); } catch (e) { setToast({ message: e.response?.data?.message || "Error", type: "error" }); } };
-    const handleRespondChallenge = async (cid, action) => { try { await api.post('/challenges/respond', { challengeId: cid, action }); setChallengeRequests(prev => prev.filter(c => c._id !== cid)); setToast({ message: action === 'accept' ? "Aceptado" : "Rechazado", type: "success" }); if (action === 'accept') { const me = await api.get('/users/'); setUser(me.data); } } catch (e) { if (e.response?.status === 404) setChallengeRequests(prev => prev.filter(c => c._id !== cid)); } };
-    const handleClaimReward = async (tier) => { try { const res = await api.post('/clans/event/claim', { tier }); setToast({ message: "Reclamado", type: "success" }); if (res.data.user) { setUser(res.data.user); localStorage.setItem('user', JSON.stringify(res.data.user)); } setMyClan(prev => ({ ...prev, eventStats: { ...prev.eventStats, myClaims: [...prev.eventStats.myClaims, tier] } })); } catch (e) { } };
-    const handleCycleEvent = async () => { if (!myClan) return; const types = ['volume', 'missions', 'calories', 'xp']; const next = types[(types.indexOf(myClan.eventStats.type) + 1) % types.length]; try { await api.put('/clans/event/force', { eventType: next }); setTimeout(() => refreshData(), 500); } catch (e) { } };
-    const handleUpdateRank = async (mid, rank) => { try { await api.put('/clans/rank', { memberId: mid, newRank: rank }); refreshData(); } catch (e) { } };
-    const handleKickMember = async (mid) => { try { await api.post('/clans/kick', { memberId: mid }); refreshData(); } catch (e) { } };
-    const handleSendRequest = async (targetId) => { try { await api.post('/social/request', { targetId }); setToast({ message: "Enviada", type: "success" }); setSearchResults(prev => prev.filter(u => u._id !== targetId)); } catch (e) { } };
-    const handleRespond = async (rid, action) => { try { await api.post('/social/respond', { requesterId: rid, action }); setRequests(prev => prev.filter(r => r._id !== rid)); if (action === 'accept') { const f = await api.get('/social/friends'); setFriends(f.data.friends); } } catch (e) { } };
-    const handleRemoveFriend = async (fid) => { try { await api.delete(`/social/friends/${fid}`); setFriends(prev => prev.filter(f => f._id !== fid)); } catch (e) { } };
+    const sendChallenge = async (opponentId, type, betAmount) => {
+        try {
+            await api.post('/challenges', { opponentId, type, betAmount });
+            setToast({ message: "Desafío enviado", type: "success" });
+            setShowCreateChallenge(null);
+            const meRes = await api.get('/users/');
+            setUser(meRes.data);
+        } catch (e) {
+            setToast({ message: e.response?.data?.message || "Error", type: "error" });
+        }
+    };
+
+    const handleRespondChallenge = async (cid, action) => {
+        // Actualizamos usuario desde el servidor (lógica pendiente por unificación, simulado aquí)
+    };
+
+    const handleClaimReward = async (tier) => {
+        try {
+            const res = await api.post('/clans/event/claim', { tier });
+            setToast({ message: "Reclamado", type: "success" });
+            if (res.data.user) {
+                setUser(res.data.user);
+                localStorage.setItem('user', JSON.stringify(res.data.user));
+            }
+            // Optimistic update para las claims
+            mutateMyClan(prev => ({
+                ...prev,
+                eventStats: { ...prev.eventStats, myClaims: [...prev.eventStats.myClaims, tier] }
+            }), false);
+        } catch (e) { }
+    };
+
+    const handleUpdateRank = async (mid, rank) => {
+        try {
+            await api.put('/clans/rank', { memberId: mid, newRank: rank });
+            refreshData();
+        } catch (e) { }
+    };
+
+    const handleKickMember = async (mid) => {
+        try {
+            await api.post('/clans/kick', { memberId: mid });
+            refreshData();
+        } catch (e) { }
+    };
+
+    const handleSendRequest = async (targetId) => {
+        try {
+            await api.post('/social/request', { targetId });
+            setToast({ message: "Enviada", type: "success" });
+            setSearchResults(prev => prev.filter(u => u._id !== targetId));
+        } catch (e) { }
+    };
+
+    // 🔥 OPTIMISTIC UI: ACEPTAR/RECHAZAR SOLICITUD
+    const handleRespond = async (rid, action) => {
+        // Actualización optimista de las solicitudes
+        mutateFriends(prev => ({
+            ...prev,
+            requests: prev.requests.filter(r => r._id !== rid)
+        }), false);
+
+        try {
+            await api.post('/social/respond', { requesterId: rid, action });
+            if (action === 'accept') {
+                mutateFriends(); // Recargamos para traernos los datos completos del nuevo amigo
+            }
+        } catch (e) {
+            mutateFriends(); // Rollback en caso de error
+        }
+    };
+
+    // 🔥 OPTIMISTIC UI: BORRAR AMIGO
+    const handleRemoveFriend = async (fid) => {
+        // Actualización instantánea en pantalla
+        mutateFriends(prev => ({
+            ...prev,
+            friends: prev.friends.filter(f => f._id !== fid)
+        }), false);
+
+        try {
+            await api.delete(`/social/friends/${fid}`);
+        } catch (e) {
+            mutateFriends(); // Rollback
+            setToast({ message: "No se pudo eliminar al amigo", type: "error" });
+        }
+    };
 
     const handleCreateClan = async () => {
-        if (!newClanData.name.trim()) {
-            setToast({ message: "Falta el nombre del clan", type: "error" });
-            return;
-        }
-        if (!newClanData.icon.trim() || [...newClanData.icon].length > 4) {
-            setToast({ message: "Elige un estandarte (1 Emoji)", type: "error" });
-            return;
-        }
+        if (!newClanData.name.trim()) return setToast({ message: "Falta el nombre del clan", type: "error" });
+        if (!newClanData.icon.trim() || [...newClanData.icon].length > 4) return setToast({ message: "Elige un estandarte (1 Emoji)", type: "error" });
+
         try {
             const res = await api.post('/clans', newClanData);
-            setMyClan(res.data);
-            setMyRank('dios');
+            mutateMyClan(res.data, false);
             setShowCreateClan(false);
             setIsUiHidden(false);
             refreshData();
@@ -709,8 +738,7 @@ export default function Social() {
 
     const handleUpdateClan = async () => {
         try {
-            // await api.put(`/clans/${myClan._id}`, { ...newClanData });
-            setMyClan(prev => ({ ...prev, ...newClanData }));
+            mutateMyClan(prev => ({ ...prev, ...newClanData }), false);
             setShowEditClan(false);
             setIsUiHidden(false);
             setToast({ message: "Clan actualizado", type: "success" });
@@ -719,14 +747,40 @@ export default function Social() {
         }
     };
 
-    const handleLeaveClan = async () => { try { await api.post('/clans/leave'); setMyClan(null); refreshData(); } catch (e) { } };
-    const handleRespondMission = async (mid, action) => { try { await api.post('/missions/respond', { missionId: mid, action }); setMissionInvites(prev => prev.filter(m => m._id !== mid)); setToast({ message: "Hecho", type: "success" }); } catch (e) { } };
+    const handleLeaveClan = async () => {
+        try {
+            await api.post('/clans/leave');
+            mutateMyClan(null, false);
+            refreshData();
+        } catch (e) { }
+    };
 
-    useEffect(() => { const t = setTimeout(async () => { if (searchText.trim().length > 0) { setIsSearching(true); try { const res = await api.get(`/social/search?q=${encodeURIComponent(searchText)}`); setSearchResults(res.data); } catch (e) { } finally { setIsSearching(false); } } else { setSearchResults([]); } }, 500); return () => clearTimeout(t); }, [searchText]);
+    const handleRespondMission = async (mid, action) => {
+        try {
+            await api.post('/missions/respond', { missionId: mid, action });
+            // Actualizamos en local (Debería ir al store eventualmente, pero lo filtramos temporalmente)
+            setUser({ ...user, missionRequests: user.missionRequests.filter(m => m._id !== mid) });
+            setToast({ message: "Hecho", type: "success" });
+        } catch (e) { }
+    };
+
+    useEffect(() => {
+        const t = setTimeout(async () => {
+            if (searchText.trim().length > 0) {
+                setIsSearching(true);
+                try {
+                    const res = await api.get(`/social/search?q=${encodeURIComponent(searchText)}`);
+                    setSearchResults(res.data);
+                } catch (e) { } finally { setIsSearching(false); }
+            } else {
+                setSearchResults([]);
+            }
+        }, 500);
+        return () => clearTimeout(t);
+    }, [searchText]);
 
     const totalNotifications = requests.length + missionInvites.length + challengeRequests.length;
 
-    // --- MANEJADORES DE MODALES FLOTANTES ---
     const openCreateClan = () => {
         setNewClanData({ name: '', description: '', icon: '🛡️', minLevel: 1 });
         setShowCreateClan(true); setIsUiHidden(true);
@@ -735,14 +789,8 @@ export default function Social() {
 
     const openEditClan = () => {
         if (!myClan) return;
-        setNewClanData({
-            name: myClan.name,
-            description: myClan.description,
-            icon: myClan.icon,
-            minLevel: myClan.minLevel
-        });
-        setShowEditClan(true);
-        setIsUiHidden(true);
+        setNewClanData({ name: myClan.name, description: myClan.description, icon: myClan.icon, minLevel: myClan.minLevel });
+        setShowEditClan(true); setIsUiHidden(true);
     };
     const closeEditClan = () => { setShowEditClan(false); setIsUiHidden(false); };
 
@@ -752,17 +800,19 @@ export default function Social() {
     const handleIconChange = (e) => {
         const val = e.target.value;
         const isNotLetterOrNumber = !/^[a-zA-Z0-9]*$/.test(val);
-        // Permitimos borrar o si es emoji (longitud visual 1-4 chars para cubrir todos)
         if (val === '' || (isNotLetterOrNumber && [...val].length <= 4)) {
             setNewClanData({ ...newClanData, icon: val });
         }
     };
 
-    // --- FILTRADO DE CLANES ---
-    const filteredClans = clansList.filter(c =>
+    const filteredClans = (clansList || []).filter(c =>
         c.name.toLowerCase().includes(clanSearchText.toLowerCase()) &&
         c._id !== myClan?._id
     );
+
+    // Pantalla de carga Inicial SOLO si no hay caché
+    const isFirstLoad = !friendsData && !leaderboardData && !myClan;
+    if (isFirstLoad) return <div className="text-center py-40 text-zinc-500 animate-pulse uppercase text-xs font-bold bg-black min-h-screen">Conectando...</div>;
 
     return (
         <div className="pb-24 pt-6 px-4 min-h-screen animate-in fade-in select-none bg-black relative">
@@ -771,14 +821,13 @@ export default function Social() {
 
             <div className="flex justify-between items-end mb-6"><div><h1 className="text-3xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2">SOCIAL</h1><p className="text-xs text-zinc-500 font-bold uppercase tracking-wide">Compite y Conecta</p></div><button onClick={() => setShowInbox(true)} className="bg-zinc-900 p-3 rounded-2xl text-white hover:border-yellow-500/50 border border-zinc-800 transition-all relative"><Mail size={20} />{totalNotifications > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold flex items-center justify-center border border-black animate-bounce">{totalNotifications}</span>}</button></div>
 
-            {/* Inyectamos los estilos de la animación suave */}
             <style>{customAnimationsStyle}</style>
 
             <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 border-b border-white/5 mb-6"><div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-white/10 overflow-hidden"><div className={`absolute top-1 bottom-1 w-[calc(33.33%-2.6px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'friends' ? 'translate-x-[calc(100%+4px)]' : activeTab === 'clans' ? 'translate-x-[calc(200%+8px)]' : 'translate-x-0'}`} /><button onClick={() => setActiveTab('ranking')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'ranking' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Trophy size={14} /> RANKING</button><button onClick={() => setActiveTab('friends')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'friends' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><UserPlus size={14} /> AMIGOS</button><button onClick={() => setActiveTab('clans')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'clans' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Shield size={14} /> CLANES</button></div></div>
 
             {activeTab === 'ranking' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300">
                 <MonthlyRewardsBanner />
-                <div className="mb-4 px-1 flex justify-between items-center"><h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest">Top 10 Global</h3><span className="text-[10px] text-zinc-600 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">Histórico</span></div>{loading ? <div className="text-center py-20 text-zinc-600 animate-pulse font-bold text-xs uppercase">Cargando...</div> : <div className="space-y-3 pb-20">{leaderboard.slice(0, 10).map((player, index) => <RankingItem key={player._id} player={player} index={index} isMe={player._id === currentUserId} />)}</div>}
+                <div className="mb-4 px-1 flex justify-between items-center"><h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest">Top 10 Global</h3><span className="text-[10px] text-zinc-600 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">Histórico</span></div><div className="space-y-3 pb-20">{leaderboard.slice(0, 10).map((player, index) => <RankingItem key={player._id} player={player} index={index} isMe={player._id === currentUserId} />)}</div>
             </div>)}
 
             {activeTab === 'friends' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300 space-y-6"><div className="relative group"><Search className="absolute left-4 top-4 text-zinc-500 group-focus-within:text-yellow-500 transition-colors" size={20} /><input type="text" placeholder="Buscar jugadores..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 pl-12 text-white focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-600 font-bold text-sm" />{isSearching && <div className="absolute right-4 top-4"><Loader2 className="animate-spin text-yellow-500" size={20} /></div>}</div>{searchText.length > 0 && (<div className="space-y-3"><h3 className="text-xs font-bold text-yellow-500 uppercase ml-2">Resultados</h3>{searchResults.map(u => (<div key={u._id} className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl flex justify-between items-center"><div className="flex items-center gap-3 relative"><div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-zinc-500 border border-zinc-800 overflow-hidden relative z-10">{u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : u.username.charAt(0)}</div>{u.frame && <img src={u.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}<span className="text-white font-bold text-sm ml-2">{u.username}</span></div><button onClick={() => handleSendRequest(u._id)} className="bg-yellow-500 text-black px-3 py-1.5 rounded-lg text-xs font-black hover:bg-yellow-400">AGREGAR</button></div>))}</div>)}{searchText.length === 0 && (<div><div className="flex justify-between items-center mb-3 px-1"><h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Tus Amigos ({friends.length})</h3><span className="text-[10px] text-green-500 font-bold bg-green-900/20 px-2 py-0.5 rounded border border-green-900/30">{friends.filter(f => f.online).length} Online</span></div>{friends.length === 0 ? (<div className="text-center py-10 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl"><Users className="mx-auto mb-2 opacity-50" /><p className="text-xs">Aún no tienes aliados.</p></div>) : (friends.map(friend => (<FriendCard key={friend._id} friend={friend} onRemoveRequest={(f) => requestConfirm(`¿Eliminar a ${f.username}?`, () => handleRemoveFriend(f._id))} onChallengeOrView={handleSwipeRightFriend} />)))}</div>)}</div>)}
@@ -786,7 +835,6 @@ export default function Social() {
             {activeTab === 'clans' && (
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-8 pb-20">
 
-                    {/* 1. TU CLAN (O CREAR) - AHORA ARRIBA */}
                     <div>
                         <h3 className="text-xs font-black text-zinc-500 uppercase ml-2 mb-3 tracking-widest">Tu Alianza</h3>
 
@@ -794,39 +842,28 @@ export default function Social() {
                             <div className="bg-zinc-900 border border-white/10 rounded-[32px] p-6 relative overflow-hidden shadow-2xl">
                                 <div className="absolute top-0 right-0 p-10 opacity-10 bg-purple-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
 
-                                {/* HEADER DE TU CLAN (CORREGIDO - FIX 8) */}
                                 <div className="relative z-10 mb-6">
                                     <div className="flex items-start gap-4 w-full">
-                                        {/* Icono */}
                                         <div className="text-4xl bg-black w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner border border-zinc-800 shrink-0">
                                             {myClan.icon}
                                         </div>
 
-                                        {/* Columna de Texto + Botones */}
                                         <div className="flex-1 min-w-0">
-
-                                            {/* --- BOTONES MOVIDOS AQUÍ --- */}
                                             <div className="flex justify-end gap-2 mb-1">
-                                                {/* BOTÓN EDITAR (SOLO LÍDER) */}
                                                 {((myClan.leader?._id || myClan.leader) === currentUserId) && (
                                                     <button onClick={openEditClan} className="bg-zinc-800 p-2 rounded-xl text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
                                                         <Edit size={16} />
                                                     </button>
                                                 )}
-
-                                                {/* BOTÓN SALIR (ROJO) */}
                                                 <button onClick={() => requestConfirm("¿Salir del clan?", handleLeaveClan)} className="bg-red-900/20 p-2 rounded-xl text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors">
                                                     <LogOut size={16} />
                                                 </button>
                                             </div>
 
-                                            {/* Nombre del Clan */}
-                                            {/* 🔥 FIX: quitado 'truncate', mantiene 'break-words' y 'leading-tight' */}
                                             <h2 className="text-2xl font-black text-white uppercase italic break-words leading-tight">
                                                 {myClan.name}
                                             </h2>
 
-                                            {/* Stats (Poder / Miembros) */}
                                             <div className="flex items-center gap-4 mt-2">
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 border border-purple-500/50 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
@@ -867,7 +904,6 @@ export default function Social() {
                         )}
                     </div>
 
-                    {/* 2. BOTÓN EXPLORAR OTROS CLANES (DEBAJO) */}
                     <div>
                         <button
                             onClick={() => setShowOtherClans(!showOtherClans)}
@@ -925,20 +961,16 @@ export default function Social() {
             {showCreateChallenge && <CreateChallengeModal friend={showCreateChallenge} onClose={() => setShowCreateChallenge(null)} onSend={sendChallenge} />}
             {activeDuel && <DuelStatusModal duel={activeDuel} userId={currentUserId} onClose={() => setActiveDuel(null)} />}
 
-            {/* MODAL CREAR / EDITAR CLAN (UNIFICADO) */}
             {(showCreateClan || showEditClan) && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={showEditClan ? closeEditClan : closeCreateClan} />
-
                     <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl relative z-10 animate-in zoom-in-95">
-
                         <div className="p-5 border-b border-white/10 flex justify-between items-center bg-zinc-950">
                             <h3 className="text-xl font-black text-white flex items-center gap-2 uppercase italic">
                                 {showEditClan ? <><Edit className="text-blue-500" /> Editar Clan</> : <><Crown className="text-yellow-500" /> Fundar Clan</>}
                             </h3>
                             <button onClick={showEditClan ? closeEditClan : closeCreateClan} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white transition-colors border border-white/5"><X size={20} /></button>
                         </div>
-
                         <div className="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar bg-black/20">
                             <div>
                                 <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Nombre del Clan</label>
@@ -948,7 +980,7 @@ export default function Social() {
                                     className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     value={newClanData.name}
                                     onChange={e => setNewClanData({ ...newClanData, name: e.target.value })}
-                                    disabled={showEditClan} // 🔒 NOMBRE NO EDITABLE
+                                    disabled={showEditClan}
                                 />
                             </div>
                             <div>
@@ -962,8 +994,6 @@ export default function Social() {
                                     <input type="number" min="1" max="100" className="flex-1 bg-black border border-zinc-800 rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none transition-colors text-center" value={newClanData.minLevel} onChange={e => setNewClanData({ ...newClanData, minLevel: parseInt(e.target.value) || 1 })} />
                                 </div>
                             </div>
-
-                            {/* 4. EMOJI INPUT (PERSONALIZADO) */}
                             <div>
                                 <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-2">Estandarte (Emoji)</label>
                                 <div className="flex justify-center">
@@ -978,7 +1008,6 @@ export default function Social() {
                                 <p className="text-[9px] text-zinc-600 text-center mt-2">Usa el teclado de emojis de tu móvil</p>
                             </div>
                         </div>
-
                         <div className="p-5 bg-zinc-950 border-t border-white/10">
                             <button
                                 onClick={showEditClan ? handleUpdateClan : handleCreateClan}

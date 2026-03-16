@@ -3,15 +3,19 @@ import { useOutletContext } from 'react-router-dom';
 import {
     Plus, Play, Trash2, Dumbbell, X, Bike, Activity, Loader2, MapPin,
     Timer, Edit, Footprints, Waves, PersonStanding, Flame,
-    Save, Lock // 🔥 Importamos candado para feedback visual
+    Save, Lock
 } from 'lucide-react';
 
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
-
-// 🔥 IMPORTAR CONTEXTO
 import { useWorkout } from '../context/WorkoutContext';
+
+// 🔥 IMPORTAMOS SWR
+import useSWR from 'swr';
+
+// Fetcher global para SWR
+const fetcher = (url) => api.get(url).then(res => res.data);
 
 // --- CONSTANTES DEPORTE ---
 const SPORT_ACTIVITIES = [
@@ -23,7 +27,6 @@ const SPORT_ACTIVITIES = [
     { id: 'Padel', icon: <Activity size={24} />, color: 'text-lime-400', bg: 'bg-lime-900/20 border-lime-500/30' },
 ];
 
-// 🔥 TEMAS VISUALES "WIDGET STYLE"
 const COLOR_THEMES = {
     blue: { border: 'border-blue-500', shadow: 'rgba(59,130,246,0.4)', bgIcon: 'bg-blue-600', textIcon: 'text-white', play: 'bg-blue-500 text-white' },
     red: { border: 'border-red-500', shadow: 'rgba(239,68,68,0.4)', bgIcon: 'bg-red-600', textIcon: 'text-white', play: 'bg-red-500 text-white' },
@@ -34,7 +37,6 @@ const COLOR_THEMES = {
     pink: { border: 'border-pink-500', shadow: 'rgba(236,72,153,0.4)', bgIcon: 'bg-pink-600', textIcon: 'text-white', play: 'bg-pink-500 text-white' },
 };
 
-// --- COMPONENTE TARJETA RUTINA (OPTIMIZADO + PROTEGIDO) ---
 const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -54,7 +56,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
 
     const handleTouchEnd = () => {
         setIsDragging(false);
-        // Umbral de activación
         if (offsetX > 100) onEdit();
         else if (offsetX < -100) onDelete();
         setOffsetX(0);
@@ -66,7 +67,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
 
     return (
         <div className="relative w-full mb-4 select-none touch-pan-y overflow-hidden rounded-3xl">
-            {/* FONDO (ACCIONES) */}
             <div className="absolute inset-0 flex justify-between items-center px-6 bg-zinc-900 border border-zinc-800">
                 <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-blue-400'} font-bold uppercase text-xs transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
                     {isLocked ? <><Lock size={20} /> Bloqueado</> : <><Edit size={20} /> Editar</>}
@@ -76,7 +76,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
                 </div>
             </div>
 
-            {/* TARJETA SUPERIOR */}
             <div
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -101,12 +100,10 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
                 </div>
 
                 {isLocked ? (
-                    // Botón de Bloqueado (si está en uso)
                     <div className="w-12 h-12 rounded-full flex items-center justify-center bg-zinc-800 text-zinc-500 border border-zinc-700 z-20">
                         <Activity size={20} className="animate-pulse" />
                     </div>
                 ) : (
-                    // Botón de Play Normal
                     <button
                         onClick={(e) => { e.stopPropagation(); onPlay(); }}
                         className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
@@ -119,7 +116,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
     );
 };
 
-// --- COMPONENTE TARJETA DEPORTE (OPTIMIZADO) ---
 const SwipeableSportCard = ({ workout, onDelete }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -164,34 +160,31 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
     );
 };
 
-// --- PÁGINA PRINCIPAL ---
 export default function Gym() {
     const { user, setUser, setIsUiHidden } = useOutletContext();
-    // 🔥 OBTENEMOS activeRoutine DEL CONTEXTO
     const { startWorkout, activeRoutine } = useWorkout();
 
-    const [routines, setRoutines] = useState([]);
-    const [todaySports, setTodaySports] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [toast, setToast] = useState(null);
+    // 🔥 MAGIA DE SWR: Obtenemos rutinas y diarios en caché instantánea
+    const { data: routinesData, mutate: mutateRoutines, isLoading: loadingRoutines } = useSWR('/gym/routines', fetcher);
+    const { data: dailyData, mutate: mutateDaily, isLoading: loadingDaily } = useSWR('/daily', fetcher);
 
-    // Estados
+    // Asignamos datos de forma segura
+    const routines = routinesData || [];
+    const todaySports = dailyData?.sportWorkouts ? [...dailyData.sportWorkouts].reverse() : [];
+
+    // Solo mostramos el spinner si es la primerísima vez que carga y la caché está vacía
+    const isFirstLoad = (!routinesData && loadingRoutines) || (!dailyData && loadingDaily);
+
+    const [toast, setToast] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
     const [showSportModal, setShowSportModal] = useState(false);
-
-    // Formulario Deporte
     const [isSavingSport, setIsSavingSport] = useState(false);
     const [sportForm, setSportForm] = useState({ name: '', time: '', distance: '' });
     const [intensity, setIntensity] = useState('Media');
 
-    useEffect(() => { fetchRoutines(); fetchTodaySport(); }, []);
-
-    const fetchRoutines = async () => { try { const res = await api.get('/gym/routines'); setRoutines(res.data); } catch (e) { } finally { setLoading(false); } };
-    const fetchTodaySport = async () => { try { const res = await api.get('/daily'); setTodaySports(res.data.sportWorkouts ? res.data.sportWorkouts.reverse() : []); } catch (e) { } };
     const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
-    // Control UI
     const openCreateRoutine = (r) => { setRoutineToEdit(r); setShowCreateModal(true); setIsUiHidden(true); };
     const closeCreateRoutine = () => { setShowCreateModal(false); setIsUiHidden(false); };
 
@@ -203,34 +196,32 @@ export default function Gym() {
     };
     const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
-    // Acciones
     const openActiveWorkout = (r) => {
-        if (activeRoutine && activeRoutine._id === r._id) {
-            // Si es la misma, maximizamos (esto lo maneja el contexto, pero aquí no hacemos nada extra)
-            return;
-        }
-        if (activeRoutine) {
-            return showToast("Ya hay una rutina en curso", "error");
-        }
+        if (activeRoutine && activeRoutine._id === r._id) return;
+        if (activeRoutine) return showToast("Ya hay una rutina en curso", "error");
         startWorkout(r);
     };
 
-    // 🔥 HANDLE EDIT: PROTEGIDO
     const handleEditRoutine = (r) => {
-        if (activeRoutine && activeRoutine._id === r._id) {
-            return showToast("⚠️ En curso: Finaliza para editar.", "error");
-        }
+        if (activeRoutine && activeRoutine._id === r._id) return showToast("⚠️ En curso: Finaliza para editar.", "error");
         openCreateRoutine(r);
     };
 
-    // 🔥 HANDLE DELETE: PROTEGIDO
     const handleDeleteRoutine = async (id) => {
-        if (activeRoutine && activeRoutine._id === id) {
-            return showToast("⚠️ En curso: No se puede borrar.", "error");
-        }
-
+        if (activeRoutine && activeRoutine._id === id) return showToast("⚠️ En curso: No se puede borrar.", "error");
         if (!window.confirm("¿Borrar rutina?")) return;
-        try { await api.delete(`/gym/routines/${id}`); setRoutines(prev => prev.filter(r => r._id !== id)); showToast("Eliminada", "info"); } catch (e) { showToast("Error", "error"); }
+
+        // Optimistic UI para borrado de rutina
+        mutateRoutines(routines.filter(r => r._id !== id), false);
+
+        try {
+            await api.delete(`/gym/routines/${id}`);
+            mutateRoutines(); // Sincroniza al terminar
+            showToast("Eliminada", "info");
+        } catch (e) {
+            mutateRoutines(); // Rollback
+            showToast("Error al eliminar", "error");
+        }
     };
 
     const handleSaveSport = async () => {
@@ -240,12 +231,22 @@ export default function Gym() {
             const payload = { ...sportForm, name: sportForm.name, time: Number(sportForm.time), distance: sportForm.distance ? Number(sportForm.distance) : null, intensity };
             const res = await api.post('/gym/sport', payload);
             if (res.data.user) setUser(res.data.user);
-            closeSportModal(); fetchTodaySport(); showToast(`+${res.data.log.caloriesBurned} kcal`, "success");
-        } catch (e) { showToast('Error', 'error'); } finally { setIsSavingSport(false); }
+
+            closeSportModal();
+            // Revalida los datos deportivos en caché (SWR)
+            mutateDaily();
+            showToast(`+${res.data.log.caloriesBurned} kcal`, "success");
+        } catch (e) {
+            showToast('Error', 'error');
+        } finally {
+            setIsSavingSport(false);
+        }
     };
+
     const handleDeleteSport = () => showToast("Usa la web para borrar", "info");
 
-    if (loading) return <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>;
+    // 🔥 PANTALLA DE CARGA (SOLO 1 VEZ EN LA VIDA)
+    if (isFirstLoad) return <div className="text-center py-40 text-zinc-500 animate-pulse uppercase text-xs font-bold">Preparando zona de entreno...</div>;
 
     return (
         <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden">
@@ -298,17 +299,16 @@ export default function Gym() {
                                 onPlay={() => openActiveWorkout(routine)}
                                 onDelete={() => handleDeleteRoutine(routine._id)}
                                 onEdit={() => handleEditRoutine(routine)}
-                                isLocked={activeRoutine && activeRoutine._id === routine._id} // 🔥 PASAMOS EL ESTADO DE BLOQUEO
+                                isLocked={activeRoutine && activeRoutine._id === routine._id}
                             />
                         ))
                     )}
                 </div>
             </div>
 
-            {/* MODAL CREAR RUTINA */}
-            {showCreateModal && <CreateRoutineModal routineToEdit={routineToEdit} onClose={closeCreateRoutine} onRoutineCreated={() => { fetchRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }} />}
+            {/* MODALES */}
+            {showCreateModal && <CreateRoutineModal routineToEdit={routineToEdit} onClose={closeCreateRoutine} onRoutineCreated={() => { mutateRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }} />}
 
-            {/* MODAL REGISTRAR DEPORTE */}
             {showSportModal && (
                 <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
                     <div className="bg-zinc-950 w-full max-w-sm rounded-[32px] border border-lime-500/20 p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95">
