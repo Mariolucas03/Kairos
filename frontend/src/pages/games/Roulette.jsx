@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Info, X, Trash2, Undo2, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- CONSTANTES ---
 const WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -30,7 +32,10 @@ const ChipRain = ({ isFading }) => {
 };
 
 export default function Roulette() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
     // SALDO VISUAL

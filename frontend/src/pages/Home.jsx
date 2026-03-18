@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Settings, X, ToggleLeft, ToggleRight, Calendar, Gift, Move, Lock, Unlock, Activity } from 'lucide-react';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
@@ -7,6 +7,7 @@ import { registerPush } from '../utils/pushNotifications';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
+import { useSmoothMount } from '../hooks/useSmoothMount';
 
 import DailyRewardModal from '../components/widgets/DailyRewardModal';
 import MoodWidget from '../components/widgets/MoodWidget';
@@ -20,6 +21,9 @@ import MissionsWidget from '../components/widgets/MissionsWidget';
 import SportWidget from '../components/widgets/SportWidget';
 import WeeklyWidget from '../components/widgets/WeeklyWidget';
 import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
+
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 // ==========================================
 // WRAPPER INTELIGENTE V4 (FIX CLICS)
@@ -61,8 +65,13 @@ const SmartWidgetWrapper = ({ children, onClick, className, isDragEnabled }) => 
 };
 
 export default function Home() {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
     const navigate = useNavigate();
+
+    // 🔥 EL NUEVO AMORTIGUADOR DE CARGA
+    const isSmoothMounted = useSmoothMount();
 
     const { dailyData: logData, loading: logLoading, updateWidget, calculations } = useDailyLog(user);
     const { showRewardModal, rewardData, closeModal, claimReward, openCalendar, hasClaimedToday } = useDailyRewards(user, setUser);
@@ -98,7 +107,6 @@ export default function Home() {
     // --- MODO ARRASTRE ---
     const [isDragEnabled, setIsDragEnabled] = useState(() => localStorage.getItem('home_drag_enabled') === 'true');
 
-    // 🔥 Delay bajado a 0 porque ahora el modo organizar lo protege
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
@@ -158,10 +166,11 @@ export default function Home() {
         }
     };
 
-    if ((logLoading && !logData) || !user) {
+    // 🔥 LA CONDICIÓN MÁGICA QUE QUITA EL LAG
+    if (!isSmoothMounted || (logLoading && !logData) || !user) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-silver-500 animate-pulse bg-black">
-                <Activity size={48} className="text-gold-500 animate-spin" />
+            <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-zinc-500 bg-black">
+                <Activity size={48} className="text-yellow-500 animate-spin" />
                 <p className="text-xs font-bold uppercase tracking-widest">Cargando...</p>
             </div>
         );
@@ -176,17 +185,17 @@ export default function Home() {
             <div className="flex justify-between items-center px-4 pt-4">
                 <div>
                     <h1 className="text-2xl font-black text-white italic">
-                        Hola, <span className="text-gold-400 capitalize">{user?.username || 'Guerrero'}</span>
+                        Hola, <span className="text-yellow-500 capitalize">{user?.username || 'Guerrero'}</span>
                     </h1>
-                    <p className="text-xs font-bold text-silver-500 uppercase tracking-widest flex items-center gap-1 mt-1">
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 mt-1">
                         <Calendar size={12} /> {todayStr}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button onClick={openCalendar} className={`p-2.5 rounded-2xl border transition-all ${hasClaimedToday() ? 'bg-[#09090b] border-white/10 text-silver-600' : 'bg-gold-500 text-black border-gold-400 shadow-lg shadow-gold-500/20 animate-pulse'}`}>
+                    <button onClick={openCalendar} className={`p-2.5 rounded-2xl border transition-all ${hasClaimedToday() ? 'bg-[#09090b] border-white/10 text-zinc-600' : 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20 animate-pulse'}`}>
                         <Gift size={20} />
                     </button>
-                    <button onClick={() => setShowSettings(true)} className="bg-[#09090b] border border-white/10 p-2.5 rounded-2xl text-silver-500 hover:text-white transition-colors hover:border-silver-600">
+                    <button onClick={() => setShowSettings(true)} className="bg-[#09090b] border border-white/10 p-2.5 rounded-2xl text-zinc-500 hover:text-white transition-colors hover:border-zinc-600">
                         <Settings size={20} />
                     </button>
                 </div>
@@ -239,15 +248,15 @@ export default function Home() {
                             </div>
                             <div className="p-4 border border-white/5 rounded-3xl bg-zinc-900/50 flex justify-between items-center">
                                 <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">🔔 Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
-                                <button onClick={async () => { const success = await registerPush(); if (success) alert("¡Alertas activadas!"); else alert("No se pudo activar. Revisa permisos."); }} className="text-[10px] bg-gold-500 hover:bg-gold-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform shadow-lg shadow-gold-500/10">ACTIVAR</button>
+                                <button onClick={async () => { const success = await registerPush(); if (success) alert("¡Alertas activadas!"); else alert("No se pudo activar. Revisa permisos."); }} className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform shadow-lg shadow-yellow-500/10">ACTIVAR</button>
                             </div>
                             <div>
                                 <h3 className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-3 pl-1">Visibilidad</h3>
                                 <div className="space-y-2">
                                     {Object.keys(DEFAULTS_CONFIG).map(key => (
-                                        <div key={key} onClick={() => toggleWidget(key)} className={`p-3.5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${visibleWidgets[key] ? 'bg-zinc-900 border-gold-500/30' : 'bg-black border-white/5 opacity-60'}`}>
+                                        <div key={key} onClick={() => toggleWidget(key)} className={`p-3.5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${visibleWidgets[key] ? 'bg-zinc-900 border-yellow-500/30' : 'bg-black border-white/5 opacity-60'}`}>
                                             <span className={`text-xs font-bold capitalize ${visibleWidgets[key] ? 'text-white' : 'text-zinc-600'}`}>{widgetNames[key] || key}</span>
-                                            {visibleWidgets[key] ? <ToggleRight className="text-gold-500" size={22} /> : <ToggleLeft className="text-zinc-700" size={22} />}
+                                            {visibleWidgets[key] ? <ToggleRight className="text-yellow-500" size={22} /> : <ToggleLeft className="text-zinc-700" size={22} />}
                                         </div>
                                     ))}
                                 </div>

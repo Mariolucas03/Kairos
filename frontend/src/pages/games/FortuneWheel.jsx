@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Gift, Flame, Diamond, Lock, X, Info, AlertTriangle, Zap } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- COMPONENTE DE LLUVIA DE MONEDAS ---
 const CoinsRain = () => {
@@ -167,8 +169,12 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
 }
 
 export default function FortuneWheel() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
+
     const [selectedMode, setSelectedMode] = useState(null);
     const [lastSpinDate, setLastSpinDate] = useState(() => localStorage.getItem('last_wheel_spin_date'));
     const getTodayStr = () => new Date().toISOString().split('T')[0];

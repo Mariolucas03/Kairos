@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Info, X, Trophy, Frown } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const ChipRain = ({ isFading }) => { /* Mantén tu ChipRain original aquí (lo abrevio por espacio) */
@@ -18,8 +20,12 @@ const DigitalDie = ({ value, rolling }) => {
 };
 
 export default function Dice() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
+
     const [visualBalance, setVisualBalance] = useState(user?.stats?.gameCoins ?? user?.gameCoins ?? 0);
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 

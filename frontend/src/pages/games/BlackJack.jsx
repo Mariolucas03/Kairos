@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Spade, Club, Heart, Diamond, Info, X, Trophy, Frown, Handshake } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- COMPONENTE CARTA ---
 const Card = ({ card, hidden, small }) => (
@@ -32,7 +34,10 @@ const calculateScore = (hand) => {
 };
 
 export default function BlackJack() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
     // SALDO VISUAL INSTANTÁNEO

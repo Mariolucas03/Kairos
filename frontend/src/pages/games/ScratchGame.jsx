@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Zap, Info, X } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- RUTA DE LA IMAGEN DEL REVERSO ---
 const CARD_BACK_IMG = '/assets/images/reverso-carta.png';
@@ -40,7 +42,10 @@ const ChipRain = ({ isFading }) => {
 };
 
 export default function ScratchGame() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
     // SALDO

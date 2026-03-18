@@ -1,8 +1,11 @@
-import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function Games() {
-    const { user } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
     const navigate = useNavigate();
 
     // --- LÓGICA DE BLOQUEO ---

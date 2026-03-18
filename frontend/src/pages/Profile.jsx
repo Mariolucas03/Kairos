@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Activity, ChevronLeft, ChevronRight, Lock, MapPin, LogOut } from 'lucide-react';
 import api from '../services/api';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
@@ -21,8 +21,13 @@ import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
 import RPGBody from '../components/profile/RPGBody';
 import ProfileStats from '../components/profile/ProfileStats';
 
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
+
 export default function Profile() {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
     const navigate = useNavigate();
 
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);

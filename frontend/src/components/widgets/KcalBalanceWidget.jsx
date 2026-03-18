@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 import { X, Scale, Flame, Utensils, User, ToggleLeft, ToggleRight, Save, Activity, Edit2 } from 'lucide-react';
 import api from '../../services/api';
 
 export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: propWeight }) {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
     const [isOpen, setIsOpen] = useState(false);
 
     // --- DATOS DEL USUARIO ---
@@ -272,8 +275,8 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                                             <button
                                                 onClick={() => setFormData({ ...formData, gender: 'male' })}
                                                 className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${formData.gender === 'male'
-                                                        ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
-                                                        : 'text-zinc-500 hover:text-zinc-300'
+                                                    ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
+                                                    : 'text-zinc-500 hover:text-zinc-300'
                                                     }`}
                                             >
                                                 Hombre
@@ -281,8 +284,8 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                                             <button
                                                 onClick={() => setFormData({ ...formData, gender: 'female' })}
                                                 className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${formData.gender === 'female'
-                                                        ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
-                                                        : 'text-zinc-500 hover:text-zinc-300'
+                                                    ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
+                                                    : 'text-zinc-500 hover:text-zinc-300'
                                                     }`}
                                             >
                                                 Mujer

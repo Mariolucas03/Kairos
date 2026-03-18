@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 // 🔥 IMPORTAMOS ZUSTAND EN LUGAR DE USEOUTLETCONTEXT
 import { useAuthStore } from '../store/useAuthStore';
+// 🔥 IMPORTAMOS SWR Y SMOOTHMOUNT
+import { useSmoothMount } from '../hooks/useSmoothMount';
+import useSWR from 'swr';
 import {
     Settings, X, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf,
     Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Sparkles, BrainCircuit, Camera, Image as ImageIcon, SortAsc, Filter
@@ -10,14 +13,18 @@ import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
 
+const fetcher = url => api.get(url).then(res => res.data);
+
 export default function Food() {
-    // 🔥 CONECTAMOS CON ZUSTAND
+    // 🔥 CONECTAMOS CON ZUSTAND Y AMORTIGUADOR
+    const isSmoothMounted = useSmoothMount();
     const user = useAuthStore(state => state.user);
     const setUser = useAuthStore(state => state.setUser);
 
+    // 🔥 SWR: Carga instantánea desde caché
+    const { data: log, mutate: mutateLog, isLoading } = useSWR('/food/log', fetcher);
+
     // --- ESTADOS DE DATOS ---
-    const [log, setLog] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
     // --- ESTADOS DE MODALES ---
@@ -52,39 +59,20 @@ export default function Food() {
     }, [user]);
 
     useEffect(() => {
-        fetchLog(false);
-    }, []);
-
-    useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chatHistory]);
 
     // --- FUNCIONES API ---
-    // isSilent evita que parpadee la pantalla cuando hacemos sincronizaciones de fondo
-    const fetchLog = async (isSilent = false) => {
-        if (!isSilent) setLoading(true);
-        try {
-            const res = await api.get('/food/log');
-            setLog(res.data);
-        } catch (error) {
-            console.error("Error obteniendo log:", error);
-        } finally {
-            if (!isSilent) setLoading(false);
-        }
-    };
-
     const showToast = (message, type = 'success') => setToast({ message, type });
 
     // 🔥 OPTIMISTIC UI: BORRAR
     const handleRemoveFood = async (mealId, foodItemId) => {
         if (!window.confirm("¿Borrar alimento?")) return;
 
-        // 1. Guardamos el estado anterior por si falla la red
-        const previousLog = JSON.parse(JSON.stringify(log));
-
-        // 2. Actualizamos la UI AL INSTANTE
-        setLog(prev => {
-            const newLog = { ...prev };
+        // Actualizamos la UI AL INSTANTE en SWR
+        mutateLog(prev => {
+            if (!prev) return prev;
+            const newLog = JSON.parse(JSON.stringify(prev)); // Clon profundo
             const meal = newLog.meals.find(m => m._id === mealId);
             if (meal) {
                 const foodIdx = meal.foods.findIndex(f => f._id === foodItemId);
@@ -99,25 +87,24 @@ export default function Food() {
                 }
             }
             return newLog;
-        });
+        }, false);
 
-        // 3. Petición en segundo plano
+        // Petición en segundo plano
         try {
             await api.delete(`/food/log/${mealId}/${foodItemId}`);
-            // No hacemos showToast para que se sienta fluido y silencioso, solo sincronizamos
-            fetchLog(true);
+            mutateLog(); // Sincronizamos silenciosamente
         } catch (error) {
             console.error(error);
-            setLog(previousLog); // Rollback si falla
+            mutateLog(); // Rollback si falla
             showToast("Error de conexión. Se han restaurado los datos.", "error");
         }
     };
 
     // 🔥 OPTIMISTIC UI: AÑADIR (Llamada desde el Modal)
     const handleOptimisticAdd = (foodData) => {
-        setLog(prev => {
+        mutateLog(prev => {
             if (!prev) return prev;
-            const newLog = { ...prev };
+            const newLog = JSON.parse(JSON.stringify(prev));
             const meal = newLog.meals.find(m => m._id === activeMealId);
             if (meal) {
                 // Le damos un ID temporal para que React no se queje
@@ -129,7 +116,7 @@ export default function Food() {
                 newLog.totalFiber += foodData.fiber;
             }
             return newLog;
-        });
+        }, false);
     };
 
     const updateGoals = async (newGoals) => {
@@ -205,7 +192,7 @@ export default function Food() {
         setShowSearch(true);
     };
 
-    if (loading) return (
+    if (!isSmoothMounted || (!log && isLoading)) return (
         <div className="min-h-screen bg-black flex items-center justify-center">
             <div className="text-center text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando nutrición...</div>
         </div>
@@ -368,7 +355,7 @@ export default function Food() {
                             onClose={() => setShowSearch(false)}
                             // 🔥 LE PASAMOS LA FUNCIÓN OPTIMISTA AL MODAL
                             onFoodAddedOptimistic={(foodData) => handleOptimisticAdd(foodData)}
-                            onBackgroundSync={() => fetchLog(true)}
+                            onBackgroundSync={() => mutateLog()}
                             onShowToast={showToast}
                         />
                     </div>

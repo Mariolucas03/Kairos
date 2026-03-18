@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Zap, Cherry, Gem, Star, Crown, Clover, Info, X, Skull, Ghost } from 'lucide-react';
 import api from '../../services/api';
+
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- IMAGEN DE PORTADA ---
 const SLOT_COVER_IMG = '/assets/images/neon-cover.png';
@@ -52,7 +55,11 @@ const PAYTABLE = [
 ];
 
 export default function Slots() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
+
     const navigate = useNavigate();
 
     // Saldo
@@ -246,7 +253,7 @@ export default function Slots() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="bg-black rounded-2xl flex items-center p-1 border border-zinc-800 shrink-0">
+                        <div className="bg-black rounded-2xl flex items-center p-1 border border-zinc-800 shrink-0 shadow-inner">
                             <button onClick={() => setBet(Math.max(10, bet - 10))} disabled={isGameActive} className="w-12 h-12 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 disabled:opacity-50 active:scale-95 transition-transform">-</button>
                             <div className="min-w-[80px] flex items-center justify-center gap-1 font-black text-yellow-500 text-xl">
                                 {bet}
@@ -270,15 +277,15 @@ export default function Slots() {
                 </div>
             </div>
 
-            {/* INFO MODAL */}
+            {/* MODAL INFO */}
             {showInfo && (
                 <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
                     <div className="bg-zinc-900 w-full max-w-xs rounded-3xl border border-white/10 p-6 relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
-                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">TABLA DE PAGOS</h3>
-                        <div className="space-y-2">
+                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">Tabla de Pagos</h3>
+                        <div className="space-y-2 text-xs text-zinc-300">
                             {PAYTABLE.map(s => (
-                                <div key={s.id} className="flex items-center justify-between bg-black/40 p-2 rounded-lg border border-white/5">
+                                <div key={s.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-white/5">
                                     <div className="flex items-center gap-2">{s.icon} <span className="font-bold text-sm text-zinc-300">3x</span></div>
                                     <span className="font-mono font-black text-white text-lg">x{s.val}</span>
                                 </div>

@@ -1,25 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useAuthStore } from '../store/useAuthStore';
+import { useSmoothMount } from '../hooks/useSmoothMount';
+import useSWR from 'swr';
 import {
-    Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
+    Trash2, Plus, Check, X, Target, Users, Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
-// 🔥 IMPORTAMOS ZUSTAND
-import { useAuthStore } from '../store/useAuthStore';
 
-// ==========================================
-// 0. CONFIGURACIÓN DE ICONOS
-// ==========================================
+const fetcher = url => api.get(url).then(res => res.data);
+
 const ICON_XP = "/assets/icons/xp.png";
 const ICON_COIN = "/assets/icons/moneda.png";
 const ICON_CHIP = "/assets/icons/ficha.png";
 const ICON_HEART = "/assets/icons/corazon.png";
 
-// ==========================================
-// 1. HELPERS VISUALES Y LÓGICOS
-// ==========================================
 const COOP_COLORS = [
     'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-indigo-500'
 ];
@@ -52,7 +48,6 @@ const getDeadlineText = (frequency) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
-// DAÑO INVERTIDO (Fácil = 10, Épica = 0)
 const getPotentialDamage = (diff) => {
     const rules = { easy: 10, medium: 5, hard: 2, epic: 0 };
     return rules[diff] !== undefined ? rules[diff] : 5;
@@ -63,10 +58,10 @@ const getGradientStyles = (diff, completed) => {
     const label = labels[diff] || diff;
 
     if (completed) return {
-        gradient: 'from-[#18181b] to-[#09090b]', // Zinc-900 to Black
-        shadow: 'rgba(0,0,0,0)', // Sin sombra de color
-        textGradient: 'from-zinc-600 to-zinc-500', // Texto gris apagado
-        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900', // Badge invisible casi
+        gradient: 'from-[#18181b] to-[#09090b]',
+        shadow: 'rgba(0,0,0,0)',
+        textGradient: 'from-zinc-600 to-zinc-500',
+        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900',
         iconColor: 'text-zinc-700',
         label: 'HECHO'
     };
@@ -115,9 +110,6 @@ const getGradientStyles = (diff, completed) => {
     }
 };
 
-// ==========================================
-// COMPONENTE: TARJETA DE MISIÓN
-// ==========================================
 function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdit, viewAllMode }) {
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -203,14 +195,8 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         );
     };
 
-    const handleCardClick = () => {
-        if (viewAllMode) {
-            onEdit(mission);
-        }
-    };
-
     return (
-        <div className="relative w-full mb-4 select-none group" onClick={handleCardClick}>
+        <div className="relative w-full mb-4 select-none group" onClick={() => viewAllMode && onEdit(mission)}>
             {canSwipe && (
                 <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
                     {dragX > 0 && <div className="flex items-center gap-2 text-emerald-400 font-black text-sm"><Check size={24} /> COMPLETAR</div>}
@@ -220,14 +206,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
 
             <div
                 style={cardStyle}
-                className={`
-                    relative rounded-[24px] overflow-hidden z-10 will-change-transform
-                    p-[2px] bg-gradient-to-br ${styles.gradient}
-                    shadow-[0_0_25px_${styles.shadow}]
-                    ${isPending ? 'opacity-70 grayscale-[0.5]' : ''}
-                    ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''}
-                    ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'} 
-                `}
+                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} shadow-[0_0_25px_${styles.shadow}] ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
@@ -237,11 +216,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
                 <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-4 relative overflow-hidden h-full flex flex-col justify-between`}>
-
-                    {!mission.completed && (
-                        <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
-                    )}
-
+                    {!mission.completed && <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>}
                     <div className="relative z-10">
                         <div className="flex justify-between items-start gap-3 mb-1">
                             <div className="flex-1 min-w-0 relative">
@@ -249,21 +224,15 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                     <div className="flex items-center gap-2">
                                         {mission.isCoop && <Users size={16} className={styles.iconColor} />}
                                         {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>
-                                            {mission.title}
-                                        </h3>
+                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
                                     </div>
-
                                     <div className="flex items-center gap-2 mt-1">
                                         <div className="flex items-baseline gap-1">
-                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>
-                                                {mission.progress}/{mission.target}
-                                            </span>
+                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>{mission.progress}/{mission.target}</span>
                                             {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
                                         </div>
                                     </div>
                                 </div>
-
                                 <div className="absolute -top-1 -right-1 flex items-center gap-2">
                                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
                                         {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
@@ -271,12 +240,9 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                     <div className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>{styles.label}</div>
                                 </div>
                             </div>
-
                             <div className="flex flex-col items-center gap-2">
                                 {!isBinary && !mission.completed && !isPending && !viewAllMode && (
-                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
-                                        <Plus size={16} />
-                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto"><Plus size={16} /></button>
                                 )}
                             </div>
                         </div>
@@ -286,30 +252,17 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                         <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
                             <div className="flex items-center gap-4">
                                 {mission.xpReward > 0 && (
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span>
-                                        <img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" />
-                                    </div>
+                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span><img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" /></div>
                                 )}
                                 {(mission.coinReward > 0) && (
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span>
-                                        <img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" />
-                                    </div>
+                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span><img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" /></div>
                                 )}
                                 {(mission.gameCoinReward > 0) && (
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span>
-                                        <img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" />
-                                    </div>
+                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span><img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" /></div>
                                 )}
                             </div>
-
                             {!mission.completed && (
-                                <div className="ml-auto flex items-center gap-1.5 opacity-90">
-                                    <span className="text-sm font-black text-red-400">-{damage}</span>
-                                    <img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" />
-                                </div>
+                                <div className="ml-auto flex items-center gap-1.5 opacity-90"><span className="text-sm font-black text-red-400">-{damage}</span><img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" /></div>
                             )}
                         </div>
 
@@ -323,8 +276,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
 
                     {isPending && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-[22px] z-30">
-                            <Loader2 className="animate-spin text-zinc-500 mb-2" />
-                            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
+                            <Loader2 className="animate-spin text-zinc-500 mb-2" /><span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
                             {amIOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(mission._id); }} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
                         </div>
                     )}
@@ -334,23 +286,23 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     );
 }
 
-// ==========================================
-// PÁGINA PRINCIPAL
-// ==========================================
 export default function Missions() {
-    // 🔥 ZUSTAND: Conectado a la vena
+    const isSmoothMounted = useSmoothMount();
     const user = useAuthStore(state => state.user);
     const setUser = useAuthStore(state => state.setUser);
 
-    const [missions, setMissions] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // 🔥 SWR INYECTADO PARA CACHÉ INSTANTÁNEA
+    const { data: missionsData, mutate: mutateMissions, isLoading } = useSWR('/missions', fetcher);
+    const { data: friendsData } = useSWR('/social/friends', fetcher);
+
+    const missions = missionsData || [];
+    const friends = friendsData?.friends || [];
+
     const [activeTab, setActiveTab] = useState('daily');
     const [showCreator, setShowCreator] = useState(false);
     const [toast, setToast] = useState(null);
-    const [friends, setFriends] = useState([]);
     const [viewAllMode, setViewAllMode] = useState(false);
 
-    // Estados Edición
     const [showEditModal, setShowEditModal] = useState(false);
     const [missionToEdit, setMissionToEdit] = useState(null);
     const [editSelectedDays, setEditSelectedDays] = useState([]);
@@ -360,17 +312,9 @@ export default function Missions() {
     const [selectedDays, setSelectedDays] = useState([]);
     const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
 
-    useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'instant' });
-    }, [activeTab]);
+    useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
+    useEffect(() => { if (!showCreator) setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab })); }, [activeTab, showCreator]);
 
-    useEffect(() => {
-        if (!showCreator) setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab }));
-        fetchMissions(); fetchFriends();
-    }, [activeTab, showCreator]);
-
-    const fetchMissions = async () => { try { const res = await api.get('/missions'); setMissions(res.data); } catch (e) { setMissions([]); } finally { setLoading(false); } };
-    const fetchFriends = async () => { try { const res = await api.get('/social/friends'); setFriends(res.data.friends); } catch (e) { } };
     const showToast = (message, type = 'success') => setToast({ message, type });
 
     const toggleDay = (dayValue) => setSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
@@ -402,20 +346,15 @@ export default function Missions() {
         if (newMission.isCoop && !newMission.friendId) return showToast("Falta amigo", "error");
         const payload = { title: newMission.title.trim(), frequency: newMission.frequency || 'daily', type: newMission.type || 'habit', difficulty: newMission.difficulty || 'easy', target: parseInt(newMission.target) || 1, unit: newMission.unit ? newMission.unit.trim() : undefined, isCoop: !!newMission.isCoop, specificDays: newMission.frequency === 'daily' ? selectedDays : [] };
         if (payload.isCoop) payload.friendId = newMission.friendId;
-        try { await api.post('/missions', payload); handleCloseCreator(); fetchMissions(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
+        try { await api.post('/missions', payload); handleCloseCreator(); mutateMissions(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
     };
 
-    // 🔥 OPTIMISTIC UI 🪄✨
+    // 🔥 OPTIMISTIC UI CON SWR
     const handleUpdateProgress = async (mission, amount) => {
-        // 1. GUARDAMOS ESTADO PREVIO (Para rollback si falla)
-        const previousMissions = [...missions];
-        const previousUser = { ...user };
-
-        // 2. ACTUALIZACIÓN OPTIMISTA (Instantánea en la UI)
         const newProgress = mission.progress + amount;
         const isCompletedNow = newProgress >= mission.target;
 
-        setMissions(prev => prev.map(m => {
+        mutateMissions(prev => prev.map(m => {
             if (m._id === mission._id) {
                 return {
                     ...m,
@@ -424,9 +363,8 @@ export default function Missions() {
                 };
             }
             return m;
-        }));
+        }), false);
 
-        // Si se completa, sumamos recursos visualmente al momento
         if (isCompletedNow && !mission.completed) {
             setUser({
                 ...user,
@@ -437,29 +375,21 @@ export default function Missions() {
             showToast(`+${mission.xpReward} XP`, "success");
         }
 
-        // 3. PETICIÓN REAL AL SERVIDOR EN SEGUNDO PLANO
         try {
             const res = await api.put(`/missions/${mission._id}/progress`, { amount });
-
-            // 4. SINCRONIZACIÓN SILENCIOSA
-            if (res.data.progressOnly) {
-                setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
-                return;
-            }
-            if (res.data.user) {
-                setUser(res.data.user); // Si hubo level up real en backend, lo asienta
-            }
-            setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
-
+            if (res.data.progressOnly) { mutateMissions(); return; }
+            if (res.data.user) setUser(res.data.user);
+            mutateMissions();
         } catch (e) {
-            // 5. ROLLBACK EN CASO DE ERROR
-            setMissions(previousMissions);
-            setUser(previousUser);
+            mutateMissions(); // Rollback
             showToast("Error de red. Acción revertida.", "error");
         }
     };
 
-    const handleDelete = async (id) => { try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Eliminada", "info"); } catch (e) { } };
+    const handleDelete = async (id) => {
+        mutateMissions(prev => prev.filter(m => m._id !== id), false);
+        try { await api.delete(`/missions/${id}`); showToast("Eliminada", "info"); mutateMissions(); } catch (e) { mutateMissions(); }
+    };
 
     const openEditModal = (mission) => {
         setMissionToEdit(mission);
@@ -475,17 +405,17 @@ export default function Missions() {
                 title: missionToEdit.title, target: missionToEdit.target, frequency: missionToEdit.frequency, difficulty: missionToEdit.difficulty, unit: missionToEdit.unit,
                 specificDays: missionToEdit.frequency === 'daily' ? editSelectedDays : []
             });
-            setShowEditModal(false); fetchMissions(); showToast("Actualizada");
+            setShowEditModal(false); mutateMissions(); showToast("Actualizada");
         } catch (e) { showToast("Error", "error"); }
     };
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" size={32} /></div>;
+    // 🔥 PANTALLA DE CARGA REESCRITA
+    if (!isSmoothMounted || (!missionsData && isLoading)) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" size={32} /></div>;
 
     return (
         <div className="min-h-screen bg-black text-white pb-24 animate-in fade-in relative">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER STICKY */}
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                     <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
@@ -509,7 +439,6 @@ export default function Missions() {
                 {viewAllMode && <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2"><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Toca una misión para editarla</p></div>}
             </div>
 
-            {/* LISTA */}
             <div className="px-4 mt-4 space-y-4">
                 {filteredMissions.length === 0 ? (
                     <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p></div>
@@ -521,7 +450,6 @@ export default function Missions() {
                 )}
             </div>
 
-            {/* MODAL EDITAR */}
             {showEditModal && missionToEdit && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -538,7 +466,6 @@ export default function Missions() {
                 </div>, document.body
             )}
 
-            {/* MODAL CREAR */}
             {showCreator && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">

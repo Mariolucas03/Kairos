@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useState, useRef } from 'react';
+// 🔥 QUITAMOS useOutletContext
+// import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 import {
     Plus, Play, Trash2, Dumbbell, X, Bike, Activity, Loader2, MapPin,
     Timer, Edit, Footprints, Waves, PersonStanding, Flame,
@@ -10,6 +13,7 @@ import api from '../services/api';
 import Toast from '../components/common/Toast';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
 import { useWorkout } from '../context/WorkoutContext';
+import { useSmoothMount } from '../hooks/useSmoothMount';
 
 // 🔥 IMPORTAMOS SWR
 import useSWR from 'swr';
@@ -161,8 +165,14 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
 };
 
 export default function Gym() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 USAMOS ZUSTAND PARA ESTADO GLOBAL
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
+
     const { startWorkout, activeRoutine } = useWorkout();
+
+    const isSmoothMounted = useSmoothMount();
 
     // 🔥 MAGIA DE SWR: Obtenemos rutinas y diarios en caché instantánea
     const { data: routinesData, mutate: mutateRoutines, isLoading: loadingRoutines } = useSWR('/gym/routines', fetcher);
@@ -245,11 +255,11 @@ export default function Gym() {
 
     const handleDeleteSport = () => showToast("Usa la web para borrar", "info");
 
-    // 🔥 PANTALLA DE CARGA (SOLO 1 VEZ EN LA VIDA)
-    if (isFirstLoad) return <div className="text-center py-40 text-zinc-500 animate-pulse uppercase text-xs font-bold">Preparando zona de entreno...</div>;
+    // 🔥 PANTALLA DE CARGA CON LA PROTECCIÓN DEL BOTÓN (SMOOTH MOUNT)
+    if (!isSmoothMounted || isFirstLoad) return <div className="text-center py-40 text-zinc-500 animate-pulse uppercase text-xs font-bold bg-black min-h-screen">Preparando zona de entreno...</div>;
 
     return (
-        <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden">
+        <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* HEADER GYM */}

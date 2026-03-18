@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+// 🔥 QUITAMOS useOutletContext
+// import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 import {
     Plus, X, ArrowLeft, ArrowRightLeft,
     Ticket, Heart, User, ScanFace, Palette, Package, PawPrint, Crown,
@@ -21,7 +24,10 @@ const CATEGORIES = [
 ];
 
 export default function Shop() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 USAMOS ZUSTAND PARA ESTADO GLOBAL
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
 
     // ESTADOS
     const [activeTab, setActiveTab] = useState('shop');

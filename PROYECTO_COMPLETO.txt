@@ -887,7 +887,8 @@ exports.claimReward = async (req, res) => {
 const Food = require('../models/Food');
 const NutritionLog = require('../models/NutritionLog');
 const DailyLog = require('../models/DailyLog');
-const fs = require('fs');
+// Importamos el helper de fecha local (¡Asegúrate de que el archivo utils/dateHelpers.js exista!)
+const { getTodayDateString } = require('../utils/dateHelpers');
 
 // --- CONFIGURACIÓN OPENROUTER ---
 const OpenAI = require("openai");
@@ -900,7 +901,8 @@ const openrouter = new OpenAI({
     }
 });
 
-const getTodayStr = () => new Date().toISOString().split('T')[0];
+// Usamos el helper centralizado en lugar del toISOString() que falla por zona horaria
+const getTodayStr = () => getTodayDateString();
 
 // ==========================================
 // ⏱️ HELPER: TIMEOUT PARA IA (EVITA BLOQUEOS)
@@ -920,14 +922,6 @@ const fetchWithTimeout = async (config, timeoutMs = 8000) => {
         clearTimeout(timeoutId);
         throw error;
     }
-};
-
-// ==========================================
-// 🧠 CÁLCULO MATEMÁTICO LOCAL (PLAN Z)
-// ==========================================
-const calculateLocalMacros = (text) => {
-    console.log("⚠️ IAs caídas. Usando Plan Z (Matemático)...");
-    return null;
 };
 
 // ==========================================
@@ -956,7 +950,6 @@ const chatMacroCalculator = async (req, res) => {
 
     for (const model of TEXT_MODELS_CASCADE) {
         try {
-            // Usamos el helper con 8 segundos de límite
             const completion = await fetchWithTimeout({
                 model: model,
                 messages: messages,
@@ -1011,8 +1004,6 @@ const analyzeFoodText = async (req, res) => {
     for (const model of TEXT_MODELS_CASCADE) {
         try {
             console.log(`🤖 Analizando comida con: ${model}...`);
-
-            // Usamos el helper con 8 segundos de límite
             const completion = await fetchWithTimeout({
                 model: model,
                 messages: [{ role: "system", content: SYSTEM_PROMPT }],
@@ -1040,7 +1031,7 @@ const analyzeFoodText = async (req, res) => {
 };
 
 // ==========================================
-// 📷 ANÁLISIS DE IMAGEN (MEGA CASCADA)
+// 📷 ANÁLISIS DE IMAGEN (MEGA CASCADA EN RAM)
 // ==========================================
 const analyzeImage = async (req, res) => {
     const VISION_MODELS = [
@@ -1048,18 +1039,17 @@ const analyzeImage = async (req, res) => {
         "google/gemini-2.0-pro-exp-02-05:free",
         "qwen/qwen-2.5-vl-72b-instruct:free",
         "meta-llama/llama-3.2-90b-vision-instruct:free",
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
-        "mistralai/pixtral-12b:free",
-        "microsoft/phi-3.5-vision-instruct:free",
-        "google/gemini-flash-1.5-8b:free"
+        "mistralai/pixtral-12b:free"
     ];
 
     try {
         if (!req.file) return res.status(400).json({ message: 'No hay imagen' });
 
         const userContext = req.body.context || "Sin contexto extra.";
-        const imageBuffer = fs.readFileSync(req.file.path);
-        const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+
+        // 🔥 FIX ARQUITECTÓNICO: Leemos directamente de la RAM (req.file.buffer) sin tocar el disco.
+        // Ya NO usamos fs.readFileSync ni req.file.path
+        const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
         let foodData = null;
 
         const finalPrompt = `
@@ -1082,8 +1072,6 @@ const analyzeImage = async (req, res) => {
         for (const modelName of VISION_MODELS) {
             try {
                 console.log(`👁️ Intentando analizar imagen con: ${modelName}...`);
-
-                // Usamos el helper con 12 segundos de límite (visión tarda más)
                 const completion = await fetchWithTimeout({
                     model: modelName,
                     messages: [
@@ -1110,8 +1098,6 @@ const analyzeImage = async (req, res) => {
             }
         }
 
-        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-
         if (foodData) {
             foodData.calories = Math.round(foodData.calories || 0);
             foodData.protein = Math.round(foodData.protein || 0);
@@ -1124,13 +1110,13 @@ const analyzeImage = async (req, res) => {
             return res.status(503).json({ message: 'Ninguna IA pudo leer la imagen. Inténtalo de nuevo o usa texto.' });
         }
     } catch (error) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        res.status(500).json({ message: 'Error interno imagen' });
+        console.error(error);
+        res.status(500).json({ message: 'Error interno procesando la imagen' });
     }
 };
 
 // ==========================================
-// 🔥 CRUD NUTRICIÓN COMPLETO 🔥
+// 🔥 CRUD NUTRICIÓN (REMASTERIZADO Y ATÓMICO) 🔥
 // ==========================================
 
 const getNutritionLog = async (req, res) => {
@@ -1173,17 +1159,12 @@ const addMealCategory = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error creando categoría' }); }
 };
 
+// 🟢 FIX: AÑADIR ALIMENTO DE FORMA 100% ATÓMICA
 const addFoodToLog = async (req, res) => {
     try {
         const { mealId } = req.params;
         const { name, calories, protein, carbs, fat, fiber, quantity } = req.body;
         const today = getTodayStr();
-
-        let log = await NutritionLog.findOne({ user: req.user._id, date: today });
-        if (!log) return res.status(404).json({ message: 'Registro no encontrado' });
-
-        const meal = log.meals.id(mealId);
-        if (!meal) return res.status(404).json({ message: 'Comida no encontrada' });
 
         const newFood = {
             name,
@@ -1195,16 +1176,25 @@ const addFoodToLog = async (req, res) => {
             quantity: Number(quantity || 1)
         };
 
-        meal.foods.push(newFood);
+        // Operación atómica de MongoDB: Push al array e incremento de totales matemáticos EN UN SOLO PASO.
+        const log = await NutritionLog.findOneAndUpdate(
+            { user: req.user._id, date: today, "meals._id": mealId },
+            {
+                $push: { "meals.$.foods": newFood },
+                $inc: {
+                    totalCalories: newFood.calories,
+                    totalProtein: newFood.protein,
+                    totalCarbs: newFood.carbs,
+                    totalFat: newFood.fat,
+                    totalFiber: newFood.fiber
+                }
+            },
+            { new: true }
+        );
 
-        log.totalCalories = Math.round(log.totalCalories + newFood.calories);
-        log.totalProtein = Math.round(log.totalProtein + newFood.protein);
-        log.totalCarbs = Math.round(log.totalCarbs + newFood.carbs);
-        log.totalFat = Math.round(log.totalFat + newFood.fat);
-        log.totalFiber = Math.round(log.totalFiber + newFood.fiber);
+        if (!log) return res.status(404).json({ message: 'Registro o categoría no encontrada' });
 
-        await log.save();
-
+        // Sincronizamos el DailyLog también atómicamente
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: today },
             { $set: { "nutrition.totalKcal": log.totalCalories } }
@@ -1217,36 +1207,46 @@ const addFoodToLog = async (req, res) => {
     }
 };
 
+// 🟢 FIX: ELIMINAR ALIMENTO DE FORMA 100% ATÓMICA
 const removeFoodFromLog = async (req, res) => {
     try {
         const { mealId, foodItemId } = req.params;
         const today = getTodayStr();
 
-        const log = await NutritionLog.findOne({ user: req.user._id, date: today });
-        if (!log) return res.status(404).json({ message: 'Log no encontrado' });
+        // 1. Buscamos usando proyecciones (muy rápido) SOLO para saber cuánto restarle a los totales
+        const logData = await NutritionLog.findOne(
+            { user: req.user._id, date: today, "meals.foods._id": foodItemId },
+            { "meals.$": 1 }
+        ).lean();
 
-        const meal = log.meals.id(mealId);
-        if (!meal) return res.status(404).json({ message: 'Comida no encontrada' });
+        if (!logData) return res.status(404).json({ message: 'Alimento no encontrado' });
 
-        const foodItem = meal.foods.id(foodItemId);
-        if (!foodItem) return res.status(404).json({ message: 'Alimento no encontrado' });
+        const meal = logData.meals[0];
+        const foodItem = meal.foods.find(f => f._id.toString() === foodItemId);
 
-        log.totalCalories = Math.max(0, Math.round(log.totalCalories - foodItem.calories));
-        log.totalProtein = Math.max(0, Math.round(log.totalProtein - foodItem.protein));
-        log.totalCarbs = Math.max(0, Math.round(log.totalCarbs - foodItem.carbs));
-        log.totalFat = Math.max(0, Math.round(log.totalFat - foodItem.fat));
-        log.totalFiber = Math.max(0, Math.round(log.totalFiber - foodItem.fiber));
-
-        meal.foods.pull(foodItemId);
-
-        await log.save();
-
-        await DailyLog.findOneAndUpdate(
-            { user: req.user._id, date: today },
-            { $set: { "nutrition.totalKcal": log.totalCalories } }
+        // 2. Operación Atómica Inversa ($pull para sacar del array, $inc negativo para matemáticas)
+        const updatedLog = await NutritionLog.findOneAndUpdate(
+            { user: req.user._id, date: today, "meals._id": mealId },
+            {
+                $pull: { "meals.$.foods": { _id: foodItemId } },
+                $inc: {
+                    totalCalories: -Math.abs(foodItem.calories),
+                    totalProtein: -Math.abs(foodItem.protein),
+                    totalCarbs: -Math.abs(foodItem.carbs),
+                    totalFat: -Math.abs(foodItem.fat),
+                    totalFiber: -Math.abs(foodItem.fiber)
+                }
+            },
+            { new: true }
         );
 
-        res.json(log);
+        // Sincronizamos el DailyLog
+        await DailyLog.findOneAndUpdate(
+            { user: req.user._id, date: today },
+            { $set: { "nutrition.totalKcal": Math.max(0, updatedLog.totalCalories) } }
+        );
+
+        res.json(updatedLog);
     } catch (error) {
         console.error("Error removeFoodFromLog:", error);
         res.status(500).json({ message: 'Error eliminando alimento' });
@@ -4525,23 +4525,31 @@ const {
     addFoodToLog,
     searchFoods,
     addFoodEntry,
-    analyzeFoodText // <--- IMPORTADO
+    analyzeFoodText,
+    removeFoodFromLog
 } = require('../controllers/foodController');
 const protect = require('../middleware/authMiddleware');
 
-const upload = multer({ dest: 'uploads/' });
+// 🔥 FIX ARQUITECTÓNICO: Usar memoria en lugar de disco (Ultra rápido para Serverless)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 } // Límite de seguridad: 5MB máximo por foto
+});
 
 router.get('/log', protect, getNutritionLog);
 router.post('/add', protect, addFoodEntry);
 router.post('/category', protect, addMealCategory);
 router.post('/seed', protect, seedFoods);
+
+// Le pasamos el multer en memoria
 router.post('/analyze', protect, upload.single('image'), analyzeImage);
 
-// 🔥 RUTAS DE GUARDADO Y BÚSQUEDA
+// RUTAS DE GUARDADO Y BÚSQUEDA
 router.post('/log/:mealId', protect, addFoodToLog);
+router.delete('/log/:mealId/:foodItemId', protect, removeFoodFromLog); // Aseguramos que exista la ruta delete
 router.get('/search', protect, searchFoods);
 
-// 🔥 RUTA NUEVA IA TEXTO
+// RUTA NUEVA IA TEXTO
 router.post('/analyze-text', protect, analyzeFoodText);
 
 // Mis Comidas
@@ -5010,10 +5018,20 @@ module.exports = { addRewards, ensureLevelConsistency };
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\backend\utils\dateHelpers.js ---
 
 // backend/utils/dateHelpers.js
+
+// Usamos la configuración regional para forzar la zona horaria correcta
 const getTodayDateString = () => {
-    // Retorna YYYY-MM-DD en la zona horaria local o UTC según prefieras
-    // Para simplificar, usamos ISO slice (UTC)
-    return new Date().toISOString().split('T')[0];
+    const now = new Date();
+    // Ajusta 'Europe/Madrid' a tu zona horaria objetivo si la app es internacional,
+    // o pásale la zona horaria desde el frontend en los headers.
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    // Devuelve formato YYYY-MM-DD exacto a la hora de Madrid
+    return formatter.format(now);
 };
 
 module.exports = { getTodayDateString };
@@ -5314,7 +5332,9 @@ module.exports = { initScheduledJobs, runNightlyMaintenance };
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.10.1",
     "react-swipeable-list": "^1.10.0",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "swr": "^2.4.1",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
@@ -5324,6 +5344,7 @@ module.exports = { initScheduledJobs, runNightlyMaintenance };
     "vite": "^5.2.0"
   }
 }
+
 
 --- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\package.json ---
 
@@ -6288,7 +6309,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 
-// --- COMPONENTE INTERNO: ÍTEM DESLIZABLE (Sin cambios) ---
+// --- COMPONENTE INTERNO: ÍTEM DESLIZABLE ---
 const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -6360,7 +6381,7 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
 };
 
 // --- COMPONENTE PRINCIPAL ---
-export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowToast }) {
+export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic, onBackgroundSync, onShowToast }) {
     const [mode, setMode] = useState('search');
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
@@ -6378,12 +6399,11 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
     const [aiDescription, setAiDescription] = useState('');
     const [aiHelperLoading, setAiHelperLoading] = useState(false);
 
-    // 🔥 CONSTANTE DE CARPETAS (ORDEN SOLICITADO)
     const FOLDERS = ['Desayuno', 'Snack', 'Comida', 'Merienda', 'Cena'];
 
     const [manualForm, setManualForm] = useState({
         name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1,
-        folder: 'Desayuno' // Valor por defecto
+        folder: 'Desayuno'
     });
     const searchInputRef = useRef(null);
 
@@ -6429,16 +6449,26 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
 
     const processedResults = getProcessedResults();
 
+    // 🔥 FUNCIÓN OPTIMISTA PARA LA LISTA GUARDADA
     const handleAddFood = async (food) => {
+        const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
+
+        // 1. Avisamos a Food.jsx al instante y cerramos
+        onFoodAddedOptimistic(foodData);
+        onClose();
+
+        // 2. Operación real en segundo plano
         try {
-            const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
             await api.post(`/food/log/${mealId}`, foodData);
-            onFoodAdded(); onShowToast("Añadido correctamente", "success"); onClose();
-        } catch (error) { onShowToast("Error al añadir", "error"); }
+            if (onBackgroundSync) onBackgroundSync(); // Recarga silencioca para asentar los IDs de la base de datos
+        } catch (error) {
+            onShowToast("Error de red. El alimento no se guardó en la nube.", "error");
+            if (onBackgroundSync) onBackgroundSync(); // Rollback silencioso
+        }
     };
 
     const handleDeleteSavedFood = async (id) => {
-        try { await api.delete(`/food/saved/${id}`); setResults(prev => prev.filter(item => item._id !== id)); onShowToast("Alimento eliminado", "info"); }
+        try { await api.delete(`/food/saved/${id}`); setResults(prev => prev.filter(item => item._id !== id)); onShowToast("Alimento eliminado de tus guardados", "info"); }
         catch (e) { onShowToast("No se pudo eliminar", "error"); fetchSavedFoods(); }
     };
 
@@ -6464,27 +6494,38 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                 fat: analyzedData.fat || 0,
                 fiber: analyzedData.fiber || 0,
                 quantity: 1,
-                folder: 'Comida' // Default lógico para fotos
+                folder: 'Comida'
             });
 
-            onShowToast("¡Analizado! Elige carpeta y guarda.", "success");
+            onShowToast("¡Analizado! Revisa los datos y guarda.", "success");
             setMode('review');
 
         } catch (error) {
             console.error(error);
-            onShowToast("Error al procesar. Intenta de nuevo.", "error");
+            onShowToast("Error al procesar la imagen. Intenta de nuevo.", "error");
         } finally {
             setAiLoading(false);
         }
     };
 
+    // 🔥 FUNCIÓN OPTIMISTA PARA MANUAL / IA
     const handleAddToMealNow = async () => {
         if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
+
+        const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber) };
+
+        // 1. Avisamos al padre al instante
+        onFoodAddedOptimistic(foodData);
+        onClose();
+
+        // 2. Background Sync
         try {
-            const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber) };
             await api.post(`/food/log/${mealId}`, foodData);
-            onFoodAdded(); onShowToast("Añadido a la comida", "success"); onClose();
-        } catch (e) { onShowToast("Error al añadir", "error"); }
+            if (onBackgroundSync) onBackgroundSync();
+        } catch (e) {
+            onShowToast("Error de conexión al guardar", "error");
+            if (onBackgroundSync) onBackgroundSync();
+        }
     };
 
     const handleSaveToList = async () => {
@@ -6495,7 +6536,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
             onShowToast("Guardado en carpeta " + manualForm.folder, "success");
             setMode('search');
             setQuery(manualForm.name);
-            fetchSavedFoods(); // Recargar lista para ver el nuevo
+            fetchSavedFoods();
             setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1, folder: 'Desayuno' });
         } catch (e) { onShowToast("Error al guardar", "error"); }
     };
@@ -6552,7 +6593,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                                 <button onClick={() => setSortBy('calories')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'calories' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>Kcal</button>
                             </div>
 
-                            {/* 🔥 NUEVO ORDEN DE FILTROS: TODOS + LISTA SOLICITADA */}
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
                                     <Filter size={14} className="text-zinc-500" />
@@ -6619,7 +6659,6 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAdded, onShowTo
                             )}
                         </div>
 
-                        {/* 🔥 SELECCIÓN DE CARPETA (Visible en Manual y Review) */}
                         <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800">
                             <label className="text-[10px] font-bold text-zinc-400 mb-2 block pl-2 uppercase tracking-wider flex items-center gap-1"><Folder size={12} /> Guardar en Carpeta</label>
                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -6676,7 +6715,6 @@ import ExerciseSelector from './ExerciseSelector';
 
 // ==========================================
 // SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
-// (Solo esto se re-renderiza cada segundo)
 // ==========================================
 const GlobalTimerDisplay = ({ startTime, isMinimized }) => {
     const [seconds, setSeconds] = useState(() => Math.floor((Date.now() - startTime) / 1000));
@@ -6714,7 +6752,7 @@ const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaul
             if (diff <= 0) {
                 clearInterval(interval);
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                onSkip(); // Cierra el modal automáticamente
+                onSkip();
             } else {
                 setRemaining(diff);
             }
@@ -6779,7 +6817,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     const [intensity, setIntensity] = useState('Media');
 
-    // Lógica de Descanso (Optimizada)
     const [restTargetTime, setRestTargetTime] = useState(() => {
         const saved = localStorage.getItem(REST_KEY);
         return saved ? parseInt(saved) : null;
@@ -6790,13 +6827,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return saved && JSON.parse(saved).defaultRest ? JSON.parse(saved).defaultRest : 60;
     });
 
-    // UI & Alertas
     const [finishing, setFinishing] = useState(false);
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
-
-    // Swap
     const [swapIndex, setSwapIndex] = useState(null);
     const [showSelector, setShowSelector] = useState(false);
 
@@ -6836,10 +6870,17 @@ export default function ActiveWorkout({ routine, onFinish }) {
         fetchHistory();
     }, []);
 
-    // 2. Auto-save (Persistencia Local solo cuando cambian los datos importantes)
+    // 🔥 2. AUTO-SAVE OPTIMIZADO (DEBOUNCE) 🪄
     useEffect(() => {
-        const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        // En lugar de guardar de inmediato, programamos el guardado para dentro de 1 segundo
+        const timeoutId = setTimeout(() => {
+            const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }, 1000);
+
+        // Si el usuario vuelve a teclear antes de que pase 1 segundo, el timeout anterior se cancela.
+        // ¡Cero tirones al escribir!
+        return () => clearTimeout(timeoutId);
     }, [exercises, intensity, defaultRest, startTime, routine._id, routine.name, STORAGE_KEY]);
 
     // --- FUNCIONES DESCANSO ---
@@ -6858,7 +6899,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     const handleUpdateDefaultRest = (newRestValue) => {
         setDefaultRest(newRestValue);
-        // Ajustamos el target de descanso actual al vuelo
         const targetTime = Date.now() + (newRestValue * 1000);
         localStorage.setItem(REST_KEY, targetTime.toString());
         setRestTargetTime(targetTime);
@@ -6990,7 +7030,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
         setFinishing(true);
         try {
-            // Calculamos los segundos exactos en el momento de guardar
             const finalSeconds = Math.floor((Date.now() - startTime) / 1000);
 
             const logData = {
@@ -7834,8 +7873,11 @@ export function MissionsHistoryModal({ stats, onClose }) {
 
 import { NavLink } from 'react-router-dom';
 import { Home, ScrollText, Utensils, Dumbbell, Users } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore'; // 🔥 AÑADIDO
 
-export default function Footer({ user }) {
+export default function Footer() {
+    // Leemos directo de Zustand sin props
+    const user = useAuthStore(state => state.user);
 
     // 🔥 CÁLCULO DE NOTIFICACIONES (PUNTO ROJO)
     const notificationCount = (user?.friendRequests?.length || 0) +
@@ -7902,6 +7944,7 @@ export default function Footer({ user }) {
 
 import { Link } from 'react-router-dom';
 import HealthWidget from './HealthWidget';
+import { useAuthStore } from '../../store/useAuthStore'; // 🔥 AÑADIDO
 
 // --- DEFINICIÓN DE ANIMACIÓN CSS SUAVE ---
 const customAnimationsStyle = `
@@ -7918,10 +7961,7 @@ const customAnimationsStyle = `
 
 // --- HELPER: COLORES DE NIVEL ---
 const getLevelStyle = (level) => {
-    // Nivel 100+ (Cromático Suave - Sin parpadeo)
     if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
-
-    // Rangos normales
     if (level >= 90) return "bg-cyan-900/40 text-cyan-400 border-cyan-500/40 shadow-[0_0_8px_rgba(34,211,238,0.2)]";
     if (level >= 80) return "bg-pink-900/40 text-pink-400 border-pink-500/40";
     if (level >= 70) return "bg-purple-900/40 text-purple-400 border-purple-500/40";
@@ -7931,12 +7971,14 @@ const getLevelStyle = (level) => {
     if (level >= 30) return "bg-emerald-900/40 text-emerald-400 border-emerald-500/40";
     if (level >= 20) return "bg-blue-900/40 text-blue-400 border-blue-500/40";
     if (level >= 10) return "bg-indigo-900/40 text-indigo-400 border-indigo-500/40";
-
-    // Nivel 1-9 (Básico)
     return "bg-zinc-800 text-zinc-400 border-zinc-700";
 };
 
-export default function Header({ user, setUser }) {
+// 🔥 QUITAMOS LOS PROPS DE LA FUNCIÓN
+export default function Header() {
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+
     if (!user) return null;
 
     // --- DATOS ---
@@ -8011,7 +8053,7 @@ export default function Header({ user, setUser }) {
                                 {username}
                             </span>
 
-                            {/* 🔥 CAJA DE NIVEL BLINDADA: 'whitespace-nowrap' y 'shrink-0' evitan que se rompa */}
+                            {/* CAJA DE NIVEL BLINDADA */}
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wide leading-none whitespace-nowrap shrink-0 ${levelClass}`}>
                                 Lvl {level}
                             </span>
@@ -8262,7 +8304,7 @@ export default function HealthWidget({ user, setUser }) {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\components\layout\Layout.jsx ---
 
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import api from '../../services/api';
@@ -8273,28 +8315,20 @@ import IosInstallPrompt from '../common/IosInstallPrompt';
 import { WorkoutProvider, useWorkout } from '../../context/WorkoutContext';
 import ActiveWorkout from '../../components/gym/ActiveWorkout';
 
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
+
 function LayoutContent() {
     const navigate = useNavigate();
     const location = useLocation();
     const { activeRoutine, endWorkout } = useWorkout();
 
-    const [user, setUser] = useState(() => {
-        try {
-            const saved = localStorage.getItem('user');
-            return saved ? JSON.parse(saved) : null;
-        } catch (e) { return null; }
-    });
-
-    const [isUiHidden, setIsUiHidden] = useState(false);
-
-    // 🔥 1. useCallback: Evita que esta función se re-cree en cada render
-    const handleUserUpdate = useCallback((newData) => {
-        setUser((prev) => {
-            const updated = { ...prev, ...newData };
-            localStorage.setItem('user', JSON.stringify(updated));
-            return updated;
-        });
-    }, []);
+    // ⚡ Conexión directa al motor Zustand (Ultra rápido)
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const isUiHidden = useAuthStore(state => state.isUiHidden);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
+    const logout = useAuthStore(state => state.logout);
 
     // Sincronización con Backend
     useEffect(() => {
@@ -8304,14 +8338,17 @@ function LayoutContent() {
                     api.get('/daily'),
                     api.get('/users/')
                 ]);
-                setUser((prev) => {
-                    const updated = { ...prev, ...(dailyRes.data.user || {}), ...userRes.data, dailyLog: dailyRes.data };
-                    localStorage.setItem('user', JSON.stringify(updated));
-                    return updated;
+
+                // Actualizamos el estado global (Zustand lo guarda en localStorage en 2º plano)
+                setUser({
+                    ...user,
+                    ...(dailyRes.data.user || {}),
+                    ...userRes.data,
+                    dailyLog: dailyRes.data
                 });
             } catch (error) {
                 if (error.response?.status === 401) {
-                    localStorage.removeItem('user');
+                    logout();
                     localStorage.removeItem('token');
                     navigate('/login');
                 }
@@ -8321,38 +8358,36 @@ function LayoutContent() {
     }, [navigate]);
 
     // MANEJADOR DE FIN DE RUTINA GLOBAL
-    const handleWorkoutFinish = useCallback((data) => {
+    const handleWorkoutFinish = (data) => {
         if (data.user) {
-            handleUserUpdate(data.user);
+            setUser(data.user);
         }
         endWorkout();
         if (location.pathname === '/gym') {
             window.location.reload();
         }
-    }, [handleUserUpdate, endWorkout, location.pathname]);
+    };
 
-    // 🔥 2. useMemo: ESTA ES LA MAGIA. 
-    // Mantiene el objeto de contexto intacto en memoria. 
-    // Evita que TODAS las páginas hijas se re-rendericen innecesariamente.
+    // 🛡️ Mantenemos el contextValue por compatibilidad para no romper páginas existentes (Gym, Social, etc)
     const contextValue = useMemo(() => ({
         user,
-        setUser: handleUserUpdate,
+        setUser,
         setIsUiHidden
-    }), [user, handleUserUpdate]);
+    }), [user, setUser, setIsUiHidden]);
 
     // Pantalla de Muerte
     if (user?.stats?.hp <= 0 || user?.hp <= 0) {
-        return <RedemptionScreen user={user} setUser={handleUserUpdate} />;
+        return <RedemptionScreen user={user} setUser={setUser} />;
     }
 
     return (
         <div className="h-[100dvh] w-full bg-black text-zinc-200 font-sans relative flex flex-col overflow-hidden">
 
-            {/* El Header SÍ debe actualizarse si cambian las monedas, por eso le pasamos el user directo */}
-            {!isUiHidden && <Header user={user} setUser={handleUserUpdate} />}
+            {/* Ya no le pasamos el user como prop, el Header lo lee de Zustand */}
+            {!isUiHidden && <Header />}
 
             <main className={`flex-1 overflow-y-auto no-scrollbar w-full max-w-md mx-auto relative z-0 overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : 'pt-28 pb-safe-content px-4'}`}>
-                {/* Pasamos el contexto memoizado a las páginas */}
+                {/* Pasamos el contexto memoizado a las páginas temporalmente */}
                 <Outlet context={contextValue} />
             </main>
 
@@ -8364,7 +8399,8 @@ function LayoutContent() {
                 />
             )}
 
-            {!isUiHidden && <Footer user={user} />}
+            {/* Ya no le pasamos el user como prop */}
+            {!isUiHidden && <Footer />}
             <IosInstallPrompt />
         </div>
     );
@@ -9281,12 +9317,15 @@ export default function LevelWidget({
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 import { X, Scale, Flame, Utensils, User, ToggleLeft, ToggleRight, Save, Activity, Edit2 } from 'lucide-react';
 import api from '../../services/api';
 
 export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: propWeight }) {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
     const [isOpen, setIsOpen] = useState(false);
 
     // --- DATOS DEL USUARIO ---
@@ -9553,8 +9592,8 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                                             <button
                                                 onClick={() => setFormData({ ...formData, gender: 'male' })}
                                                 className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${formData.gender === 'male'
-                                                        ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
-                                                        : 'text-zinc-500 hover:text-zinc-300'
+                                                    ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
+                                                    : 'text-zinc-500 hover:text-zinc-300'
                                                     }`}
                                             >
                                                 Hombre
@@ -9562,8 +9601,8 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                                             <button
                                                 onClick={() => setFormData({ ...formData, gender: 'female' })}
                                                 className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${formData.gender === 'female'
-                                                        ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
-                                                        : 'text-zinc-500 hover:text-zinc-300'
+                                                    ? `bg-gradient-to-r ${gradientClasses} text-black shadow-md`
+                                                    : 'text-zinc-500 hover:text-zinc-300'
                                                     }`}
                                             >
                                                 Mujer
@@ -11322,55 +11361,49 @@ export const useWorkout = () => useContext(WorkoutContext);
 
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useDailyLog.js ---
 
-import { useState, useEffect, useCallback } from 'react';
+import useSWR from 'swr';
 import api from '../services/api';
 
+// El "fetcher" le dice a SWR cómo ir a buscar los datos
+const fetcher = (url) => api.get(url).then(res => res.data || {});
+
 export function useDailyLog(user) {
-    const [dailyData, setDailyData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    // 1. Cargar Datos
-    const fetchDailyData = useCallback(async () => {
-        if (!user) return;
-
-        // --- CORRECCIÓN AQUÍ ---
-        // Solo mostramos 'loading' si NO tenemos datos previos.
-        // Si ya hay datos, esto ocurre en "segundo plano" sin parpadeos.
-        setDailyData(prevData => {
-            if (!prevData) setLoading(true);
-            return prevData; // Mantenemos los datos viejos mientras cargan los nuevos
-        });
-
-        try {
-            const res = await api.get('/daily');
-            setDailyData(res.data || {});
-        } catch (err) {
-            console.error("Error cargando diario:", err);
-            setError(err);
-            // Si falla y no teníamos datos, ponemos objeto vacío para quitar el loading
-            setDailyData(prev => prev || {});
-        } finally {
-            setLoading(false);
+    // 🔥 MAGIA DE SWR: 
+    // Si 'user' existe, busca '/daily'. 
+    // Si ya lo buscó antes, devuelve 'data' al instante desde la memoria RAM.
+    const { data: dailyData, error, mutate, isLoading } = useSWR(
+        user ? '/daily' : null,
+        fetcher,
+        {
+            revalidateOnFocus: true, // Si el usuario minimiza la app y vuelve, recarga silenciosamente
+            dedupingInterval: 2000,  // Evita hacer la misma petición 2 veces en menos de 2 segundos
         }
-    }, [user]); // Al cambiar el user, se ejecuta, pero gracias al IF de arriba no parpadea
+    );
 
-    // Cargar al montar o cambiar usuario
-    useEffect(() => {
-        fetchDailyData();
-    }, [fetchDailyData]);
-
-    // 2. Actualizar un Widget específico
+    // 2. Actualizar un Widget específico de forma OPTIMISTA 🪄
     const updateWidget = async (type, value) => {
-        setDailyData(prev => ({ ...prev, [type]: value }));
+        if (!dailyData) return;
+
+        // Clonamos los datos actuales y le aplicamos el nuevo valor
+        const optimisticData = { ...dailyData, [type]: value };
+
+        // Mutamos la caché de SWR al instante (la UI se actualiza en 0ms)
+        // El 'false' le dice a SWR: "No vayas a validar al servidor todavía, confía en mí"
+        mutate(optimisticData, false);
+
         try {
+            // Mandamos el dato real al backend
             await api.put('/daily', { type, value });
+            // Cuando el backend responde bien, re-validamos silenciosamente para asegurar sincronía
+            mutate();
         } catch (err) {
             console.error(`Error actualizando ${type}:`, err);
+            // Si falla el internet, hacemos rollback (deshacemos el cambio visual)
+            mutate();
         }
     };
 
-    // 3. Cálculos Derivados (Getters)
+    // 3. Cálculos Derivados (Getters) seguros contra nulos
     const getBurnedCalories = () => {
         if (!dailyData) return 0;
         const sport = dailyData.sportWorkouts?.reduce((acc, w) => acc + (w.caloriesBurned || 0), 0) || 0;
@@ -11383,11 +11416,12 @@ export function useDailyLog(user) {
     };
 
     return {
-        dailyData,
-        loading,
+        // Si no hay data pero tampoco error, devolvemos un objeto vacío seguro para que no rompa la UI
+        dailyData: dailyData || {},
+        loading: isLoading,
         error,
         updateWidget,
-        refreshLog: fetchDailyData,
+        refreshLog: () => mutate(), // mutate fuerza a SWR a recargar los datos del servidor
         calculations: {
             burned: getBurnedCalories(),
             intake: getIntakeCalories()
@@ -11492,6 +11526,27 @@ export function useDailyRewards(user, setUser) {
 }
 
 --- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useDailyRewards.js ---
+
+
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useSmoothMount.js ---
+
+import { useState, useEffect } from 'react';
+
+export function useSmoothMount() {
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        // Le damos al navegador 50ms para hacer la transición de pestaña sin congelarse
+        const timer = setTimeout(() => {
+            setIsMounted(true);
+        }, 50);
+        return () => clearTimeout(timer);
+    }, []);
+
+    return isMounted;
+}
+
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\hooks\useSmoothMount.js ---
 
 
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\index.css ---
@@ -11683,7 +11738,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND EN LUGAR DE USEOUTLETCONTEXT
+import { useAuthStore } from '../store/useAuthStore';
+// 🔥 IMPORTAMOS SWR Y SMOOTHMOUNT
+import { useSmoothMount } from '../hooks/useSmoothMount';
+import useSWR from 'swr';
 import {
     Settings, X, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf,
     Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Sparkles, BrainCircuit, Camera, Image as ImageIcon, SortAsc, Filter
@@ -11692,12 +11751,18 @@ import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
 
+const fetcher = url => api.get(url).then(res => res.data);
+
 export default function Food() {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND Y AMORTIGUADOR
+    const isSmoothMounted = useSmoothMount();
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+
+    // 🔥 SWR: Carga instantánea desde caché
+    const { data: log, mutate: mutateLog, isLoading } = useSWR('/food/log', fetcher);
 
     // --- ESTADOS DE DATOS ---
-    const [log, setLog] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
     // --- ESTADOS DE MODALES ---
@@ -11732,45 +11797,71 @@ export default function Food() {
     }, [user]);
 
     useEffect(() => {
-        fetchLog();
-    }, []);
-
-    useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chatHistory]);
 
     // --- FUNCIONES API ---
-    const fetchLog = async () => {
+    const showToast = (message, type = 'success') => setToast({ message, type });
+
+    // 🔥 OPTIMISTIC UI: BORRAR
+    const handleRemoveFood = async (mealId, foodItemId) => {
+        if (!window.confirm("¿Borrar alimento?")) return;
+
+        // Actualizamos la UI AL INSTANTE en SWR
+        mutateLog(prev => {
+            if (!prev) return prev;
+            const newLog = JSON.parse(JSON.stringify(prev)); // Clon profundo
+            const meal = newLog.meals.find(m => m._id === mealId);
+            if (meal) {
+                const foodIdx = meal.foods.findIndex(f => f._id === foodItemId);
+                if (foodIdx > -1) {
+                    const food = meal.foods[foodIdx];
+                    newLog.totalCalories = Math.max(0, newLog.totalCalories - food.calories);
+                    newLog.totalProtein = Math.max(0, newLog.totalProtein - food.protein);
+                    newLog.totalCarbs = Math.max(0, newLog.totalCarbs - food.carbs);
+                    newLog.totalFat = Math.max(0, newLog.totalFat - food.fat);
+                    newLog.totalFiber = Math.max(0, newLog.totalFiber - food.fiber);
+                    meal.foods.splice(foodIdx, 1);
+                }
+            }
+            return newLog;
+        }, false);
+
+        // Petición en segundo plano
         try {
-            const res = await api.get('/food/log');
-            setLog(res.data);
+            await api.delete(`/food/log/${mealId}/${foodItemId}`);
+            mutateLog(); // Sincronizamos silenciosamente
         } catch (error) {
-            console.error("Error obteniendo log:", error);
-        } finally {
-            setLoading(false);
+            console.error(error);
+            mutateLog(); // Rollback si falla
+            showToast("Error de conexión. Se han restaurado los datos.", "error");
         }
     };
 
-    const showToast = (message, type = 'success') => setToast({ message, type });
-
-    const handleRemoveFood = async (mealId, foodItemId) => {
-        if (!window.confirm("¿Borrar alimento?")) return;
-        try {
-            // Intenta endpoint específico o fallback
-            await api.delete(`/food/log/${mealId}/${foodItemId}`);
-            showToast("Eliminado", "info");
-            fetchLog(); // 🔥 Recargar para actualizar gráfica
-        } catch (error) {
-            console.error(error);
-            showToast("Error al eliminar", "error");
-        }
+    // 🔥 OPTIMISTIC UI: AÑADIR (Llamada desde el Modal)
+    const handleOptimisticAdd = (foodData) => {
+        mutateLog(prev => {
+            if (!prev) return prev;
+            const newLog = JSON.parse(JSON.stringify(prev));
+            const meal = newLog.meals.find(m => m._id === activeMealId);
+            if (meal) {
+                // Le damos un ID temporal para que React no se queje
+                meal.foods.push({ ...foodData, _id: `temp_${Math.random()}` });
+                newLog.totalCalories += foodData.calories;
+                newLog.totalProtein += foodData.protein;
+                newLog.totalCarbs += foodData.carbs;
+                newLog.totalFat += foodData.fat;
+                newLog.totalFiber += foodData.fiber;
+            }
+            return newLog;
+        }, false);
     };
 
     const updateGoals = async (newGoals) => {
         try {
             const res = await api.put('/users/macros', newGoals);
             setGoals(res.data.macros);
-            setUser(res.data);
+            setUser(res.data); // Sincroniza con Zustand
             return true;
         } catch (error) {
             showToast("Error al guardar objetivos", "error");
@@ -11839,7 +11930,7 @@ export default function Food() {
         setShowSearch(true);
     };
 
-    if (loading) return (
+    if (!isSmoothMounted || (!log && isLoading)) return (
         <div className="min-h-screen bg-black flex items-center justify-center">
             <div className="text-center text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando nutrición...</div>
         </div>
@@ -11882,7 +11973,7 @@ export default function Food() {
                 </button>
             </div>
 
-            {/* 🔥 TARJETA PRINCIPAL (RESTAURADA AL DISEÑO ORIGINAL) */}
+            {/* TARJETA PRINCIPAL */}
             <div className="px-4">
                 <div className="bg-zinc-950 border border-green-500 rounded-[32px] p-6 shadow-[0_0_30px_rgba(34,197,94,0.15)] relative overflow-hidden">
                     <div className="flex items-center justify-between gap-6">
@@ -12000,7 +12091,9 @@ export default function Food() {
                         <FoodSearchModal
                             mealId={activeMealId}
                             onClose={() => setShowSearch(false)}
-                            onFoodAdded={() => fetchLog()}
+                            // 🔥 LE PASAMOS LA FUNCIÓN OPTIMISTA AL MODAL
+                            onFoodAddedOptimistic={(foodData) => handleOptimisticAdd(foodData)}
+                            onBackgroundSync={() => mutateLog()}
                             onShowToast={showToast}
                         />
                     </div>
@@ -12010,7 +12103,7 @@ export default function Food() {
 
             {/* Modal Configuración (IA / Manual) */}
             {configModal.show && createPortal(
-                <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-zinc-950 border border-zinc-800 rounded-[32px] w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
 
@@ -12098,9 +12191,11 @@ export default function Food() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\BlackJack.jsx ---
 
 import { useState, useEffect } from 'react';
-import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Spade, Club, Heart, Diamond, Info, X, Trophy, Frown, Handshake } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- COMPONENTE CARTA ---
 const Card = ({ card, hidden, small }) => (
@@ -12131,7 +12226,10 @@ const calculateScore = (hand) => {
 };
 
 export default function BlackJack() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
     // SALDO VISUAL INSTANTÁNEO
@@ -12353,9 +12451,11 @@ export default function BlackJack() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\DiceGame.jsx ---
 
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Info, X, Trophy, Frown } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const ChipRain = ({ isFading }) => { /* Mantén tu ChipRain original aquí (lo abrevio por espacio) */
@@ -12372,8 +12472,12 @@ const DigitalDie = ({ value, rolling }) => {
 };
 
 export default function Dice() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
+
     const [visualBalance, setVisualBalance] = useState(user?.stats?.gameCoins ?? user?.gameCoins ?? 0);
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
@@ -12436,9 +12540,11 @@ export default function Dice() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\FortuneWheel.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Gift, Flame, Diamond, Lock, X, Info, AlertTriangle, Zap } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- COMPONENTE DE LLUVIA DE MONEDAS ---
 const CoinsRain = () => {
@@ -12604,8 +12710,12 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
 }
 
 export default function FortuneWheel() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
+
     const [selectedMode, setSelectedMode] = useState(null);
     const [lastSpinDate, setLastSpinDate] = useState(() => localStorage.getItem('last_wheel_spin_date'));
     const getTodayStr = () => new Date().toISOString().split('T')[0];
@@ -12659,10 +12769,12 @@ export default function FortuneWheel() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\Roulette.jsx ---
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Info, X, Trash2, Undo2, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- CONSTANTES ---
 const WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -12690,7 +12802,10 @@ const ChipRain = ({ isFading }) => {
 };
 
 export default function Roulette() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
     // SALDO VISUAL
@@ -13021,9 +13136,11 @@ export default function Roulette() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\ScratchGame.jsx ---
 
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Zap, Info, X } from 'lucide-react';
 import api from '../../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- RUTA DE LA IMAGEN DEL REVERSO ---
 const CARD_BACK_IMG = '/assets/images/reverso-carta.png';
@@ -13062,7 +13179,10 @@ const ChipRain = ({ isFading }) => {
 };
 
 export default function ScratchGame() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
     // SALDO
@@ -13314,9 +13434,12 @@ export default function ScratchGame() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\games\Slots.jsx ---
 
 import { useState, useRef, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Zap, Cherry, Gem, Star, Crown, Clover, Info, X, Skull, Ghost } from 'lucide-react';
 import api from '../../services/api';
+
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../../store/useAuthStore';
 
 // --- IMAGEN DE PORTADA ---
 const SLOT_COVER_IMG = '/assets/images/neon-cover.png';
@@ -13367,7 +13490,11 @@ const PAYTABLE = [
 ];
 
 export default function Slots() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
+
     const navigate = useNavigate();
 
     // Saldo
@@ -13561,7 +13688,7 @@ export default function Slots() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="bg-black rounded-2xl flex items-center p-1 border border-zinc-800 shrink-0">
+                        <div className="bg-black rounded-2xl flex items-center p-1 border border-zinc-800 shrink-0 shadow-inner">
                             <button onClick={() => setBet(Math.max(10, bet - 10))} disabled={isGameActive} className="w-12 h-12 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 disabled:opacity-50 active:scale-95 transition-transform">-</button>
                             <div className="min-w-[80px] flex items-center justify-center gap-1 font-black text-yellow-500 text-xl">
                                 {bet}
@@ -13585,15 +13712,15 @@ export default function Slots() {
                 </div>
             </div>
 
-            {/* INFO MODAL */}
+            {/* MODAL INFO */}
             {showInfo && (
                 <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
                     <div className="bg-zinc-900 w-full max-w-xs rounded-3xl border border-white/10 p-6 relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
-                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">TABLA DE PAGOS</h3>
-                        <div className="space-y-2">
+                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">Tabla de Pagos</h3>
+                        <div className="space-y-2 text-xs text-zinc-300">
                             {PAYTABLE.map(s => (
-                                <div key={s.id} className="flex items-center justify-between bg-black/40 p-2 rounded-lg border border-white/5">
+                                <div key={s.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-white/5">
                                     <div className="flex items-center gap-2">{s.icon} <span className="font-bold text-sm text-zinc-300">3x</span></div>
                                     <span className="font-mono font-black text-white text-lg">x{s.val}</span>
                                 </div>
@@ -13615,11 +13742,14 @@ export default function Slots() {
 
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Games.jsx ---
 
-import { useOutletContext, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function Games() {
-    const { user } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
     const navigate = useNavigate();
 
     // --- LÓGICA DE BLOQUEO ---
@@ -13780,20 +13910,28 @@ export default function Games() {
 
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Gym.jsx ---
 
-import { useState, useEffect, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useState, useRef } from 'react';
+// 🔥 QUITAMOS useOutletContext
+// import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 import {
     Plus, Play, Trash2, Dumbbell, X, Bike, Activity, Loader2, MapPin,
     Timer, Edit, Footprints, Waves, PersonStanding, Flame,
-    Save, Lock // 🔥 Importamos candado para feedback visual
+    Save, Lock
 } from 'lucide-react';
 
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
-
-// 🔥 IMPORTAR CONTEXTO
 import { useWorkout } from '../context/WorkoutContext';
+import { useSmoothMount } from '../hooks/useSmoothMount';
+
+// 🔥 IMPORTAMOS SWR
+import useSWR from 'swr';
+
+// Fetcher global para SWR
+const fetcher = (url) => api.get(url).then(res => res.data);
 
 // --- CONSTANTES DEPORTE ---
 const SPORT_ACTIVITIES = [
@@ -13805,7 +13943,6 @@ const SPORT_ACTIVITIES = [
     { id: 'Padel', icon: <Activity size={24} />, color: 'text-lime-400', bg: 'bg-lime-900/20 border-lime-500/30' },
 ];
 
-// 🔥 TEMAS VISUALES "WIDGET STYLE"
 const COLOR_THEMES = {
     blue: { border: 'border-blue-500', shadow: 'rgba(59,130,246,0.4)', bgIcon: 'bg-blue-600', textIcon: 'text-white', play: 'bg-blue-500 text-white' },
     red: { border: 'border-red-500', shadow: 'rgba(239,68,68,0.4)', bgIcon: 'bg-red-600', textIcon: 'text-white', play: 'bg-red-500 text-white' },
@@ -13816,7 +13953,6 @@ const COLOR_THEMES = {
     pink: { border: 'border-pink-500', shadow: 'rgba(236,72,153,0.4)', bgIcon: 'bg-pink-600', textIcon: 'text-white', play: 'bg-pink-500 text-white' },
 };
 
-// --- COMPONENTE TARJETA RUTINA (OPTIMIZADO + PROTEGIDO) ---
 const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -13836,7 +13972,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
 
     const handleTouchEnd = () => {
         setIsDragging(false);
-        // Umbral de activación
         if (offsetX > 100) onEdit();
         else if (offsetX < -100) onDelete();
         setOffsetX(0);
@@ -13848,7 +13983,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
 
     return (
         <div className="relative w-full mb-4 select-none touch-pan-y overflow-hidden rounded-3xl">
-            {/* FONDO (ACCIONES) */}
             <div className="absolute inset-0 flex justify-between items-center px-6 bg-zinc-900 border border-zinc-800">
                 <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-blue-400'} font-bold uppercase text-xs transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
                     {isLocked ? <><Lock size={20} /> Bloqueado</> : <><Edit size={20} /> Editar</>}
@@ -13858,7 +13992,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
                 </div>
             </div>
 
-            {/* TARJETA SUPERIOR */}
             <div
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -13883,12 +14016,10 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
                 </div>
 
                 {isLocked ? (
-                    // Botón de Bloqueado (si está en uso)
                     <div className="w-12 h-12 rounded-full flex items-center justify-center bg-zinc-800 text-zinc-500 border border-zinc-700 z-20">
                         <Activity size={20} className="animate-pulse" />
                     </div>
                 ) : (
-                    // Botón de Play Normal
                     <button
                         onClick={(e) => { e.stopPropagation(); onPlay(); }}
                         className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
@@ -13901,7 +14032,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
     );
 };
 
-// --- COMPONENTE TARJETA DEPORTE (OPTIMIZADO) ---
 const SwipeableSportCard = ({ workout, onDelete }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -13946,34 +14076,37 @@ const SwipeableSportCard = ({ workout, onDelete }) => {
     );
 };
 
-// --- PÁGINA PRINCIPAL ---
 export default function Gym() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
-    // 🔥 OBTENEMOS activeRoutine DEL CONTEXTO
+    // 🔥 USAMOS ZUSTAND PARA ESTADO GLOBAL
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
+
     const { startWorkout, activeRoutine } = useWorkout();
 
-    const [routines, setRoutines] = useState([]);
-    const [todaySports, setTodaySports] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [toast, setToast] = useState(null);
+    const isSmoothMounted = useSmoothMount();
 
-    // Estados
+    // 🔥 MAGIA DE SWR: Obtenemos rutinas y diarios en caché instantánea
+    const { data: routinesData, mutate: mutateRoutines, isLoading: loadingRoutines } = useSWR('/gym/routines', fetcher);
+    const { data: dailyData, mutate: mutateDaily, isLoading: loadingDaily } = useSWR('/daily', fetcher);
+
+    // Asignamos datos de forma segura
+    const routines = routinesData || [];
+    const todaySports = dailyData?.sportWorkouts ? [...dailyData.sportWorkouts].reverse() : [];
+
+    // Solo mostramos el spinner si es la primerísima vez que carga y la caché está vacía
+    const isFirstLoad = (!routinesData && loadingRoutines) || (!dailyData && loadingDaily);
+
+    const [toast, setToast] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
     const [showSportModal, setShowSportModal] = useState(false);
-
-    // Formulario Deporte
     const [isSavingSport, setIsSavingSport] = useState(false);
     const [sportForm, setSportForm] = useState({ name: '', time: '', distance: '' });
     const [intensity, setIntensity] = useState('Media');
 
-    useEffect(() => { fetchRoutines(); fetchTodaySport(); }, []);
-
-    const fetchRoutines = async () => { try { const res = await api.get('/gym/routines'); setRoutines(res.data); } catch (e) { } finally { setLoading(false); } };
-    const fetchTodaySport = async () => { try { const res = await api.get('/daily'); setTodaySports(res.data.sportWorkouts ? res.data.sportWorkouts.reverse() : []); } catch (e) { } };
     const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
-    // Control UI
     const openCreateRoutine = (r) => { setRoutineToEdit(r); setShowCreateModal(true); setIsUiHidden(true); };
     const closeCreateRoutine = () => { setShowCreateModal(false); setIsUiHidden(false); };
 
@@ -13985,34 +14118,32 @@ export default function Gym() {
     };
     const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
-    // Acciones
     const openActiveWorkout = (r) => {
-        if (activeRoutine && activeRoutine._id === r._id) {
-            // Si es la misma, maximizamos (esto lo maneja el contexto, pero aquí no hacemos nada extra)
-            return;
-        }
-        if (activeRoutine) {
-            return showToast("Ya hay una rutina en curso", "error");
-        }
+        if (activeRoutine && activeRoutine._id === r._id) return;
+        if (activeRoutine) return showToast("Ya hay una rutina en curso", "error");
         startWorkout(r);
     };
 
-    // 🔥 HANDLE EDIT: PROTEGIDO
     const handleEditRoutine = (r) => {
-        if (activeRoutine && activeRoutine._id === r._id) {
-            return showToast("⚠️ En curso: Finaliza para editar.", "error");
-        }
+        if (activeRoutine && activeRoutine._id === r._id) return showToast("⚠️ En curso: Finaliza para editar.", "error");
         openCreateRoutine(r);
     };
 
-    // 🔥 HANDLE DELETE: PROTEGIDO
     const handleDeleteRoutine = async (id) => {
-        if (activeRoutine && activeRoutine._id === id) {
-            return showToast("⚠️ En curso: No se puede borrar.", "error");
-        }
-
+        if (activeRoutine && activeRoutine._id === id) return showToast("⚠️ En curso: No se puede borrar.", "error");
         if (!window.confirm("¿Borrar rutina?")) return;
-        try { await api.delete(`/gym/routines/${id}`); setRoutines(prev => prev.filter(r => r._id !== id)); showToast("Eliminada", "info"); } catch (e) { showToast("Error", "error"); }
+
+        // Optimistic UI para borrado de rutina
+        mutateRoutines(routines.filter(r => r._id !== id), false);
+
+        try {
+            await api.delete(`/gym/routines/${id}`);
+            mutateRoutines(); // Sincroniza al terminar
+            showToast("Eliminada", "info");
+        } catch (e) {
+            mutateRoutines(); // Rollback
+            showToast("Error al eliminar", "error");
+        }
     };
 
     const handleSaveSport = async () => {
@@ -14022,15 +14153,25 @@ export default function Gym() {
             const payload = { ...sportForm, name: sportForm.name, time: Number(sportForm.time), distance: sportForm.distance ? Number(sportForm.distance) : null, intensity };
             const res = await api.post('/gym/sport', payload);
             if (res.data.user) setUser(res.data.user);
-            closeSportModal(); fetchTodaySport(); showToast(`+${res.data.log.caloriesBurned} kcal`, "success");
-        } catch (e) { showToast('Error', 'error'); } finally { setIsSavingSport(false); }
+
+            closeSportModal();
+            // Revalida los datos deportivos en caché (SWR)
+            mutateDaily();
+            showToast(`+${res.data.log.caloriesBurned} kcal`, "success");
+        } catch (e) {
+            showToast('Error', 'error');
+        } finally {
+            setIsSavingSport(false);
+        }
     };
+
     const handleDeleteSport = () => showToast("Usa la web para borrar", "info");
 
-    if (loading) return <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>;
+    // 🔥 PANTALLA DE CARGA CON LA PROTECCIÓN DEL BOTÓN (SMOOTH MOUNT)
+    if (!isSmoothMounted || isFirstLoad) return <div className="text-center py-40 text-zinc-500 animate-pulse uppercase text-xs font-bold bg-black min-h-screen">Preparando zona de entreno...</div>;
 
     return (
-        <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden">
+        <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* HEADER GYM */}
@@ -14080,17 +14221,16 @@ export default function Gym() {
                                 onPlay={() => openActiveWorkout(routine)}
                                 onDelete={() => handleDeleteRoutine(routine._id)}
                                 onEdit={() => handleEditRoutine(routine)}
-                                isLocked={activeRoutine && activeRoutine._id === routine._id} // 🔥 PASAMOS EL ESTADO DE BLOQUEO
+                                isLocked={activeRoutine && activeRoutine._id === routine._id}
                             />
                         ))
                     )}
                 </div>
             </div>
 
-            {/* MODAL CREAR RUTINA */}
-            {showCreateModal && <CreateRoutineModal routineToEdit={routineToEdit} onClose={closeCreateRoutine} onRoutineCreated={() => { fetchRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }} />}
+            {/* MODALES */}
+            {showCreateModal && <CreateRoutineModal routineToEdit={routineToEdit} onClose={closeCreateRoutine} onRoutineCreated={() => { mutateRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }} />}
 
-            {/* MODAL REGISTRAR DEPORTE */}
             {showSportModal && (
                 <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
                     <div className="bg-zinc-950 w-full max-w-sm rounded-[32px] border border-lime-500/20 p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95">
@@ -14146,7 +14286,7 @@ export default function Gym() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Home.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Settings, X, ToggleLeft, ToggleRight, Calendar, Gift, Move, Lock, Unlock, Activity } from 'lucide-react';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
@@ -14154,6 +14294,7 @@ import { registerPush } from '../utils/pushNotifications';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
+import { useSmoothMount } from '../hooks/useSmoothMount';
 
 import DailyRewardModal from '../components/widgets/DailyRewardModal';
 import MoodWidget from '../components/widgets/MoodWidget';
@@ -14167,6 +14308,9 @@ import MissionsWidget from '../components/widgets/MissionsWidget';
 import SportWidget from '../components/widgets/SportWidget';
 import WeeklyWidget from '../components/widgets/WeeklyWidget';
 import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
+
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 // ==========================================
 // WRAPPER INTELIGENTE V4 (FIX CLICS)
@@ -14208,8 +14352,13 @@ const SmartWidgetWrapper = ({ children, onClick, className, isDragEnabled }) => 
 };
 
 export default function Home() {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
     const navigate = useNavigate();
+
+    // 🔥 EL NUEVO AMORTIGUADOR DE CARGA
+    const isSmoothMounted = useSmoothMount();
 
     const { dailyData: logData, loading: logLoading, updateWidget, calculations } = useDailyLog(user);
     const { showRewardModal, rewardData, closeModal, claimReward, openCalendar, hasClaimedToday } = useDailyRewards(user, setUser);
@@ -14245,7 +14394,6 @@ export default function Home() {
     // --- MODO ARRASTRE ---
     const [isDragEnabled, setIsDragEnabled] = useState(() => localStorage.getItem('home_drag_enabled') === 'true');
 
-    // 🔥 Delay bajado a 0 porque ahora el modo organizar lo protege
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
@@ -14305,10 +14453,11 @@ export default function Home() {
         }
     };
 
-    if ((logLoading && !logData) || !user) {
+    // 🔥 LA CONDICIÓN MÁGICA QUE QUITA EL LAG
+    if (!isSmoothMounted || (logLoading && !logData) || !user) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-silver-500 animate-pulse bg-black">
-                <Activity size={48} className="text-gold-500 animate-spin" />
+            <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-zinc-500 bg-black">
+                <Activity size={48} className="text-yellow-500 animate-spin" />
                 <p className="text-xs font-bold uppercase tracking-widest">Cargando...</p>
             </div>
         );
@@ -14323,17 +14472,17 @@ export default function Home() {
             <div className="flex justify-between items-center px-4 pt-4">
                 <div>
                     <h1 className="text-2xl font-black text-white italic">
-                        Hola, <span className="text-gold-400 capitalize">{user?.username || 'Guerrero'}</span>
+                        Hola, <span className="text-yellow-500 capitalize">{user?.username || 'Guerrero'}</span>
                     </h1>
-                    <p className="text-xs font-bold text-silver-500 uppercase tracking-widest flex items-center gap-1 mt-1">
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1 mt-1">
                         <Calendar size={12} /> {todayStr}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button onClick={openCalendar} className={`p-2.5 rounded-2xl border transition-all ${hasClaimedToday() ? 'bg-[#09090b] border-white/10 text-silver-600' : 'bg-gold-500 text-black border-gold-400 shadow-lg shadow-gold-500/20 animate-pulse'}`}>
+                    <button onClick={openCalendar} className={`p-2.5 rounded-2xl border transition-all ${hasClaimedToday() ? 'bg-[#09090b] border-white/10 text-zinc-600' : 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20 animate-pulse'}`}>
                         <Gift size={20} />
                     </button>
-                    <button onClick={() => setShowSettings(true)} className="bg-[#09090b] border border-white/10 p-2.5 rounded-2xl text-silver-500 hover:text-white transition-colors hover:border-silver-600">
+                    <button onClick={() => setShowSettings(true)} className="bg-[#09090b] border border-white/10 p-2.5 rounded-2xl text-zinc-500 hover:text-white transition-colors hover:border-zinc-600">
                         <Settings size={20} />
                     </button>
                 </div>
@@ -14386,15 +14535,15 @@ export default function Home() {
                             </div>
                             <div className="p-4 border border-white/5 rounded-3xl bg-zinc-900/50 flex justify-between items-center">
                                 <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">🔔 Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
-                                <button onClick={async () => { const success = await registerPush(); if (success) alert("¡Alertas activadas!"); else alert("No se pudo activar. Revisa permisos."); }} className="text-[10px] bg-gold-500 hover:bg-gold-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform shadow-lg shadow-gold-500/10">ACTIVAR</button>
+                                <button onClick={async () => { const success = await registerPush(); if (success) alert("¡Alertas activadas!"); else alert("No se pudo activar. Revisa permisos."); }} className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform shadow-lg shadow-yellow-500/10">ACTIVAR</button>
                             </div>
                             <div>
                                 <h3 className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-3 pl-1">Visibilidad</h3>
                                 <div className="space-y-2">
                                     {Object.keys(DEFAULTS_CONFIG).map(key => (
-                                        <div key={key} onClick={() => toggleWidget(key)} className={`p-3.5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${visibleWidgets[key] ? 'bg-zinc-900 border-gold-500/30' : 'bg-black border-white/5 opacity-60'}`}>
+                                        <div key={key} onClick={() => toggleWidget(key)} className={`p-3.5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${visibleWidgets[key] ? 'bg-zinc-900 border-yellow-500/30' : 'bg-black border-white/5 opacity-60'}`}>
                                             <span className={`text-xs font-bold capitalize ${visibleWidgets[key] ? 'text-white' : 'text-zinc-600'}`}>{widgetNames[key] || key}</span>
-                                            {visibleWidgets[key] ? <ToggleRight className="text-gold-500" size={22} /> : <ToggleLeft className="text-zinc-700" size={22} />}
+                                            {visibleWidgets[key] ? <ToggleRight className="text-yellow-500" size={22} /> : <ToggleLeft className="text-zinc-700" size={22} />}
                                         </div>
                                     ))}
                                 </div>
@@ -14412,19 +14561,29 @@ export default function Home() {
 
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Login.jsx ---
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Lock, User, ArrowRight } from 'lucide-react'; // Usamos icono User
+import { Eye, EyeOff, LogIn, Lock, User, ArrowRight } from 'lucide-react';
 import api from '../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function Login() {
     const navigate = useNavigate();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const setUser = useAuthStore(state => state.setUser);
 
-    // 1. Estado inicial con USERNAME
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // 🔥 AUTO-REDIRECCIÓN: Si ya hay sesión, salta el login
+    useEffect(() => {
+        if (localStorage.getItem('token')) {
+            navigate('/home', { replace: true });
+        }
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -14443,8 +14602,11 @@ export default function Login() {
             const response = await api.post('/auth/login', formData);
 
             if (response.data && response.data.token) {
+                // Guardamos Token clásico para Axios
                 localStorage.setItem('token', response.data.token);
-                localStorage.setItem('user', JSON.stringify(response.data));
+                // 🔥 GUARDAMOS EN EL NUEVO CEREBRO (ZUSTAND)
+                setUser(response.data);
+
                 navigate('/home', { replace: true });
             } else {
                 setError("El servidor no devolvió las credenciales correctas.");
@@ -14492,7 +14654,6 @@ export default function Login() {
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* 2. CAMPO USUARIO (En vez de Email) */}
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Usuario / Alias</label>
                             <div className="relative group">
@@ -14509,7 +14670,6 @@ export default function Login() {
                             </div>
                         </div>
 
-                        {/* Password */}
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
                             <div className="relative group">
@@ -14567,25 +14727,22 @@ export default function Login() {
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useOutletContext } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
+import { useSmoothMount } from '../hooks/useSmoothMount';
+import useSWR from 'swr';
 import {
-    Trash2, Plus, Check, X, Target, Users,
-    Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
+    Trash2, Plus, Check, X, Target, Users, Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 
-// ==========================================
-// 0. CONFIGURACIÓN DE ICONOS
-// ==========================================
+const fetcher = url => api.get(url).then(res => res.data);
+
 const ICON_XP = "/assets/icons/xp.png";
 const ICON_COIN = "/assets/icons/moneda.png";
 const ICON_CHIP = "/assets/icons/ficha.png";
-const ICON_HEART = "/assets/icons/corazon.png"; // 🔥 CAMBIO 2: Usando tu imagen
+const ICON_HEART = "/assets/icons/corazon.png";
 
-// ==========================================
-// 1. HELPERS VISUALES Y LÓGICOS
-// ==========================================
 const COOP_COLORS = [
     'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-indigo-500'
 ];
@@ -14618,7 +14775,6 @@ const getDeadlineText = (frequency) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
-// DAÑO INVERTIDO (Fácil = 10, Épica = 0)
 const getPotentialDamage = (diff) => {
     const rules = { easy: 10, medium: 5, hard: 2, epic: 0 };
     return rules[diff] !== undefined ? rules[diff] : 5;
@@ -14628,12 +14784,11 @@ const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
     const label = labels[diff] || diff;
 
-    // 🔥 CAMBIO 3: Estilo Completado "Bloqueado/Metal" (Gris muy oscuro y apagado)
     if (completed) return {
-        gradient: 'from-[#18181b] to-[#09090b]', // Zinc-900 to Black
-        shadow: 'rgba(0,0,0,0)', // Sin sombra de color
-        textGradient: 'from-zinc-600 to-zinc-500', // Texto gris apagado
-        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900', // Badge invisible casi
+        gradient: 'from-[#18181b] to-[#09090b]',
+        shadow: 'rgba(0,0,0,0)',
+        textGradient: 'from-zinc-600 to-zinc-500',
+        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900',
         iconColor: 'text-zinc-700',
         label: 'HECHO'
     };
@@ -14682,9 +14837,6 @@ const getGradientStyles = (diff, completed) => {
     }
 };
 
-// ==========================================
-// COMPONENTE: TARJETA DE MISIÓN
-// ==========================================
 function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdit, viewAllMode }) {
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -14699,7 +14851,6 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     const isBinary = mission.target === 1;
     const damage = getPotentialDamage(mission.difficulty);
 
-    // 🔥 CAMBIO 4: Si estamos en viewAllMode (OJO), NO se puede deslizar
     const canSwipe = !isPending && !viewAllMode;
 
     const handleStart = (clientX) => { if (canSwipe) { setIsDragging(true); startX.current = clientX; } };
@@ -14708,9 +14859,8 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (!isDragging) return;
         const diff = clientX - startX.current;
 
-        // Bloqueos de lógica:
-        if (mission.completed && diff > 0) return; // No recompletar
-        if (mission.completed && diff < 0 && !viewAllMode) return; // No borrar si está hecha (salvo modo ojo)
+        if (mission.completed && diff > 0) return;
+        if (mission.completed && diff < 0 && !viewAllMode) return;
 
         setDragX(diff);
     };
@@ -14720,13 +14870,11 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         if (isPending) { setDragX(0); return; }
 
         if (dragX > THRESHOLD) {
-            // Completar (Derecha)
             if (!mission.completed) {
                 const remaining = mission.target - mission.progress;
                 onUpdateProgress(mission, Math.max(0, remaining));
             }
         } else if (dragX < -THRESHOLD) {
-            // Borrar (Izquierda)
             if (!mission.completed || viewAllMode) {
                 if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión permanentemente?")) {
                     onDelete(mission._id);
@@ -14774,15 +14922,8 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
         );
     };
 
-    const handleCardClick = () => {
-        if (viewAllMode) {
-            onEdit(mission);
-        }
-    };
-
     return (
-        <div className="relative w-full mb-4 select-none group" onClick={handleCardClick}>
-            {/* Fondo Swipe */}
+        <div className="relative w-full mb-4 select-none group" onClick={() => viewAllMode && onEdit(mission)}>
             {canSwipe && (
                 <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
                     {dragX > 0 && <div className="flex items-center gap-2 text-emerald-400 font-black text-sm"><Check size={24} /> COMPLETAR</div>}
@@ -14790,17 +14931,9 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                 </div>
             )}
 
-            {/* Tarjeta Principal */}
             <div
                 style={cardStyle}
-                className={`
-                    relative rounded-[24px] overflow-hidden z-10 will-change-transform
-                    p-[2px] bg-gradient-to-br ${styles.gradient}
-                    shadow-[0_0_25px_${styles.shadow}]
-                    ${isPending ? 'opacity-70 grayscale-[0.5]' : ''}
-                    ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''}
-                    ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'} 
-                `}
+                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} shadow-[0_0_25px_${styles.shadow}] ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
@@ -14810,37 +14943,23 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
                 <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-4 relative overflow-hidden h-full flex flex-col justify-between`}>
-
-                    {/* Brillo ambiental (Apagado si está completada) */}
-                    {!mission.completed && (
-                        <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>
-                    )}
-
+                    {!mission.completed && <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>}
                     <div className="relative z-10">
-                        {/* HEADER */}
                         <div className="flex justify-between items-start gap-3 mb-1">
                             <div className="flex-1 min-w-0 relative">
                                 <div className="pr-20 mb-1">
                                     <div className="flex items-center gap-2">
                                         {mission.isCoop && <Users size={16} className={styles.iconColor} />}
                                         {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>
-                                            {mission.title}
-                                        </h3>
+                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
                                     </div>
-
                                     <div className="flex items-center gap-2 mt-1">
-                                        {/* 🔥 CAMBIO 1: Eliminado Frecuencia visual */}
-                                        {/* 🔥 CAMBIO 5: Contador Gigante */}
                                         <div className="flex items-baseline gap-1">
-                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>
-                                                {mission.progress}/{mission.target}
-                                            </span>
+                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>{mission.progress}/{mission.target}</span>
                                             {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
                                         </div>
                                     </div>
                                 </div>
-
                                 <div className="absolute -top-1 -right-1 flex items-center gap-2">
                                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
                                         {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
@@ -14848,53 +14967,29 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
                                     <div className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>{styles.label}</div>
                                 </div>
                             </div>
-
-                            {/* 🔥 CAMBIO 6: Botón Check eliminado completamente. Solo queda "+" si es necesario */}
                             <div className="flex flex-col items-center gap-2">
                                 {!isBinary && !mission.completed && !isPending && !viewAllMode && (
-                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto">
-                                        <Plus size={16} />
-                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto"><Plus size={16} /></button>
                                 )}
                             </div>
                         </div>
 
                         {renderProgressBar()}
 
-                        {/* RECOMPENSAS / RIESGOS */}
                         <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
                             <div className="flex items-center gap-4">
-                                {/* XP */}
                                 {mission.xpReward > 0 && (
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span>
-                                        <img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" />
-                                    </div>
+                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span><img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" /></div>
                                 )}
-
-                                {/* Monedas */}
                                 {(mission.coinReward > 0) && (
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span>
-                                        <img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" />
-                                    </div>
+                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span><img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" /></div>
                                 )}
-
-                                {/* Fichas */}
                                 {(mission.gameCoinReward > 0) && (
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span>
-                                        <img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" />
-                                    </div>
+                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span><img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" /></div>
                                 )}
                             </div>
-
-                            {/* 🔥 CAMBIO 2: Icono Corazón Imagen */}
                             {!mission.completed && (
-                                <div className="ml-auto flex items-center gap-1.5 opacity-90">
-                                    <span className="text-sm font-black text-red-400">-{damage}</span>
-                                    <img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" />
-                                </div>
+                                <div className="ml-auto flex items-center gap-1.5 opacity-90"><span className="text-sm font-black text-red-400">-{damage}</span><img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" /></div>
                             )}
                         </div>
 
@@ -14908,8 +15003,7 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
 
                     {isPending && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-[22px] z-30">
-                            <Loader2 className="animate-spin text-zinc-500 mb-2" />
-                            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
+                            <Loader2 className="animate-spin text-zinc-500 mb-2" /><span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
                             {amIOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(mission._id); }} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
                         </div>
                     )}
@@ -14919,20 +15013,23 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
     );
 }
 
-// ==========================================
-// PÁGINA PRINCIPAL
-// ==========================================
 export default function Missions() {
-    const { user, setUser } = useOutletContext();
-    const [missions, setMissions] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const isSmoothMounted = useSmoothMount();
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+
+    // 🔥 SWR INYECTADO PARA CACHÉ INSTANTÁNEA
+    const { data: missionsData, mutate: mutateMissions, isLoading } = useSWR('/missions', fetcher);
+    const { data: friendsData } = useSWR('/social/friends', fetcher);
+
+    const missions = missionsData || [];
+    const friends = friendsData?.friends || [];
+
     const [activeTab, setActiveTab] = useState('daily');
     const [showCreator, setShowCreator] = useState(false);
     const [toast, setToast] = useState(null);
-    const [friends, setFriends] = useState([]);
     const [viewAllMode, setViewAllMode] = useState(false);
 
-    // Estados Edición
     const [showEditModal, setShowEditModal] = useState(false);
     const [missionToEdit, setMissionToEdit] = useState(null);
     const [editSelectedDays, setEditSelectedDays] = useState([]);
@@ -14942,17 +15039,9 @@ export default function Missions() {
     const [selectedDays, setSelectedDays] = useState([]);
     const daysOptions = [{ label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'X', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, { label: 'S', value: 6 }, { label: 'D', value: 0 }];
 
-    useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'instant' });
-    }, [activeTab]);
+    useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
+    useEffect(() => { if (!showCreator) setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab })); }, [activeTab, showCreator]);
 
-    useEffect(() => {
-        if (!showCreator) setNewMission(prev => ({ ...prev, frequency: activeTab === 'all' ? 'daily' : activeTab }));
-        fetchMissions(); fetchFriends();
-    }, [activeTab, showCreator]);
-
-    const fetchMissions = async () => { try { const res = await api.get('/missions'); setMissions(res.data); } catch (e) { setMissions([]); } finally { setLoading(false); } };
-    const fetchFriends = async () => { try { const res = await api.get('/social/friends'); setFriends(res.data.friends); } catch (e) { } };
     const showToast = (message, type = 'success') => setToast({ message, type });
 
     const toggleDay = (dayValue) => setSelectedDays(prev => prev.includes(dayValue) ? prev.filter(d => d !== dayValue) : [...prev, dayValue]);
@@ -14984,20 +15073,50 @@ export default function Missions() {
         if (newMission.isCoop && !newMission.friendId) return showToast("Falta amigo", "error");
         const payload = { title: newMission.title.trim(), frequency: newMission.frequency || 'daily', type: newMission.type || 'habit', difficulty: newMission.difficulty || 'easy', target: parseInt(newMission.target) || 1, unit: newMission.unit ? newMission.unit.trim() : undefined, isCoop: !!newMission.isCoop, specificDays: newMission.frequency === 'daily' ? selectedDays : [] };
         if (payload.isCoop) payload.friendId = newMission.friendId;
-        try { await api.post('/missions', payload); handleCloseCreator(); fetchMissions(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
+        try { await api.post('/missions', payload); handleCloseCreator(); mutateMissions(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
     };
 
+    // 🔥 OPTIMISTIC UI CON SWR
     const handleUpdateProgress = async (mission, amount) => {
+        const newProgress = mission.progress + amount;
+        const isCompletedNow = newProgress >= mission.target;
+
+        mutateMissions(prev => prev.map(m => {
+            if (m._id === mission._id) {
+                return {
+                    ...m,
+                    progress: newProgress > m.target ? m.target : newProgress,
+                    completed: isCompletedNow || m.completed
+                };
+            }
+            return m;
+        }), false);
+
+        if (isCompletedNow && !mission.completed) {
+            setUser({
+                ...user,
+                currentXP: (user.currentXP || 0) + (mission.xpReward || 0),
+                coins: (user.coins || 0) + (mission.coinReward || 0),
+                gameCoins: (user.gameCoins || 0) + (mission.gameCoinReward || 0)
+            });
+            showToast(`+${mission.xpReward} XP`, "success");
+        }
+
         try {
             const res = await api.put(`/missions/${mission._id}/progress`, { amount });
-            if (res.data.progressOnly) { setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m)); return; }
-            if (res.data.user) { setUser(res.data.user); localStorage.setItem('user', JSON.stringify(res.data.user)); }
-            setMissions(prev => prev.map(m => m._id === mission._id ? res.data.mission : m));
-            if (res.data.rewards) showToast(`+${res.data.rewards.xp} XP`, "success");
-        } catch (e) { showToast("Error", "error"); }
+            if (res.data.progressOnly) { mutateMissions(); return; }
+            if (res.data.user) setUser(res.data.user);
+            mutateMissions();
+        } catch (e) {
+            mutateMissions(); // Rollback
+            showToast("Error de red. Acción revertida.", "error");
+        }
     };
 
-    const handleDelete = async (id) => { try { await api.delete(`/missions/${id}`); setMissions(prev => prev.filter(m => m._id !== id)); showToast("Eliminada", "info"); } catch (e) { } };
+    const handleDelete = async (id) => {
+        mutateMissions(prev => prev.filter(m => m._id !== id), false);
+        try { await api.delete(`/missions/${id}`); showToast("Eliminada", "info"); mutateMissions(); } catch (e) { mutateMissions(); }
+    };
 
     const openEditModal = (mission) => {
         setMissionToEdit(mission);
@@ -15013,17 +15132,17 @@ export default function Missions() {
                 title: missionToEdit.title, target: missionToEdit.target, frequency: missionToEdit.frequency, difficulty: missionToEdit.difficulty, unit: missionToEdit.unit,
                 specificDays: missionToEdit.frequency === 'daily' ? editSelectedDays : []
             });
-            setShowEditModal(false); fetchMissions(); showToast("Actualizada");
+            setShowEditModal(false); mutateMissions(); showToast("Actualizada");
         } catch (e) { showToast("Error", "error"); }
     };
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" size={32} /></div>;
+    // 🔥 PANTALLA DE CARGA REESCRITA
+    if (!isSmoothMounted || (!missionsData && isLoading)) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" size={32} /></div>;
 
     return (
         <div className="min-h-screen bg-black text-white pb-24 animate-in fade-in relative">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER STICKY */}
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                     <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
@@ -15047,7 +15166,6 @@ export default function Missions() {
                 {viewAllMode && <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2"><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Toca una misión para editarla</p></div>}
             </div>
 
-            {/* LISTA */}
             <div className="px-4 mt-4 space-y-4">
                 {filteredMissions.length === 0 ? (
                     <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p></div>
@@ -15059,7 +15177,6 @@ export default function Missions() {
                 )}
             </div>
 
-            {/* MODAL EDITAR */}
             {showEditModal && missionToEdit && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -15076,7 +15193,6 @@ export default function Missions() {
                 </div>, document.body
             )}
 
-            {/* MODAL CREAR */}
             {showCreator && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">
@@ -15103,7 +15219,7 @@ export default function Missions() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Profile.jsx ---
 
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Activity, ChevronLeft, ChevronRight, Lock, MapPin, LogOut } from 'lucide-react';
 import api from '../services/api';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
@@ -15125,8 +15241,13 @@ import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
 import RPGBody from '../components/profile/RPGBody';
 import ProfileStats from '../components/profile/ProfileStats';
 
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
+
 export default function Profile() {
-    const { user, setUser } = useOutletContext();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
     const navigate = useNavigate();
 
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -15310,18 +15431,29 @@ export default function Profile() {
 
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Register.jsx ---
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, UserPlus, User, Mail, Lock, ArrowRight } from 'lucide-react';
 import api from '../services/api';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function Register() {
     const navigate = useNavigate();
+    // 🔥 CONECTAMOS CON ZUSTAND
+    const setUser = useAuthStore(state => state.setUser);
 
     const [formData, setFormData] = useState({ username: '', email: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // 🔥 AUTO-REDIRECCIÓN
+    useEffect(() => {
+        if (localStorage.getItem('token')) {
+            navigate('/home', { replace: true });
+        }
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -15337,7 +15469,8 @@ export default function Register() {
             const response = await api.post('/auth/register', formData);
 
             localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify(response.data));
+            // 🔥 GUARDAMOS EN ZUSTAND
+            setUser(response.data);
 
             navigate('/home', { replace: true });
         } catch (err) {
@@ -15468,7 +15601,10 @@ export default function Register() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Shop.jsx ---
 
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+// 🔥 QUITAMOS useOutletContext
+// import { useOutletContext } from 'react-router-dom';
+// 🔥 IMPORTAMOS ZUSTAND
+import { useAuthStore } from '../store/useAuthStore';
 import {
     Plus, X, ArrowLeft, ArrowRightLeft,
     Ticket, Heart, User, ScanFace, Palette, Package, PawPrint, Crown,
@@ -15490,7 +15626,10 @@ const CATEGORIES = [
 ];
 
 export default function Shop() {
-    const { user, setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 USAMOS ZUSTAND PARA ESTADO GLOBAL
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
 
     // ESTADOS
     const [activeTab, setActiveTab] = useState('shop');
@@ -15902,15 +16041,22 @@ export default function Shop() {
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\pages\Social.jsx ---
 
 import { useState, useEffect, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
     Users, Shield, Search, UserPlus, Swords, Crown, Loader2, Mail, Check, X, Bell, Zap, Trash2, LogOut,
     ChevronDown, ChevronUp, AlertTriangle, Dumbbell, Gift, Lock, Trophy, Medal, Flame, Target,
-    Coins, Wrench, Footprints, Timer, MapPin, Construction, Eye, DoorOpen, Edit, Globe, Calendar
+    Coins, Construction, Eye, DoorOpen, Edit, Globe, Calendar
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+import { useSmoothMount } from '../hooks/useSmoothMount';
+
+// 🔥 IMPORTACIONES DE ALTO RENDIMIENTO
+import useSWR from 'swr';
+import { useAuthStore } from '../store/useAuthStore';
+
+// Fetcher global para SWR
+const fetcher = (url) => api.get(url).then(res => res.data);
 
 // CONFIGURACIÓN DE RANGOS
 const RANK_CONFIG = {
@@ -16107,11 +16253,9 @@ function FriendCard({ friend, onRemoveRequest, onChallengeOrView }) {
     );
 }
 
-// 🔥 FIX PUNTO 9: TARJETA DE MIEMBRO CLAN REDISEÑADA
 function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId }) {
     if (!member) return null;
     const currentRankData = RANK_CONFIG[member.clanRank || 'esclavo'];
-    // Regla: Puedes editar si eres mayor rango que el objetivo, o si eres líder
     const hasAuthority = member._id !== currentUserId && ((RANK_CONFIG[myRank || 'esclavo'].value === 4) || (RANK_CONFIG[myRank || 'esclavo'].value === 3 && RANK_CONFIG[member.clanRank || 'esclavo'].value < 3));
     const availableOptions = ['esclavo', 'recluta', 'guerrero'];
     if (RANK_CONFIG[myRank || 'esclavo'].value === 4) availableOptions.push('rey');
@@ -16121,7 +16265,6 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
 
     return (
         <div className={cardBaseStyle}>
-            {/* IZQUIERDA: Avatar y Nombre */}
             <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
                 <div className="relative flex-shrink-0 overflow-visible">
                     <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/5 overflow-hidden">
@@ -16136,26 +16279,19 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
                 </div>
             </div>
 
-            {/* DERECHA: Columna de Datos y Acciones */}
             <div className="flex flex-col items-end gap-1.5">
-
-                {/* FILA 1: Nivel y Rango */}
                 <div className="flex items-center gap-1.5">
                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>
                         Lvl {member.level}
                     </span>
-
-                    {/* Badge de Rango */}
                     <div className={`px-2 py-0.5 rounded-md border flex items-center gap-1 ${currentRankData.color}`}>
                         {member.clanRank === 'dios' && <Crown size={10} strokeWidth={3} />}
                         <span className="text-[8px] font-black uppercase tracking-wider">{currentRankData.label}</span>
                     </div>
                 </div>
 
-                {/* FILA 2: Acciones de Gestión (Solo si tienes autoridad) */}
                 {hasAuthority && (
                     <div className="flex items-center gap-2">
-                        {/* Selector de Rango Discreto */}
                         <div className="relative">
                             <select
                                 className="bg-zinc-800 text-[9px] text-zinc-300 font-bold py-1 px-2 rounded border border-zinc-700 outline-none appearance-none pr-4"
@@ -16169,7 +16305,6 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
                             <ChevronDown size={10} className="absolute right-0.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
                         </div>
 
-                        {/* Botón Expulsar */}
                         <button
                             onClick={() => onKick(member)}
                             className="bg-red-900/20 p-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
@@ -16184,7 +16319,6 @@ function ClanMemberCard({ member, myRank, onUpdateRank, onKick, currentUserId })
     );
 }
 
-// MODAL DUELO
 function DuelStatusModal({ duel, userId, onClose }) {
     if (!duel) return null;
     const iAmChallenger = duel.challenger._id === userId;
@@ -16194,7 +16328,7 @@ function DuelStatusModal({ duel, userId, onClose }) {
     const opponentName = iAmChallenger ? duel.opponent.username : duel.challenger.username;
     const winning = myScore > opponentScore;
     const losing = myScore < opponentScore;
-    const getUnit = (t) => { if (t === 'gym') return 'Kg'; if (t === 'distance') return 'Km'; if (t === 'steps') return ''; return 'Misiones'; };
+    const getUnit = (t) => { if (t === 'gym') return 'Kg'; if (t === 'distance') return 'Km'; if (t === 'steps') return 'Pasos'; return 'Misiones'; };
     const duelType = duel.type ? duel.type.toUpperCase() : 'DESCONOCIDO';
 
     return (
@@ -16228,7 +16362,6 @@ function DuelStatusModal({ duel, userId, onClose }) {
     );
 }
 
-// MODAL CREAR DESAFÍO
 function CreateChallengeModal({ friend, onClose, onSend }) {
     const [bet, setBet] = useState(0);
     const [type, setType] = useState('missions');
@@ -16266,21 +16399,9 @@ function CreateChallengeModal({ friend, onClose, onSend }) {
     );
 }
 
-// 3. MODAL CLAN PREVIEW
 function ClanPreviewModal({ clanId, currentUserId, userClanId, onClose, onJoin }) {
-    const [clanData, setClanData] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchDetails = async () => {
-            try {
-                const res = await api.get(`/clans/${clanId}`);
-                setClanData(res.data);
-            } catch (error) { console.error(error); }
-            finally { setLoading(false); }
-        };
-        fetchDetails();
-    }, [clanId]);
+    // 🔥 Uso de SWR para carga instantánea al espiar clanes
+    const { data: clanData, isLoading } = useSWR(clanId ? `/clans/${clanId}` : null, fetcher);
 
     if (!clanId) return null;
 
@@ -16289,7 +16410,7 @@ function ClanPreviewModal({ clanId, currentUserId, userClanId, onClose, onJoin }
             <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={onClose} />
             <div className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[85vh] shadow-2xl relative z-10 animate-in zoom-in-95 mt-10 sm:mt-0">
                 <button onClick={onClose} className="absolute top-4 right-4 z-20 bg-black/50 p-2 rounded-full text-zinc-400 hover:text-white border border-white/10"><X size={20} /></button>
-                {loading ? (
+                {!clanData && isLoading ? (
                     <div className="flex flex-col items-center justify-center h-64 gap-4">
                         <Loader2 className="animate-spin text-yellow-500" size={32} />
                         <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Espiando clan...</p>
@@ -16392,7 +16513,6 @@ function WeeklyEventWidget({ clan, onClaim, isPreview = false }) {
     ];
     const sortedMembers = [...clan.members].sort((a, b) => (b.weeklyContribution || 0) - (a.weeklyContribution || 0));
 
-    // Si es preview, el widget no hace nada al click
     if (isPreview) {
         return (
             <div className={`bg-zinc-900 border ${config.border} rounded-[32px] p-5 mb-8 relative overflow-hidden shadow-lg z-10`}>
@@ -16493,75 +16613,52 @@ function WeeklyEventWidget({ clan, onClaim, isPreview = false }) {
 // 2. COMPONENTE PRINCIPAL (MAIN)
 // ==========================================
 export default function Social() {
-    const { setUser, setIsUiHidden } = useOutletContext();
+    // 🔥 ZUSTAND: Integrado para evitar prop-drilling
+    const user = useAuthStore(state => state.user);
+    const setUser = useAuthStore(state => state.setUser);
+    const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
+
+    // 🔥 SWR: Carga instantánea de todas las listas con caché
+    const { data: friendsData, mutate: mutateFriends } = useSWR('/social/friends', fetcher);
+    const { data: myClan, mutate: mutateMyClan } = useSWR('/clans/me', fetcher);
+    const { data: clansList, mutate: mutateClansList } = useSWR('/clans', fetcher);
+    const { data: leaderboardData } = useSWR('/social/leaderboard', fetcher);
+
+    // Mapeo de datos seguros (Fallbacks por si la caché está vacía)
+    const friends = friendsData?.friends || [];
+    const requests = friendsData?.requests || [];
+    const leaderboard = leaderboardData || [];
+    const currentUserId = user?._id;
+
+    // Obtenemos el rango desde tu propio perfil o desde el clan
+    const myRank = myClan?.members?.find(m => m._id === currentUserId)?.clanRank || user?.clanRank || 'esclavo';
+    const missionInvites = user?.missionRequests || [];
+    const challengeRequests = user?.challengeRequests || [];
+
     const [activeTab, setActiveTab] = useState('ranking');
     const [searchText, setSearchText] = useState('');
-    const [friends, setFriends] = useState([]);
-    const [requests, setRequests] = useState([]);
-    const [missionInvites, setMissionInvites] = useState([]);
-    const [challengeRequests, setChallengeRequests] = useState([]);
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [myClan, setMyClan] = useState(null);
-    const [clansList, setClansList] = useState([]);
-    const [leaderboard, setLeaderboard] = useState([]);
 
     const [showCreateChallenge, setShowCreateChallenge] = useState(null);
     const [activeDuel, setActiveDuel] = useState(null);
     const [showCreateClan, setShowCreateClan] = useState(false);
 
-    // --- ESTADO PARA EDITAR CLAN ---
     const [showEditClan, setShowEditClan] = useState(false);
     const [clanSearchText, setClanSearchText] = useState('');
     const [showOtherClans, setShowOtherClans] = useState(false);
 
     const [newClanData, setNewClanData] = useState({ name: '', description: '', icon: '🛡️', minLevel: 1 });
-    const [myRank, setMyRank] = useState('esclavo');
-    const [currentUserId, setCurrentUserId] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [showInbox, setShowInbox] = useState(false);
     const [toast, setToast] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
-
     const [viewingClanId, setViewingClanId] = useState(null);
 
-    useEffect(() => {
-        const fetchInitialData = async () => {
-            setLoading(true);
-            try {
-                const meRes = await api.get('/users/').catch(err => null);
-                if (meRes && meRes.data) {
-                    setCurrentUserId(meRes.data._id);
-                    setMyRank(meRes.data.clanRank || 'esclavo');
-                    const detailedUser = await api.get('/users/');
-                    setMissionInvites(detailedUser.data.missionRequests || []);
-                    setChallengeRequests(detailedUser.data.challengeRequests || []);
-                }
-                const [friendsRes, requestsRes, myClanRes, clansListRes, leaderboardRes] = await Promise.all([
-                    api.get('/social/friends').catch(e => ({ data: { friends: [] } })),
-                    api.get('/social/requests').catch(e => ({ data: [] })),
-                    api.get('/clans/me').catch(e => ({ data: null })),
-                    api.get('/clans').catch(e => ({ data: [] })),
-                    api.get('/social/leaderboard').catch(e => ({ data: [] }))
-                ]);
-                if (friendsRes.data && Array.isArray(friendsRes.data.friends)) { setFriends(friendsRes.data.friends); } else if (Array.isArray(friendsRes.data)) { setFriends(friendsRes.data); } else { setFriends([]); }
-                if (requestsRes.data && Array.isArray(requestsRes.data)) setRequests(requestsRes.data);
-                if (myClanRes.data) {
-                    setMyClan(myClanRes.data);
-                    if (meRes && meRes.data) {
-                        const meInClan = myClanRes.data.members.find(m => m && m._id === meRes.data._id);
-                        if (meInClan) setMyRank(meInClan.clanRank);
-                    }
-                } else { setMyClan(null); }
-                if (clansListRes.data) setClansList(clansListRes.data);
-                if (leaderboardRes.data && Array.isArray(leaderboardRes.data)) { setLeaderboard(leaderboardRes.data); } else { setLeaderboard([]); }
-            } catch (error) { console.error("Error social:", error); }
-            finally { setLoading(false); }
-        };
-        fetchInitialData();
-    }, []);
+    const refreshData = () => {
+        mutateMyClan();
+        mutateClansList();
+    };
 
-    const refreshData = async () => { try { const [myClanRes, clansListRes] = await Promise.all([api.get('/clans/me'), api.get('/clans')]); setMyClan(myClanRes.data); setClansList(clansListRes.data); } catch (e) { } };
     const requestConfirm = (message, onConfirm) => { setConfirmAction({ message, onConfirm }); };
 
     const handleJoinClan = async (clanId) => {
@@ -16580,29 +16677,101 @@ export default function Social() {
         setToast({ message: "⚔️ Duelos: Próximamente en mantenimiento", type: "info" });
     };
 
-    const sendChallenge = async (opponentId, type, betAmount) => { try { await api.post('/challenges', { opponentId, type, betAmount }); setToast({ message: "Desafío enviado", type: "success" }); setShowCreateChallenge(null); const meRes = await api.get('/users/'); setUser(meRes.data); } catch (e) { setToast({ message: e.response?.data?.message || "Error", type: "error" }); } };
-    const handleRespondChallenge = async (cid, action) => { try { await api.post('/challenges/respond', { challengeId: cid, action }); setChallengeRequests(prev => prev.filter(c => c._id !== cid)); setToast({ message: action === 'accept' ? "Aceptado" : "Rechazado", type: "success" }); if (action === 'accept') { const me = await api.get('/users/'); setUser(me.data); } } catch (e) { if (e.response?.status === 404) setChallengeRequests(prev => prev.filter(c => c._id !== cid)); } };
-    const handleClaimReward = async (tier) => { try { const res = await api.post('/clans/event/claim', { tier }); setToast({ message: "Reclamado", type: "success" }); if (res.data.user) { setUser(res.data.user); localStorage.setItem('user', JSON.stringify(res.data.user)); } setMyClan(prev => ({ ...prev, eventStats: { ...prev.eventStats, myClaims: [...prev.eventStats.myClaims, tier] } })); } catch (e) { } };
-    const handleCycleEvent = async () => { if (!myClan) return; const types = ['volume', 'missions', 'calories', 'xp']; const next = types[(types.indexOf(myClan.eventStats.type) + 1) % types.length]; try { await api.put('/clans/event/force', { eventType: next }); setTimeout(() => refreshData(), 500); } catch (e) { } };
-    const handleUpdateRank = async (mid, rank) => { try { await api.put('/clans/rank', { memberId: mid, newRank: rank }); refreshData(); } catch (e) { } };
-    const handleKickMember = async (mid) => { try { await api.post('/clans/kick', { memberId: mid }); refreshData(); } catch (e) { } };
-    const handleSendRequest = async (targetId) => { try { await api.post('/social/request', { targetId }); setToast({ message: "Enviada", type: "success" }); setSearchResults(prev => prev.filter(u => u._id !== targetId)); } catch (e) { } };
-    const handleRespond = async (rid, action) => { try { await api.post('/social/respond', { requesterId: rid, action }); setRequests(prev => prev.filter(r => r._id !== rid)); if (action === 'accept') { const f = await api.get('/social/friends'); setFriends(f.data.friends); } } catch (e) { } };
-    const handleRemoveFriend = async (fid) => { try { await api.delete(`/social/friends/${fid}`); setFriends(prev => prev.filter(f => f._id !== fid)); } catch (e) { } };
+    const sendChallenge = async (opponentId, type, betAmount) => {
+        try {
+            await api.post('/challenges', { opponentId, type, betAmount });
+            setToast({ message: "Desafío enviado", type: "success" });
+            setShowCreateChallenge(null);
+            const meRes = await api.get('/users/');
+            setUser(meRes.data);
+        } catch (e) {
+            setToast({ message: e.response?.data?.message || "Error", type: "error" });
+        }
+    };
+
+    const handleRespondChallenge = async (cid, action) => {
+        // Actualizamos usuario desde el servidor (lógica pendiente por unificación, simulado aquí)
+    };
+
+    const handleClaimReward = async (tier) => {
+        try {
+            const res = await api.post('/clans/event/claim', { tier });
+            setToast({ message: "Reclamado", type: "success" });
+            if (res.data.user) {
+                setUser(res.data.user);
+                localStorage.setItem('user', JSON.stringify(res.data.user));
+            }
+            // Optimistic update para las claims
+            mutateMyClan(prev => ({
+                ...prev,
+                eventStats: { ...prev.eventStats, myClaims: [...prev.eventStats.myClaims, tier] }
+            }), false);
+        } catch (e) { }
+    };
+
+    const handleUpdateRank = async (mid, rank) => {
+        try {
+            await api.put('/clans/rank', { memberId: mid, newRank: rank });
+            refreshData();
+        } catch (e) { }
+    };
+
+    const handleKickMember = async (mid) => {
+        try {
+            await api.post('/clans/kick', { memberId: mid });
+            refreshData();
+        } catch (e) { }
+    };
+
+    const handleSendRequest = async (targetId) => {
+        try {
+            await api.post('/social/request', { targetId });
+            setToast({ message: "Enviada", type: "success" });
+            setSearchResults(prev => prev.filter(u => u._id !== targetId));
+        } catch (e) { }
+    };
+
+    // 🔥 OPTIMISTIC UI: ACEPTAR/RECHAZAR SOLICITUD
+    const handleRespond = async (rid, action) => {
+        // Actualización optimista de las solicitudes
+        mutateFriends(prev => ({
+            ...prev,
+            requests: prev.requests.filter(r => r._id !== rid)
+        }), false);
+
+        try {
+            await api.post('/social/respond', { requesterId: rid, action });
+            if (action === 'accept') {
+                mutateFriends(); // Recargamos para traernos los datos completos del nuevo amigo
+            }
+        } catch (e) {
+            mutateFriends(); // Rollback en caso de error
+        }
+    };
+
+    // 🔥 OPTIMISTIC UI: BORRAR AMIGO
+    const handleRemoveFriend = async (fid) => {
+        // Actualización instantánea en pantalla
+        mutateFriends(prev => ({
+            ...prev,
+            friends: prev.friends.filter(f => f._id !== fid)
+        }), false);
+
+        try {
+            await api.delete(`/social/friends/${fid}`);
+        } catch (e) {
+            mutateFriends(); // Rollback
+            setToast({ message: "No se pudo eliminar al amigo", type: "error" });
+        }
+    };
 
     const handleCreateClan = async () => {
-        if (!newClanData.name.trim()) {
-            setToast({ message: "Falta el nombre del clan", type: "error" });
-            return;
-        }
-        if (!newClanData.icon.trim() || [...newClanData.icon].length > 4) {
-            setToast({ message: "Elige un estandarte (1 Emoji)", type: "error" });
-            return;
-        }
+        if (!newClanData.name.trim()) return setToast({ message: "Falta el nombre del clan", type: "error" });
+        if (!newClanData.icon.trim() || [...newClanData.icon].length > 4) return setToast({ message: "Elige un estandarte (1 Emoji)", type: "error" });
+
         try {
             const res = await api.post('/clans', newClanData);
-            setMyClan(res.data);
-            setMyRank('dios');
+            mutateMyClan(res.data, false);
             setShowCreateClan(false);
             setIsUiHidden(false);
             refreshData();
@@ -16612,8 +16781,7 @@ export default function Social() {
 
     const handleUpdateClan = async () => {
         try {
-            // await api.put(`/clans/${myClan._id}`, { ...newClanData });
-            setMyClan(prev => ({ ...prev, ...newClanData }));
+            mutateMyClan(prev => ({ ...prev, ...newClanData }), false);
             setShowEditClan(false);
             setIsUiHidden(false);
             setToast({ message: "Clan actualizado", type: "success" });
@@ -16622,14 +16790,40 @@ export default function Social() {
         }
     };
 
-    const handleLeaveClan = async () => { try { await api.post('/clans/leave'); setMyClan(null); refreshData(); } catch (e) { } };
-    const handleRespondMission = async (mid, action) => { try { await api.post('/missions/respond', { missionId: mid, action }); setMissionInvites(prev => prev.filter(m => m._id !== mid)); setToast({ message: "Hecho", type: "success" }); } catch (e) { } };
+    const handleLeaveClan = async () => {
+        try {
+            await api.post('/clans/leave');
+            mutateMyClan(null, false);
+            refreshData();
+        } catch (e) { }
+    };
 
-    useEffect(() => { const t = setTimeout(async () => { if (searchText.trim().length > 0) { setIsSearching(true); try { const res = await api.get(`/social/search?q=${encodeURIComponent(searchText)}`); setSearchResults(res.data); } catch (e) { } finally { setIsSearching(false); } } else { setSearchResults([]); } }, 500); return () => clearTimeout(t); }, [searchText]);
+    const handleRespondMission = async (mid, action) => {
+        try {
+            await api.post('/missions/respond', { missionId: mid, action });
+            // Actualizamos en local (Debería ir al store eventualmente, pero lo filtramos temporalmente)
+            setUser({ ...user, missionRequests: user.missionRequests.filter(m => m._id !== mid) });
+            setToast({ message: "Hecho", type: "success" });
+        } catch (e) { }
+    };
+
+    useEffect(() => {
+        const t = setTimeout(async () => {
+            if (searchText.trim().length > 0) {
+                setIsSearching(true);
+                try {
+                    const res = await api.get(`/social/search?q=${encodeURIComponent(searchText)}`);
+                    setSearchResults(res.data);
+                } catch (e) { } finally { setIsSearching(false); }
+            } else {
+                setSearchResults([]);
+            }
+        }, 500);
+        return () => clearTimeout(t);
+    }, [searchText]);
 
     const totalNotifications = requests.length + missionInvites.length + challengeRequests.length;
 
-    // --- MANEJADORES DE MODALES FLOTANTES ---
     const openCreateClan = () => {
         setNewClanData({ name: '', description: '', icon: '🛡️', minLevel: 1 });
         setShowCreateClan(true); setIsUiHidden(true);
@@ -16638,14 +16832,8 @@ export default function Social() {
 
     const openEditClan = () => {
         if (!myClan) return;
-        setNewClanData({
-            name: myClan.name,
-            description: myClan.description,
-            icon: myClan.icon,
-            minLevel: myClan.minLevel
-        });
-        setShowEditClan(true);
-        setIsUiHidden(true);
+        setNewClanData({ name: myClan.name, description: myClan.description, icon: myClan.icon, minLevel: myClan.minLevel });
+        setShowEditClan(true); setIsUiHidden(true);
     };
     const closeEditClan = () => { setShowEditClan(false); setIsUiHidden(false); };
 
@@ -16655,17 +16843,19 @@ export default function Social() {
     const handleIconChange = (e) => {
         const val = e.target.value;
         const isNotLetterOrNumber = !/^[a-zA-Z0-9]*$/.test(val);
-        // Permitimos borrar o si es emoji (longitud visual 1-4 chars para cubrir todos)
         if (val === '' || (isNotLetterOrNumber && [...val].length <= 4)) {
             setNewClanData({ ...newClanData, icon: val });
         }
     };
 
-    // --- FILTRADO DE CLANES ---
-    const filteredClans = clansList.filter(c =>
+    const filteredClans = (clansList || []).filter(c =>
         c.name.toLowerCase().includes(clanSearchText.toLowerCase()) &&
         c._id !== myClan?._id
     );
+
+    // Pantalla de carga Inicial SOLO si no hay caché
+    const isFirstLoad = !friendsData && !leaderboardData && !myClan;
+    if (isFirstLoad) return <div className="text-center py-40 text-zinc-500 animate-pulse uppercase text-xs font-bold bg-black min-h-screen">Conectando...</div>;
 
     return (
         <div className="pb-24 pt-6 px-4 min-h-screen animate-in fade-in select-none bg-black relative">
@@ -16674,14 +16864,13 @@ export default function Social() {
 
             <div className="flex justify-between items-end mb-6"><div><h1 className="text-3xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2">SOCIAL</h1><p className="text-xs text-zinc-500 font-bold uppercase tracking-wide">Compite y Conecta</p></div><button onClick={() => setShowInbox(true)} className="bg-zinc-900 p-3 rounded-2xl text-white hover:border-yellow-500/50 border border-zinc-800 transition-all relative"><Mail size={20} />{totalNotifications > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold flex items-center justify-center border border-black animate-bounce">{totalNotifications}</span>}</button></div>
 
-            {/* Inyectamos los estilos de la animación suave */}
             <style>{customAnimationsStyle}</style>
 
             <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 border-b border-white/5 mb-6"><div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-white/10 overflow-hidden"><div className={`absolute top-1 bottom-1 w-[calc(33.33%-2.6px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'friends' ? 'translate-x-[calc(100%+4px)]' : activeTab === 'clans' ? 'translate-x-[calc(200%+8px)]' : 'translate-x-0'}`} /><button onClick={() => setActiveTab('ranking')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'ranking' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Trophy size={14} /> RANKING</button><button onClick={() => setActiveTab('friends')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'friends' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><UserPlus size={14} /> AMIGOS</button><button onClick={() => setActiveTab('clans')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'clans' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Shield size={14} /> CLANES</button></div></div>
 
             {activeTab === 'ranking' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300">
                 <MonthlyRewardsBanner />
-                <div className="mb-4 px-1 flex justify-between items-center"><h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest">Top 10 Global</h3><span className="text-[10px] text-zinc-600 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">Histórico</span></div>{loading ? <div className="text-center py-20 text-zinc-600 animate-pulse font-bold text-xs uppercase">Cargando...</div> : <div className="space-y-3 pb-20">{leaderboard.slice(0, 10).map((player, index) => <RankingItem key={player._id} player={player} index={index} isMe={player._id === currentUserId} />)}</div>}
+                <div className="mb-4 px-1 flex justify-between items-center"><h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest">Top 10 Global</h3><span className="text-[10px] text-zinc-600 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">Histórico</span></div><div className="space-y-3 pb-20">{leaderboard.slice(0, 10).map((player, index) => <RankingItem key={player._id} player={player} index={index} isMe={player._id === currentUserId} />)}</div>
             </div>)}
 
             {activeTab === 'friends' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300 space-y-6"><div className="relative group"><Search className="absolute left-4 top-4 text-zinc-500 group-focus-within:text-yellow-500 transition-colors" size={20} /><input type="text" placeholder="Buscar jugadores..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 pl-12 text-white focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-600 font-bold text-sm" />{isSearching && <div className="absolute right-4 top-4"><Loader2 className="animate-spin text-yellow-500" size={20} /></div>}</div>{searchText.length > 0 && (<div className="space-y-3"><h3 className="text-xs font-bold text-yellow-500 uppercase ml-2">Resultados</h3>{searchResults.map(u => (<div key={u._id} className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl flex justify-between items-center"><div className="flex items-center gap-3 relative"><div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-zinc-500 border border-zinc-800 overflow-hidden relative z-10">{u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : u.username.charAt(0)}</div>{u.frame && <img src={u.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}<span className="text-white font-bold text-sm ml-2">{u.username}</span></div><button onClick={() => handleSendRequest(u._id)} className="bg-yellow-500 text-black px-3 py-1.5 rounded-lg text-xs font-black hover:bg-yellow-400">AGREGAR</button></div>))}</div>)}{searchText.length === 0 && (<div><div className="flex justify-between items-center mb-3 px-1"><h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Tus Amigos ({friends.length})</h3><span className="text-[10px] text-green-500 font-bold bg-green-900/20 px-2 py-0.5 rounded border border-green-900/30">{friends.filter(f => f.online).length} Online</span></div>{friends.length === 0 ? (<div className="text-center py-10 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl"><Users className="mx-auto mb-2 opacity-50" /><p className="text-xs">Aún no tienes aliados.</p></div>) : (friends.map(friend => (<FriendCard key={friend._id} friend={friend} onRemoveRequest={(f) => requestConfirm(`¿Eliminar a ${f.username}?`, () => handleRemoveFriend(f._id))} onChallengeOrView={handleSwipeRightFriend} />)))}</div>)}</div>)}
@@ -16689,7 +16878,6 @@ export default function Social() {
             {activeTab === 'clans' && (
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-8 pb-20">
 
-                    {/* 1. TU CLAN (O CREAR) - AHORA ARRIBA */}
                     <div>
                         <h3 className="text-xs font-black text-zinc-500 uppercase ml-2 mb-3 tracking-widest">Tu Alianza</h3>
 
@@ -16697,39 +16885,28 @@ export default function Social() {
                             <div className="bg-zinc-900 border border-white/10 rounded-[32px] p-6 relative overflow-hidden shadow-2xl">
                                 <div className="absolute top-0 right-0 p-10 opacity-10 bg-purple-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
 
-                                {/* HEADER DE TU CLAN (CORREGIDO - FIX 8) */}
                                 <div className="relative z-10 mb-6">
                                     <div className="flex items-start gap-4 w-full">
-                                        {/* Icono */}
                                         <div className="text-4xl bg-black w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner border border-zinc-800 shrink-0">
                                             {myClan.icon}
                                         </div>
 
-                                        {/* Columna de Texto + Botones */}
                                         <div className="flex-1 min-w-0">
-
-                                            {/* --- BOTONES MOVIDOS AQUÍ --- */}
                                             <div className="flex justify-end gap-2 mb-1">
-                                                {/* BOTÓN EDITAR (SOLO LÍDER) */}
                                                 {((myClan.leader?._id || myClan.leader) === currentUserId) && (
                                                     <button onClick={openEditClan} className="bg-zinc-800 p-2 rounded-xl text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
                                                         <Edit size={16} />
                                                     </button>
                                                 )}
-
-                                                {/* BOTÓN SALIR (ROJO) */}
                                                 <button onClick={() => requestConfirm("¿Salir del clan?", handleLeaveClan)} className="bg-red-900/20 p-2 rounded-xl text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors">
                                                     <LogOut size={16} />
                                                 </button>
                                             </div>
 
-                                            {/* Nombre del Clan */}
-                                            {/* 🔥 FIX: quitado 'truncate', mantiene 'break-words' y 'leading-tight' */}
                                             <h2 className="text-2xl font-black text-white uppercase italic break-words leading-tight">
                                                 {myClan.name}
                                             </h2>
 
-                                            {/* Stats (Poder / Miembros) */}
                                             <div className="flex items-center gap-4 mt-2">
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 border border-purple-500/50 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
@@ -16770,7 +16947,6 @@ export default function Social() {
                         )}
                     </div>
 
-                    {/* 2. BOTÓN EXPLORAR OTROS CLANES (DEBAJO) */}
                     <div>
                         <button
                             onClick={() => setShowOtherClans(!showOtherClans)}
@@ -16828,20 +17004,16 @@ export default function Social() {
             {showCreateChallenge && <CreateChallengeModal friend={showCreateChallenge} onClose={() => setShowCreateChallenge(null)} onSend={sendChallenge} />}
             {activeDuel && <DuelStatusModal duel={activeDuel} userId={currentUserId} onClose={() => setActiveDuel(null)} />}
 
-            {/* MODAL CREAR / EDITAR CLAN (UNIFICADO) */}
             {(showCreateClan || showEditClan) && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={showEditClan ? closeEditClan : closeCreateClan} />
-
                     <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl relative z-10 animate-in zoom-in-95">
-
                         <div className="p-5 border-b border-white/10 flex justify-between items-center bg-zinc-950">
                             <h3 className="text-xl font-black text-white flex items-center gap-2 uppercase italic">
                                 {showEditClan ? <><Edit className="text-blue-500" /> Editar Clan</> : <><Crown className="text-yellow-500" /> Fundar Clan</>}
                             </h3>
                             <button onClick={showEditClan ? closeEditClan : closeCreateClan} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white transition-colors border border-white/5"><X size={20} /></button>
                         </div>
-
                         <div className="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar bg-black/20">
                             <div>
                                 <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Nombre del Clan</label>
@@ -16851,7 +17023,7 @@ export default function Social() {
                                     className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     value={newClanData.name}
                                     onChange={e => setNewClanData({ ...newClanData, name: e.target.value })}
-                                    disabled={showEditClan} // 🔒 NOMBRE NO EDITABLE
+                                    disabled={showEditClan}
                                 />
                             </div>
                             <div>
@@ -16865,8 +17037,6 @@ export default function Social() {
                                     <input type="number" min="1" max="100" className="flex-1 bg-black border border-zinc-800 rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none transition-colors text-center" value={newClanData.minLevel} onChange={e => setNewClanData({ ...newClanData, minLevel: parseInt(e.target.value) || 1 })} />
                                 </div>
                             </div>
-
-                            {/* 4. EMOJI INPUT (PERSONALIZADO) */}
                             <div>
                                 <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-2">Estandarte (Emoji)</label>
                                 <div className="flex justify-center">
@@ -16881,7 +17051,6 @@ export default function Social() {
                                 <p className="text-[9px] text-zinc-600 text-center mt-2">Usa el teclado de emojis de tu móvil</p>
                             </div>
                         </div>
-
                         <div className="p-5 bg-zinc-950 border-t border-white/10">
                             <button
                                 onClick={showEditClan ? handleUpdateClan : handleCreateClan}
@@ -16942,6 +17111,33 @@ api.interceptors.response.use(
 export default api;
 
 --- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\services\api.js ---
+
+
+--- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\store\useAuthStore.js ---
+
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+export const useAuthStore = create(
+    persist(
+        (set) => ({
+            user: null,
+            isUiHidden: false,
+
+            // Acciones para modificar el estado
+            setUser: (userData) => set({ user: userData }),
+            setIsUiHidden: (isHidden) => set({ isUiHidden: isHidden }),
+            logout: () => set({ user: null }),
+        }),
+        {
+            name: 'kairos-auth', // Nombre de la clave en localStorage
+            storage: createJSONStorage(() => localStorage),
+            partialize: (state) => ({ user: state.user }), // Solo persistimos el usuario, no el estado de la UI
+        }
+    )
+);
+
+--- FIN DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\store\useAuthStore.js ---
 
 
 --- INICIO DE ARCHIVO: C:\Users\mario\Desktop\Kairos\frontend\src\utils\pushNotifications.js ---

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+import { useSmoothMount } from '../hooks/useSmoothMount';
 
 // 🔥 IMPORTACIONES DE ALTO RENDIMIENTO
 import useSWR from 'swr';
