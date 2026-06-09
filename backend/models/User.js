@@ -47,6 +47,9 @@ const userSchema = new mongoose.Schema({
         quantity: { type: Number, default: 1 }
     }],
 
+    // --- 🔥 SEGURIDAD CASINO (NUEVO) ---
+    activeGameToken: { type: String, default: null }, // Evita trampas en juegos por turnos
+
     // Racha
     streak: {
         current: { type: Number, default: 1 },
@@ -83,11 +86,8 @@ const userSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
-// --- 🔥 ÍNDICES CRÍTICOS PARA RENDIMIENTO (NUEVO) 🔥 ---
-// 1. Índice Compuesto para el Leaderboard (Ordena instantáneamente sin colapsar la BD)
+// --- 🔥 ÍNDICES CRÍTICOS PARA RENDIMIENTO 🔥 ---
 userSchema.index({ level: -1, currentXP: -1 });
-
-// 2. Índice de Texto para buscar amigos rapidísimo por nombre
 userSchema.index({ username: 1 });
 
 // --- LÓGICA DE BACKEND ---

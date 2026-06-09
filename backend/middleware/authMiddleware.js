@@ -19,7 +19,6 @@ const protect = asyncHandler(async (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
             // 4. Obtener el ID del usuario del payload del token
-            // Soporta varios formatos de payload por si acaso (id, user.id, _id)
             const userId = decoded.id || decoded.user?.id || decoded._id || decoded.user;
 
             // 5. Buscar el usuario en la base de datos (sin la contraseña)
@@ -30,9 +29,15 @@ const protect = asyncHandler(async (req, res, next) => {
                 throw new Error('Usuario no encontrado en base de datos');
             }
 
-            // 🔥🔥🔥 AÑADIDO CLAVE PARA SOCIAL: ACTUALIZAR "LAST ACTIVE" 🔥🔥🔥
-            // Cada vez que el usuario hace una petición autenticada, actualizamos su fecha
-            await User.findByIdAndUpdate(userId, { lastActive: new Date() });
+            // 🔥 FIX: ACTUALIZACIÓN INTELIGENTE DEL "LAST ACTIVE"
+            // Solo escribimos en la BD si han pasado más de 5 minutos desde su última acción
+            const now = new Date();
+            const lastActive = req.user.lastActive ? new Date(req.user.lastActive) : new Date(0);
+            const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+            if ((now - lastActive) > FIVE_MINUTES_MS) {
+                await User.findByIdAndUpdate(userId, { lastActive: now });
+            }
 
             next();
 
