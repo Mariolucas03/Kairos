@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import HealthWidget from './HealthWidget';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -36,6 +37,8 @@ export default function Header() {
     const level = user.level || 1;
     const currentXP = user.currentXP || 0;
     const nextLevelXP = user.nextLevelXP || 100;
+    const coins = user.coins || 0;
+    const gameCoins = user.stats?.gameCoins ?? user.gameCoins ?? 0;
     const username = user.username || "Usuario";
     const userTitle = user.title || "Novato";
     const xpPercent = Math.min((currentXP / nextLevelXP) * 100, 100);
@@ -44,31 +47,41 @@ export default function Header() {
     const userFrame = user.frame;
     const userPet = user.pet;
 
+    const ICON_COINS = "/assets/icons/moneda.png";
+    const ICON_CHIPS = "/assets/icons/ficha.png";
+
     const avatarBorderClass = userFrame ? 'border-transparent' : (userAvatar ? 'border-gold-500' : 'border-zinc-700');
     const avatarBgClass = userAvatar ? 'bg-transparent' : 'bg-zinc-900';
     const levelClass = getLevelStyle(level);
+
+    const getFontSize = (num) => {
+        const str = num.toString();
+        if (str.length > 6) return 'text-[9px]';
+        if (str.length > 4) return 'text-[10px]';
+        return 'text-xs';
+    };
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-md border-b border-zinc-800/50 safe-top pb-2 px-3 shadow-2xl select-none transition-all duration-300">
             <style>{customAnimationsStyle}</style>
             <div className="max-w-4xl mx-auto flex justify-between items-center relative h-14 sm:h-16">
-                
-                {/* 1. IZQUIERDA: PERFIL (Solo visual, sin enlaces) */}
+
+                {/* 1. IZQUIERDA: PERFIL */}
                 <div className="flex items-center gap-3 group flex-1 min-w-0 mr-1">
-                    <div className="relative flex-shrink-0 overflow-visible">
+                    <Link to="/profile" className="relative flex-shrink-0 cursor-pointer active:scale-95 transition-transform overflow-visible">
                         <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center overflow-hidden border-2 ${avatarBgClass} ${avatarBorderClass}`}>
                             {userAvatar ? (
                                 <img src={userAvatar} alt="Av" className="w-full h-full object-cover" />
                             ) : (
-                                <span className="text-lg font-bold text-yellow-500">{username.charAt(0).toUpperCase()}</span>
+                                <span className="text-lg font-bold text-gold-400">{username.charAt(0).toUpperCase()}</span>
                             )}
                         </div>
                         {userFrame && <img src={userFrame} className="absolute -top-2.5 -left-2.5 sm:-top-3 sm:-left-3 w-[68px] h-[68px] sm:w-[80px] sm:h-[80px] max-w-none pointer-events-none z-10" />}
                         {userPet && <img src={userPet} className="absolute -bottom-1 -right-2 w-6 h-6 sm:w-7 sm:h-7 object-contain z-30 drop-shadow-md filter" />}
-                    </div>
+                    </Link>
 
                     <div className="flex flex-col justify-center w-full max-w-[140px] sm:max-w-[220px]">
-                        <span className="text-[9px] sm:text-[10px] text-yellow-500/80 italic font-bold tracking-wider mb-0.5 truncate uppercase">
+                        <span className="text-[9px] sm:text-[10px] text-gold-500/80 italic font-bold tracking-wider mb-0.5 truncate uppercase">
                             {userTitle}
                         </span>
                         <div className="flex items-center gap-2 mb-1 overflow-hidden">
@@ -90,12 +103,46 @@ export default function Header() {
                     </div>
                 </div>
 
-                {/* 2. DERECHA: SALUD Y PACTO DE RESCATE */}
+                {/* 2. DERECHA: SALUD + ECONOMÍA */}
                 <div className="flex items-center gap-4 shrink-0">
                     <div className="scale-90 sm:scale-100 origin-right">
                         <HealthWidget user={user} setUser={setUser} />
                     </div>
+
+                    <div className="flex flex-col gap-1.5 w-auto items-end">
+                        {/* Botón Monedas */}
+                        <Link
+                            to="/shop"
+                            state={{ openCategory: 'reward' }}
+                            className="relative flex items-center bg-zinc-900/90 border border-gold-500/30 hover:border-gold-500/80 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden transition-all active:scale-95 group"
+                        >
+                            <span className={`relative z-10 text-gold-400 font-black w-full text-right pr-5 ${getFontSize(coins)}`}>
+                                {coins > 99999 ? (coins / 1000).toFixed(0) + 'k' : coins.toLocaleString()}
+                            </span>
+                            <img
+                                src={ICON_COINS}
+                                alt="C"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100 group-hover:scale-110 transition-all"
+                            />
+                        </Link>
+
+                        {/* Botón Fichas */}
+                        <Link
+                            to="/games"
+                            className="relative flex items-center bg-zinc-900/90 border border-purple-500/30 hover:border-purple-500/80 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden transition-all active:scale-95 group"
+                        >
+                            <span className={`relative z-10 text-purple-300 font-black w-full text-right pr-5 ${getFontSize(gameCoins)}`}>
+                                {gameCoins > 99999 ? (gameCoins / 1000).toFixed(0) + 'k' : gameCoins.toLocaleString()}
+                            </span>
+                            <img
+                                src={ICON_CHIPS}
+                                alt="F"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100 group-hover:scale-110 transition-all"
+                            />
+                        </Link>
+                    </div>
                 </div>
+
             </div>
         </header>
     );

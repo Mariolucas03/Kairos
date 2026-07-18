@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Users, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home, User } from 'lucide-react';
+import { Users, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Footer() {
@@ -39,7 +39,6 @@ export default function Footer() {
     const navItemsRight = [
         { name: 'Gym', path: '/gym', icon: Dumbbell },
         { name: 'Inicio', path: '/home', icon: Home },
-        { name: 'Perfil', path: '/profile', icon: User },
     ];
 
     return (
@@ -79,7 +78,7 @@ export default function Footer() {
                 <div className="flex justify-between items-center px-4 h-full relative">
                     
                     {/* Items Izquierda (IG, Comida) */}
-                    <div className="flex w-[35%] justify-around">
+                    <div className="flex w-[40%] justify-around">
                         {navItemsLeft.map((item) => (
                             <NavLink key={item.name} to={item.path} className="group relative w-12 flex justify-center">
                                 {({ isActive }) => (
@@ -114,8 +113,8 @@ export default function Footer() {
                         </button>
                     </div>
 
-                    {/* Items Derecha (Gym, Inicio, Perfil) */}
-                    <div className="flex w-[45%] justify-around">
+                    {/* Items Derecha (Gym, Inicio) */}
+                    <div className="flex w-[40%] justify-around">
                         {navItemsRight.map((item) => (
                             <NavLink key={item.name} to={item.path} className="group relative w-12 flex justify-center">
                                 {({ isActive }) => (
