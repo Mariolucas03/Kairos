@@ -182,7 +182,11 @@ const updateProgress = asyncHandler(async (req, res) => {
         mission.completed = false;
     }
 
-    const addAmount = Number(amount) || 1;
+    // 🔥 Clamp: nunca confiar en un incremento arbitrario del cliente. Como mucho,
+    // lo que falte para completar la misión (evita completar de un tirón misiones coop grandes).
+    const remaining = Math.max(mission.target - mission.progress, 1);
+    const requestedAmount = Number(amount) || 1;
+    const addAmount = Math.min(Math.max(requestedAmount, 1), remaining);
     let rewards = null, leveledUp = false, userResult = null;
 
     // Función Helper para progresar y premiar sin Race Conditions

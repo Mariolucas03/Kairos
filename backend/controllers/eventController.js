@@ -9,11 +9,11 @@ const getCurrentPeriod = () => {
     return `${currentYear}-W${currentWeek}`; // Ej: "2024-W52"
 };
 
-// @desc    Obtener estado del evento actual para un usuario
-// @route   GET /api/events/status/:userId
+// @desc    Obtener estado del evento actual para el usuario autenticado
+// @route   GET /api/events/status
 exports.getEventStatus = async (req, res) => {
     try {
-        const { userId } = req.params;
+        const userId = req.user._id;
         const currentPeriod = getCurrentPeriod();
 
         // Buscamos el progreso SOLO de la semana actual
@@ -47,10 +47,11 @@ exports.getEventStatus = async (req, res) => {
 // @route   POST /api/events/add-points
 exports.addPoints = async (req, res) => {
     try {
-        const { userId, points } = req.body;
+        const userId = req.user._id;
+        const { points } = req.body;
 
-        if (!userId || points === undefined) {
-            return res.status(400).json({ message: "Faltan datos (userId o points)" });
+        if (points === undefined || typeof points !== 'number' || points <= 0 || points > 10000) {
+            return res.status(400).json({ message: "Puntos inválidos" });
         }
 
         const currentPeriod = getCurrentPeriod();
@@ -85,9 +86,10 @@ exports.addPoints = async (req, res) => {
 // @route   POST /api/events/claim-reward
 exports.claimReward = async (req, res) => {
     try {
-        const { userId, rewardId } = req.body; // rewardId ej: "chest_1", "gold_pack"
+        const userId = req.user._id;
+        const { rewardId } = req.body; // rewardId ej: "chest_1", "gold_pack"
 
-        if (!userId || !rewardId) {
+        if (!rewardId) {
             return res.status(400).json({ message: "Faltan datos" });
         }
 

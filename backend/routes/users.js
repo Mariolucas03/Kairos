@@ -28,9 +28,16 @@ router.post('/set-redemption-mission', protect, setRedemptionMission);
 router.post('/revive', protect, reviveUser);
 router.put('/update-stats', protect, updateStatsManual);
 
-// Rutas Debug
-router.post('/debug/yesterday', protect, simulateYesterday);
-router.put('/debug/streak', protect, setManualStreak);
-router.post('/debug/force-night', protect, forceNightlyMaintenance);
+// Rutas Debug (🔥 solo disponibles fuera de producción: force-night dispara el mantenimiento
+// nocturno GLOBAL para todos los usuarios, no solo el que llama)
+const devOnly = (req, res, next) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: 'No disponible en producción' });
+    }
+    next();
+};
+router.post('/debug/yesterday', protect, devOnly, simulateYesterday);
+router.put('/debug/streak', protect, devOnly, setManualStreak);
+router.post('/debug/force-night', protect, devOnly, forceNightlyMaintenance);
 
 module.exports = router;

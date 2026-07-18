@@ -41,7 +41,7 @@ router.post('/log', protect, validate(workoutLogSchema), saveWorkoutLog);
 router.post('/sport', protect, saveSportLog);
 
 // Utilidades
-router.get('/seed', seedExercises);
+router.get('/seed', protect, seedExercises);
 
 // --- ESTADÍSTICAS Y WIDGETS ---
 router.get('/weekly', protect, getWeeklyStats);

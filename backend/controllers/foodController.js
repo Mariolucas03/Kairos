@@ -18,6 +18,9 @@ const openrouter = new OpenAI({
 // Usamos el helper centralizado en lugar del toISOString() que falla por zona horaria
 const getTodayStr = () => getTodayDateString();
 
+// 🔥 Escapa caracteres especiales de regex para evitar ReDoS / patrones inesperados
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // ==========================================
 // ⏱️ HELPER: TIMEOUT PARA IA (EVITA BLOQUEOS)
 // ==========================================
@@ -371,8 +374,9 @@ const searchFoods = async (req, res) => {
     try {
         const { query } = req.query;
         if (!query) return res.json([]);
+        const safeQuery = escapeRegex(query).slice(0, 100);
         const foods = await Food.find({
-            name: { $regex: query, $options: 'i' },
+            name: { $regex: safeQuery, $options: 'i' },
             $or: [{ user: req.user._id }, { user: null }, { user: { $exists: false } }]
         }).limit(20);
         res.json(foods);

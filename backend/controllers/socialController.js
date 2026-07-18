@@ -1,16 +1,20 @@
 const User = require('../models/User');
 const DailyLog = require('../models/DailyLog');
 
+// 🔥 Escapa caracteres especiales de regex para evitar ReDoS / patrones inesperados
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // @desc    Buscar usuarios por nombre o email
 const searchUsers = async (req, res) => {
     try {
         const query = req.query.q;
         if (!query) return res.json([]);
+        const safeQuery = escapeRegex(query).slice(0, 100);
 
         const users = await User.find({
             $or: [
-                { username: { $regex: query, $options: 'i' } },
-                { email: { $regex: query, $options: 'i' } }
+                { username: { $regex: safeQuery, $options: 'i' } },
+                { email: { $regex: safeQuery, $options: 'i' } }
             ],
             _id: { $ne: req.user._id }
         })

@@ -335,9 +335,26 @@ const kickMember = asyncHandler(async (req, res) => {
     res.json({ message: 'Miembro expulsado de la alianza.' });
 });
 
+const RANKS = { 'esclavo': 0, 'recluta': 1, 'guerrero': 2, 'rey': 3, 'dios': 4 };
+
 const updateMemberRank = asyncHandler(async (req, res) => {
     const { memberId, newRank } = req.body;
+
+    if (!RANKS.hasOwnProperty(newRank)) { res.status(400); throw new Error('Rango inválido'); }
+
+    const requester = await User.findById(req.user._id);
     const target = await User.findById(memberId);
+    if (!target) { res.status(404); throw new Error('Miembro no encontrado'); }
+
+    if (!requester.clan || !target.clan || requester.clan.toString() !== target.clan.toString()) {
+        res.status(403); throw new Error('Error de validación');
+    }
+
+    // Solo el líder ('dios') puede cambiar rangos, y no puede degradarse/ascender a sí mismo
+    if (requester.clanRank !== 'dios') { res.status(403); throw new Error('Solo el líder puede cambiar rangos'); }
+    if (target._id.toString() === requester._id.toString()) { res.status(400); throw new Error('No puedes cambiar tu propio rango'); }
+    if (newRank === 'dios') { res.status(400); throw new Error('Usa la sucesión de liderazgo para transferir el mando'); }
+
     target.clanRank = newRank;
     await target.save();
     res.json({ message: 'Rango actualizado' });

@@ -1,6 +1,5 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto'); // 🔥 IMPORTACIÓN NATIVA DE NODE PARA SEGURIDAD
 
 // --- UTILIDADES GLOBALES ---
@@ -193,18 +192,72 @@ const playSlots = asyncHandler(async (req, res) => {
 // ==========================================
 // 4. RULETA
 // ==========================================
+const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+const BLACK_NUMBERS = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
+const TABLE_COLUMNS = {
+    1: [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34],
+    2: [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
+    3: [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36]
+};
+
+// 🔥 TABLA DE APUESTAS CANÓNICA: nunca confiamos en "numbers"/"multiplier" del cliente,
+// los recalculamos siempre a partir de type+value.
+const getCanonicalRouletteBet = (type, value) => {
+    switch (type) {
+        case 'number': {
+            const n = Number(value);
+            if (!Number.isInteger(n) || n < 0 || n > 36) return null;
+            return { numbers: [n], multiplier: 36 };
+        }
+        case 'column': {
+            const col = Number(value);
+            if (!TABLE_COLUMNS[col]) return null;
+            return { numbers: TABLE_COLUMNS[col], multiplier: 3 };
+        }
+        case 'dozen': {
+            const d = Number(value);
+            if (![1, 2, 3].includes(d)) return null;
+            return { numbers: Array.from({ length: 12 }, (_, i) => i + 1 + (d - 1) * 12), multiplier: 3 };
+        }
+        case 'low':
+            return { numbers: Array.from({ length: 18 }, (_, i) => i + 1), multiplier: 2 };
+        case 'high':
+            return { numbers: Array.from({ length: 18 }, (_, i) => i + 19), multiplier: 2 };
+        case 'even':
+            return { numbers: Array.from({ length: 36 }, (_, i) => i + 1).filter(n => n % 2 === 0), multiplier: 2 };
+        case 'odd':
+            return { numbers: Array.from({ length: 36 }, (_, i) => i + 1).filter(n => n % 2 !== 0), multiplier: 2 };
+        case 'color':
+            if (value === 'red') return { numbers: RED_NUMBERS, multiplier: 2 };
+            if (value === 'black') return { numbers: BLACK_NUMBERS, multiplier: 2 };
+            return null;
+        default:
+            return null;
+    }
+};
+
 const playRoulette = asyncHandler(async (req, res) => {
     const { bets } = req.body;
-    if (!bets || bets.length === 0) { res.status(400); throw new Error('Sin apuestas'); }
+    if (!Array.isArray(bets) || bets.length === 0) { res.status(400); throw new Error('Sin apuestas'); }
+    if (bets.length > 50) { res.status(400); throw new Error('Demasiadas apuestas'); }
 
-    const totalBet = bets.reduce((a, b) => a + b.amount, 0);
+    const canonicalBets = [];
+    for (const b of bets) {
+        const amount = Number(b?.amount);
+        if (!Number.isFinite(amount) || amount <= 0) { res.status(400); throw new Error('Apuesta inválida'); }
+        const canonical = getCanonicalRouletteBet(b?.type, b?.value);
+        if (!canonical) { res.status(400); throw new Error('Apuesta inválida'); }
+        canonicalBets.push({ amount, ...canonical });
+    }
+
+    const totalBet = canonicalBets.reduce((a, b) => a + b.amount, 0);
     await chargeAndValidate(req.user._id, totalBet);
 
     const WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
     const winNum = WHEEL_NUMBERS[Math.floor(Math.random() * WHEEL_NUMBERS.length)];
 
     let totalWin = 0;
-    bets.forEach(b => { if (b.numbers.includes(winNum)) totalWin += b.amount * b.multiplier; });
+    canonicalBets.forEach(b => { if (b.numbers.includes(winNum)) totalWin += b.amount * b.multiplier; });
 
     const finalUser = await payPrize(req.user._id, totalWin);
     res.json({ winNum, totalWin, user: finalUser });
@@ -263,6 +316,33 @@ const calcScore = (hand) => {
     return score;
 };
 
+// 🔥 El estado (incluye el mazo restante) se ENCRIPTA, no solo se firma:
+// un JWT normal solo está codificado en base64 y el cliente podría decodificarlo
+// para ver todas las cartas futuras (conteo de cartas / trampas). AES-256-GCM
+// evita que el contenido sea legible, y la etiqueta de autenticación evita manipulación.
+const getBlackjackKey = () => crypto.createHash('sha256').update(process.env.JWT_SECRET).digest();
+
+const encryptState = (state) => {
+    const key = getBlackjackKey();
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([cipher.update(JSON.stringify(state), 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    return Buffer.concat([iv, authTag, encrypted]).toString('base64');
+};
+
+const decryptState = (token) => {
+    const key = getBlackjackKey();
+    const raw = Buffer.from(token, 'base64');
+    const iv = raw.subarray(0, 12);
+    const authTag = raw.subarray(12, 28);
+    const encrypted = raw.subarray(28);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return JSON.parse(decrypted.toString('utf8'));
+};
+
 const playBlackjack = asyncHandler(async (req, res) => {
     const { action, bet, token } = req.body;
     let state;
@@ -291,7 +371,11 @@ const playBlackjack = asyncHandler(async (req, res) => {
         }
     } else {
         if (!token) { res.status(400); throw new Error('Sesión no encontrada'); }
-        state = jwt.verify(token, process.env.JWT_SECRET);
+        try {
+            state = decryptState(token);
+        } catch (e) {
+            res.status(400); throw new Error('Sesión inválida o manipulada. Empieza de nuevo.');
+        }
 
         // 🔥 VALIDACIÓN ANTI-TRAMPAS (REPLAY ATTACK)
         const currentUser = await User.findById(req.user._id).select('activeGameToken');
@@ -361,7 +445,7 @@ const playBlackjack = asyncHandler(async (req, res) => {
         }
     }
 
-    const newStateToken = state.status === 'ended' ? null : jwt.sign(state, process.env.JWT_SECRET);
+    const newStateToken = state.status === 'ended' ? null : encryptState(state);
 
     // Ocultar segunda carta del dealer si no ha terminado
     const safeDHand = state.status === 'ended' ? state.dHand : [state.dHand[0], { hidden: true }];

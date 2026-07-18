@@ -1,31 +1,29 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Users, Utensils, Dumbbell, User, Plus, ShoppingBag, Gamepad2, ScrollText, Home } from 'lucide-react';
+import { Users, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home, User } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Footer() {
     const user = useAuthStore(state => state.user);
     const location = useLocation();
     
-    // Estados independientes para el botón central y el menú de perfil
+    // Solo manejamos el botón central (+)
     const [isFabOpen, setIsFabOpen] = useState(false);
-    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-    // Cierra los menús al cambiar de ruta
+    // Cierra el menú al cambiar de ruta
     useEffect(() => {
         setIsFabOpen(false);
-        setIsProfileMenuOpen(false);
     }, [location.pathname]);
 
-    // Bloqueo de scroll para inmersión
+    // Bloqueo de scroll para inmersión del menú +
     useEffect(() => {
-        if (isFabOpen || isProfileMenuOpen) {
+        if (isFabOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'auto';
         }
         return () => { document.body.style.overflow = 'auto'; };
-    }, [isFabOpen, isProfileMenuOpen]);
+    }, [isFabOpen]);
 
     const notificationCount = (user?.friendRequests?.length || 0) +
         (user?.missionRequests?.length || 0) +
@@ -38,13 +36,18 @@ export default function Footer() {
         { name: 'Comida', path: '/food', icon: Utensils },
     ];
 
+    const navItemsRight = [
+        { name: 'Gym', path: '/gym', icon: Dumbbell },
+        { name: 'Inicio', path: '/home', icon: Home },
+        { name: 'Perfil', path: '/profile', icon: User },
+    ];
+
     return (
         <>
-            {/* --- OVERLAY GLOBAL OSCURO --- */}
-            {/* Se activa tanto si abres el FAB central como el menú de Perfil */}
+            {/* --- OVERLAY GLOBAL OSCURO PARA EL BOTÓN + --- */}
             <div
-                className={`fixed inset-0 z-40 bg-black/80 backdrop-blur-sm transition-all duration-400 ease-out ${isFabOpen || isProfileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-                onClick={() => { setIsFabOpen(false); setIsProfileMenuOpen(false); }}
+                className={`fixed inset-0 z-40 bg-black/80 backdrop-blur-sm transition-all duration-400 ease-out ${isFabOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                onClick={() => setIsFabOpen(false)}
             />
 
             {/* --- MENÚ RADIAL FLOTANTE (BOTÓN +) --- */}
@@ -76,7 +79,7 @@ export default function Footer() {
                 <div className="flex justify-between items-center px-4 h-full relative">
                     
                     {/* Items Izquierda (IG, Comida) */}
-                    <div className="flex w-[40%] justify-around">
+                    <div className="flex w-[35%] justify-around">
                         {navItemsLeft.map((item) => (
                             <NavLink key={item.name} to={item.path} className="group relative w-12 flex justify-center">
                                 {({ isActive }) => (
@@ -99,7 +102,7 @@ export default function Footer() {
                     {/* BOTÓN CENTRAL FLOTANTE (+) */}
                     <div className="absolute left-1/2 -translate-x-1/2 -top-6 flex justify-center w-[20%]">
                         <button
-                            onClick={() => { setIsFabOpen(!isFabOpen); setIsProfileMenuOpen(false); }}
+                            onClick={() => setIsFabOpen(!isFabOpen)}
                             className={`w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(234,179,8,0.4)] transition-all duration-300 z-50 border-4 border-black
                                 ${isFabOpen 
                                     ? 'bg-zinc-800 text-zinc-400 scale-90 rotate-45 border-zinc-900 shadow-none' 
@@ -111,70 +114,20 @@ export default function Footer() {
                         </button>
                     </div>
 
-                    {/* Items Derecha (Gym, Perfil/Home) */}
-                    <div className="flex w-[40%] justify-around relative">
-                        {/* Gym */}
-                        <NavLink to="/gym" className="group relative w-12 flex justify-center">
-                            {({ isActive }) => (
-                                <div className={`flex flex-col items-center justify-center transition-all duration-300 ${isActive ? 'text-yellow-400 scale-110 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                                    <Dumbbell size={22} strokeWidth={isActive ? 2.5 : 2} />
-                                    <span className={`text-[9px] mt-1 font-bold tracking-wide transition-colors uppercase ${isActive ? 'text-yellow-500' : 'text-zinc-600'}`}>
-                                        Gym
-                                    </span>
-                                </div>
-                            )}
-                        </NavLink>
-
-                        {/* BOTÓN PERFIL / HOME (EL ÚNICO BOTÓN A LA DERECHA) */}
-                        <div className="relative flex justify-center w-12 group">
-                            <button 
-                                onClick={() => { setIsProfileMenuOpen(!isProfileMenuOpen); setIsFabOpen(false); }}
-                                className="flex flex-col items-center justify-center transition-all duration-300 outline-none"
-                            >
-                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 overflow-hidden flex items-center justify-center transition-all duration-300
-                                    ${isProfileMenuOpen || location.pathname === '/home' || location.pathname === '/profile' 
-                                        ? 'border-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.6)] scale-110' 
-                                        : 'border-zinc-600 hover:border-zinc-400'
-                                    }`}
-                                >
-                                    {user?.avatar ? (
-                                        <img src={user.avatar} className="w-full h-full object-cover" alt="Perfil" />
-                                    ) : (
-                                        <User size={16} className="text-zinc-400" />
-                                    )}
-                                </div>
-                                <span className={`text-[9px] mt-1 font-bold tracking-wide uppercase transition-colors 
-                                    ${isProfileMenuOpen || location.pathname === '/home' || location.pathname === '/profile' 
-                                        ? 'text-yellow-500' 
-                                        : 'text-zinc-600'
-                                    }`}
-                                >
-                                    Tú
-                                </span>
-                            </button>
-
-                            {/* PANEL FLOTANTE HOME/PERFIL */}
-                            {isProfileMenuOpen && (
-                                <div className="absolute bottom-[140%] right-0 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-[28px] p-3 flex flex-col gap-3 shadow-[0_0_40px_rgba(0,0,0,0.9)] z-50 min-w-[200px] origin-bottom-right animate-in zoom-in-95 duration-300">
-                                    
-                                    {/* 1. HOME (ACCIÓN PRINCIPAL Y DESTACADA) */}
-                                    <NavLink 
-                                        to="/home" 
-                                        className={({isActive}) => `flex items-center gap-3 p-4 rounded-[20px] font-black text-base uppercase tracking-widest transition-all shadow-lg active:scale-95 ${isActive ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-black shadow-yellow-500/20' : 'bg-zinc-800 text-white hover:bg-zinc-700 hover:text-yellow-400'}`}
-                                    >
-                                        <Home size={24} /> INICIO
-                                    </NavLink>
-
-                                    {/* 2. PERFIL (ACCIÓN SECUNDARIA Y SUTIL) */}
-                                    <NavLink 
-                                        to="/profile" 
-                                        className={({isActive}) => `flex items-center justify-center gap-2 p-3 rounded-[16px] font-bold text-xs uppercase tracking-wide transition-all active:scale-95 ${isActive ? 'bg-white/10 text-white border border-white/20' : 'bg-transparent text-zinc-500 hover:bg-white/5 hover:text-zinc-300'}`}
-                                    >
-                                        <User size={16} /> Ajustes de Cuenta
-                                    </NavLink>
-                                </div>
-                            )}
-                        </div>
+                    {/* Items Derecha (Gym, Inicio, Perfil) */}
+                    <div className="flex w-[45%] justify-around">
+                        {navItemsRight.map((item) => (
+                            <NavLink key={item.name} to={item.path} className="group relative w-12 flex justify-center">
+                                {({ isActive }) => (
+                                    <div className={`flex flex-col items-center justify-center transition-all duration-300 ${isActive ? 'text-yellow-400 scale-110 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                        <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                                        <span className={`text-[9px] mt-1 font-bold tracking-wide transition-colors uppercase ${isActive ? 'text-yellow-500' : 'text-zinc-600'}`}>
+                                            {item.name}
+                                        </span>
+                                    </div>
+                                )}
+                            </NavLink>
+                        ))}
                     </div>
 
                 </div>

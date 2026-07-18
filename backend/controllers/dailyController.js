@@ -10,10 +10,12 @@ const ensureDailyLog = async (userId, dateString, userStreak) => {
     const dayOfWeek = dateObj.getDay();
 
     const missionQuery = {
-        $or: [{ user: userId }, { participants: userId }],
-        frequency: 'daily',
-        $or: [{ specificDays: { $size: 0 } }, { specificDays: dayOfWeek }],
-        $or: [{ isCoop: false }, { isCoop: true, invitationStatus: 'active' }]
+        $and: [
+            { $or: [{ user: userId }, { participants: userId }] },
+            { frequency: 'daily' },
+            { $or: [{ specificDays: { $size: 0 } }, { specificDays: dayOfWeek }] },
+            { $or: [{ isCoop: false }, { isCoop: true, invitationStatus: 'active' }] }
+        ]
     };
 
     const [activeCount, lastLog, nutritionLog] = await Promise.all([
@@ -95,7 +97,7 @@ const updateDailyLog = asyncHandler(async (req, res) => {
         case 'training': log.gymWorkouts = value; break;
         case 'missions': log.missionStats = value; break;
         case 'gains': log.gains = value; break;
-        default: if (log[type] !== undefined) log[type] = value; break;
+        default: res.status(400); throw new Error('Campo no editable'); // 🔥 solo se permiten los campos listados arriba
     }
     await log.save();
     const logObj = log.toObject();

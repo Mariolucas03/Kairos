@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
     Users, Shield, Search, UserPlus, Swords, Crown, Loader2, Mail, Check, X, Bell, Zap, Trash2, LogOut,
     ChevronDown, ChevronUp, AlertTriangle, Dumbbell, Gift, Lock, Trophy, Medal, Flame, Target,
-    Coins, Construction, Eye, DoorOpen, Edit, Globe, Calendar
+    Coins, Construction, Eye, DoorOpen, Edit, Globe, Calendar, Timer, Footprints, MapPin
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';

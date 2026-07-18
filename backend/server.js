@@ -5,6 +5,7 @@ const connectDB = require('./config/db');
 const { initScheduledJobs } = require('./utils/scheduler');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const mongoSanitize = require('express-mongo-sanitize');
+const rateLimit = require('express-rate-limit');
 
 // --- 1. IMPORTACIÓN DE RUTAS ---
 const authRoutes = require('./routes/auth');
@@ -26,10 +27,26 @@ connectDB();
 
 const app = express();
 
-// --- CONFIGURACIÓN CORS (MODIFICADO) ---
-// Usamos la opción "Permisiva Explícita" para evitar errores en el primer despliegue
+// --- CONFIGURACIÓN CORS ---
+// Lista blanca configurable vía env (ALLOWED_ORIGINS="https://tuapp.vercel.app,https://otro.dominio.com").
+// Las apps móviles / cron-job.org / curl no mandan header "Origin", así que siempre se permiten.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
+if (allowedOrigins.length === 0 && process.env.NODE_ENV === 'production') {
+    console.warn('⚠️  ALLOWED_ORIGINS no está configurado: se rechazarán las peticiones del navegador con Origin. Configúralo con el dominio real del frontend.');
+}
+
 app.use(cors({
-    origin: '*', // Permite tráfico desde Vercel, Móvil y Cron-Job.org
+    origin: (origin, callback) => {
+        // Sin header Origin (apps móviles, cron-job.org, curl, server-to-server) -> permitir
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') return callback(null, true); // conveniencia en desarrollo local
+        return callback(new Error('No permitido por CORS'));
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     // ¡CRÍTICO! Añadimos 'x-cron-secret' para que el Cron Job externo pueda autenticarse
     allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret']
@@ -39,6 +56,15 @@ app.use(express.json());
 
 // Seguridad: Prevenir inyección NoSQL
 app.use(mongoSanitize());
+
+// Seguridad: Límite de peticiones global (protege login, apuestas, etc. de fuerza bruta/spam)
+app.use(rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Demasiadas peticiones, inténtalo de nuevo más tarde.' }
+}));
 
 // --- 2. DEFINICIÓN DE ENDPOINTS ---
 app.use('/api/auth', authRoutes);
