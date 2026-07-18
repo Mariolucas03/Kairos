@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); // 🔥 IMPORTACIÓN NATIVA DE NODE PARA SEGURIDAD
 
 // --- UTILIDADES GLOBALES ---
 const chargeAndValidate = async (userId, amount) => {
@@ -106,7 +107,6 @@ const playScratch = asyncHandler(async (req, res) => {
 
     items = items.sort(() => Math.random() - 0.5);
 
-    // Calcular premio final de la matriz asegurada
     const finalCounts = {};
     items.forEach(i => finalCounts[i.id] = (finalCounts[i.id] || 0) + 1);
     const winSymObj = Object.values(SCRATCH_SYMBOLS).find(s => finalCounts[s.id] >= 3 && s.type !== 'none');
@@ -221,7 +221,6 @@ const playFortuneWheel = asyncHandler(async (req, res) => {
     if (cost === undefined) { res.status(400); throw new Error('Tipo inválido'); }
     await chargeAndValidate(req.user._id, cost);
 
-    // Lógica básica de premios (mismos que en el frontend)
     const PRIZES = {
         daily: [{ v: 10, t: 'c' }, { v: 50, t: 'c' }, { v: 5, t: 'c' }, { v: 25, t: 'c' }, { v: 100, t: 'c' }, { v: 5, t: 'c' }],
         hardcore: [{ v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 1000, t: 'c' }, { v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 200, t: 'c' }],
@@ -241,7 +240,7 @@ const playFortuneWheel = asyncHandler(async (req, res) => {
 });
 
 // ==========================================
-// 6. BLACKJACK (STATELESS / JWT)
+// 6. BLACKJACK (STATELESS / JWT) CON ANTI-CHEAT 🔥
 // ==========================================
 const SUITS = ['♠', '♥', '♣', '♦'];
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -273,8 +272,15 @@ const playBlackjack = asyncHandler(async (req, res) => {
         await chargeAndValidate(req.user._id, bet);
 
         const deck = createDeck();
+        const gameId = crypto.randomBytes(16).toString('hex'); // 🔥 CANDADO ÚNICO
+
+        // Guardamos el candado en el usuario
+        await User.findByIdAndUpdate(req.user._id, { activeGameToken: gameId });
+
         state = {
-            deck, pHands: [{ cards: [deck.pop(), deck.pop()], bet, isDone: false, isDoubled: false }],
+            gameId, // Incluimos el candado en el estado que se va a firmar
+            deck, 
+            pHands: [{ cards: [deck.pop(), deck.pop()], bet, isDone: false, isDoubled: false }],
             dHand: [deck.pop(), deck.pop()], activeHand: 0, status: 'playing'
         };
 
@@ -286,6 +292,13 @@ const playBlackjack = asyncHandler(async (req, res) => {
     } else {
         if (!token) { res.status(400); throw new Error('Sesión no encontrada'); }
         state = jwt.verify(token, process.env.JWT_SECRET);
+
+        // 🔥 VALIDACIÓN ANTI-TRAMPAS (REPLAY ATTACK)
+        const currentUser = await User.findById(req.user._id).select('activeGameToken');
+        if (!currentUser.activeGameToken || currentUser.activeGameToken !== state.gameId) {
+            res.status(400); 
+            throw new Error('Partida expirada o intento de trampa detectado. Empieza de nuevo.');
+        }
 
         let hand = state.pHands[state.activeHand];
 
@@ -332,7 +345,20 @@ const playBlackjack = asyncHandler(async (req, res) => {
             }
         });
 
-        if (totalPayout > 0) finalUser = await payPrize(req.user._id, totalPayout);
+        // 🔥 PAGAR Y ROMPER EL CANDADO EN UNA SOLA CONSULTA
+        if (totalPayout > 0) {
+            finalUser = await User.findByIdAndUpdate(
+                req.user._id, 
+                { $inc: { gameCoins: totalPayout }, $set: { activeGameToken: null } }, 
+                { new: true }
+            );
+        } else {
+            finalUser = await User.findByIdAndUpdate(
+                req.user._id, 
+                { $set: { activeGameToken: null } }, 
+                { new: true }
+            );
+        }
     }
 
     const newStateToken = state.status === 'ended' ? null : jwt.sign(state, process.env.JWT_SECRET);
