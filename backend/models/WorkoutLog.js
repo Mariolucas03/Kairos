@@ -39,7 +39,15 @@ const workoutLogSchema = mongoose.Schema({
     date: {
         type: Date,
         default: Date.now
-    }
+    },
+
+    // --- 🔥 FEED SOCIAL (Likes y Comentarios) ---
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    comments: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        text: { type: String, maxlength: 300 },
+        createdAt: { type: Date, default: Date.now }
+    }]
 }, {
     timestamps: true
 });

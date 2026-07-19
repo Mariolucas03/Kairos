@@ -3,11 +3,14 @@ import { createPortal } from 'react-dom';
 import {
     Users, Shield, Search, UserPlus, Swords, Crown, Loader2, Mail, Check, X, Bell, Zap, Trash2, LogOut,
     ChevronDown, ChevronUp, AlertTriangle, Dumbbell, Gift, Lock, Trophy, Medal, Flame, Target,
-    Coins, Construction, Eye, DoorOpen, Edit, Globe, Calendar, Timer, Footprints, MapPin
+    Coins, Construction, Eye, DoorOpen, Edit, Globe, Calendar, Timer, Footprints, MapPin, Rss
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import { useSmoothMount } from '../hooks/useSmoothMount';
+import WorkoutPostCard from '../components/social/WorkoutPostCard';
+import FriendProfileModal from '../components/social/FriendProfileModal';
+import { getLevelStyle, cardBaseStyle } from '../utils/socialHelpers';
 
 // 🔥 IMPORTACIONES DE ALTO RENDIMIENTO
 import useSWR from 'swr';
@@ -45,23 +48,8 @@ const customAnimationsStyle = `
   }
 `;
 
-// --- HELPER: COLORES DE NIVEL ---
-const getLevelStyle = (level) => {
-    if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
-    if (level >= 90) return "bg-cyan-900/40 text-cyan-400 border-cyan-500/40 shadow-[0_0_8px_rgba(34,211,238,0.2)]";
-    if (level >= 80) return "bg-pink-900/40 text-pink-400 border-pink-500/40";
-    if (level >= 70) return "bg-purple-900/40 text-purple-400 border-purple-500/40";
-    if (level >= 60) return "bg-red-900/40 text-red-400 border-red-500/40";
-    if (level >= 50) return "bg-orange-900/40 text-orange-400 border-orange-500/40";
-    if (level >= 40) return "bg-yellow-900/40 text-yellow-400 border-yellow-500/40";
-    if (level >= 30) return "bg-emerald-900/40 text-emerald-400 border-emerald-500/40";
-    if (level >= 20) return "bg-blue-900/40 text-blue-400 border-blue-500/40";
-    if (level >= 10) return "bg-indigo-900/40 text-indigo-400 border-indigo-500/40";
-    return "bg-zinc-800 text-zinc-400 border-zinc-700";
-};
-
-// ESTILO BASE DE TARJETAS
-const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-3 rounded-[20px] border border-white/5 mb-2 relative group hover:border-white/10 transition-all shadow-sm";
+// Nota: getLevelStyle y cardBaseStyle viven en utils/socialHelpers.js (compartidos
+// con WorkoutPostCard / FriendProfileModal para evitar un import circular con esta página).
 
 // ==========================================
 // 1. COMPONENTES UI
@@ -102,7 +90,7 @@ const MonthlyRewardsBanner = () => (
     </div>
 );
 
-const RankingItem = ({ player, index, isMe }) => {
+const RankingItem = ({ player, index, isMe, isViewable, onViewProfile }) => {
     let rankIcon = <span className="font-bold text-sm text-zinc-500">#{index + 1}</span>;
     let rankStyles = "border-white/5 bg-zinc-950";
     let textStyle = "text-white";
@@ -122,11 +110,16 @@ const RankingItem = ({ player, index, isMe }) => {
     }
 
     const levelClass = getLevelStyle(player.level || 1);
+    const clickable = isViewable && !isMe;
 
     return (
         <div className={`flex items-center justify-between p-4 rounded-[24px] border mb-2 relative overflow-hidden group ${rankStyles} ${isMe ? 'ring-1 ring-white/20' : ''}`}>
             <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors"></div>
-            <div className="flex items-center gap-4 flex-1 min-w-0 relative z-10">
+            <button
+                onClick={() => clickable && onViewProfile(player._id)}
+                disabled={!clickable}
+                className={`flex items-center gap-4 flex-1 min-w-0 relative z-10 text-left ${clickable ? 'active:scale-[0.98] transition-transform' : 'cursor-default'}`}
+            >
                 <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">{rankIcon}</div>
                 <div className="relative flex-shrink-0">
                     <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
@@ -141,7 +134,7 @@ const RankingItem = ({ player, index, isMe }) => {
                     </span>
                     <span className="text-[10px] text-zinc-500 font-bold uppercase truncate tracking-wider">{player.title || 'Novato'}</span>
                 </div>
-            </div>
+            </button>
 
             <div className="flex flex-col items-end relative z-10 pl-2">
                 <div className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wide mb-1 ${levelClass}`}>
@@ -153,7 +146,7 @@ const RankingItem = ({ player, index, isMe }) => {
     );
 };
 
-function FriendCard({ friend, onRemoveRequest, onChallengeOrView }) {
+function FriendCard({ friend, onRemoveRequest, onChallengeOrView, onViewProfile }) {
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
@@ -180,7 +173,7 @@ function FriendCard({ friend, onRemoveRequest, onChallengeOrView }) {
                 onTouchMove={e => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
                 className={`${cardBaseStyle} h-full`}>
-                <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div onClick={() => onViewProfile?.(friend._id)} className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer active:opacity-70 transition-opacity">
                     <div className="relative flex-shrink-0">
                         <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
                             {friend.avatar ? <img src={friend.avatar} className="w-full h-full object-cover" alt="av" /> : friend.username.charAt(0)}
@@ -581,19 +574,21 @@ export default function Social() {
     const { data: myClan, mutate: mutateMyClan } = useSWR('/clans/me', fetcher);
     const { data: clansList, mutate: mutateClansList } = useSWR('/clans', fetcher);
     const { data: leaderboardData } = useSWR('/social/leaderboard', fetcher);
+    const { data: feedData, mutate: mutateFeed } = useSWR('/social/feed?page=1', fetcher);
 
     // Mapeo de datos seguros (Fallbacks por si la caché está vacía)
     const friends = friendsData?.friends || [];
     const requests = friendsData?.requests || [];
     const leaderboard = leaderboardData || [];
     const currentUserId = user?._id;
+    const friendIdSet = new Set(friends.map(f => f._id));
 
     // Obtenemos el rango desde tu propio perfil o desde el clan
     const myRank = myClan?.members?.find(m => m._id === currentUserId)?.clanRank || user?.clanRank || 'esclavo';
     const missionInvites = user?.missionRequests || [];
     const challengeRequests = user?.challengeRequests || [];
 
-    const [activeTab, setActiveTab] = useState('ranking');
+    const [activeTab, setActiveTab] = useState('feed');
     const [searchText, setSearchText] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -611,6 +606,36 @@ export default function Social() {
     const [toast, setToast] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
     const [viewingClanId, setViewingClanId] = useState(null);
+    const [viewingFriendId, setViewingFriendId] = useState(null);
+
+    // 🔥 FEED: página 1 viene de SWR, páginas siguientes se acumulan localmente
+    const [feedExtra, setFeedExtra] = useState([]);
+    const [feedPage, setFeedPage] = useState(1);
+    const [feedHasMore, setFeedHasMore] = useState(false);
+    const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
+
+    useEffect(() => {
+        if (feedData) setFeedHasMore(feedData.hasMore);
+    }, [feedData]);
+
+    const feedItems = [...(feedData?.items || []), ...feedExtra];
+
+    const loadMoreFeed = async () => {
+        if (loadingMoreFeed) return;
+        setLoadingMoreFeed(true);
+        try {
+            const nextPage = feedPage + 1;
+            const res = await api.get(`/social/feed?page=${nextPage}`);
+            setFeedExtra(prev => [...prev, ...res.data.items]);
+            setFeedHasMore(res.data.hasMore);
+            setFeedPage(nextPage);
+        } catch (e) { } finally {
+            setLoadingMoreFeed(false);
+        }
+    };
+
+    const openViewFriend = (fid) => { setViewingFriendId(fid); setIsUiHidden(true); };
+    const closeViewFriend = () => { setViewingFriendId(null); setIsUiHidden(false); };
 
     const refreshData = () => {
         mutateMyClan();
@@ -824,14 +849,39 @@ export default function Social() {
 
             <style>{customAnimationsStyle}</style>
 
-            <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 border-b border-white/5 mb-6"><div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-white/10 overflow-hidden"><div className={`absolute top-1 bottom-1 w-[calc(33.33%-2.6px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'friends' ? 'translate-x-[calc(100%+4px)]' : activeTab === 'clans' ? 'translate-x-[calc(200%+8px)]' : 'translate-x-0'}`} /><button onClick={() => setActiveTab('ranking')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'ranking' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Trophy size={14} /> RANKING</button><button onClick={() => setActiveTab('friends')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'friends' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><UserPlus size={14} /> AMIGOS</button><button onClick={() => setActiveTab('clans')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'clans' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Shield size={14} /> CLANES</button></div></div>
+            <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 border-b border-white/5 mb-6"><div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-white/10 overflow-hidden"><div className={`absolute top-1 bottom-1 w-[calc(25%-3px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'ranking' ? 'translate-x-[calc(100%+4px)]' : activeTab === 'friends' ? 'translate-x-[calc(200%+8px)]' : activeTab === 'clans' ? 'translate-x-[calc(300%+12px)]' : 'translate-x-0'}`} /><button onClick={() => setActiveTab('feed')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'feed' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Rss size={14} /> FEED</button><button onClick={() => setActiveTab('ranking')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'ranking' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Trophy size={14} /> RANKING</button><button onClick={() => setActiveTab('friends')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'friends' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><UserPlus size={14} /> AMIGOS</button><button onClick={() => setActiveTab('clans')} className={`flex-1 z-10 font-black text-[10px] sm:text-xs flex items-center justify-center gap-1.5 py-3 rounded-xl transition-colors ${activeTab === 'clans' ? 'text-black' : 'text-zinc-500 hover:text-white'}`}><Shield size={14} /> CLANES</button></div></div>
+
+            {activeTab === 'feed' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300 pb-20">
+                {friends.length === 0 ? (
+                    <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                        <Rss className="mx-auto mb-3 opacity-50" size={32} />
+                        <p className="text-xs mb-4">Añade amigos para ver aquí sus entrenos.</p>
+                        <button onClick={() => setActiveTab('friends')} className="bg-yellow-500 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-yellow-400 transition-colors">Buscar Amigos</button>
+                    </div>
+                ) : feedItems.length === 0 ? (
+                    <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                        <Dumbbell className="mx-auto mb-3 opacity-50" size={32} />
+                        <p className="text-xs">Tus amigos aún no han publicado entrenos.</p>
+                    </div>
+                ) : (
+                    <>
+                        {feedItems.map(post => <WorkoutPostCard key={post._id} post={post} onOpenProfile={openViewFriend} />)}
+                        {feedHasMore && (
+                            <button onClick={loadMoreFeed} disabled={loadingMoreFeed} className="w-full py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
+                                {loadingMoreFeed ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
+                                Cargar más
+                            </button>
+                        )}
+                    </>
+                )}
+            </div>)}
 
             {activeTab === 'ranking' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300">
                 <MonthlyRewardsBanner />
-                <div className="mb-4 px-1 flex justify-between items-center"><h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest">Top 10 Global</h3><span className="text-[10px] text-zinc-600 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">Histórico</span></div><div className="space-y-3 pb-20">{leaderboard.slice(0, 10).map((player, index) => <RankingItem key={player._id} player={player} index={index} isMe={player._id === currentUserId} />)}</div>
+                <div className="mb-4 px-1 flex justify-between items-center"><h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest">Top 10 Global</h3><span className="text-[10px] text-zinc-600 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">Histórico</span></div><div className="space-y-3 pb-20">{leaderboard.slice(0, 10).map((player, index) => <RankingItem key={player._id} player={player} index={index} isMe={player._id === currentUserId} isViewable={friendIdSet.has(player._id)} onViewProfile={openViewFriend} />)}</div>
             </div>)}
 
-            {activeTab === 'friends' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300 space-y-6"><div className="relative group"><Search className="absolute left-4 top-4 text-zinc-500 group-focus-within:text-yellow-500 transition-colors" size={20} /><input type="text" placeholder="Buscar jugadores..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 pl-12 text-white focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-600 font-bold text-sm" />{isSearching && <div className="absolute right-4 top-4"><Loader2 className="animate-spin text-yellow-500" size={20} /></div>}</div>{searchText.length > 0 && (<div className="space-y-3"><h3 className="text-xs font-bold text-yellow-500 uppercase ml-2">Resultados</h3>{searchResults.map(u => (<div key={u._id} className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl flex justify-between items-center"><div className="flex items-center gap-3 relative"><div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-zinc-500 border border-zinc-800 overflow-hidden relative z-10">{u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : u.username.charAt(0)}</div>{u.frame && <img src={u.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}<span className="text-white font-bold text-sm ml-2">{u.username}</span></div><button onClick={() => handleSendRequest(u._id)} className="bg-yellow-500 text-black px-3 py-1.5 rounded-lg text-xs font-black hover:bg-yellow-400">AGREGAR</button></div>))}</div>)}{searchText.length === 0 && (<div><div className="flex justify-between items-center mb-3 px-1"><h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Tus Amigos ({friends.length})</h3><span className="text-[10px] text-green-500 font-bold bg-green-900/20 px-2 py-0.5 rounded border border-green-900/30">{friends.filter(f => f.online).length} Online</span></div>{friends.length === 0 ? (<div className="text-center py-10 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl"><Users className="mx-auto mb-2 opacity-50" /><p className="text-xs">Aún no tienes aliados.</p></div>) : (friends.map(friend => (<FriendCard key={friend._id} friend={friend} onRemoveRequest={(f) => requestConfirm(`¿Eliminar a ${f.username}?`, () => handleRemoveFriend(f._id))} onChallengeOrView={handleSwipeRightFriend} />)))}</div>)}</div>)}
+            {activeTab === 'friends' && (<div className="animate-in slide-in-from-left-4 fade-in duration-300 space-y-6"><div className="relative group"><Search className="absolute left-4 top-4 text-zinc-500 group-focus-within:text-yellow-500 transition-colors" size={20} /><input type="text" placeholder="Buscar jugadores..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 pl-12 text-white focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-600 font-bold text-sm" />{isSearching && <div className="absolute right-4 top-4"><Loader2 className="animate-spin text-yellow-500" size={20} /></div>}</div>{searchText.length > 0 && (<div className="space-y-3"><h3 className="text-xs font-bold text-yellow-500 uppercase ml-2">Resultados</h3>{searchResults.map(u => (<div key={u._id} className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl flex justify-between items-center"><div className="flex items-center gap-3 relative"><div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-zinc-500 border border-zinc-800 overflow-hidden relative z-10">{u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : u.username.charAt(0)}</div>{u.frame && <img src={u.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}<span className="text-white font-bold text-sm ml-2">{u.username}</span></div><button onClick={() => handleSendRequest(u._id)} className="bg-yellow-500 text-black px-3 py-1.5 rounded-lg text-xs font-black hover:bg-yellow-400">AGREGAR</button></div>))}</div>)}{searchText.length === 0 && (<div><div className="flex justify-between items-center mb-3 px-1"><h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Tus Amigos ({friends.length})</h3><span className="text-[10px] text-green-500 font-bold bg-green-900/20 px-2 py-0.5 rounded border border-green-900/30">{friends.filter(f => f.online).length} Online</span></div>{friends.length === 0 ? (<div className="text-center py-10 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl"><Users className="mx-auto mb-2 opacity-50" /><p className="text-xs">Aún no tienes aliados.</p></div>) : (friends.map(friend => (<FriendCard key={friend._id} friend={friend} onRemoveRequest={(f) => requestConfirm(`¿Eliminar a ${f.username}?`, () => handleRemoveFriend(f._id))} onChallengeOrView={handleSwipeRightFriend} onViewProfile={openViewFriend} />)))}</div>)}</div>)}
 
             {activeTab === 'clans' && (
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300 space-y-8 pb-20">
@@ -1022,6 +1072,7 @@ export default function Social() {
             )}
 
             {viewingClanId && (<ClanPreviewModal clanId={viewingClanId} currentUserId={currentUserId} userClanId={myClan?._id} onClose={closeViewClan} onJoin={handleJoinClan} />)}
+            {viewingFriendId && (<FriendProfileModal userId={viewingFriendId} onClose={closeViewFriend} />)}
         </div>
     );
 }

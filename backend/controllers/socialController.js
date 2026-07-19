@@ -1,8 +1,183 @@
 const User = require('../models/User');
 const DailyLog = require('../models/DailyLog');
+const WorkoutLog = require('../models/WorkoutLog');
 
 // 🔥 Escapa caracteres especiales de regex para evitar ReDoS / patrones inesperados
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const FEED_PAGE_SIZE = 15;
+
+// Da forma a un WorkoutLog para el feed/perfil: cuenta likes/comments sin exponer
+// la lista completa de quién ha dado like (privacidad + payload más ligero)
+const shapeFeedItem = (log, viewerId) => {
+    const obj = log.toObject ? log.toObject() : log;
+    const likes = obj.likes || [];
+    return {
+        _id: obj._id,
+        user: obj.user,
+        routineName: obj.routineName,
+        type: obj.type,
+        duration: obj.duration,
+        intensity: obj.intensity,
+        distance: obj.distance,
+        caloriesBurned: obj.caloriesBurned,
+        exercises: obj.exercises,
+        date: obj.date,
+        likesCount: likes.length,
+        likedByMe: likes.some(id => id.toString() === viewerId.toString()),
+        comments: (obj.comments || []).map(c => ({
+            _id: c._id,
+            text: c.text,
+            createdAt: c.createdAt,
+            user: c.user
+        }))
+    };
+};
+
+// Verifica que el dueño del post sea amigo del que consulta, o el propio usuario
+const canAccessWorkout = async (viewerId, ownerId) => {
+    if (viewerId.toString() === ownerId.toString()) return true;
+    const viewer = await User.findById(viewerId).select('friends');
+    return viewer.friends.some(f => f.toString() === ownerId.toString());
+};
+
+// @desc    Feed de entrenos de tus amigos (estilo IG)
+// @route   GET /api/social/feed?page=1
+const getFeed = async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const friendIds = req.user.friends || [];
+
+        if (friendIds.length === 0) {
+            return res.json({ items: [], hasMore: false });
+        }
+
+        const logs = await WorkoutLog.find({ user: { $in: friendIds } })
+            .sort({ date: -1 })
+            .skip((page - 1) * FEED_PAGE_SIZE)
+            .limit(FEED_PAGE_SIZE + 1) // Pedimos uno de más para saber si hay más páginas
+            .populate('user', 'username avatar frame level title')
+            .populate('comments.user', 'username avatar')
+            .lean();
+
+        const hasMore = logs.length > FEED_PAGE_SIZE;
+        const pageItems = logs.slice(0, FEED_PAGE_SIZE);
+
+        res.json({
+            items: pageItems.map(log => shapeFeedItem(log, req.user._id)),
+            hasMore
+        });
+    } catch (error) {
+        console.error('Error en getFeed:', error);
+        res.status(500).json({ message: 'Error cargando el feed' });
+    }
+};
+
+// @desc    Dar/quitar like a un entreno
+// @route   POST /api/social/feed/:workoutId/like
+const toggleLike = async (req, res) => {
+    try {
+        const { workoutId } = req.params;
+        const userId = req.user._id;
+
+        const workout = await WorkoutLog.findById(workoutId).select('user likes');
+        if (!workout) return res.status(404).json({ message: 'Entreno no encontrado' });
+
+        const allowed = await canAccessWorkout(userId, workout.user);
+        if (!allowed) return res.status(403).json({ message: 'No tienes acceso a este entreno' });
+
+        const alreadyLiked = workout.likes.some(id => id.toString() === userId.toString());
+
+        const updated = await WorkoutLog.findByIdAndUpdate(
+            workoutId,
+            alreadyLiked ? { $pull: { likes: userId } } : { $addToSet: { likes: userId } },
+            { new: true }
+        ).select('likes');
+
+        res.json({ likesCount: updated.likes.length, likedByMe: !alreadyLiked });
+    } catch (error) {
+        console.error('Error en toggleLike:', error);
+        res.status(500).json({ message: 'Error al dar like' });
+    }
+};
+
+// @desc    Comentar un entreno
+// @route   POST /api/social/feed/:workoutId/comment
+const addComment = async (req, res) => {
+    try {
+        const { workoutId } = req.params;
+        const userId = req.user._id;
+        const text = (req.body.text || '').trim();
+
+        if (!text) return res.status(400).json({ message: 'El comentario no puede estar vacío' });
+        if (text.length > 300) return res.status(400).json({ message: 'Comentario demasiado largo (máx 300 caracteres)' });
+
+        const workout = await WorkoutLog.findById(workoutId).select('user');
+        if (!workout) return res.status(404).json({ message: 'Entreno no encontrado' });
+
+        const allowed = await canAccessWorkout(userId, workout.user);
+        if (!allowed) return res.status(403).json({ message: 'No tienes acceso a este entreno' });
+
+        const updated = await WorkoutLog.findByIdAndUpdate(
+            workoutId,
+            { $push: { comments: { user: userId, text } } },
+            { new: true }
+        ).select('comments');
+
+        const savedComment = updated.comments[updated.comments.length - 1];
+
+        res.status(201).json({
+            comment: {
+                _id: savedComment._id,
+                text: savedComment.text,
+                createdAt: savedComment.createdAt,
+                user: { _id: userId, username: req.user.username, avatar: req.user.avatar }
+            }
+        });
+    } catch (error) {
+        console.error('Error en addComment:', error);
+        res.status(500).json({ message: 'Error al comentar' });
+    }
+};
+
+// @desc    Perfil público de un amigo + su historial de entrenos
+// @route   GET /api/social/profile/:userId
+const getFriendProfile = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const viewerId = req.user._id;
+
+        const allowed = await canAccessWorkout(viewerId, userId);
+        if (!allowed) return res.status(403).json({ message: 'Solo puedes ver el perfil de tus amigos' });
+
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+
+        const [profile, logs] = await Promise.all([
+            User.findById(userId).select('username avatar frame level title currentXP nextLevelXP streak'),
+            WorkoutLog.find({ user: userId })
+                .sort({ date: -1 })
+                .skip((page - 1) * FEED_PAGE_SIZE)
+                .limit(FEED_PAGE_SIZE + 1)
+                .populate('user', 'username avatar frame level title')
+                .populate('comments.user', 'username avatar')
+                .lean()
+        ]);
+
+        if (!profile) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+        const hasMore = logs.length > FEED_PAGE_SIZE;
+        const pageItems = logs.slice(0, FEED_PAGE_SIZE);
+
+        res.json({
+            profile,
+            items: pageItems.map(log => shapeFeedItem(log, viewerId)),
+            hasMore
+        });
+    } catch (error) {
+        console.error('Error en getFriendProfile:', error);
+        res.status(500).json({ message: 'Error cargando el perfil' });
+    }
+};
 
 // @desc    Buscar usuarios por nombre o email
 const searchUsers = async (req, res) => {
@@ -209,5 +384,6 @@ const getLeaderboard = async (req, res) => {
 };
 
 module.exports = {
-    searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard
+    searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
+    getFeed, toggleLike, addComment, getFriendProfile
 };
