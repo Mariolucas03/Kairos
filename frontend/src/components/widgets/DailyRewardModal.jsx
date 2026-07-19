@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
-import { X, Lock, Zap } from 'lucide-react';
+import { X, Lock, Zap, Heart } from 'lucide-react';
 import { getRewardForDay } from '../../utils/rewardsGenerator';
 
 export default function DailyRewardModal({ data, onClose }) {
@@ -109,6 +109,14 @@ export default function DailyRewardModal({ data, onClose }) {
                         <div className={`flex items-center gap-0.5 text-[10px] font-bold ${isToday ? 'text-blue-200' : 'opacity-70'}`}>
                             <span>+{reward.xp} XP</span>
                             <Zap size={8} fill="currentColor" />
+                        </div>
+                    )}
+
+                    {/* 4. VIDA (SOLO EN DÍAS QUE LA OTORGAN) */}
+                    {reward.hp > 0 && (
+                        <div className={`flex items-center gap-0.5 text-[10px] font-bold ${isToday ? 'text-red-200' : 'opacity-70'}`}>
+                            <span>+{reward.hp} HP</span>
+                            <Heart size={8} fill="currentColor" />
                         </div>
                     )}
                 </div>

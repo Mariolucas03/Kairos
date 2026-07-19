@@ -3,6 +3,7 @@ const User = require('../models/User');
 const levelService = require('../services/levelService');
 // Importamos la función manual del scheduler
 const { runNightlyMaintenance } = require('../utils/scheduler');
+const { getRewardForDay } = require('../utils/dailyRewards');
 
 // ==========================================
 // 1. OBTENER PERFIL (getMe)
@@ -101,12 +102,15 @@ const claimDailyReward = asyncHandler(async (req, res) => {
         }
     }
 
-    const rewardCoins = 0;
-    const rewardXP = 20;
-    const rewardGameCoins = 50;
+    // 🔥 Recompensa calculada en el servidor según el día del ciclo (nunca confiar en el cliente)
+    const { coins: rewardCoins, gameCoins: rewardGameCoins, xp: rewardXP, hp: rewardHp } = getRewardForDay(currentDay);
 
     user.dailyRewards.claimedDays.push(currentDay);
     user.dailyRewards.lastClaimDate = now;
+    if (rewardHp > 0) {
+        user.hp = Math.min(user.maxHp, (user.hp ?? 0) + rewardHp);
+        user.lives = user.hp;
+    }
     await user.save();
 
     const result = await levelService.addRewards(
@@ -120,7 +124,7 @@ const claimDailyReward = asyncHandler(async (req, res) => {
         success: true,
         message: `¡Has reclamado el Día ${currentDay}!`,
         user: result.user,
-        reward: { xp: rewardXP, coins: rewardCoins, gameCoins: rewardGameCoins, day: currentDay }
+        reward: { xp: rewardXP, coins: rewardCoins, gameCoins: rewardGameCoins, hp: rewardHp, day: currentDay }
     });
 });
 
@@ -190,8 +194,8 @@ const updateStatsManual = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (hp !== undefined) {
-        user.hp = hp;
-        user.lives = hp;
+        user.hp = Math.max(0, Math.min(user.maxHp, Number(hp) || 0));
+        user.lives = user.hp;
     }
     if (xp !== undefined) user.currentXP = xp;
     if (coins !== undefined) user.coins = coins;

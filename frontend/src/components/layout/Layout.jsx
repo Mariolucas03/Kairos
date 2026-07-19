@@ -26,6 +26,10 @@ function LayoutContent() {
     const logout = useAuthStore(state => state.logout);
 
     // Sincronización con Backend
+    // 🔥 Solo al montar el shell autenticado (login / recarga de página), NO en cada
+    // cambio de sección. `navigate` de react-router cambia de identidad en cada
+    // navegación, así que ponerlo en deps aquí causaba refetch de /daily y /users
+    // (y por tanto una espera perceptible) cada vez que se cambiaba de pestaña.
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -50,7 +54,8 @@ function LayoutContent() {
             }
         };
         if (localStorage.getItem('token')) fetchUserData();
-    }, [navigate]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // MANEJADOR DE FIN DE RUTINA GLOBAL
     const handleWorkoutFinish = (data) => {

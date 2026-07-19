@@ -5,6 +5,8 @@ import { getRewardForDay } from '../utils/rewardsGenerator';
 export function useDailyRewards(user, setUser) {
     const [showRewardModal, setShowRewardModal] = useState(false);
     const [rewardData, setRewardData] = useState(null);
+    const [claiming, setClaiming] = useState(false);
+    const [toast, setToast] = useState(null);
 
     // Helpers de fecha
     const getTodayString = () => new Date().toISOString().split('T')[0];
@@ -48,6 +50,8 @@ export function useDailyRewards(user, setUser) {
 
     // 2. Acción: Reclamar
     const claimReward = async () => {
+        if (claiming) return; // Evita doble-clic / doble submit
+        setClaiming(true);
         try {
             const res = await api.post('/users/claim-daily');
             const updatedUser = { ...user, ...res.data.user };
@@ -60,7 +64,20 @@ export function useDailyRewards(user, setUser) {
             setShowRewardModal(false);
         } catch (error) {
             console.error("Error reclamando recompensa:", error);
-            setShowRewardModal(false);
+            const backendMessage = error.response?.data?.message;
+
+            if (error.response?.status === 400 && backendMessage) {
+                // Caso legítimo (ej. ya reclamada hoy): no hay nada que reintentar
+                sessionStorage.setItem(`reward_seen_${getTodayString()}`, 'true');
+                setShowRewardModal(false);
+                setToast({ message: backendMessage, type: 'info' });
+            } else {
+                // Error transitorio (red caída, servidor despertando, etc.)
+                // Dejamos el modal abierto para que pueda reintentar sin perder el premio.
+                setToast({ message: 'No se pudo reclamar la recompensa. Comprueba tu conexión e inténtalo de nuevo.', type: 'error' });
+            }
+        } finally {
+            setClaiming(false);
         }
     };
 
@@ -85,6 +102,9 @@ export function useDailyRewards(user, setUser) {
         closeModal: () => setShowRewardModal(false),
         claimReward,
         openCalendar,
-        hasClaimedToday
+        hasClaimedToday,
+        claiming,
+        toast,
+        clearToast: () => setToast(null)
     };
 }
