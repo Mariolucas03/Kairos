@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+import LoadingScreen from '../components/common/LoadingScreen';
 import { useAuthStore } from '../store/useAuthStore';
 import WorkoutPostCard from '../components/social/WorkoutPostCard';
 import InboxModal from '../components/social/InboxModal';
@@ -205,7 +206,7 @@ export default function Social() {
 
             {/* --- FEED --- */}
             {isFirstLoad ? (
-                <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando feed...</div>
+                <LoadingScreen message="Cargando feed..." full={false} />
             ) : friends.length === 0 ? (
                 <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Users className="mx-auto mb-3 opacity-50" size={32} />

@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
 import {
-    Plus, X, ArrowLeft, ArrowRightLeft,
+    Plus, X, ArrowRightLeft,
     Ticket, Heart, User, ScanFace, Palette, Package, PawPrint, Crown,
     ShoppingBag, Backpack, Save, Loader2
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import ChestModal from '../components/common/ChestModal';
+import BackButton from '../components/common/BackButton';
 
 const CATEGORIES = [
     { id: 'reward', label: 'PREMIOS', icon: <Ticket size={24} /> },
@@ -61,13 +62,9 @@ export default function Shop() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [selectedCategory, activeTab]);
 
-    // Auto-cierre del toast
-    useEffect(() => {
-        if (toast) {
-            const t = setTimeout(() => setToast(null), 2000);
-            return () => clearTimeout(t);
-        }
-    }, [toast]);
+    // El auto-cierre lo gestiona el propio componente Toast (3 s).
+    // Aquí había un segundo temporizador de 2 s que competía con él y hacía que
+    // el aviso desapareciera antes de tiempo.
 
     const fetchShop = async () => {
         setLoading(true);
@@ -230,7 +227,7 @@ export default function Shop() {
                     <div className="animate-in fade-in slide-in-from-right-8 pb-20">
                         {/* Header Categoría */}
                         <div className="flex items-center gap-4 mb-6">
-                            <button onClick={() => setSelectedCategory(null)} className="bg-zinc-900 p-3 rounded-full hover:text-white active:scale-90 transition-transform text-zinc-400 border border-zinc-800"><ArrowLeft size={20} /></button>
+                            <BackButton onClick={() => setSelectedCategory(null)} />
                             <h2 className="text-xl font-black uppercase tracking-tighter italic text-white">{CATEGORIES.find(c => c.id === selectedCategory)?.label}</h2>
                         </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Info, X, Trophy, Frown } from 'lucide-react';
+import { Info, X, Trophy, Frown } from 'lucide-react';
+import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
@@ -55,7 +56,7 @@ export default function Dice() {
     return (
         <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-40 pb-4 overflow-hidden select-none font-sans">
             {showRain && <ChipRain isFading={false} />}
-            <div className="absolute top-12 left-4 right-4 flex justify-between z-50"><button onClick={() => navigate('/games')} className="bg-zinc-900/80 p-2 rounded-xl text-zinc-400"><ChevronLeft /></button><div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-blue-500/50"><span className="text-blue-400 font-black text-xl">{visualBalance}</span><img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" /></div><div></div></div>
+            <div className="absolute top-12 left-4 right-4 flex justify-between z-50"><BackButton to="/games" /><div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-blue-500/50"><span className="text-blue-400 font-black text-xl">{visualBalance}</span><img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" /></div><div></div></div>
             <div className="absolute top-28 w-full text-center z-10"><h1 className="text-4xl font-black italic text-cyan-400">NEON DICE</h1></div>
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-8 z-10">
                 <div className="relative w-full flex justify-center gap-6"><DigitalDie value={dices[0]} rolling={rolling} /><DigitalDie value={dices[1]} rolling={rolling} /></div>

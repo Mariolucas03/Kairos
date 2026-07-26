@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ChevronLeft, ChevronRight, Lock, MapPin, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, MapPin, LogOut } from 'lucide-react';
 import api from '../services/api';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
@@ -20,6 +20,7 @@ import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
 
 import RPGBody from '../components/profile/RPGBody';
 import ProfileStats from '../components/profile/ProfileStats';
+import { getMadridDateString } from '../utils/dateHelpers';
 
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
@@ -30,7 +31,9 @@ export default function Profile() {
     const setUser = useAuthStore(state => state.setUser);
     const navigate = useNavigate();
 
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    // 🔥 Fecha en hora de Madrid, no UTC: con toISOString() el calendario abría en
+    // el día anterior entre las 00:00 y las 02:00 y no encontraba el registro de hoy.
+    const [selectedDate, setSelectedDate] = useState(getMadridDateString());
     const [calendarViewDate, setCalendarViewDate] = useState(new Date());
     const [dailyData, setDailyData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -123,7 +126,7 @@ export default function Profile() {
         for (let i = 1; i <= daysInMonth; i++) {
             const dStr = `${calendarViewDate.getFullYear()}-${String(calendarViewDate.getMonth() + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
             const isSelected = selectedDate === dStr;
-            const isToday = new Date().toISOString().split('T')[0] === dStr;
+            const isToday = getMadridDateString() === dStr;
             const isFuture = new Date(dStr) > new Date();
 
             days.push(
@@ -151,7 +154,7 @@ export default function Profile() {
         );
     };
 
-    if (loading && !dailyData && !user) return <div className="min-h-screen bg-black flex items-center justify-center"><Activity className="animate-spin text-zinc-500" /></div>;
+    if (loading && !dailyData && !user) return <LoadingScreen message="Cargando perfil..." />;
 
     return (
         <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none bg-black">

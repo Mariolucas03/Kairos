@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Gift, Flame, Diamond, Lock, X, Info, AlertTriangle, Zap } from 'lucide-react';
+import { Gift, Flame, Diamond, Lock, X, Info, AlertTriangle, Zap } from 'lucide-react';
+import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
+import { getMadridDateString } from '../../utils/dateHelpers';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -177,7 +179,8 @@ export default function FortuneWheel() {
 
     const [selectedMode, setSelectedMode] = useState(null);
     const [lastSpinDate, setLastSpinDate] = useState(() => localStorage.getItem('last_wheel_spin_date'));
-    const getTodayStr = () => new Date().toISOString().split('T')[0];
+    // Hora de Madrid (no UTC): así el giro diario se renueva a medianoche real
+    const getTodayStr = () => getMadridDateString();
     const hasSpunToday = lastSpinDate === getTodayStr();
 
     useEffect(() => { if (selectedMode) setIsUiHidden(true); else setIsUiHidden(false); return () => setIsUiHidden(false); }, [selectedMode, setIsUiHidden]);
@@ -187,7 +190,7 @@ export default function FortuneWheel() {
     return (
         <div className={`flex flex-col h-full animate-in fade-in select-none px-4 pb-20 ${selectedMode ? 'pt-24' : 'pt-4'}`}>
             <div className="flex items-center mb-6">
-                <button onClick={() => selectedMode ? setSelectedMode(null) : navigate(-1)} className="bg-zinc-900 p-3 rounded-2xl border border-zinc-800 text-zinc-400 hover:text-white transition-all active:scale-95"><ChevronLeft size={24} /></button>
+                <BackButton onClick={() => selectedMode ? setSelectedMode(null) : navigate('/games')} />
                 <h1 className="ml-4 text-xl font-black italic uppercase text-white tracking-tight">{selectedMode ? WHEEL_CONFIG[selectedMode].title : 'Ruleta de la Fortuna'}</h1>
             </div>
 

@@ -12,6 +12,8 @@ import {
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import LoadingScreen from '../components/common/LoadingScreen';
 
 const fetcher = url => api.get(url).then(res => res.data);
 
@@ -26,6 +28,9 @@ export default function Food() {
 
     // --- ESTADOS DE DATOS ---
     const [toast, setToast] = useState(null);
+    // Confirmación de borrado con el modal de la app (antes era un window.confirm
+    // nativo, que rompía la estética y no se puede tocar fuera para cancelar)
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     // --- ESTADOS DE MODALES ---
     const [activeMealId, setActiveMealId] = useState(null);
@@ -67,8 +72,6 @@ export default function Food() {
 
     // 🔥 OPTIMISTIC UI: BORRAR
     const handleRemoveFood = async (mealId, foodItemId) => {
-        if (!window.confirm("¿Borrar alimento?")) return;
-
         // Actualizamos la UI AL INSTANTE en SWR
         mutateLog(prev => {
             if (!prev) return prev;
@@ -192,11 +195,7 @@ export default function Food() {
         setShowSearch(true);
     };
 
-    if (!isSmoothMounted || (!log && isLoading)) return (
-        <div className="min-h-screen bg-black flex items-center justify-center">
-            <div className="text-center text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando nutrición...</div>
-        </div>
-    );
+    if (!isSmoothMounted || (!log && isLoading)) return <LoadingScreen message="Cargando nutrición..." />;
 
     // --- CÁLCULOS VISUALES PARA LA TARJETA VERDE ---
     const currentKcal = log?.totalCalories || 0;
@@ -218,6 +217,18 @@ export default function Food() {
     return (
         <div className="animate-in fade-in space-y-6 pb-24 bg-black min-h-screen">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+            {confirmDelete && (
+                <ConfirmDialog
+                    message={`¿Quitar "${confirmDelete.name}" de esta comida?`}
+                    confirmLabel="Borrar"
+                    onCancel={() => setConfirmDelete(null)}
+                    onConfirm={() => {
+                        handleRemoveFood(confirmDelete.mealId, confirmDelete.foodItemId);
+                        setConfirmDelete(null);
+                    }}
+                />
+            )}
 
             {/* HEADER */}
             <div className="flex justify-between items-center px-4 pt-4">
@@ -331,7 +342,7 @@ export default function Food() {
                                                     {Math.round(item.calories)} <span className="text-[9px] text-zinc-500 font-bold">KCAL</span>
                                                 </span>
                                                 <button
-                                                    onClick={() => handleRemoveFood(meal._id, item._id)}
+                                                    onClick={() => setConfirmDelete({ mealId: meal._id, foodItemId: item._id, name: item.name })}
                                                     className="p-2 bg-red-900/10 text-red-500 rounded-lg hover:bg-red-900/30 transition-colors"
                                                 >
                                                     <Trash2 size={14} />

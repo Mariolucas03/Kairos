@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Spade, Club, Heart, Diamond, Info, X, Trophy, Frown, Handshake } from 'lucide-react';
+import { Spade, Club, Heart, Diamond, Info, X, Trophy, Frown, Handshake } from 'lucide-react';
+import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
@@ -118,7 +119,7 @@ export default function BlackJack() {
 
             {/* HEADER FLOTANTE */}
             <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
-                <button onClick={() => navigate('/games')} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><ChevronLeft /></button>
+                <BackButton to="/games" />
                 <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-green-500/50 backdrop-blur-md shadow-2xl">
                     <span className="text-green-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />

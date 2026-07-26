@@ -11,6 +11,7 @@ import {
 
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+import LoadingScreen from '../components/common/LoadingScreen';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
 import { useWorkout } from '../context/WorkoutContext';
 import { useSmoothMount } from '../hooks/useSmoothMount';
@@ -256,7 +257,7 @@ export default function Gym() {
     const handleDeleteSport = () => showToast("Usa la web para borrar", "info");
 
     // 🔥 PANTALLA DE CARGA CON LA PROTECCIÓN DEL BOTÓN (SMOOTH MOUNT)
-    if (!isSmoothMounted || isFirstLoad) return <div className="text-center py-40 text-zinc-500 animate-pulse uppercase text-xs font-bold bg-black min-h-screen">Preparando zona de entreno...</div>;
+    if (!isSmoothMounted || isFirstLoad) return <LoadingScreen message="Preparando zona de entreno..." />;
 
     return (
         <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen">

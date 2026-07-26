@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import LoadingScreen from '../components/common/LoadingScreen';
 
 const fetcher = url => api.get(url).then(res => res.data);
 
@@ -110,7 +112,7 @@ const getGradientStyles = (diff, completed) => {
     }
 };
 
-function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdit, viewAllMode }) {
+function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId, onEdit, viewAllMode }) {
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [inputValue, setInputValue] = useState('');
@@ -149,9 +151,8 @@ function MissionCard({ mission, onUpdateProgress, onDelete, currentUserId, onEdi
             }
         } else if (dragX < -THRESHOLD) {
             if (!mission.completed || viewAllMode) {
-                if (window.confirm(mission.isCoop ? "⚠️ ¿Eliminar misión cooperativa?" : "¿Borrar misión permanentemente?")) {
-                    onDelete(mission._id);
-                }
+                // Confirmación con el modal de la app en vez del window.confirm nativo
+                onRequestDelete(mission);
             }
         }
         setDragX(0);
@@ -301,6 +302,7 @@ export default function Missions() {
     const [activeTab, setActiveTab] = useState('daily');
     const [showCreator, setShowCreator] = useState(false);
     const [toast, setToast] = useState(null);
+    const [missionToDelete, setMissionToDelete] = useState(null);
     const [viewAllMode, setViewAllMode] = useState(false);
 
     const [showEditModal, setShowEditModal] = useState(false);
@@ -386,6 +388,7 @@ export default function Missions() {
         }
     };
 
+    // Misión pendiente de confirmar borrado (se muestra con ConfirmDialog)
     const handleDelete = async (id) => {
         mutateMissions(prev => prev.filter(m => m._id !== id), false);
         try { await api.delete(`/missions/${id}`); showToast("Eliminada", "info"); mutateMissions(); } catch (e) { mutateMissions(); }
@@ -410,11 +413,22 @@ export default function Missions() {
     };
 
     // 🔥 PANTALLA DE CARGA REESCRITA
-    if (!isSmoothMounted || (!missionsData && isLoading)) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" size={32} /></div>;
+    if (!isSmoothMounted || (!missionsData && isLoading)) return <LoadingScreen message="Cargando misiones..." />;
 
     return (
         <div className="min-h-screen bg-black text-white pb-24 animate-in fade-in relative">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+            {missionToDelete && (
+                <ConfirmDialog
+                    message={missionToDelete.isCoop
+                        ? `"${missionToDelete.title}" es cooperativa: se eliminará también para tu compañero.`
+                        : `¿Borrar "${missionToDelete.title}" permanentemente?`}
+                    confirmLabel="Borrar"
+                    onCancel={() => setMissionToDelete(null)}
+                    onConfirm={() => { handleDelete(missionToDelete._id); setMissionToDelete(null); }}
+                />
+            )}
 
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
@@ -444,7 +458,7 @@ export default function Missions() {
                     <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p></div>
                 ) : (
                     <>
-                        {filteredMissions.map(m => <MissionCard key={m._id} mission={m} onUpdateProgress={handleUpdateProgress} onDelete={handleDelete} currentUserId={user._id} onEdit={openEditModal} viewAllMode={viewAllMode} />)}
+                        {filteredMissions.map(m => <MissionCard key={m._id} mission={m} onUpdateProgress={handleUpdateProgress} onRequestDelete={setMissionToDelete} currentUserId={user._id} onEdit={openEditModal} viewAllMode={viewAllMode} />)}
                         {!viewAllMode && <div className="text-center mt-8 mb-4"><span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 flex items-center justify-center gap-2 mx-auto w-fit"><Clock size={12} /> HASTA: <span className="text-zinc-300">{getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}</span></span></div>}
                     </>
                 )}

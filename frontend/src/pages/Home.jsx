@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, X, ToggleLeft, ToggleRight, Calendar, Gift, Move, Lock, Unlock, Activity } from 'lucide-react';
+import { Settings, X, ToggleLeft, ToggleRight, Calendar, Gift, Move, Lock, Unlock } from 'lucide-react';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
 import { registerPush } from '../utils/pushNotifications';
@@ -9,6 +9,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStr
 import SortableWidget from '../components/common/SortableWidget';
 import { useSmoothMount } from '../hooks/useSmoothMount';
 import Toast from '../components/common/Toast';
+import LoadingScreen from '../components/common/LoadingScreen';
 
 import DailyRewardModal from '../components/widgets/DailyRewardModal';
 import MoodWidget from '../components/widgets/MoodWidget';
@@ -169,12 +170,7 @@ export default function Home() {
 
     // 🔥 LA CONDICIÓN MÁGICA QUE QUITA EL LAG
     if (!isSmoothMounted || (logLoading && !logData) || !user) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-zinc-500 bg-black">
-                <Activity size={48} className="text-yellow-500 animate-spin" />
-                <p className="text-xs font-bold uppercase tracking-widest">Cargando...</p>
-            </div>
-        );
+        return <LoadingScreen />;
     }
 
     const todayStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });

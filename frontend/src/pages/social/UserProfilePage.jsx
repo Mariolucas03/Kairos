@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
-    ChevronLeft, Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
+    Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
     Flame, Shield, Lock
 } from 'lucide-react';
 import api from '../../services/api';
+import BackButton from '../../components/common/BackButton';
 import WorkoutPostCard from '../../components/social/WorkoutPostCard';
 import { getLevelStyle, customAnimationsStyle } from '../../utils/socialHelpers';
 
@@ -126,7 +127,7 @@ export default function UserProfilePage() {
         const denied = profileError.response?.status === 403;
         return (
             <div className="min-h-screen bg-black pt-6 px-4 pb-24">
-                <button onClick={() => navigate(-1)} className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-2xl text-zinc-400 mb-8"><ChevronLeft size={20} /></button>
+                <div className="mb-8"><BackButton /></div>
                 <div className="text-center py-20 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Lock className="mx-auto mb-3 opacity-50" size={32} />
                     <p className="text-xs px-6">
@@ -163,9 +164,7 @@ export default function UserProfilePage() {
 
             {/* --- BARRA SUPERIOR --- */}
             <div className="flex items-center gap-3 mb-6">
-                <button onClick={() => navigate(-1)} className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-2xl text-zinc-400 hover:text-white active:scale-95 transition-all shrink-0">
-                    <ChevronLeft size={20} />
-                </button>
+                <BackButton />
                 <h1 className="text-lg font-black text-white uppercase tracking-tight truncate">{profile.username}</h1>
             </div>
 

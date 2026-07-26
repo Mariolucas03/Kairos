@@ -1,14 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Z } from '../../utils/zLayers';
 
 export default function Toast({ message, type = 'success', onClose }) {
+    // Guardamos onClose en una ref: si la página pasa una función nueva en cada
+    // render (lo habitual con arrow functions inline), el efecto se reiniciaba
+    // constantemente y el aviso podía no cerrarse nunca.
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            onClose();
-        }, 3000); // Se va solo a los 3 segundos
+        const timer = setTimeout(() => onCloseRef.current?.(), 3000);
         return () => clearTimeout(timer);
-    }, [onClose]);
+    }, [message]);
 
     // Colores según tipo
     const styles = type === 'success'
@@ -20,8 +24,9 @@ export default function Toast({ message, type = 'success', onClose }) {
     const Icon = type === 'success' ? CheckCircle : AlertCircle;
 
     return (
-        // 🔥 CAMBIO: 'fixed bottom-24' en lugar de top. Centrado horizontalmente.
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-4 py-3 rounded-2xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm">
+        // Fijo abajo y centrado. Va en la capa más alta para que nunca lo tape
+        // un modal (antes usaba z-200, el mismo que los modales).
+        <div style={{ zIndex: Z.toast }} className="fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-3 rounded-2xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm bg-zinc-950/90 border-white/10">
             <div className={`p-2 rounded-full ${styles} bg-opacity-20`}>
                 <Icon size={20} />
             </div>

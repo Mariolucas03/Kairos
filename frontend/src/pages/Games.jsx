@@ -1,19 +1,24 @@
 import { Link, useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
 import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
-// 🔥 IMPORTAMOS ZUSTAND
-import { useAuthStore } from '../store/useAuthStore';
+import api from '../services/api';
+
+const fetcher = (url) => api.get(url).then(res => res.data);
 
 export default function Games() {
-    // 🔥 CONECTAMOS CON ZUSTAND
-    const user = useAuthStore(state => state.user);
     const navigate = useNavigate();
 
     // --- LÓGICA DE BLOQUEO ---
-    const missions = user?.dailyMissions || [];
-    const totalMissions = missions.length;
-    const completedMissions = missions.filter(m => m.completed).length;
+    // 🔥 Antes leía `user.dailyMissions`, un campo que NO existe en el backend:
+    // la lista salía siempre vacía, el progreso se calculaba como 100% y el
+    // arcade estaba SIEMPRE desbloqueado (la pantalla de bloqueo era inalcanzable).
+    // La fuente real del progreso diario es missionStats del log del día.
+    const { data: daily } = useSWR('/daily', fetcher);
 
-    // Si no hay misiones (0), consideramos que está desbloqueado
+    const completedMissions = daily?.missionStats?.completed || 0;
+    const totalMissions = daily?.missionStats?.total || 0;
+
+    // Sin misiones creadas no tiene sentido bloquear: se considera desbloqueado
     const progress = totalMissions > 0 ? (completedMissions / totalMissions) : 1;
     const isLocked = progress < 0.75;
 
@@ -89,7 +94,7 @@ export default function Games() {
                             <div className="absolute top-0 bottom-0 left-[75%] w-0.5 bg-white/50 z-20"></div>
                         </div>
                         <div className="flex justify-between w-full text-xs font-bold text-zinc-500 px-1 uppercase tracking-wider">
-                            <span>Progreso: {percentage}%</span>
+                            <span>Progreso: {percentage}% ({completedMissions}/{totalMissions})</span>
                             <span>Meta: 75%</span>
                         </div>
                         <button onClick={() => navigate('/missions')} className="w-full py-4 bg-white text-black font-black rounded-xl uppercase tracking-widest shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">

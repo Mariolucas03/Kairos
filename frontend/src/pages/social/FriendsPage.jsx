@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { Users, AlertTriangle } from 'lucide-react';
+import { Users } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../../components/common/Toast';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import SocialSubHeader from '../../components/social/SocialSubHeader';
 import FriendCard from '../../components/social/FriendCard';
 import { customAnimationsStyle } from '../../utils/socialHelpers';
@@ -84,17 +85,11 @@ export default function FriendsPage() {
             )}
 
             {confirmAction && (
-                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in zoom-in-95">
-                    <div className="bg-[#09090b] border border-white/10 w-full max-w-xs rounded-[24px] p-6 shadow-2xl text-center">
-                        <div className="flex justify-center mb-4 text-yellow-500"><AlertTriangle size={40} /></div>
-                        <h3 className="text-white font-bold text-lg mb-2">¿Estás seguro?</h3>
-                        <p className="text-zinc-400 text-sm mb-6">{confirmAction.message}</p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setConfirmAction(null)} className="flex-1 py-3 bg-zinc-800 text-zinc-300 rounded-xl font-bold text-sm">Cancelar</button>
-                            <button onClick={() => { confirmAction.onConfirm(); setConfirmAction(null); }} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-sm">Confirmar</button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDialog
+                    message={confirmAction.message}
+                    onCancel={() => setConfirmAction(null)}
+                    onConfirm={() => { confirmAction.onConfirm(); setConfirmAction(null); }}
+                />
             )}
         </div>
     );
