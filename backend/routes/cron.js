@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { runNightlyMaintenance } = require('../utils/scheduler');
+const { runNightlyMaintenance, runMonthlyRankingRewards } = require('../utils/scheduler');
 const { protectCron } = require('../middleware/cronMiddleware');
 
 // --- 1. RUTA DE MANTENIMIENTO NOCTURNO (PESADA) ---
@@ -15,6 +15,21 @@ router.get('/nightly-maintenance', protectCron, async (req, res) => {
         res.status(200).send('Maintenance started');
     } catch (error) {
         console.error("❌ Error en Cron Externo:", error);
+        res.status(500).send('Error');
+    }
+});
+
+// --- 1.b PREMIOS DEL RANKING MENSUAL ---
+// El cron interno (0 0 1 * *) puede no dispararse nunca si Render tiene la
+// instancia dormida a esa hora, así que exponemos la tarea para un cron externo.
+// Es idempotente: llamarla varias veces NO reparte el premio dos veces.
+// Programar en cron-job.org el día 1 de cada mes.
+router.get('/monthly-rewards', protectCron, async (req, res) => {
+    try {
+        const result = await runMonthlyRankingRewards(req.query.period || null);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("❌ Error en premios mensuales:", error);
         res.status(500).send('Error');
     }
 });

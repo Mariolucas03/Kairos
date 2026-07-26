@@ -10,7 +10,13 @@ import Food from './pages/Food';
 import Gym from './pages/Gym';
 import Shop from './pages/Shop';
 import Profile from './pages/Profile';
-import Social from './pages/Social'; // 🔥 Asegúrate de tener esto
+import Social from './pages/Social'; // Feed social (pantalla principal de la sección)
+
+// Subpáginas de la sección social
+import FriendsPage from './pages/social/FriendsPage';
+import ClansPage from './pages/social/ClansPage';
+import RankingPage from './pages/social/RankingPage';
+import UserProfilePage from './pages/social/UserProfilePage';
 
 // Importar Juegos
 import Games from './pages/Games';
@@ -37,7 +43,11 @@ function App() {
                     <Route path="/food" element={<Food />} />
                     <Route path="/gym" element={<Gym />} />
                     <Route path="/shop" element={<Shop />} />
-                    <Route path="/social" element={<Social />} /> {/* 🔥 Ruta Social */}
+                    <Route path="/social" element={<Social />} /> {/* Feed */}
+                    <Route path="/social/friends" element={<FriendsPage />} />
+                    <Route path="/social/clans" element={<ClansPage />} />
+                    <Route path="/social/ranking" element={<RankingPage />} />
+                    <Route path="/social/user/:userId" element={<UserProfilePage />} />
                     <Route path="/profile" element={<Profile />} />
 
                     {/* Juegos */}

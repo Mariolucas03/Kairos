@@ -7,8 +7,15 @@ export const useAuthStore = create(
             user: null,
             isUiHidden: false,
 
-            // Acciones para modificar el estado
-            setUser: (userData) => set({ user: userData }),
+            // Acciones para modificar el estado.
+            // 🔥 Acepta también la forma funcional —setUser(prev => ...)— igual que
+            // el setState de React. Varias pantallas (Ruleta, Rasca, Ruleta de la
+            // Fortuna) ya la usaban, y al no estar soportada se guardaba la PROPIA
+            // FUNCIÓN como usuario: el perfil se quedaba a cero (nivel 1, sin monedas)
+            // hasta recargar.
+            setUser: (userData) => set((state) => ({
+                user: typeof userData === 'function' ? userData(state.user) : userData
+            })),
             setIsUiHidden: (isHidden) => set({ isUiHidden: isHidden }),
             logout: () => set({ user: null }),
         }),

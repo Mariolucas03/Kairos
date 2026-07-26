@@ -10,7 +10,8 @@ const {
     kickMember,
     previewClan, // Se mantiene por compatibilidad
     claimEventReward,
-    getClanDetails // 🔥 La nueva función
+    getClanDetails, // 🔥 La nueva función
+    updateClan
 } = require('../controllers/clanController');
 const protect = require('../middleware/authMiddleware');
 
@@ -29,5 +30,6 @@ router.post('/kick', protect, kickMember);
 router.post('/event/claim', protect, claimEventReward);
 
 router.put('/rank', protect, updateMemberRank);
+router.put('/', protect, updateClan);
 
 module.exports = router;

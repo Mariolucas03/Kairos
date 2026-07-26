@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { getRewardForDay } from '../utils/rewardsGenerator';
+import { getMadridDateString } from '../utils/dateHelpers';
 
 export function useDailyRewards(user, setUser) {
     const [showRewardModal, setShowRewardModal] = useState(false);
@@ -8,38 +9,61 @@ export function useDailyRewards(user, setUser) {
     const [claiming, setClaiming] = useState(false);
     const [toast, setToast] = useState(null);
 
-    // Helpers de fecha
-    const getTodayString = () => new Date().toISOString().split('T')[0];
+    // 🔥 Mismo criterio de "día" que el backend (hora de Madrid, no UTC)
+    const getTodayString = () => getMadridDateString();
 
     const hasClaimedToday = () => {
-        if (!user?.dailyRewards?.lastClaimDate) return false;
-        const last = new Date(user.dailyRewards.lastClaimDate).toISOString().split('T')[0];
+        const dr = user?.dailyRewards;
+        if (!dr) return false;
+        // Preferimos el día explícito que guarda el servidor; si es un usuario
+        // antiguo sin ese campo, lo derivamos de la fecha.
+        const last = dr.lastClaimDay
+            || (dr.lastClaimDate ? getMadridDateString(new Date(dr.lastClaimDate)) : null);
         return last === getTodayString();
     };
 
-    // 1. Chequeo Automático al entrar
+    // Aplica al store el estado de recompensas que devuelve el servidor,
+    // para que hasClaimedToday() deje de ofrecer un premio ya cobrado.
+    const syncDailyRewards = (dailyRewards, extraUserData) => {
+        if (!dailyRewards && !extraUserData) return;
+        setUser(prev => {
+            const next = {
+                ...prev,
+                ...(extraUserData || {}),
+                dailyRewards: dailyRewards || extraUserData?.dailyRewards || prev?.dailyRewards
+            };
+            localStorage.setItem('user', JSON.stringify(next));
+            return next;
+        });
+    };
+
+    const buildRewardData = (overrides = {}) => {
+        const streakLength = user?.dailyRewards?.claimedDays?.length || 0;
+        const currentDayVisual = (streakLength % 7) + 1;
+        return {
+            currentDay: currentDayVisual,
+            claimedDays: user?.dailyRewards?.claimedDays || [],
+            rewardOfDay: getRewardForDay(currentDayVisual),
+            ...overrides
+        };
+    };
+
+    // 1. Chequeo automático al entrar
     useEffect(() => {
         if (!user) return;
 
         const checkDailyReward = () => {
             const todayLocal = getTodayString();
-
-            // Check LocalStorage para no molestar en cada F5
+            // No molestamos en cada F5 del mismo día
             const sessionLock = sessionStorage.getItem(`reward_seen_${todayLocal}`);
 
             if (!hasClaimedToday() && sessionLock !== 'true') {
-                const streakLength = user.dailyRewards?.claimedDays?.length || 0;
-                const currentDayVisual = (streakLength % 7) + 1;
-
-                setRewardData({
-                    currentDay: currentDayVisual,
-                    claimedDays: user.dailyRewards?.claimedDays || [],
-                    rewardOfDay: getRewardForDay(currentDayVisual),
-                    message: "¡RECOMPENSA DIARIA!",
-                    subMessage: "¡Nuevo día, nueva ganancia!",
-                    buttonText: "RECLAMAR AHORA",
+                setRewardData(buildRewardData({
+                    message: '¡RECOMPENSA DIARIA!',
+                    subMessage: '¡Nuevo día, nueva ganancia!',
+                    buttonText: 'RECLAMAR AHORA',
                     isViewOnly: false
-                });
+                }));
                 setShowRewardModal(true);
             }
         };
@@ -50,56 +74,70 @@ export function useDailyRewards(user, setUser) {
 
     // 2. Acción: Reclamar
     const claimReward = async () => {
-        if (claiming) return; // Evita doble-clic / doble submit
+        if (claiming) return;
         setClaiming(true);
         try {
             const res = await api.post('/users/claim-daily');
-            const updatedUser = { ...user, ...res.data.user };
+            syncDailyRewards(res.data.dailyRewards, res.data.user);
 
-            setUser(updatedUser);
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-
-            // Bloquear popup por hoy
             sessionStorage.setItem(`reward_seen_${getTodayString()}`, 'true');
             setShowRewardModal(false);
-        } catch (error) {
-            console.error("Error reclamando recompensa:", error);
-            const backendMessage = error.response?.data?.message;
 
-            if (error.response?.status === 400 && backendMessage) {
-                // Caso legítimo (ej. ya reclamada hoy): no hay nada que reintentar
+            const r = res.data.reward;
+            if (r) {
+                const parts = [];
+                if (r.xp) parts.push(`+${r.xp} XP`);
+                if (r.coins) parts.push(`+${r.coins} monedas`);
+                if (r.gameCoins) parts.push(`+${r.gameCoins} fichas`);
+                if (r.hp) parts.push(`+${r.hp} HP`);
+                setToast({ message: parts.join(' · ') || '¡Recompensa reclamada!', type: 'success' });
+            }
+        } catch (error) {
+            console.error('Error reclamando recompensa:', error);
+            const data = error.response?.data;
+
+            if (data?.alreadyClaimed) {
+                // Caso legítimo: ya estaba cobrada (otra pestaña, doble clic...).
+                // Sincronizamos para que el modal no vuelva a aparecer.
+                syncDailyRewards(data.dailyRewards);
                 sessionStorage.setItem(`reward_seen_${getTodayString()}`, 'true');
                 setShowRewardModal(false);
-                setToast({ message: backendMessage, type: 'info' });
+                setToast({ message: data.message, type: 'info' });
             } else {
-                // Error transitorio (red caída, servidor despertando, etc.)
-                // Dejamos el modal abierto para que pueda reintentar sin perder el premio.
-                setToast({ message: 'No se pudo reclamar la recompensa. Comprueba tu conexión e inténtalo de nuevo.', type: 'error' });
+                // Error transitorio (red caída, servidor despertando en Render...).
+                // Dejamos el modal abierto para poder reintentar sin perder el premio.
+                setToast({ message: 'No se pudo reclamar. Comprueba tu conexión e inténtalo de nuevo.', type: 'error' });
             }
         } finally {
             setClaiming(false);
         }
     };
 
-    // 3. Acción: Ver Calendario Manualmente
+    // 3. Acción: abrir el calendario desde el botón de regalo.
+    // 🔥 Si la recompensa de hoy sigue pendiente, este modal SÍ permite reclamarla.
+    // Antes siempre era isViewOnly:true, así que si te perdías el popup automático
+    // no había ninguna forma de cobrar el premio del día.
     const openCalendar = () => {
-        const currentStreak = (user?.dailyRewards?.claimedDays?.length % 7) + 1;
-        setRewardData({
-            currentDay: currentStreak,
-            claimedDays: user?.dailyRewards?.claimedDays || [],
-            rewardOfDay: getRewardForDay(currentStreak),
-            message: "Calendario de Premios",
-            subMessage: hasClaimedToday() ? "¡Ya has reclamado hoy!" : "¡Tienes recompensa pendiente!",
-            buttonText: "CERRAR",
-            isViewOnly: true
-        });
+        const claimed = hasClaimedToday();
+        setRewardData(buildRewardData({
+            message: claimed ? 'Calendario de Premios' : '¡RECOMPENSA DIARIA!',
+            subMessage: claimed ? '¡Ya has reclamado hoy!' : '¡Tienes recompensa pendiente!',
+            buttonText: claimed ? 'CERRAR' : 'RECLAMAR AHORA',
+            isViewOnly: claimed
+        }));
         setShowRewardModal(true);
+    };
+
+    const closeModal = () => {
+        // Cerrar sin reclamar no debe silenciar el aviso el resto del día:
+        // si sigue pendiente, volverá a aparecer en la próxima visita.
+        setShowRewardModal(false);
     };
 
     return {
         showRewardModal,
         rewardData,
-        closeModal: () => setShowRewardModal(false),
+        closeModal,
         claimReward,
         openCalendar,
         hasClaimedToday,

@@ -4,6 +4,7 @@ const levelService = require('../services/levelService');
 // Importamos la función manual del scheduler
 const { runNightlyMaintenance } = require('../utils/scheduler');
 const { getRewardForDay } = require('../utils/dailyRewards');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 // ==========================================
 // 1. OBTENER PERFIL (getMe)
@@ -62,51 +63,64 @@ const updateMacros = asyncHandler(async (req, res) => {
 // 3. RECOMPENSA DIARIA
 // ==========================================
 const claimDailyReward = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user._id);
-    if (!user) { res.status(404); throw new Error('Usuario no encontrado'); }
-
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    // 🔥 Fechas SIEMPRE en hora de Madrid. Con toISOString() (UTC) el "día" cambiaba
+    // a las 02:00 locales, así que entre las 00:00 y 02:00 se podía reclamar dos veces
+    // y el modal reaparecía como no reclamado.
+    const todayStr = getMadridDateString(now);
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = getMadridDateString(yesterday);
 
-    if (!user.dailyRewards) {
-        user.dailyRewards = { claimedDays: [], lastClaimDate: null };
-    }
+    // 🔒 ATÓMICO: comparamos contra el DÍA guardado como string (hora de Madrid), así que
+    // solo entra el primer clic del día natural. Evita doble premio por doble clic,
+    // por dos pestañas abiertas, o por el desfase UTC/Madrid de madrugada.
+    const claimLock = await User.findOneAndUpdate(
+        { _id: req.user._id, 'dailyRewards.lastClaimDay': { $ne: todayStr } },
+        { $set: { 'dailyRewards.lastClaimDay': todayStr, 'dailyRewards.lastClaimDate': now } },
+        { new: false } // Queremos el documento ANTERIOR para saber en qué día del ciclo estaba
+    );
 
-    if (user.dailyRewards.lastClaimDate) {
-        const lastDate = new Date(user.dailyRewards.lastClaimDate);
-        const lastDateStr = lastDate.toISOString().split('T')[0];
+    const alreadyClaimed = async () => {
+        const current = await User.findById(req.user._id).select('dailyRewards');
+        return res.status(400).json({
+            success: false,
+            alreadyClaimed: true,
+            message: '¡Ya has reclamado tu recompensa de hoy! Vuelve mañana.',
+            dailyRewards: current?.dailyRewards || null
+        });
+    };
 
-        if (lastDateStr === todayStr) {
-            return res.status(400).json({
-                success: false,
-                message: '¡Ya has reclamado tu recompensa de hoy! Vuelve mañana.'
-            });
-        }
-    }
+    if (!claimLock) return alreadyClaimed();
 
-    let currentDay = 1;
-    if (user.dailyRewards.lastClaimDate) {
-        const lastDate = new Date(user.dailyRewards.lastClaimDate);
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
+    const previousRewards = claimLock.dailyRewards || { claimedDays: [], lastClaimDate: null };
+    const lastStr = previousRewards.lastClaimDay
+        || (previousRewards.lastClaimDate ? getMadridDateString(new Date(previousRewards.lastClaimDate)) : null);
 
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
-        const lastDateStr = lastDate.toISOString().split('T')[0];
+    // Usuarios anteriores a este campo no tenían `lastClaimDay`, así que el lock de arriba
+    // no los frena. Comprobamos también la fecha derivada para no regalar un reclamo extra.
+    if (lastStr === todayStr) return alreadyClaimed();
 
-        if (lastDateStr === yesterdayStr) {
-            const currentStreak = user.dailyRewards.claimedDays.length;
-            currentDay = (currentStreak % 7) + 1;
-        } else {
-            user.dailyRewards.claimedDays = [];
-            currentDay = 1;
-        }
-    }
+    // Si la última vez fue ayer seguimos el ciclo; si se rompió la cadena, volvemos al día 1.
+    const previousDays = previousRewards.claimedDays || [];
+    const cyclePosition = lastStr === yesterdayStr ? (previousDays.length % 7) : 0;
+    const currentDay = cyclePosition + 1;
+
+    // `claimedDays` es siempre la lista canónica de días ya cobrados del ciclo en curso
+    // ([1..currentDay], como máximo hasta el 6) y se vacía al cobrar el día 7.
+    // Reconstruirla en vez de ir añadiendo evita que crezca sin límite —había cuentas
+    // con más de 7 entradas, y entonces el calendario marcaba todos los días como cobrados.
+    const nextClaimedDays = currentDay === 7
+        ? []
+        : Array.from({ length: currentDay }, (_, i) => i + 1);
 
     // 🔥 Recompensa calculada en el servidor según el día del ciclo (nunca confiar en el cliente)
     const { coins: rewardCoins, gameCoins: rewardGameCoins, xp: rewardXP, hp: rewardHp } = getRewardForDay(currentDay);
 
-    user.dailyRewards.claimedDays.push(currentDay);
+    const user = await User.findById(req.user._id);
+    user.dailyRewards.claimedDays = nextClaimedDays;
     user.dailyRewards.lastClaimDate = now;
+    user.dailyRewards.lastClaimDay = todayStr;
     if (rewardHp > 0) {
         user.hp = Math.min(user.maxHp, (user.hp ?? 0) + rewardHp);
         user.lives = user.hp;
@@ -124,6 +138,9 @@ const claimDailyReward = asyncHandler(async (req, res) => {
         success: true,
         message: `¡Has reclamado el Día ${currentDay}!`,
         user: result.user,
+        // Lo devolvemos aparte para que el frontend pueda sincronizar el estado
+        // aunque el objeto `user` viaje incompleto por cualquier motivo.
+        dailyRewards: { claimedDays: nextClaimedDays, lastClaimDate: now, lastClaimDay: todayStr },
         reward: { xp: rewardXP, coins: rewardCoins, gameCoins: rewardGameCoins, hp: rewardHp, day: currentDay }
     });
 });
@@ -217,6 +234,7 @@ const simulateYesterday = asyncHandler(async (req, res) => {
 
     if (user.dailyRewards) {
         user.dailyRewards.lastClaimDate = yesterday;
+        user.dailyRewards.lastClaimDay = getMadridDateString(yesterday);
     }
 
     await user.save();

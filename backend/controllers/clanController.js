@@ -360,6 +360,40 @@ const updateMemberRank = asyncHandler(async (req, res) => {
     res.json({ message: 'Rango actualizado' });
 });
 
+// @desc    Editar datos del clan (solo el líder)
+// @route   PUT /api/clans
+// El frontend tenía un formulario de edición que en realidad no llamaba a ningún
+// endpoint: parecía guardarse pero nunca se persistía nada.
+const updateClan = asyncHandler(async (req, res) => {
+    const { description, icon, minLevel } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user.clan) { res.status(400); throw new Error('No tienes clan'); }
+    if (user.clanRank !== 'dios') { res.status(403); throw new Error('Solo el líder puede editar el clan'); }
+
+    const updates = {};
+    if (description !== undefined) updates.description = String(description).slice(0, 200);
+    if (icon !== undefined) {
+        const trimmed = String(icon).trim();
+        // Estandarte = 1 emoji (permitimos hasta 4 code points por emojis compuestos)
+        if (!trimmed || [...trimmed].length > 4) { res.status(400); throw new Error('Estandarte inválido'); }
+        updates.icon = trimmed;
+    }
+    if (minLevel !== undefined) {
+        const lvl = parseInt(minLevel);
+        if (!Number.isInteger(lvl) || lvl < 1 || lvl > 100) { res.status(400); throw new Error('Nivel mínimo inválido'); }
+        updates.minLevel = lvl;
+    }
+
+    if (Object.keys(updates).length === 0) { res.status(400); throw new Error('Nada que actualizar'); }
+
+    // El nombre no se puede cambiar: es único y se usa como identidad del clan
+    const clan = await Clan.findByIdAndUpdate(user.clan, { $set: updates }, { new: true });
+    if (!clan) { res.status(404); throw new Error('Clan no encontrado'); }
+
+    res.json({ message: 'Clan actualizado', clan });
+});
+
 // @desc    Previsualizar clan
 const getClanDetails = asyncHandler(async (req, res) => {
     const clanId = req.params.id;
@@ -394,5 +428,5 @@ const previewClan = getClanDetails;
 
 module.exports = {
     getMyClan, createClan, searchClans, joinClan, leaveClan, updateMemberRank, kickMember, claimEventReward,
-    getClanDetails, previewClan
+    getClanDetails, previewClan, updateClan
 };

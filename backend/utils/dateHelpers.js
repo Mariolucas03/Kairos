@@ -1,18 +1,25 @@
 // backend/utils/dateHelpers.js
+// ⚠️ TODA fecha "de calendario" de la app debe salir de aquí (zona Europe/Madrid).
+// Usar new Date().toISOString() da la fecha en UTC, que entre las 00:00 y 02:00
+// de Madrid corresponde al día ANTERIOR: eso provocaba que la recompensa diaria
+// se pudiera reclamar dos veces o reapareciera ya reclamada.
 
-// Usamos la configuración regional para forzar la zona horaria correcta
-const getTodayDateString = () => {
-    const now = new Date();
-    // Ajusta 'Europe/Madrid' a tu zona horaria objetivo si la app es internacional,
-    // o pásale la zona horaria desde el frontend en los headers.
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Europe/Madrid',
+const APP_TIMEZONE = 'Europe/Madrid';
+
+// Devuelve YYYY-MM-DD en hora de Madrid
+const getMadridDateString = (dateObj = new Date()) => {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: APP_TIMEZONE,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
-    });
-    // Devuelve formato YYYY-MM-DD exacto a la hora de Madrid
-    return formatter.format(now);
+    }).format(dateObj);
 };
 
-module.exports = { getTodayDateString };
+// Devuelve YYYY-MM en hora de Madrid (para ciclos mensuales / ranking)
+const getMadridMonthString = (dateObj = new Date()) => getMadridDateString(dateObj).slice(0, 7);
+
+// Alias histórico usado por foodController / gymController
+const getTodayDateString = () => getMadridDateString();
+
+module.exports = { getTodayDateString, getMadridDateString, getMadridMonthString, APP_TIMEZONE };

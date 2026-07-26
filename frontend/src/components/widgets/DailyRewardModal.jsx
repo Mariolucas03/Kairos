@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
-import { X, Lock, Zap, Heart } from 'lucide-react';
+import { X, Lock, Zap, Heart, Loader2 } from 'lucide-react';
 import { getRewardForDay } from '../../utils/rewardsGenerator';
 
-export default function DailyRewardModal({ data, onClose }) {
+// `onClaim` reclama la recompensa; `onClose` solo cierra.
+// Antes ambos eran la misma función, así que la X y el fondo también reclamaban
+// (y si fallaba, el premio se perdía sin avisar).
+export default function DailyRewardModal({ data, onClose, onClaim, claiming = false }) {
     if (!data) return null;
 
     const {
@@ -128,7 +131,7 @@ export default function DailyRewardModal({ data, onClose }) {
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={isViewOnly ? onClose : undefined}></div>
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}></div>
             <div className="relative z-10 w-full max-w-lg flex flex-col items-center animate-in zoom-in-95 duration-300">
                 <div className="text-center mb-8">
                     <h2 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-purple-300 to-indigo-500 uppercase tracking-tighter drop-shadow-lg">{message}</h2>
@@ -137,7 +140,14 @@ export default function DailyRewardModal({ data, onClose }) {
                 <div className="flex items-center justify-center gap-2 md:gap-3 mb-10 w-full px-2 py-8">
                     {visibleDays.map(day => renderDayCard(day))}
                 </div>
-                <button onClick={onClose} className={`w-full max-w-xs py-4 rounded-2xl font-black text-xl uppercase tracking-widest shadow-[0_0_40px_rgba(147,51,234,0.4)] transition-all transform active:scale-95 hover:scale-105 border-b-4 ${isViewOnly ? 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700 hover:text-white' : 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-indigo-800 hover:brightness-110'}`}>{buttonText}</button>
+                <button
+                    onClick={isViewOnly ? onClose : onClaim}
+                    disabled={claiming}
+                    className={`w-full max-w-xs py-4 rounded-2xl font-black text-xl uppercase tracking-widest shadow-[0_0_40px_rgba(147,51,234,0.4)] transition-all transform active:scale-95 hover:scale-105 border-b-4 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-wait ${isViewOnly ? 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700 hover:text-white' : 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-indigo-800 hover:brightness-110'}`}
+                >
+                    {claiming && <Loader2 size={20} className="animate-spin" />}
+                    {claiming ? 'RECLAMANDO...' : buttonText}
+                </button>
                 <button onClick={onClose} className="absolute -top-12 right-0 md:-right-10 bg-white/10 p-2 rounded-full hover:bg-white/20 text-white transition-colors"><X size={24} /></button>
             </div>
         </div>,

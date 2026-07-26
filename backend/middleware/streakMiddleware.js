@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 const checkStreak = asyncHandler(async (req, res, next) => {
     if (!req.user) return next();
@@ -10,18 +11,19 @@ const checkStreak = asyncHandler(async (req, res, next) => {
 
     if (!user) return next();
 
-    // 1. Obtener fechas normalizadas (YYYY-MM-DD) para ignorar horas/minutos
+    // 1. Fechas normalizadas (YYYY-MM-DD) en hora de Madrid, no UTC: con UTC el "día"
+    // cambiaba a las 02:00 locales y la racha se contaba mal de madrugada.
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getMadridDateString(now);
 
     // Manejo seguro por si es un usuario nuevo sin fecha registrada
     const lastLogDate = user.streak.lastLogDate ? new Date(user.streak.lastLogDate) : new Date(0);
-    const lastLogStr = lastLogDate.toISOString().split('T')[0];
+    const lastLogStr = getMadridDateString(lastLogDate);
 
     // Calcular "Ayer"
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = getMadridDateString(yesterday);
 
     let changed = false;
 

@@ -4,14 +4,8 @@ const User = require('../models/User');
 const DailyLog = require('../models/DailyLog');
 const { sendPushToUser } = require('../controllers/pushController');
 const { addRewards } = require('../services/levelService');
-
-// Función auxiliar para obtener fecha en String (Zona horaria Madrid)
-const getMadridDateString = (dateObj) => {
-    return new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Europe/Madrid',
-        year: 'numeric', month: '2-digit', day: '2-digit'
-    }).format(dateObj);
-};
+const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
+const { getMadridDateString, getMadridMonthString } = require('./dateHelpers');
 
 // --- Recordatorio Nocturno (20:00) ---
 const runEveningReminder = async () => {
@@ -50,36 +44,70 @@ const runEveningReminder = async () => {
 };
 
 // --- PREMIOS MENSUALES RANKING ---
-const runMonthlyRankingRewards = async () => {
-    console.log("🏆 Ejecutando premios mensuales del ranking...");
+/**
+ * Reparte los premios del ranking MENSUAL.
+ *
+ * Se ejecuta el día 1, así que premia el mes que acaba de cerrar.
+ * Es idempotente por usuario (marca `lastMonthlyRewardPeriod`), de forma que se
+ * puede llamar varias veces —cron interno + cron externo, reintentos, etc.—
+ * sin repartir el premio dos veces.
+ */
+const runMonthlyRankingRewards = async (targetPeriod = null) => {
+    // Por defecto premiamos el MES ANTERIOR (se lanza el día 1 del mes nuevo)
+    const period = targetPeriod || (() => {
+        const d = new Date();
+        d.setDate(0); // Último día del mes anterior
+        return getMadridMonthString(d);
+    })();
 
-    const topUsers = await User.find({})
-        .sort({ level: -1, currentXP: -1 })
-        .limit(3);
+    console.log(`🏆 Repartiendo premios del ranking mensual (${period})...`);
 
-    const PRIZES = [10000, 5000, 2500];
+    const ranking = await getMonthlyRanking(period, MONTHLY_PRIZES.length);
 
-    // Mantenemos secuencial porque son solo 3 y addRewards es complejo
-    for (let i = 0; i < topUsers.length; i++) {
-        const user = topUsers[i];
-        const prize = PRIZES[i];
+    if (ranking.length === 0) {
+        console.log('📭 Nadie tuvo actividad ese mes: sin premios que repartir.');
+        return { success: true, period, awarded: 0, message: 'Sin actividad en el periodo' };
+    }
 
-        if (!user) continue;
+    let awarded = 0;
+
+    for (let i = 0; i < ranking.length; i++) {
+        const entry = ranking[i];
+        const prize = MONTHLY_PRIZES[i];
+        if (!prize) continue;
 
         try {
-            await addRewards(user._id, 0, 0, prize);
-            const payload = {
+            // 🔒 IDEMPOTENTE: solo marcamos (y por tanto premiamos) si este usuario
+            // no tiene ya registrado este periodo. Si otra ejecución se adelantó,
+            // findOneAndUpdate devuelve null y no pagamos otra vez.
+            const claimed = await User.findOneAndUpdate(
+                { _id: entry._id, lastMonthlyRewardPeriod: { $ne: period } },
+                { $set: { lastMonthlyRewardPeriod: period } },
+                { new: true }
+            );
+
+            if (!claimed) {
+                console.log(`↩️ ${entry.username} ya recibió el premio de ${period}, se omite.`);
+                continue;
+            }
+
+            await addRewards(entry._id, 0, 0, prize);
+            awarded++;
+
+            await sendPushToUser(claimed, {
                 title: `🏆 ¡Premio Mensual Ranking #${i + 1}!`,
-                body: `¡Felicidades! Has ganado ${prize} Fichas por ser de los mejores este mes.`,
+                body: `¡Felicidades! Has ganado ${prize} Fichas por quedar #${i + 1} en ${period}.`,
                 icon: "/assets/icons/ficha.png",
-                url: "/social"
-            };
-            await sendPushToUser(user, payload);
-            console.log(`🎁 Premio mensual enviado a ${user.username}: ${prize} fichas`);
+                url: "/social/ranking"
+            });
+
+            console.log(`🎁 Premio mensual (${period}) a ${entry.username}: ${prize} fichas`);
         } catch (error) {
-            console.error(`Error enviando premio a ${user.username}`, error);
+            console.error(`Error enviando premio a ${entry.username}`, error);
         }
     }
+
+    return { success: true, period, awarded };
 };
 
 // --- 🔥 LÓGICA CORE DE CASTIGO (OPTIMIZADA) ---
@@ -218,4 +246,4 @@ const initScheduledJobs = () => {
     }, { scheduled: true, timezone: "Europe/Madrid" });
 };
 
-module.exports = { initScheduledJobs, runNightlyMaintenance };
+module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards };

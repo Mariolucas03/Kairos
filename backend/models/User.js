@@ -56,14 +56,29 @@ const userSchema = new mongoose.Schema({
         lastLogDate: { type: Date, default: Date.now }
     },
 
+    // Última actividad, usada para el indicador "online" de la lista de amigos.
+    // ⚠️ Faltaba en el esquema: authMiddleware hacía findByIdAndUpdate({ lastActive })
+    // y Mongoose lo descartaba en silencio (modo strict), así que el campo nunca se
+    // guardaba y TODOS los amigos aparecían siempre como desconectados.
+    lastActive: { type: Date, default: Date.now },
+
     // Recompensas Diarias
     dailyRewards: {
         claimedDays: { type: [Number], default: [] },
-        lastClaimDate: { type: Date }
+        lastClaimDate: { type: Date },
+        // 🔥 Día del último reclamo como "YYYY-MM-DD" en hora de Madrid.
+        // Guardarlo como string evita depender de la zona horaria al comparar:
+        // con Date puro, entre las 00:00 y 02:00 locales el día UTC era el anterior
+        // y se podía reclamar dos veces la misma recompensa.
+        lastClaimDay: { type: String, default: null }
     },
 
     // Game Over
     redemptionMission: { type: String, default: null },
+
+    // Último periodo "YYYY-MM" cuyo premio de ranking mensual ya cobró este usuario.
+    // Sirve de candado para que el reparto sea idempotente aunque se lance varias veces.
+    lastMonthlyRewardPeriod: { type: String, default: null },
 
     // --- SOCIAL ---
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import { getLevelStyle } from '../../utils/socialHelpers';
@@ -16,7 +17,8 @@ const timeAgo = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 };
 
-export default function WorkoutPostCard({ post, onOpenProfile }) {
+export default function WorkoutPostCard({ post, linkProfile = true }) {
+    const navigate = useNavigate();
     const [liked, setLiked] = useState(!!post.likedByMe);
     const [likesCount, setLikesCount] = useState(post.likesCount || 0);
     const [likeBusy, setLikeBusy] = useState(false);
@@ -28,6 +30,11 @@ export default function WorkoutPostCard({ post, onOpenProfile }) {
 
     const author = post.user || {};
     const levelClass = getLevelStyle(author.level || 1);
+
+    // Dentro del propio perfil no hace falta volver a navegar al mismo sitio
+    const openProfile = () => {
+        if (linkProfile && author._id) navigate(`/social/user/${author._id}`);
+    };
 
     const handleLike = async () => {
         if (likeBusy) return;
@@ -68,7 +75,7 @@ export default function WorkoutPostCard({ post, onOpenProfile }) {
         <div className="bg-zinc-950 border border-white/5 rounded-[24px] mb-4 overflow-hidden shadow-sm">
             {/* CABECERA */}
             <div className="flex items-center gap-3 p-3">
-                <button onClick={() => onOpenProfile(author._id)} className="relative flex-shrink-0 active:scale-95 transition-transform">
+                <button onClick={openProfile} disabled={!linkProfile} className="relative flex-shrink-0 active:scale-95 transition-transform disabled:cursor-default">
                     <div className="w-11 h-11 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
                         {author.avatar ? <img src={author.avatar} className="w-full h-full object-cover" alt="av" /> : author.username?.charAt(0)}
                     </div>
@@ -76,7 +83,7 @@ export default function WorkoutPostCard({ post, onOpenProfile }) {
                 </button>
 
                 <div className="flex-1 min-w-0">
-                    <button onClick={() => onOpenProfile(author._id)} className="text-white font-black text-sm uppercase tracking-tight truncate block">
+                    <button onClick={openProfile} disabled={!linkProfile} className="text-white font-black text-sm uppercase tracking-tight truncate block disabled:cursor-default">
                         {author.username}
                     </button>
                     <div className="flex items-center gap-2 mt-0.5">

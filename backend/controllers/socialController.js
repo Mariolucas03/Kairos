@@ -1,6 +1,9 @@
 const User = require('../models/User');
 const DailyLog = require('../models/DailyLog');
 const WorkoutLog = require('../models/WorkoutLog');
+const NutritionLog = require('../models/NutritionLog');
+const { getMadridDateString, getMadridMonthString } = require('../utils/dateHelpers');
+const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
 
 // 🔥 Escapa caracteres especiales de regex para evitar ReDoS / patrones inesperados
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -140,7 +143,7 @@ const addComment = async (req, res) => {
     }
 };
 
-// @desc    Perfil público de un amigo + su historial de entrenos
+// @desc    Cabecera del perfil (datos + contadores estilo IG)
 // @route   GET /api/social/profile/:userId
 const getFriendProfile = async (req, res) => {
     try {
@@ -150,32 +153,130 @@ const getFriendProfile = async (req, res) => {
         const allowed = await canAccessWorkout(viewerId, userId);
         if (!allowed) return res.status(403).json({ message: 'Solo puedes ver el perfil de tus amigos' });
 
-        const page = Math.max(1, parseInt(req.query.page) || 1);
-
-        const [profile, logs] = await Promise.all([
-            User.findById(userId).select('username avatar frame level title currentXP nextLevelXP streak'),
-            WorkoutLog.find({ user: userId })
-                .sort({ date: -1 })
-                .skip((page - 1) * FEED_PAGE_SIZE)
-                .limit(FEED_PAGE_SIZE + 1)
-                .populate('user', 'username avatar frame level title')
-                .populate('comments.user', 'username avatar')
-                .lean()
-        ]);
+        const profile = await User.findById(userId)
+            .select('username avatar frame pet level title currentXP nextLevelXP streak friends clan clanRank')
+            .populate('clan', 'name icon')
+            .lean();
 
         if (!profile) return res.status(404).json({ message: 'Usuario no encontrado' });
 
-        const hasMore = logs.length > FEED_PAGE_SIZE;
-        const pageItems = logs.slice(0, FEED_PAGE_SIZE);
+        const [workoutsCount, missionsAggregate] = await Promise.all([
+            WorkoutLog.countDocuments({ user: userId }),
+            DailyLog.aggregate([
+                { $match: { user: profile._id } },
+                { $group: { _id: null, total: { $sum: '$missionStats.completed' } } }
+            ])
+        ]);
+
+        // La amistad en Kairos es mutua, así que "seguidores" y "seguidos" son el
+        // mismo conjunto (tus amigos). Se exponen por separado para la UI estilo IG.
+        const friendsCount = (profile.friends || []).length;
 
         res.json({
-            profile,
-            items: pageItems.map(log => shapeFeedItem(log, viewerId)),
-            hasMore
+            profile: {
+                _id: profile._id,
+                username: profile.username,
+                avatar: profile.avatar,
+                frame: profile.frame,
+                pet: profile.pet,
+                level: profile.level,
+                title: profile.title,
+                currentXP: profile.currentXP,
+                nextLevelXP: profile.nextLevelXP,
+                streak: profile.streak,
+                clan: profile.clan,
+                clanRank: profile.clanRank
+            },
+            counts: {
+                workouts: workoutsCount,
+                followers: friendsCount,
+                following: friendsCount,
+                missions: missionsAggregate[0]?.total || 0
+            },
+            isMe: viewerId.toString() === userId.toString()
         });
     } catch (error) {
         console.error('Error en getFriendProfile:', error);
         res.status(500).json({ message: 'Error cargando el perfil' });
+    }
+};
+
+// @desc    Contenido paginado del perfil según pestaña (entrenos / comida / misiones)
+// @route   GET /api/social/profile/:userId/items?tab=workouts|food|missions&page=1
+const getProfileItems = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const viewerId = req.user._id;
+        const tab = ['workouts', 'food', 'missions'].includes(req.query.tab) ? req.query.tab : 'workouts';
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const skip = (page - 1) * FEED_PAGE_SIZE;
+
+        const allowed = await canAccessWorkout(viewerId, userId);
+        if (!allowed) return res.status(403).json({ message: 'Solo puedes ver el perfil de tus amigos' });
+
+        if (tab === 'workouts') {
+            const logs = await WorkoutLog.find({ user: userId })
+                .sort({ date: -1 })
+                .skip(skip)
+                .limit(FEED_PAGE_SIZE + 1)
+                .populate('user', 'username avatar frame level title')
+                .populate('comments.user', 'username avatar')
+                .lean();
+
+            return res.json({
+                tab,
+                items: logs.slice(0, FEED_PAGE_SIZE).map(log => shapeFeedItem(log, viewerId)),
+                hasMore: logs.length > FEED_PAGE_SIZE
+            });
+        }
+
+        if (tab === 'food') {
+            const logs = await NutritionLog.find({ user: userId, totalCalories: { $gt: 0 } })
+                .sort({ date: -1 })
+                .skip(skip)
+                .limit(FEED_PAGE_SIZE + 1)
+                .lean();
+
+            const items = logs.slice(0, FEED_PAGE_SIZE).map(log => ({
+                _id: log._id,
+                date: log.date,
+                totalCalories: Math.round(log.totalCalories || 0),
+                totalProtein: Math.round(log.totalProtein || 0),
+                totalCarbs: Math.round(log.totalCarbs || 0),
+                totalFat: Math.round(log.totalFat || 0),
+                // Solo el resumen por comida: no exponemos cada alimento del amigo
+                meals: (log.meals || []).map(m => ({
+                    name: m.name,
+                    itemsCount: (m.foods || []).length,
+                    calories: Math.round((m.foods || []).reduce((a, f) => a + (f.calories || 0) * (f.quantity || 1), 0))
+                })).filter(m => m.itemsCount > 0)
+            }));
+
+            return res.json({ tab, items, hasMore: logs.length > FEED_PAGE_SIZE });
+        }
+
+        // tab === 'missions' → días con misiones completadas
+        const logs = await DailyLog.find({ user: userId, 'missionStats.completed': { $gt: 0 } })
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(FEED_PAGE_SIZE + 1)
+            .select('date missionStats')
+            .lean();
+
+        const items = logs.slice(0, FEED_PAGE_SIZE).map(log => ({
+            _id: log._id,
+            date: log.date,
+            completed: log.missionStats?.completed || 0,
+            total: log.missionStats?.total || 0,
+            list: (log.missionStats?.listCompleted || [])
+                .filter(m => !m.failed)
+                .map(m => ({ title: m.title, xpReward: m.xpReward, coinReward: m.coinReward, type: m.type }))
+        }));
+
+        return res.json({ tab, items, hasMore: logs.length > FEED_PAGE_SIZE });
+    } catch (error) {
+        console.error('Error en getProfileItems:', error);
+        res.status(500).json({ message: 'Error cargando el contenido del perfil' });
     }
 };
 
@@ -257,9 +358,12 @@ const getFriends = async (req, res) => {
             .populate('friends', 'username avatar level title frame lastActive')
             .populate('friendRequests', 'username avatar level');
 
-        const FIVE_MINUTES = 5 * 60 * 1000;
+        // 🔥 Ventana de 10 min, no 5: authMiddleware solo reescribe `lastActive` cuando
+        // han pasado más de 5 minutos, así que con una ventana de 5 min un usuario
+        // realmente conectado parpadeaba a "offline" justo antes de la siguiente escritura.
+        const ONLINE_WINDOW = 10 * 60 * 1000;
         const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = getMadridDateString(now);
 
         const friendIds = user.friends.map(f => f._id);
         const dailyLogs = await DailyLog.find({
@@ -274,7 +378,7 @@ const getFriends = async (req, res) => {
 
         const friendsList = user.friends.map(f => {
             const lastSeen = f.lastActive ? new Date(f.lastActive) : new Date(0);
-            const isOnline = (now - lastSeen) < FIVE_MINUTES;
+            const isOnline = (now - lastSeen) < ONLINE_WINDOW;
             const stats = logsMap[f._id.toString()] || { completed: 0, total: 0 };
 
             return {
@@ -342,6 +446,32 @@ const respondToRequest = async (req, res) => {
     }
 };
 
+// @desc    Eliminar amigo (mutuo)
+// @route   DELETE /api/social/friends/:friendId
+// El frontend ya llamaba a esta ruta, pero no existía: el borrado devolvía 404
+// y se deshacía en silencio, así que los amigos nunca se podían eliminar.
+const removeFriend = async (req, res) => {
+    try {
+        const { friendId } = req.params;
+        const userId = req.user._id;
+
+        if (userId.toString() === friendId.toString()) {
+            return res.status(400).json({ message: 'No puedes eliminarte a ti mismo' });
+        }
+
+        // La amistad es mutua: hay que quitarla en los dos sentidos
+        await Promise.all([
+            User.findByIdAndUpdate(userId, { $pull: { friends: friendId } }),
+            User.findByIdAndUpdate(friendId, { $pull: { friends: userId } })
+        ]);
+
+        res.json({ message: 'Amigo eliminado' });
+    } catch (error) {
+        console.error('Error en removeFriend:', error);
+        res.status(500).json({ message: 'Error eliminando amigo' });
+    }
+};
+
 // @desc    Obtener solicitudes (Helper)
 const getRequests = async (req, res) => {
     try {
@@ -383,7 +513,21 @@ const getLeaderboard = async (req, res) => {
     }
 };
 
+// @desc    Ranking MENSUAL (XP ganado este mes) — el que reparte los premios
+// @route   GET /api/social/leaderboard/monthly
+const getMonthlyLeaderboard = async (req, res) => {
+    try {
+        const period = getMadridMonthString();
+        const ranking = await getMonthlyRanking(period, 50);
+        res.json({ period, prizes: MONTHLY_PRIZES, ranking });
+    } catch (error) {
+        console.error('Error en getMonthlyLeaderboard:', error);
+        res.status(500).json({ message: 'Error obteniendo el ranking mensual' });
+    }
+};
+
 module.exports = {
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
-    getFeed, toggleLike, addComment, getFriendProfile
+    getFeed, toggleLike, addComment, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
+    removeFriend
 };

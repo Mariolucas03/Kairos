@@ -1,5 +1,7 @@
-// Helpers compartidos entre Social.jsx y los componentes del feed social
-// (WorkoutPostCard, FriendProfileModal) para evitar import circular con la página.
+import { Dumbbell, Target, Flame, Zap } from 'lucide-react';
+
+// Helpers y constantes compartidos por la sección social
+// (feed, amigos, clanes, ranking y perfiles de usuario).
 
 export const getLevelStyle = (level) => {
     if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
@@ -16,3 +18,33 @@ export const getLevelStyle = (level) => {
 };
 
 export const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-3 rounded-[20px] border border-white/5 mb-2 relative group hover:border-white/10 transition-all shadow-sm";
+
+export const RANK_CONFIG = {
+    dios: { label: 'DIOS', color: 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10', value: 4 },
+    rey: { label: 'REY', color: 'text-purple-400 border-purple-500/50 bg-purple-500/10', value: 3 },
+    guerrero: { label: 'GUERRERO', color: 'text-red-400 border-red-500/50 bg-red-500/10', value: 2 },
+    recluta: { label: 'RECLUTA', color: 'text-blue-400 border-blue-500/50 bg-blue-500/10', value: 1 },
+    esclavo: { label: 'ESCLAVO', color: 'text-zinc-500 border-zinc-700 bg-zinc-800/50', value: 0 }
+};
+
+export const EVENT_CONFIG = {
+    volume: { title: "Titanes del Hierro", unit: "KG", icon: Dumbbell, color: "text-blue-400", bg: "from-blue-600 to-cyan-500", border: "border-blue-500/30" },
+    missions: { title: "Cruzada Disciplina", unit: "MISIONES", icon: Target, color: "text-green-400", bg: "from-green-600 to-emerald-500", border: "border-green-500/30" },
+    calories: { title: "Horno Humano", unit: "KCAL", icon: Flame, color: "text-orange-400", bg: "from-orange-600 to-red-500", border: "border-orange-500/30" },
+    xp: { title: "Era de Sabiduría", unit: "XP", icon: Zap, color: "text-purple-400", bg: "from-purple-600 to-indigo-500", border: "border-purple-500/30" }
+};
+
+export const customAnimationsStyle = `
+  @keyframes smoothGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .animate-smooth-gradient {
+    background-size: 400% 400%;
+    animation: smoothGradient 5s ease infinite;
+  }
+`;
+
+// Fetcher común para SWR en toda la sección social
+export const socialFetcher = (api) => (url) => api.get(url).then(res => res.data);

@@ -75,7 +75,7 @@ export default function Home() {
     const isSmoothMounted = useSmoothMount();
 
     const { dailyData: logData, loading: logLoading, updateWidget, calculations } = useDailyLog(user);
-    const { showRewardModal, rewardData, closeModal, claimReward, openCalendar, hasClaimedToday, toast, clearToast } = useDailyRewards(user, setUser);
+    const { showRewardModal, rewardData, closeModal, claimReward, openCalendar, hasClaimedToday, claiming, toast, clearToast } = useDailyRewards(user, setUser);
     const [showSettings, setShowSettings] = useState(false);
 
     const DEFAULTS_ORDER = ['missions', 'sport', 'food', 'sleep', 'steps', 'mood', 'weight', 'training', 'streak', 'weekly', 'kcalBalance'];
@@ -181,7 +181,7 @@ export default function Home() {
 
     return (
         <div className="space-y-8 pb-6 animate-in fade-in select-none bg-black min-h-screen">
-            {showRewardModal && <DailyRewardModal data={rewardData} onClose={rewardData?.isViewOnly ? closeModal : claimReward} />}
+            {showRewardModal && <DailyRewardModal data={rewardData} onClose={closeModal} onClaim={claimReward} claiming={claiming} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
 
             <div className="flex justify-between items-center px-4 pt-4">
