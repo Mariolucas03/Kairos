@@ -4,16 +4,8 @@ const DailyLog = require('../models/DailyLog');
 // Importamos el helper de fecha local (¡Asegúrate de que el archivo utils/dateHelpers.js exista!)
 const { getTodayDateString } = require('../utils/dateHelpers');
 
-// --- CONFIGURACIÓN OPENROUTER ---
-const OpenAI = require("openai");
-const openrouter = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "NoteGym App",
-    }
-});
+// 🔥 Toda la IA pasa por el servicio único (una sola cascada de modelos gratis)
+const { askAI, askVisionAI } = require('../services/aiService');
 
 // Usamos el helper centralizado en lugar del toISOString() que falla por zona horaria
 const getTodayStr = () => getTodayDateString();
@@ -22,23 +14,47 @@ const getTodayStr = () => getTodayDateString();
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // ==========================================
-// ⏱️ HELPER: TIMEOUT PARA IA (EVITA BLOQUEOS)
+// 🍽️ HELPERS DE MACROS
 // ==========================================
-const fetchWithTimeout = async (config, timeoutMs = 8000) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    try {
-        const response = await openrouter.chat.completions.create(
-            config,
-            { signal: controller.signal }
-        );
-        clearTimeout(timeoutId);
-        return response;
-    } catch (error) {
-        clearTimeout(timeoutId);
-        throw error;
-    }
+// Redondea y rellena huecos: los modelos a veces omiten campos o mandan decimales
+const normalizeMacros = (data, fallbackName = 'Comida') => ({
+    name: data.name || fallbackName.slice(0, 60),
+    calories: Math.max(0, Math.round(data.calories || 0)),
+    protein: Math.max(0, Math.round(data.protein || 0)),
+    carbs: Math.max(0, Math.round(data.carbs || 0)),
+    fat: Math.max(0, Math.round(data.fat || 0)),
+    fiber: Math.max(0, Math.round(data.fiber || 0)),
+    ...(data.servingSize ? { servingSize: data.servingSize } : {})
+});
+
+/**
+ * Plan B cuando la IA no responde: estimación de una ración media.
+ * No pretende ser exacta —el usuario la edita— pero permite seguir
+ * registrando comida en vez de bloquear la pantalla con un error.
+ */
+const estimateFoodFallback = (text = '') => {
+    const t = text.toLowerCase();
+    // Perfil aproximado por tipo de plato más habitual
+    const perfiles = [
+        { claves: ['ensalada', 'verdura', 'lechuga', 'brocoli', 'brócoli'], kcal: 150, p: 5, c: 15, g: 7 },
+        { claves: ['pollo', 'pavo', 'pescado', 'merluza', 'atun', 'atún', 'ternera', 'carne', 'huevo'], kcal: 350, p: 35, c: 5, g: 18 },
+        { claves: ['pasta', 'arroz', 'patata', 'pan', 'pizza', 'bocadillo', 'macarrones'], kcal: 500, p: 15, c: 70, g: 15 },
+        { claves: ['fruta', 'manzana', 'platano', 'plátano', 'naranja', 'yogur'], kcal: 120, p: 3, c: 25, g: 1 },
+        { claves: ['dulce', 'chocolate', 'tarta', 'helado', 'galleta'], kcal: 400, p: 5, c: 50, g: 20 }
+    ];
+    const perfil = perfiles.find(p => p.claves.some(k => t.includes(k)));
+    const base = perfil || { kcal: 400, p: 20, c: 40, g: 15 };
+
+    return {
+        name: text.trim().slice(0, 60) || 'Comida',
+        calories: base.kcal,
+        protein: base.p,
+        carbs: base.c,
+        fat: base.g,
+        fiber: 3,
+        isEstimate: true
+    };
 };
 
 // ==========================================
@@ -46,13 +62,6 @@ const fetchWithTimeout = async (config, timeoutMs = 8000) => {
 // ==========================================
 const chatMacroCalculator = async (req, res) => {
     const { history } = req.body;
-
-    const TEXT_MODELS_CASCADE = [
-        "deepseek/deepseek-r1-distill-llama-70b:free",
-        "google/gemini-2.0-flash-exp:free",
-        "qwen/qwen-2.5-vl-72b-instruct:free",
-        "meta-llama/llama-3.3-70b-instruct:free"
-    ];
 
     const SYSTEM_PROMPT = `
     Actúa como un nutricionista experto. Extrae edad, peso, altura, género y objetivo.
@@ -63,24 +72,15 @@ const chatMacroCalculator = async (req, res) => {
     FORMATO JSON PURO SIN MARKDOWN.
     `;
 
-    const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
+    const result = await askAI({
+        system: SYSTEM_PROMPT,
+        messages: Array.isArray(history) ? history : [],
+        temperature: 0.5,
+        validate: (d) => d.type === 'final' || d.type === 'question'
+    });
 
-    for (const model of TEXT_MODELS_CASCADE) {
-        try {
-            const completion = await fetchWithTimeout({
-                model: model,
-                messages: messages,
-                temperature: 0.5,
-                response_format: { type: "json_object" }
-            }, 8000);
+    if (result.ok) return res.json(result.data);
 
-            let content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
-            const jsonResponse = JSON.parse(content);
-            return res.json(jsonResponse);
-        } catch (error) {
-            console.error(`❌ Falló o tardó demasiado ${model}: ${error.message}`);
-        }
-    }
     return res.json({ type: 'question', message: "No pude procesar los datos por alta demanda. Intenta en unos minutos." });
 };
 
@@ -90,20 +90,15 @@ const chatMacroCalculator = async (req, res) => {
 const analyzeFoodText = async (req, res) => {
     const { text } = req.body;
 
-    const TEXT_MODELS_CASCADE = [
-        "deepseek/deepseek-r1-distill-llama-70b:free",
-        "google/gemini-2.0-flash-exp:free",
-        "qwen/qwen-2.5-vl-72b-instruct:free",
-        "mistralai/mistral-7b-instruct:free"
-    ];
+    if (!text || !text.trim()) return res.status(400).json({ message: 'Escribe qué has comido' });
 
     const SYSTEM_PROMPT = `
     Eres un experto nutricionista y analista de alimentos.
     Tu tarea es analizar el texto del usuario: "${text}".
-    
+
     Calcula o estima las calorías y macronutrientes (Proteína, Carbohidratos, Grasa, Fibra).
     Si el usuario no especifica cantidad, asume una ración estándar lógica.
-    
+
     ⚠️ REGLAS CRÍTICAS:
     1. Responde SOLO con un objeto JSON válido. Nada de texto extra.
     2. Usa números enteros (sin decimales).
@@ -118,116 +113,70 @@ const analyzeFoodText = async (req, res) => {
     }
     `;
 
-    for (const model of TEXT_MODELS_CASCADE) {
-        try {
-            console.log(`🤖 Analizando comida con: ${model}...`);
-            const completion = await fetchWithTimeout({
-                model: model,
-                messages: [{ role: "system", content: SYSTEM_PROMPT }],
-                temperature: 0.1,
-                response_format: { type: "json_object" }
-            }, 8000);
+    const result = await askAI({
+        system: SYSTEM_PROMPT,
+        temperature: 0.1,
+        validate: (d) => typeof d.calories === 'number'
+    });
 
-            let content = completion.choices[0].message.content;
-            content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-            const firstBrace = content.indexOf('{');
-            const lastBrace = content.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1) {
-                content = content.substring(firstBrace, lastBrace + 1);
-            }
-
-            const jsonResponse = JSON.parse(content);
-            return res.json({ type: 'success', data: jsonResponse });
-
-        } catch (error) {
-            console.error(`❌ Falló visión ${model}: ${error.message}. Probando siguiente...`);
-        }
+    if (result.ok) {
+        return res.json({ type: 'success', data: normalizeMacros(result.data, text) });
     }
 
-    return res.status(503).json({ message: "Sistemas IA saturados. Por favor, añádelo manualmente." });
+    // 🔥 PLAN B: antes esto devolvía un 503 y el usuario se quedaba sin poder
+    // registrar nada. Ahora damos una estimación aproximada y avisamos de que
+    // es editable, para que la app siga siendo usable con la IA caída.
+    return res.json({
+        type: 'estimate',
+        message: 'La IA no está disponible ahora mismo. Te dejo una estimación: revísala y ajústala.',
+        data: estimateFoodFallback(text)
+    });
 };
 
 // ==========================================
 // 📷 ANÁLISIS DE IMAGEN (MEGA CASCADA EN RAM)
 // ==========================================
 const analyzeImage = async (req, res) => {
-    const VISION_MODELS = [
-        "google/gemini-2.0-flash-exp:free",
-        "google/gemini-2.0-pro-exp-02-05:free",
-        "qwen/qwen-2.5-vl-72b-instruct:free",
-        "meta-llama/llama-3.2-90b-vision-instruct:free",
-        "mistralai/pixtral-12b:free"
-    ];
-
     try {
         if (!req.file) return res.status(400).json({ message: 'No hay imagen' });
 
         const userContext = req.body.context || "Sin contexto extra.";
 
-        // 🔥 FIX ARQUITECTÓNICO: Leemos directamente de la RAM (req.file.buffer) sin tocar el disco.
-        // Ya NO usamos fs.readFileSync ni req.file.path
-        const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-        let foodData = null;
+        // Leemos directamente de la RAM (req.file.buffer), sin tocar disco
+        const imageDataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
-        const finalPrompt = `
+        const prompt = `
         Analiza esta imagen de comida o etiqueta nutricional.
         Contexto del usuario: "${userContext}".
         Identifica el alimento y calcula sus macros totales aproximados.
-        
+
         Responde SOLO con un JSON válido:
-        { 
-            "name": "Nombre corto del plato", 
-            "calories": int, 
-            "protein": int, 
-            "carbs": int, 
-            "fat": int, 
-            "fiber": int, 
-            "servingSize": "string" 
+        {
+            "name": "Nombre corto del plato",
+            "calories": int,
+            "protein": int,
+            "carbs": int,
+            "fat": int,
+            "fiber": int,
+            "servingSize": "string"
         }
         `;
 
-        for (const modelName of VISION_MODELS) {
-            try {
-                console.log(`👁️ Intentando analizar imagen con: ${modelName}...`);
-                const completion = await fetchWithTimeout({
-                    model: modelName,
-                    messages: [
-                        { role: "user", content: [{ type: "text", text: finalPrompt }, { type: "image_url", image_url: { url: base64Image } }] }
-                    ],
-                    temperature: 0.1
-                }, 12000);
+        const result = await askVisionAI({
+            prompt,
+            imageDataUrl,
+            validate: (d) => d.name && typeof d.calories === 'number'
+        });
 
-                let text = completion.choices[0].message.content;
-                const startIndex = text.indexOf('{');
-                const endIndex = text.lastIndexOf('}');
+        if (result.ok) return res.json(normalizeMacros(result.data));
 
-                if (startIndex !== -1 && endIndex !== -1) {
-                    const jsonStr = text.substring(startIndex, endIndex + 1);
-                    foodData = JSON.parse(jsonStr);
-
-                    if (foodData.name && (typeof foodData.calories === 'number')) {
-                        console.log(`✅ ÉXITO con ${modelName}`);
-                        break;
-                    }
-                }
-            } catch (e) {
-                console.error(`❌ Falló visión ${modelName}: ${e.message}`);
-            }
-        }
-
-        if (foodData) {
-            foodData.calories = Math.round(foodData.calories || 0);
-            foodData.protein = Math.round(foodData.protein || 0);
-            foodData.carbs = Math.round(foodData.carbs || 0);
-            foodData.fat = Math.round(foodData.fat || 0);
-            foodData.fiber = Math.round(foodData.fiber || 0);
-
-            return res.json(foodData);
-        } else {
-            return res.status(503).json({ message: 'Ninguna IA pudo leer la imagen. Inténtalo de nuevo o usa texto.' });
-        }
+        // Con una foto no hay forma razonable de estimar sin IA, así que aquí sí
+        // devolvemos error, pero indicando la alternativa que sí funciona.
+        return res.status(503).json({
+            message: 'No he podido leer la foto. Prueba a describir la comida por texto.'
+        });
     } catch (error) {
-        console.error(error);
+        console.error('Error en analyzeImage:', error);
         res.status(500).json({ message: 'Error interno procesando la imagen' });
     }
 };

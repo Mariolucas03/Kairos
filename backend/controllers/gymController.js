@@ -3,40 +3,15 @@ const Exercise = require('../models/Exercise');
 const WorkoutLog = require('../models/WorkoutLog');
 const DailyLog = require('../models/DailyLog');
 const levelService = require('../services/levelService');
-const fs = require('fs');
 
-// --- CONFIGURACIÓN OPENROUTER ---
-const OpenAI = require("openai");
-const openrouter = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "NoteGym App",
-    }
-});
+// 🔥 Toda la IA pasa por el servicio único (una sola cascada de modelos gratis)
+const { askAI } = require('../services/aiService');
 
-const getTodayDateString = () => new Date().toISOString().split('T')[0];
-
-// ==========================================
-// ⏱️ HELPER: TIMEOUT PARA IA
-// ==========================================
-const fetchWithTimeout = async (config, timeoutMs = 5000) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-        const response = await openrouter.chat.completions.create(
-            config,
-            { signal: controller.signal }
-        );
-        clearTimeout(timeoutId);
-        return response;
-    } catch (error) {
-        clearTimeout(timeoutId);
-        throw error;
-    }
-};
+// 🔥 Fecha en hora de Madrid. Este fichero definía su propio
+// `new Date().toISOString().split('T')[0]` (UTC), así que un entreno registrado
+// entre las 00:00 y las 02:00 se guardaba en el día ANTERIOR.
+const { getTodayDateString } = require('../utils/dateHelpers');
+const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 
 // ==========================================
 // 1. OBTENER RUTINAS
@@ -109,13 +84,42 @@ const getAllExercises = async (req, res) => {
 
 const createCustomExercise = async (req, res) => {
     try {
-        const { name, muscle } = req.body;
-        if (!name || !muscle) { res.status(400); throw new Error('Faltan datos'); }
-        const exercise = await Exercise.create({ name, muscle, category: 'strength', user: req.user._id, isCustom: true });
+        const { name, muscle, muscleDetail } = req.body;
+        if (!name) return res.status(400).json({ message: 'Falta el nombre del ejercicio' });
+        if (!muscle && !muscleDetail) return res.status(400).json({ message: 'Falta el músculo' });
+
+        // En modo PRO llega `muscleDetail` (ej: 'Dorsal ancho') y derivamos su
+        // grupo padre ('Espalda'); en modo normal llega ya el grupo. En ambos
+        // casos `muscle` acaba guardando SIEMPRE un grupo válido, que es lo que
+        // usan las estadísticas del cuerpo.
+        const grupo = resolveMuscleGroup(muscleDetail || muscle);
+        const detalle = muscleDetail && isSpecificMuscle(muscleDetail) ? muscleDetail.trim() : '';
+
+        const exercise = await Exercise.create({
+            name: String(name).trim().slice(0, 60),
+            muscle: grupo,
+            muscleDetail: detalle,
+            category: 'strength',
+            user: req.user._id,
+            isCustom: true
+        });
+
         res.status(201).json(exercise);
     } catch (error) {
+        console.error('Error creando ejercicio:', error);
         res.status(500).json({ message: 'Error creando ejercicio' });
     }
+};
+
+// @desc  Catálogo de músculos para que el frontend pinte los selectores
+// @route GET /api/gym/muscles
+const getMuscleCatalog = async (req, res) => {
+    res.json({
+        groups: MUSCLE_GROUPS,
+        specific: SPECIFIC_MUSCLES,
+        // El modo lo decide el usuario en Ajustes
+        mode: req.user.gymMode || 'normal'
+    });
 };
 
 const seedExercises = async (req, res) => {
@@ -157,9 +161,6 @@ const saveWorkoutLog = async (req, res) => {
             return `- ${ex.name}: [${setsDesc}]`;
         }).join('\n');
 
-        const MODELS = ["google/gemini-2.0-flash-exp:free", "google/gemini-flash-1.5", "mistralai/mistral-nemo:free"];
-        let calculated = false;
-
         const prompt = `
             Calcula las calorías NETAS quemadas en esta sesión de pesas.
             - Peso Atleta: ${userWeight} kg
@@ -172,24 +173,16 @@ const saveWorkoutLog = async (req, res) => {
             Responde SOLO JSON: { "calories": numero_entero }
         `;
 
-        for (const model of MODELS) {
-            try {
-                const completion = await fetchWithTimeout({
-                    model: model,
-                    messages: [{ role: "user", content: prompt }],
-                    temperature: 0.1,
-                    response_format: { type: "json_object" }
-                }, 4000);
+        const ai = await askAI({
+            system: prompt,
+            temperature: 0.1,
+            validate: (d) => typeof d.calories === 'number' && d.calories > 0
+        });
 
-                let txt = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
-                const data = JSON.parse(txt);
-                caloriesBurned = Math.round(data.calories);
-                calculated = true;
-                break;
-            } catch (e) { console.warn(`IA ${model} falló o tardó mucho. Probando siguiente...`); }
-        }
-
-        if (!calculated) {
+        if (ai.ok) {
+            caloriesBurned = Math.round(ai.data.calories);
+        } else {
+            // Plan B determinista: estimación por duración, intensidad y peso
             const durationMin = duration / 60;
             let factor = 3.5;
             if (intensity === 'Baja') factor = 2.5;
@@ -237,28 +230,21 @@ const saveSportLog = async (req, res) => {
         const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
         let caloriesBurned = 0;
 
-        const MODELS = ["google/gemini-2.0-flash-exp:free", "google/gemini-flash-1.5", "mistralai/mistral-nemo:free"];
-        let calculated = false;
-
         const prompt = `Calcula calorías NETAS (sin basal) para:
             - Actividad: "${name}" - Tiempo: ${time} min - Intensidad: ${intensity} - Peso: ${userWeight} kg - Distancia: ${distance || 'N/A'}
             Responde SOLO JSON: { "calories": numero_entero }`;
 
-        for (const model of MODELS) {
-            try {
-                const completion = await fetchWithTimeout({
-                    model: model, messages: [{ role: "user", content: prompt }], temperature: 0.1, response_format: { type: "json_object" }
-                }, 4000);
+        const ai = await askAI({
+            system: prompt,
+            temperature: 0.1,
+            validate: (d) => typeof d.calories === 'number' && d.calories > 0
+        });
 
-                let txt = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
-                const data = JSON.parse(txt);
-                caloriesBurned = Math.round(data.calories);
-                calculated = true; break;
-            } catch (e) { }
-        }
-
-        if (!calculated) {
-            let mets = intensity === 'Media' ? 6 : intensity === 'Alta' ? 8 : 4;
+        if (ai.ok) {
+            caloriesBurned = Math.round(ai.data.calories);
+        } else {
+            // Plan B determinista: fórmula MET estándar
+            const mets = intensity === 'Media' ? 6 : intensity === 'Alta' ? 8 : 4;
             caloriesBurned = Math.round(mets * userWeight * (time / 60));
         }
 
@@ -486,7 +472,9 @@ const getBodyStatus = async (req, res) => {
         const exerciseToMuscle = {};
         allExercises.forEach(ex => { exerciseToMuscle[ex.name] = ex.muscle; });
 
-        const muscleStats = { 'Pecho': 0, 'Espalda': 0, 'Pierna': 0, 'Hombro': 0, 'Bíceps': 0, 'Tríceps': 0, 'Abdomen': 0 };
+        // Se construye desde el vocabulario único, así que incluye 'Glúteo':
+        // antes estaba fuera de esta lista y esos ejercicios no contaban nunca.
+        const muscleStats = MUSCLE_GROUPS.reduce((acc, g) => ({ ...acc, [g]: 0 }), {});
 
         logs.forEach(log => {
             log.exercises.forEach(ex => {
@@ -500,7 +488,7 @@ const getBodyStatus = async (req, res) => {
 
 const chatRoutineGenerator = async (req, res) => {
     const { prompt } = req.body;
-    const TEXT_MODELS_CASCADE = ["google/gemini-2.0-flash-exp:free", "google/gemini-flash-1.5", "mistralai/mistral-nemo:free"];
+
     const SYSTEM_PROMPT = `
     Eres un Entrenador Personal de Élite. TU OBJETIVO: Crear una rutina basada en: "${prompt}".
     REGLAS:
@@ -509,26 +497,33 @@ const chatRoutineGenerator = async (req, res) => {
     3. Devuelve SOLO JSON. FORMATO: { "name": "Nombre", "difficulty": "Novato|Guerrero|Leyenda", "exercises": [{ "name": "Press", "muscle": "Pecho", "sets": 4, "reps": "8-10", "rest": 90 }], "message": "Motivación" }
     `;
 
-    for (const model of TEXT_MODELS_CASCADE) {
-        try {
-            const completion = await fetchWithTimeout({
-                model: model,
-                messages: [{ role: "system", content: SYSTEM_PROMPT }],
-                temperature: 0.7,
-                response_format: { type: "json_object" }
-            }, 8000);
+    const ai = await askAI({
+        system: SYSTEM_PROMPT,
+        temperature: 0.7,
+        validate: (d) => Array.isArray(d.exercises) && d.exercises.length > 0
+    });
 
-            let content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
-            const jsonResponse = JSON.parse(content);
-            return res.json(jsonResponse);
-        } catch (error) { console.warn(`IA ${model} falló.`); }
-    }
-    return res.json({ name: "Rutina de Emergencia", exercises: [{ name: "Flexiones", muscle: "Pecho", sets: 3, reps: "15", rest: 60 }], difficulty: "Novato", message: "Sistemas IA caídos." });
+    if (ai.ok) return res.json(ai.data);
+
+    // Plan B: rutina full-body sensata en vez de dejar al usuario sin nada
+    return res.json({
+        name: "Rutina Full Body",
+        difficulty: "Novato",
+        message: "La IA no está disponible ahora mismo, te dejo una rutina base que puedes editar.",
+        exercises: [
+            { name: "Sentadilla", muscle: "Pierna", sets: 4, reps: "10-12", rest: 90 },
+            { name: "Press Banca", muscle: "Pecho", sets: 4, reps: "8-10", rest: 90 },
+            { name: "Remo con Barra", muscle: "Espalda", sets: 4, reps: "10-12", rest: 90 },
+            { name: "Press Militar", muscle: "Hombro", sets: 3, reps: "10-12", rest: 60 },
+            { name: "Curl de Bíceps", muscle: "Bíceps", sets: 3, reps: "12", rest: 60 },
+            { name: "Plancha", muscle: "Abdomen", sets: 3, reps: "45s", rest: 45 }
+        ]
+    });
 };
 
 module.exports = {
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
-    getAllExercises, createCustomExercise, seedExercises,
+    getAllExercises, createCustomExercise, seedExercises, getMuscleCatalog,
     saveWorkoutLog, saveSportLog,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
     chatRoutineGenerator

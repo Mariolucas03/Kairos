@@ -13,7 +13,8 @@ const {
     forceNightlyMaintenance,
     setRedemptionMission,
     reviveUser,
-    updateStatsManual
+    updateStatsManual,
+    updateProfileSettings
 } = require('../controllers/userController');
 
 // Rutas base: /api/users
@@ -22,6 +23,8 @@ router.put('/macros', protect, updateMacros);
 router.post('/claim-daily', protect, claimDailyReward); // <--- Esta fallaba
 router.post('/reward', protect, addGameReward);
 router.put('/physical-stats', protect, updatePhysicalStats);
+// Ajustes del perfil público: descripción, cuenta privada y modo de gym
+router.put('/profile', protect, updateProfileSettings);
 
 // Rutas Game Over
 router.post('/set-redemption-mission', protect, setRedemptionMission);

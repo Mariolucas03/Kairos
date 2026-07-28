@@ -146,6 +146,41 @@ const claimDailyReward = asyncHandler(async (req, res) => {
 });
 
 // ==========================================
+// 3.b AJUSTES DE PERFIL (descripción y privacidad)
+// ==========================================
+// @route PUT /api/users/profile
+const updateProfileSettings = asyncHandler(async (req, res) => {
+    const { bio, isPrivate, gymMode } = req.body;
+
+    const updates = {};
+
+    if (bio !== undefined) {
+        if (typeof bio !== 'string') { res.status(400); throw new Error('Descripción inválida'); }
+        updates.bio = bio.slice(0, 150);
+    }
+
+    if (isPrivate !== undefined) {
+        updates.isPrivate = !!isPrivate;
+    }
+
+    // El modo de gym (normal/pro) también se configura desde esta pantalla
+    if (gymMode !== undefined) {
+        if (!['normal', 'pro'].includes(gymMode)) { res.status(400); throw new Error('Modo de gym inválido'); }
+        updates.gymMode = gymMode;
+    }
+
+    if (Object.keys(updates).length === 0) { res.status(400); throw new Error('Nada que actualizar'); }
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: updates },
+        { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json({ message: 'Perfil actualizado', user });
+});
+
+// ==========================================
 // 4. RECOMPENSA JUEGOS
 // ==========================================
 const addGameReward = asyncHandler(async (req, res) => {
@@ -278,5 +313,6 @@ module.exports = {
     updateStatsManual,
     simulateYesterday,
     setManualStreak,
-    forceNightlyMaintenance
+    forceNightlyMaintenance,
+    updateProfileSettings
 };

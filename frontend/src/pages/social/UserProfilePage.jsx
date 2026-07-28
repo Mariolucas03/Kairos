@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
     Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
-    Flame, Shield, Lock
+    Flame, Shield, Lock, Pencil, Check, UserPlus
 } from 'lucide-react';
 import api from '../../services/api';
 import BackButton from '../../components/common/BackButton';
@@ -90,14 +90,19 @@ export default function UserProfilePage() {
     const { data: profileData, error: profileError, isLoading: loadingProfile } =
         useSWR(userId ? `/social/profile/${userId}` : null, fetcher);
 
+    // Solo pedimos el contenido si tenemos permiso: en una cuenta privada ajena
+    // esta petición daría 403 y llenaría la consola de errores.
+    const puedeVer = profileData ? profileData.canViewContent !== false : false;
     const { data: itemsData, isLoading: loadingItems } =
-        useSWR(userId ? `/social/profile/${userId}/items?tab=${tab}&page=1` : null, fetcher);
+        useSWR(userId && puedeVer ? `/social/profile/${userId}/items?tab=${tab}&page=1` : null, fetcher);
 
     // Paginación local por pestaña
     const [extraItems, setExtraItems] = useState([]);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [sendingRequest, setSendingRequest] = useState(false);
+    const [requestFeedback, setRequestFeedback] = useState(null);
 
     // Al cambiar de pestaña (o de usuario) reiniciamos la paginación acumulada
     useEffect(() => {
@@ -152,6 +157,26 @@ export default function UserProfilePage() {
     const level = profile.level || 1;
     const xpPercent = Math.min(((profile.currentXP || 0) / (profile.nextLevelXP || 100)) * 100, 100);
 
+    const isMe = !!profileData?.isMe;
+    const isFriend = !!profileData?.isFriend;
+    const requestSent = !!profileData?.requestSent;
+    // Si la cuenta es privada y no somos amigos, la cabecera se ve pero el
+    // contenido no (el backend además lo bloquea con 403).
+    const canViewContent = profileData ? profileData.canViewContent !== false : true;
+
+    const handleSendRequest = async () => {
+        if (sendingRequest) return;
+        setSendingRequest(true);
+        try {
+            await api.post('/social/request', { targetId: userId });
+            setRequestFeedback('sent');
+        } catch (e) {
+            setRequestFeedback(e.response?.data?.message || 'No se pudo enviar');
+        } finally {
+            setSendingRequest(false);
+        }
+    };
+
     const STATS = [
         { label: 'Entrenos', value: counts.workouts },
         { label: 'Seguidores', value: counts.followers },
@@ -202,6 +227,11 @@ export default function UserProfilePage() {
                     )}
                 </div>
                 <p className="text-[10px] text-yellow-500/80 italic font-bold tracking-wider uppercase mb-1">{profile.title || 'Novato'}</p>
+
+                {/* Descripción del perfil */}
+                {profile.bio && (
+                    <p className="text-xs text-zinc-300 leading-snug whitespace-pre-line mb-2">{profile.bio}</p>
+                )}
                 {profile.streak?.current > 0 && (
                     <p className="text-[10px] text-orange-400 font-bold flex items-center gap-1 mb-2">
                         <Flame size={11} /> {profile.streak.current} días de racha
@@ -212,6 +242,38 @@ export default function UserProfilePage() {
                     <div className="h-full bg-gradient-to-r from-blue-600 to-purple-500 transition-all duration-500" style={{ width: `${xpPercent}%` }} />
                 </div>
                 <p className="text-[9px] text-zinc-600 font-bold mt-1 text-right">{profile.currentXP || 0}/{profile.nextLevelXP || 100} XP</p>
+
+                {/* --- ACCIÓN PRINCIPAL (como el botón Seguir/Editar de IG) --- */}
+                <div className="mt-4">
+                    {isMe ? (
+                        <button
+                            onClick={() => navigate('/settings')}
+                            className="w-full py-2.5 bg-zinc-900 border border-zinc-700 text-white font-black text-xs uppercase tracking-widest rounded-xl active:scale-95 transition-transform hover:bg-zinc-800 flex items-center justify-center gap-2"
+                        >
+                            <Pencil size={14} /> Editar perfil
+                        </button>
+                    ) : isFriend ? (
+                        <div className="w-full py-2.5 bg-green-900/20 border border-green-500/30 text-green-500 font-black text-xs uppercase tracking-widest rounded-xl flex items-center justify-center gap-2">
+                            <Check size={14} /> Sois amigos
+                        </div>
+                    ) : (requestSent || requestFeedback === 'sent') ? (
+                        <div className="w-full py-2.5 bg-zinc-900 border border-zinc-700 text-zinc-400 font-black text-xs uppercase tracking-widest rounded-xl flex items-center justify-center gap-2">
+                            <Check size={14} /> Solicitud enviada
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleSendRequest}
+                            disabled={sendingRequest}
+                            className="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-widest rounded-xl active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
+                        >
+                            {sendingRequest ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                            Enviar solicitud
+                        </button>
+                    )}
+                    {requestFeedback && requestFeedback !== 'sent' && (
+                        <p className="text-[10px] text-red-400 font-bold text-center mt-2">{requestFeedback}</p>
+                    )}
+                </div>
             </div>
 
             {/* --- PESTAÑAS ESTILO IG --- */}
@@ -221,19 +283,30 @@ export default function UserProfilePage() {
                     return (
                         <button
                             key={key}
-                            onClick={() => setTab(key)}
-                            className={`flex-1 py-3.5 flex flex-col items-center gap-1 relative transition-colors ${active ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}
+                            onClick={() => canViewContent && setTab(key)}
+                            disabled={!canViewContent}
+                            className={`flex-1 py-3.5 flex flex-col items-center gap-1 relative transition-colors ${!canViewContent ? 'text-zinc-800 cursor-default' : active ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}
                         >
                             <Icon size={20} strokeWidth={active ? 2.5 : 2} />
                             <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
-                            {active && <div className="absolute top-0 left-0 right-0 h-0.5 bg-yellow-500" />}
+                            {active && canViewContent && <div className="absolute top-0 left-0 right-0 h-0.5 bg-yellow-500" />}
                         </button>
                     );
                 })}
             </div>
 
-            {/* --- CONTENIDO DE LA PESTAÑA --- */}
-            {loadingItems && !itemsData ? (
+            {/* --- CUENTA PRIVADA: se ve quién es, pero no su contenido --- */}
+            {!canViewContent ? (
+                <div className="text-center py-14 px-6 border-2 border-dashed border-zinc-900 rounded-3xl">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                        <Lock className="text-zinc-500" size={26} />
+                    </div>
+                    <h3 className="text-white font-black uppercase text-sm mb-2">Esta cuenta es privada</h3>
+                    <p className="text-xs text-zinc-500 leading-relaxed max-w-[240px] mx-auto">
+                        Hazte amigo de <span className="text-zinc-300 font-bold">{profile.username}</span> para ver sus entrenos, comidas y misiones.
+                    </p>
+                </div>
+            ) : loadingItems && !itemsData ? (
                 <div className="text-center py-16 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>
             ) : items.length === 0 ? (
                 <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">

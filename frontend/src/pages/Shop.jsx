@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 // 🔥 QUITAMOS useOutletContext
 // import { useOutletContext } from 'react-router-dom';
 // 🔥 IMPORTAMOS ZUSTAND
@@ -12,6 +13,8 @@ import api from '../services/api';
 import Toast from '../components/common/Toast';
 import ChestModal from '../components/common/ChestModal';
 import BackButton from '../components/common/BackButton';
+
+const fetcher = (url) => api.get(url).then(res => res.data);
 
 const CATEGORIES = [
     { id: 'reward', label: 'PREMIOS', icon: <Ticket size={24} /> },
@@ -33,9 +36,13 @@ export default function Shop() {
     // ESTADOS
     const [activeTab, setActiveTab] = useState('shop');
     const [selectedCategory, setSelectedCategory] = useState(null);
-    const [shopItems, setShopItems] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
+
+    // 🔥 Vía SWR (antes useState+useEffect, que refetcheaba entero en cada visita
+    // y siempre mostraba la pantalla de carga). Ahora queda cacheado.
+    const { data: shopData, mutate: mutateShop, isLoading } = useSWR('/shop', fetcher);
+    const shopItems = shopData || [];
+    const loading = isLoading && !shopData;
 
     // Cofres
     const [rewardData, setRewardData] = useState(null);
@@ -54,7 +61,6 @@ export default function Shop() {
     const [isExchanging, setIsExchanging] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    useEffect(() => { fetchShop(); }, []);
     useEffect(() => { setSelectedCategory(null); }, [activeTab]);
 
     // 🔥 SCROLL AL INICIO CUANDO CAMBIA LA CATEGORÍA O LA PESTAÑA
@@ -65,15 +71,6 @@ export default function Shop() {
     // El auto-cierre lo gestiona el propio componente Toast (3 s).
     // Aquí había un segundo temporizador de 2 s que competía con él y hacía que
     // el aviso desapareciera antes de tiempo.
-
-    const fetchShop = async () => {
-        setLoading(true);
-        try {
-            const res = await api.get('/shop');
-            setShopItems(res.data);
-        } catch (error) { console.error("Error tienda:", error); }
-        finally { setLoading(false); }
-    };
 
     const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
@@ -106,7 +103,7 @@ export default function Shop() {
         if (!newReward.name || !newReward.price) return showToast("Faltan datos", "error");
         try {
             const res = await api.post('/shop/create', { name: newReward.name, price: parseInt(newReward.price) });
-            setShopItems([res.data, ...shopItems]);
+            mutateShop([res.data, ...shopItems], false);
             setShowCreator(false);
             setNewReward({ name: '', price: '' });
             showToast("Premio creado");

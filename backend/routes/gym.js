@@ -16,7 +16,8 @@ const {
     getMuscleProgress,
     getRoutineHistory,
     getExerciseHistory,
-    getBodyStatus
+    getBodyStatus,
+    chatRoutineGenerator
 } = require('../controllers/gymController');
 
 const protect = require('../middleware/authMiddleware');
@@ -39,6 +40,11 @@ router.post('/exercises', protect, createCustomExercise);
 // 🛡️ AQUÍ APLICAMOS LA VALIDACIÓN JOI ANTES DEL CONTROLADOR
 router.post('/log', protect, validate(workoutLogSchema), saveWorkoutLog);
 router.post('/sport', protect, saveSportLog);
+
+// Generador de rutinas con IA.
+// La función existía en el controlador pero NUNCA se enrutó: el endpoint
+// devolvía "Cannot POST", así que la feature era inalcanzable.
+router.post('/chat-routine', protect, chatRoutineGenerator);
 
 // Utilidades
 router.get('/seed', protect, seedExercises);

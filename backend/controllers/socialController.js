@@ -2,6 +2,8 @@ const User = require('../models/User');
 const DailyLog = require('../models/DailyLog');
 const WorkoutLog = require('../models/WorkoutLog');
 const NutritionLog = require('../models/NutritionLog');
+const Notification = require('../models/Notification');
+const { sendPushToUser } = require('./pushController');
 const { getMadridDateString, getMadridMonthString } = require('../utils/dateHelpers');
 const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
 
@@ -37,11 +39,62 @@ const shapeFeedItem = (log, viewerId) => {
     };
 };
 
-// Verifica que el dueño del post sea amigo del que consulta, o el propio usuario
-const canAccessWorkout = async (viewerId, ownerId) => {
+/**
+ * ¿Puede `viewerId` ver el CONTENIDO (entrenos, comida, misiones) de `ownerId`?
+ *
+ * Reglas estilo Instagram:
+ *  - Tú mismo: siempre.
+ *  - Cuenta pública: cualquiera.
+ *  - Cuenta privada: solo sus amigos.
+ *
+ * La cabecera del perfil (foto, nombre, descripción, contadores) es visible para
+ * todos aunque esto devuelva false; eso se decide en getFriendProfile.
+ */
+const canViewContent = async (viewerId, ownerId) => {
     if (viewerId.toString() === ownerId.toString()) return true;
-    const viewer = await User.findById(viewerId).select('friends');
-    return viewer.friends.some(f => f.toString() === ownerId.toString());
+
+    const owner = await User.findById(ownerId).select('isPrivate friends');
+    if (!owner) return false;
+    if (!owner.isPrivate) return true;
+
+    return (owner.friends || []).some(f => f.toString() === viewerId.toString());
+};
+
+/**
+ * Crea la notificación para el dueño del entreno y le manda el aviso push.
+ *
+ * Nunca notifica acciones sobre uno mismo (dar me gusta a tu propio entreno no
+ * debe generar aviso). Si algo falla, se registra pero NO se propaga: que no
+ * llegue una notificación no puede tumbar el me gusta ni el comentario.
+ */
+const notifyOwner = async ({ ownerId, actorId, type, workout, actor, text = '' }) => {
+    try {
+        if (ownerId.toString() === actorId.toString()) return;
+
+        await Notification.create({
+            user: ownerId,
+            actor: actorId,
+            type,
+            workout: workout._id,
+            workoutName: workout.routineName || '',
+            text: text.slice(0, 120)
+        });
+
+        const owner = await User.findById(ownerId).select('pushSubscriptions username');
+        if (owner) {
+            const nombre = actor?.username || 'Alguien';
+            await sendPushToUser(owner, {
+                title: type === 'like' ? '❤️ Nuevo me gusta' : '💬 Nuevo comentario',
+                body: type === 'like'
+                    ? `A ${nombre} le gusta tu entreno "${workout.routineName || ''}"`
+                    : `${nombre}: ${text.slice(0, 60)}`,
+                icon: '/assets/icons/icon-192x192.png',
+                url: '/social'
+            });
+        }
+    } catch (error) {
+        console.error('No se pudo crear la notificación:', error.message);
+    }
 };
 
 // @desc    Feed de entrenos de tus amigos (estilo IG)
@@ -83,10 +136,10 @@ const toggleLike = async (req, res) => {
         const { workoutId } = req.params;
         const userId = req.user._id;
 
-        const workout = await WorkoutLog.findById(workoutId).select('user likes');
+        const workout = await WorkoutLog.findById(workoutId).select('user likes routineName');
         if (!workout) return res.status(404).json({ message: 'Entreno no encontrado' });
 
-        const allowed = await canAccessWorkout(userId, workout.user);
+        const allowed = await canViewContent(userId, workout.user);
         if (!allowed) return res.status(403).json({ message: 'No tienes acceso a este entreno' });
 
         const alreadyLiked = workout.likes.some(id => id.toString() === userId.toString());
@@ -96,6 +149,17 @@ const toggleLike = async (req, res) => {
             alreadyLiked ? { $pull: { likes: userId } } : { $addToSet: { likes: userId } },
             { new: true }
         ).select('likes');
+
+        // Avisamos solo al DAR me gusta (no al quitarlo) y nunca a uno mismo
+        if (!alreadyLiked) {
+            await notifyOwner({
+                ownerId: workout.user,
+                actorId: userId,
+                type: 'like',
+                workout,
+                actor: req.user
+            });
+        }
 
         res.json({ likesCount: updated.likes.length, likedByMe: !alreadyLiked });
     } catch (error) {
@@ -115,10 +179,10 @@ const addComment = async (req, res) => {
         if (!text) return res.status(400).json({ message: 'El comentario no puede estar vacío' });
         if (text.length > 300) return res.status(400).json({ message: 'Comentario demasiado largo (máx 300 caracteres)' });
 
-        const workout = await WorkoutLog.findById(workoutId).select('user');
+        const workout = await WorkoutLog.findById(workoutId).select('user routineName');
         if (!workout) return res.status(404).json({ message: 'Entreno no encontrado' });
 
-        const allowed = await canAccessWorkout(userId, workout.user);
+        const allowed = await canViewContent(userId, workout.user);
         if (!allowed) return res.status(403).json({ message: 'No tienes acceso a este entreno' });
 
         const updated = await WorkoutLog.findByIdAndUpdate(
@@ -128,6 +192,15 @@ const addComment = async (req, res) => {
         ).select('comments');
 
         const savedComment = updated.comments[updated.comments.length - 1];
+
+        await notifyOwner({
+            ownerId: workout.user,
+            actorId: userId,
+            type: 'comment',
+            workout,
+            actor: req.user,
+            text
+        });
 
         res.status(201).json({
             comment: {
@@ -150,15 +223,20 @@ const getFriendProfile = async (req, res) => {
         const { userId } = req.params;
         const viewerId = req.user._id;
 
-        const allowed = await canAccessWorkout(viewerId, userId);
-        if (!allowed) return res.status(403).json({ message: 'Solo puedes ver el perfil de tus amigos' });
-
+        // 🔥 La CABECERA del perfil es pública para todo el mundo (como en IG).
+        // Antes esto devolvía 403 si no erais amigos y ni siquiera podías ver
+        // quién era la persona para mandarle solicitud.
         const profile = await User.findById(userId)
-            .select('username avatar frame pet level title currentXP nextLevelXP streak friends clan clanRank')
+            .select('username avatar frame pet level title bio isPrivate currentXP nextLevelXP streak friends friendRequests clan clanRank')
             .populate('clan', 'name icon')
             .lean();
 
         if (!profile) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+        const isMe = viewerId.toString() === userId.toString();
+        const isFriend = (profile.friends || []).some(f => f.toString() === viewerId.toString());
+        // Solo el CONTENIDO (entrenos, comida, misiones) respeta la privacidad
+        const canView = isMe || !profile.isPrivate || isFriend;
 
         const [workoutsCount, missionsAggregate] = await Promise.all([
             WorkoutLog.countDocuments({ user: userId }),
@@ -172,6 +250,9 @@ const getFriendProfile = async (req, res) => {
         // mismo conjunto (tus amigos). Se exponen por separado para la UI estilo IG.
         const friendsCount = (profile.friends || []).length;
 
+        // ¿Ya le he mandado solicitud? Sirve para pintar "Solicitud enviada"
+        const requestSent = (profile.friendRequests || []).some(r => r.toString() === viewerId.toString());
+
         res.json({
             profile: {
                 _id: profile._id,
@@ -181,6 +262,8 @@ const getFriendProfile = async (req, res) => {
                 pet: profile.pet,
                 level: profile.level,
                 title: profile.title,
+                bio: profile.bio || '',
+                isPrivate: !!profile.isPrivate,
                 currentXP: profile.currentXP,
                 nextLevelXP: profile.nextLevelXP,
                 streak: profile.streak,
@@ -193,7 +276,10 @@ const getFriendProfile = async (req, res) => {
                 following: friendsCount,
                 missions: missionsAggregate[0]?.total || 0
             },
-            isMe: viewerId.toString() === userId.toString()
+            isMe,
+            isFriend,
+            requestSent,
+            canViewContent: canView
         });
     } catch (error) {
         console.error('Error en getFriendProfile:', error);
@@ -211,8 +297,9 @@ const getProfileItems = async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const skip = (page - 1) * FEED_PAGE_SIZE;
 
-        const allowed = await canAccessWorkout(viewerId, userId);
-        if (!allowed) return res.status(403).json({ message: 'Solo puedes ver el perfil de tus amigos' });
+        // Aquí SÍ se bloquea: el contenido de una cuenta privada solo lo ven sus amigos
+        const allowed = await canViewContent(viewerId, userId);
+        if (!allowed) return res.status(403).json({ message: 'Esta cuenta es privada' });
 
         if (tab === 'workouts') {
             const logs = await WorkoutLog.find({ user: userId })
@@ -526,8 +613,43 @@ const getMonthlyLeaderboard = async (req, res) => {
     }
 };
 
+// @desc    Mis notificaciones de me gusta / comentarios
+// @route   GET /api/social/notifications
+const getNotifications = async (req, res) => {
+    try {
+        const [items, unread] = await Promise.all([
+            Notification.find({ user: req.user._id })
+                .sort({ createdAt: -1 })
+                .limit(40)
+                .populate('actor', 'username avatar frame')
+                .lean(),
+            Notification.countDocuments({ user: req.user._id, read: false })
+        ]);
+
+        res.json({ items, unread });
+    } catch (error) {
+        console.error('Error en getNotifications:', error);
+        res.status(500).json({ message: 'Error cargando notificaciones' });
+    }
+};
+
+// @desc    Marcar mis notificaciones como leídas
+// @route   POST /api/social/notifications/read
+const markNotificationsRead = async (req, res) => {
+    try {
+        await Notification.updateMany(
+            { user: req.user._id, read: false },
+            { $set: { read: true } }
+        );
+        res.json({ message: 'Notificaciones marcadas como leídas' });
+    } catch (error) {
+        console.error('Error en markNotificationsRead:', error);
+        res.status(500).json({ message: 'Error actualizando notificaciones' });
+    }
+};
+
 module.exports = {
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
     getFeed, toggleLike, addComment, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
-    removeFriend
+    removeFriend, getNotifications, markNotificationsRead
 };

@@ -25,11 +25,27 @@ export default function Social() {
 
     const { data: feedData, mutate: mutateFeed, isLoading: loadingFeed } = useSWR('/social/feed?page=1', fetcher);
     const { data: friendsData, mutate: mutateFriends } = useSWR('/social/friends', fetcher);
+    // Avisos de me gusta / comentarios. Se refrescan solos cada minuto para que
+    // el contador del buzón no se quede obsoleto mientras navegas.
+    const { data: notifData, mutate: mutateNotifs } = useSWR('/social/notifications', fetcher, { refreshInterval: 60000 });
 
     const friends = friendsData?.friends || [];
     const requests = friendsData?.requests || [];
     const missionInvites = user?.missionRequests || [];
-    const totalNotifications = requests.length + missionInvites.length;
+    const notifications = notifData?.items || [];
+    const unreadNotifs = notifData?.unread || 0;
+    const totalNotifications = requests.length + missionInvites.length + unreadNotifs;
+
+    // Al abrir el buzón damos por leídas las notificaciones de actividad
+    const openInbox = async () => {
+        setShowInbox(true);
+        if (unreadNotifs > 0) {
+            try {
+                await api.post('/social/notifications/read');
+                mutateNotifs();
+            } catch (e) { /* si falla, se reintenta al siguiente refresco */ }
+        }
+    };
 
     const [toast, setToast] = useState(null);
     const [showInbox, setShowInbox] = useState(false);
@@ -117,7 +133,7 @@ export default function Social() {
     };
 
     const ACTIONS = [
-        { key: 'inbox', icon: Mail, label: 'Buzón', onClick: () => setShowInbox(true), badge: totalNotifications },
+        { key: 'inbox', icon: Mail, label: 'Buzón', onClick: openInbox, badge: totalNotifications },
         { key: 'clan', icon: Shield, label: 'Clan', onClick: () => navigate('/social/clans') },
         { key: 'friends', icon: Users, label: 'Amigos', onClick: () => navigate('/social/friends') },
         { key: 'search', icon: Search, label: 'Buscar', onClick: () => setSearchOpen(true) },
@@ -236,6 +252,7 @@ export default function Social() {
                 <InboxModal
                     requests={requests}
                     missionInvites={missionInvites}
+                    notifications={notifications}
                     onClose={() => setShowInbox(false)}
                     onRespondFriend={handleRespondFriend}
                     onRespondMission={handleRespondMission}

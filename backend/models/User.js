@@ -8,12 +8,23 @@ const userSchema = new mongoose.Schema({
     pet: { type: String, default: null },
     title: { type: String, default: 'Principiante' },
     theme: { type: String, default: 'dark' },
+
+    // --- PERFIL PÚBLICO (estilo IG) ---
+    bio: { type: String, default: '', maxlength: 150 },
+    // Público por defecto: cualquiera puede ver tus entrenos.
+    // Si se pone en privado, solo tus amigos ven el contenido (la cabecera del
+    // perfil sigue siendo visible para todos, como en Instagram).
+    isPrivate: { type: Boolean, default: false },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, select: false }, // Protegido
 
     // Clan System
     clan: { type: mongoose.Schema.Types.ObjectId, ref: 'Clan', default: null },
     clanRank: { type: String, enum: ['esclavo', 'recluta', 'guerrero', 'rey', 'dios', null], default: null },
+
+    // Modo del gimnasio: 'normal' trabaja con grupos musculares (Pecho, Espalda...)
+    // y 'pro' permite elegir el músculo concreto (Dorsal ancho, Vasto lateral...).
+    gymMode: { type: String, enum: ['normal', 'pro'], default: 'normal' },
 
     // Datos Físicos
     physicalStats: {

@@ -13,7 +13,9 @@ const {
     getFriendProfile,
     getProfileItems,
     getMonthlyLeaderboard,
-    removeFriend
+    removeFriend,
+    getNotifications,
+    markNotificationsRead
 } = require('../controllers/socialController');
 const protect = require('../middleware/authMiddleware');
 
@@ -32,5 +34,9 @@ router.post('/feed/:workoutId/like', protect, toggleLike);
 router.post('/feed/:workoutId/comment', protect, addComment);
 router.get('/profile/:userId', protect, getFriendProfile);
 router.get('/profile/:userId/items', protect, getProfileItems);
+
+// Notificaciones de me gusta y comentarios
+router.get('/notifications', protect, getNotifications);
+router.post('/notifications/read', protect, markNotificationsRead);
 
 module.exports = router;

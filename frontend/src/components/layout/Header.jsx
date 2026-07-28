@@ -68,7 +68,8 @@ export default function Header() {
 
                 {/* 1. IZQUIERDA: PERFIL */}
                 <div className="flex items-center gap-3 group flex-1 min-w-0 mr-1">
-                    <Link to="/profile" className="relative flex-shrink-0 cursor-pointer active:scale-95 transition-transform overflow-visible">
+                    {/* Tu avatar abre los Ajustes (perfil público, privacidad, modo gym) */}
+                    <Link to="/settings" className="relative flex-shrink-0 cursor-pointer active:scale-95 transition-transform overflow-visible">
                         <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center overflow-hidden border-2 ${avatarBgClass} ${avatarBorderClass}`}>
                             {userAvatar ? (
                                 <img src={userAvatar} alt="Av" className="w-full h-full object-cover" />

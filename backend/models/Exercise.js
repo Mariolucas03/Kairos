@@ -3,7 +3,12 @@ const mongoose = require('mongoose');
 const exerciseSchema = new mongoose.Schema({
     // Campos básicos
     name: { type: String, required: true },
+    // Grupo muscular (Pecho, Espalda...). Es la clave con la que agregan las
+    // estadísticas, así que SIEMPRE guarda un grupo, nunca un músculo concreto.
     muscle: { type: String, required: true },
+    // Músculo concreto elegido en modo PRO (ej: 'Dorsal ancho'). Opcional:
+    // en modo normal se queda vacío y todo sigue funcionando igual.
+    muscleDetail: { type: String, default: '' },
     equipment: { type: String, default: "Barra" },
 
     // --- NUEVOS CAMPOS NECESARIOS PARA EL FIX ---
