@@ -17,7 +17,9 @@ const {
     getRoutineHistory,
     getExerciseHistory,
     getBodyStatus,
-    chatRoutineGenerator
+    chatRoutineGenerator,
+    getMuscleCatalog,
+    getMuscleRanksController
 } = require('../controllers/gymController');
 
 const protect = require('../middleware/authMiddleware');
@@ -34,6 +36,10 @@ router.delete('/routines/:id', protect, deleteRoutine);
 
 // Ejercicios
 router.get('/exercises', protect, getAllExercises);
+// Catálogo de músculos + modo del usuario (normal / pro)
+router.get('/muscles', protect, getMuscleCatalog);
+// Nivel/rango de cada grupo muscular
+router.get('/muscle-ranks', protect, getMuscleRanksController);
 router.post('/exercises', protect, createCustomExercise);
 
 // Logs / Registros

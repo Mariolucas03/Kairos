@@ -3,9 +3,14 @@ const mongoose = require('mongoose');
 const exerciseSchema = new mongoose.Schema({
     name: { type: String, required: true },
     muscle: { type: String, required: true },
+    // Músculo concreto y grupos secundarios, para mostrar qué trabaja cada ejercicio
+    muscleDetail: { type: String, default: '' },
+    secondary: { type: [String], default: [] },
     sets: { type: Number, default: 3 },
     reps: { type: String, default: '10-12' },
-    targetWeight: { type: Number, default: 0 }
+    targetWeight: { type: Number, default: 0 },
+    // Descanso propio de este ejercicio. Si es 0 se usa el general de la rutina.
+    rest: { type: Number, default: 0 }
 });
 
 const routineSchema = new mongoose.Schema({
@@ -14,6 +19,12 @@ const routineSchema = new mongoose.Schema({
 
     // 🔥 CAMPO NUEVO: Guardar el color elegido
     color: { type: String, default: 'blue' },
+
+    // Descanso general de la rutina, en segundos.
+    // ⚠️ Faltaba en el esquema: el frontend lo enviaba desde el principio pero
+    // Mongoose (modo strict) lo descartaba sin avisar, así que el descanso que
+    // configurabas al crear la rutina nunca llegaba a guardarse.
+    defaultRest: { type: Number, default: 60 },
 
     exercises: [exerciseSchema],
     lastPerformed: { type: Date },

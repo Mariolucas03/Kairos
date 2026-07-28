@@ -9,6 +9,11 @@ const exerciseSchema = new mongoose.Schema({
     // Músculo concreto elegido en modo PRO (ej: 'Dorsal ancho'). Opcional:
     // en modo normal se queda vacío y todo sigue funcionando igual.
     muscleDetail: { type: String, default: '' },
+    // Otros GRUPOS que participan en el ejercicio. Se usan para colorear el
+    // mapa del cuerpo con menos intensidad que el músculo principal.
+    secondary: { type: [String], default: [] },
+    // Los de cardio puntúan por duración, no por kg levantados
+    isCardio: { type: Boolean, default: false },
     equipment: { type: String, default: "Barra" },
 
     // --- NUEVOS CAMPOS NECESARIOS PARA EL FIX ---

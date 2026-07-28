@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import BodyMap from '../body/BodyMap';
 import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import { getLevelStyle } from '../../utils/socialHelpers';
@@ -22,6 +23,9 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
     const [liked, setLiked] = useState(!!post.likedByMe);
     const [likesCount, setLikesCount] = useState(post.likesCount || 0);
     const [likeBusy, setLikeBusy] = useState(false);
+
+    const [slideIndex, setSlideIndex] = useState(0);
+    const carruselRef = useRef(null);
 
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState(post.comments || []);
@@ -71,6 +75,21 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
     const durationMin = Math.round((post.duration || 0) / 60);
     const isGym = post.type === 'gym';
 
+    // Diapositivas del carrusel: solo las que tienen contenido
+    const slides = [
+        post.photo ? 'photo' : null,
+        (post.musclesWorked || []).length > 0 ? 'body' : null,
+        (post.exercises || []).length > 0 ? 'exercises' : null
+    ].filter(Boolean);
+
+    // El punto activo se calcula desde el scroll real, así funciona igual
+    // arrastrando con el dedo que con la rueda del ratón.
+    const handleCarouselScroll = () => {
+        const el = carruselRef.current;
+        if (!el) return;
+        setSlideIndex(Math.round(el.scrollLeft / el.clientWidth));
+    };
+
     return (
         <div className="bg-zinc-950 border border-white/5 rounded-[24px] mb-4 overflow-hidden shadow-sm">
             {/* CABECERA */}
@@ -97,8 +116,74 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                 </div>
             </div>
 
+            {/* --- CARRUSEL DESLIZABLE (foto · cuerpo · ejercicios), como en IG --- */}
+            {slides.length > 0 && (
+                <div className="relative">
+                    <div
+                        ref={carruselRef}
+                        onScroll={handleCarouselScroll}
+                        className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+                    >
+                        {slides.map((slide, i) => (
+                            <div key={i} className="min-w-full snap-center">
+                                {slide === 'photo' && (
+                                    <img src={post.photo} alt="Foto del entreno" className="w-full h-72 object-cover" />
+                                )}
+
+                                {slide === 'body' && (
+                                    <div className="h-72 bg-black/40 flex flex-col items-center justify-center py-2">
+                                        <BodyMap
+                                            highlight={post.musclesWorked}
+                                            secondary={post.secondaryMuscles}
+                                            showToggle={false}
+                                        />
+                                        <div className="flex flex-wrap gap-1 justify-center px-4 mt-1">
+                                            {(post.musclesWorked || []).map(m => (
+                                                <span key={m} className="text-[9px] font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 px-2 py-0.5 rounded uppercase">{m}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {slide === 'exercises' && (
+                                    <div className="h-72 bg-black/40 px-4 py-3 overflow-y-auto no-scrollbar">
+                                        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Ejercicios</p>
+                                        <div className="space-y-1.5">
+                                            {(post.exercises || []).map((ex, idx) => (
+                                                <div key={idx} className="bg-zinc-900/60 border border-white/5 rounded-xl px-3 py-2">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[11px] font-black text-white uppercase truncate pr-2">{ex.name}</span>
+                                                        <span className="text-[9px] font-bold text-zinc-500 shrink-0">{(ex.sets || []).length} {(ex.sets || []).length === 1 ? 'serie' : 'series'}</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {(ex.sets || []).map((s, j) => (
+                                                            <span key={j} className="text-[9px] font-bold text-zinc-400 bg-black px-1.5 py-0.5 rounded border border-white/5">
+                                                                {s.weight > 0 ? `${s.weight}kg × ${s.reps}` : `${s.reps} reps`}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Puntitos de posición */}
+                    {slides.length > 1 && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/60 px-2 py-1 rounded-full backdrop-blur-sm">
+                            {slides.map((_, i) => (
+                                <span key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === slideIndex ? 'bg-white w-3' : 'bg-white/40'}`} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* CUERPO */}
-            <div className="px-4 pb-3">
+            <div className="px-4 py-3">
                 <h4 className="text-white font-black text-lg italic uppercase tracking-tighter mb-2">{post.routineName}</h4>
                 <div className="flex items-center gap-4 text-zinc-400">
                     <span className="flex items-center gap-1 text-xs font-bold"><Timer size={12} className="text-blue-400" /> {durationMin} min</span>

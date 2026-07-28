@@ -16,6 +16,14 @@ import BackButton from '../components/common/BackButton';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
+// Estilo visual por rareza: borde, brillo y etiqueta
+const RARITIES = {
+    comun: { label: 'Común', border: 'border-zinc-800', glow: '', text: 'text-zinc-500', blob: 'bg-zinc-500' },
+    raro: { label: 'Raro', border: 'border-blue-500/40', glow: 'shadow-[0_0_15px_rgba(59,130,246,0.15)]', text: 'text-blue-400', blob: 'bg-blue-500' },
+    epico: { label: 'Épico', border: 'border-purple-500/50', glow: 'shadow-[0_0_18px_rgba(168,85,247,0.2)]', text: 'text-purple-400', blob: 'bg-purple-500' },
+    legendario: { label: 'Legendario', border: 'border-yellow-500/60', glow: 'shadow-[0_0_22px_rgba(234,179,8,0.25)]', text: 'text-yellow-400', blob: 'bg-yellow-500' }
+};
+
 const CATEGORIES = [
     { id: 'reward', label: 'PREMIOS', icon: <Ticket size={24} /> },
     { id: 'consumable', label: 'POCIONES', icon: <Heart size={24} /> },
@@ -260,23 +268,35 @@ export default function Shop() {
                                     const isReward = item.category === 'reward';
                                     const iconPath = isReward ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png";
 
+                                    const rarity = RARITIES[item.rarity] || RARITIES.comun;
+
                                     return (
                                         <div
                                             key={item._id}
                                             onClick={() => { if (!purchased) setSelectedItem(item); }}
                                             className={`
-                                                relative bg-zinc-950 border border-zinc-800 rounded-3xl p-4 flex flex-col items-center justify-between transition-all shadow-md min-h-[160px]
-                                                ${purchased ? 'opacity-40 grayscale cursor-default' : 'hover:border-yellow-500/30 cursor-pointer active:scale-95'}
+                                                relative bg-zinc-950 border rounded-3xl p-4 flex flex-col items-center justify-between transition-all min-h-[160px] overflow-hidden
+                                                ${rarity.border} ${rarity.glow}
+                                                ${purchased ? 'opacity-40 grayscale cursor-default' : 'cursor-pointer active:scale-95 hover:brightness-125'}
                                             `}
                                         >
-                                            <div className="h-14 w-14 mb-2 flex items-center justify-center">
+                                            {/* Halo de color según rareza */}
+                                            {item.rarity && item.rarity !== 'comun' && (
+                                                <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-20 pointer-events-none ${rarity.blob}`} />
+                                            )}
+
+                                            <div className="h-14 w-14 mb-2 flex items-center justify-center relative z-10">
                                                 {(item.icon?.startsWith('/') || item.icon?.startsWith('http')) ?
                                                     <img src={item.icon} className="w-full h-full object-contain filter drop-shadow-lg" />
                                                     : <div className="text-4xl">{item.icon}</div>}
                                             </div>
 
-                                            <div className="text-center w-full">
-                                                <h3 className="text-[10px] font-black text-white truncate w-full mb-3 uppercase tracking-wide">{item.name}</h3>
+                                            <div className="text-center w-full relative z-10">
+                                                <h3 className="text-[10px] font-black text-white truncate w-full mb-1 uppercase tracking-wide">{item.name}</h3>
+                                                {item.rarity && item.rarity !== 'comun' && (
+                                                    <p className={`text-[7px] font-black uppercase tracking-[0.15em] mb-2 ${rarity.text}`}>{rarity.label}</p>
+                                                )}
+                                                {(!item.rarity || item.rarity === 'comun') && <div className="mb-2" />}
 
                                                 {purchased ? (
                                                     <div className="text-[8px] font-black text-green-500 uppercase tracking-widest bg-green-900/10 px-2 py-1 rounded border border-green-500/20">ADQUIRIDO</div>

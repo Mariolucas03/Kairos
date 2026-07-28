@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, X, Dumbbell, Plus, CheckCircle2, Save } from 'lucide-react';
+import useSWR from 'swr';
+import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Sparkles } from 'lucide-react';
 import api from '../../services/api';
+
+const fetcher = (url) => api.get(url).then(res => res.data);
 
 export default function ExerciseSelector({ onSelect, onClose }) {
     const [exercises, setExercises] = useState([]);
@@ -12,9 +15,17 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     // Formulario de creación rápida
     const [showCreate, setShowCreate] = useState(false);
     const [newExerciseName, setNewExerciseName] = useState('');
+    // Músculo concreto elegido en modo PRO
+    const [newDetail, setNewDetail] = useState('');
 
-    // 🔥 CAMBIO APLICADO: 'Cardio' eliminado, 'Glúteo' añadido.
-    const muscles = ['Todos', 'Pecho', 'Espalda', 'Pierna', 'Glúteo', 'Hombro', 'Bíceps', 'Tríceps', 'Abdomen'];
+    // 🔥 El catálogo y el modo (normal/pro) los manda el servidor, así no hay
+    // dos listas de músculos que se puedan desincronizar.
+    const { data: catalog } = useSWR('/gym/muscles', fetcher);
+    const isPro = catalog?.mode === 'pro';
+    const groups = catalog?.groups || ['Pecho', 'Espalda', 'Hombro', 'Bíceps', 'Tríceps', 'Pierna', 'Glúteo', 'Abdomen'];
+    const specific = catalog?.specific || {};
+
+    const muscles = ['Todos', ...groups];
 
     useEffect(() => {
         const fetchExercises = async () => {
@@ -41,21 +52,29 @@ export default function ExerciseSelector({ onSelect, onClose }) {
         }
     };
 
+    // Grupo al que irá el ejercicio nuevo (si estás en "Todos", el primero de la lista)
+    const grupoDestino = selectedMuscle === 'Todos' ? groups[0] : selectedMuscle;
+
     const handleCreateNew = async () => {
         if (!newExerciseName.trim()) return;
-        // Si está en 'Todos', por defecto va a Pecho, si no, al seleccionado (ej: Glúteo)
-        const muscleToSave = selectedMuscle === 'Todos' ? 'Pecho' : selectedMuscle;
 
         try {
-            const res = await api.post('/gym/exercises', { name: newExerciseName, muscle: muscleToSave });
+            // En modo PRO mandamos el músculo concreto y el servidor deriva el grupo
+            const payload = { name: newExerciseName, muscle: grupoDestino };
+            if (isPro && newDetail) payload.muscleDetail = newDetail;
+
+            const res = await api.post('/gym/exercises', payload);
             const newEx = res.data;
             setExercises([...exercises, newEx]);
             // Al crear, lo seleccionamos automáticamente al final
             setSelectedExercises([...selectedExercises, newEx]);
             setNewExerciseName('');
+            setNewDetail('');
             setShowCreate(false);
             setSearchTerm('');
-        } catch (e) { alert("Error al crear ejercicio"); }
+        } catch (e) {
+            console.error('Error al crear ejercicio', e);
+        }
     };
 
     // Filtrado
@@ -64,6 +83,12 @@ export default function ExerciseSelector({ onSelect, onClose }) {
         const matchMuscle = selectedMuscle === 'Todos' || ex.muscle === selectedMuscle;
         return matchName && matchMuscle;
     });
+
+    // Agrupados por músculo y en el orden oficial de grupos, en vez de una
+    // lista plana de 82 ejercicios donde no se encontraba nada.
+    const agrupados = groups
+        .map(g => [g, filtered.filter(ex => ex.muscle === g)])
+        .filter(([, lista]) => lista.length > 0);
 
     return (
         <div className="fixed inset-0 z-[110] bg-zinc-950 flex flex-col h-[100dvh] w-full animate-in slide-in-from-right duration-300">
@@ -113,7 +138,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                     <button onClick={() => { setNewExerciseName(searchTerm); setShowCreate(true); }} className="w-full flex items-center justify-between p-4 bg-blue-900/20 border border-blue-500/30 rounded-2xl text-left active:scale-95 transition-all">
                         <div>
                             <p className="text-blue-400 font-bold text-sm">Crear "{searchTerm}"</p>
-                            <p className="text-[10px] text-zinc-500 uppercase">En {selectedMuscle === 'Todos' ? 'Pecho' : selectedMuscle}</p>
+                            <p className="text-[10px] text-zinc-500 uppercase">En {grupoDestino}</p>
                         </div>
                         <Plus className="text-blue-400" />
                     </button>
@@ -122,7 +147,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
 
             {/* FORMULARIO CREAR */}
             {showCreate && (
-                <div className="px-4 py-2 bg-zinc-900 border-b border-zinc-800 animate-in slide-in-from-top-2">
+                <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 animate-in slide-in-from-top-2 space-y-3">
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -131,15 +156,47 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                             placeholder="Nombre del ejercicio"
                             className="flex-1 bg-black border border-zinc-700 rounded-xl p-3 text-white text-sm font-bold outline-none focus:border-blue-500"
                         />
-                        <button onClick={handleCreateNew} className="bg-blue-600 text-white p-3 rounded-xl font-bold"><Save size={18} /></button>
+                        <button onClick={handleCreateNew} className="bg-blue-600 text-white p-3 rounded-xl font-bold active:scale-95 transition-transform"><Save size={18} /></button>
                     </div>
+
+                    {/* 🔥 MODO PRO: además del grupo, se elige el músculo concreto */}
+                    {isPro && (specific[grupoDestino] || []).length > 0 && (
+                        <div>
+                            <label className="text-[9px] font-black text-purple-400 uppercase tracking-widest flex items-center gap-1 mb-2">
+                                <Sparkles size={10} /> Músculo concreto ({grupoDestino})
+                            </label>
+                            <div className="flex flex-wrap gap-1.5">
+                                {(specific[grupoDestino] || []).map(m => (
+                                    <button
+                                        key={m}
+                                        onClick={() => setNewDetail(newDetail === m ? '' : m)}
+                                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${newDetail === m
+                                            ? 'bg-purple-600 text-white border-purple-500'
+                                            : 'bg-black text-zinc-400 border-zinc-800 hover:border-zinc-700'}`}
+                                    >
+                                        {m}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[9px] text-zinc-600 mt-2">
+                                Opcional. Se guardará dentro de <span className="text-zinc-400 font-bold">{grupoDestino}</span> para las estadísticas.
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* LISTA DE EJERCICIOS */}
+            {/* LISTA DE EJERCICIOS, AGRUPADA POR MÚSCULO */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-black p-4 space-y-2 pb-24">
                 {loading ? <div className="text-center py-10 text-zinc-600 animate-pulse font-bold text-xs uppercase">Cargando...</div> :
-                    filtered.map(ex => {
+                    agrupados.map(([grupo, lista]) => (
+                        <div key={grupo} className="mb-4">
+                            <div className="flex items-center justify-between px-1 mb-2 sticky top-0 bg-black py-1 z-10">
+                                <h3 className="text-[10px] font-black text-yellow-500 uppercase tracking-widest">{grupo}</h3>
+                                <span className="text-[9px] font-bold text-zinc-600">{lista.length}</span>
+                            </div>
+                            <div className="space-y-2">
+                                {lista.map(ex => {
                         // BUSCAMOS SU POSICIÓN EN LA LISTA DE SELECCIONADOS PARA EL NÚMERO
                         const selectionIndex = selectedExercises.findIndex(s => s._id === ex._id);
                         const isSelected = selectionIndex !== -1;
@@ -159,7 +216,13 @@ export default function ExerciseSelector({ onSelect, onClose }) {
 
                                     <div>
                                         <p className={`font-bold text-sm uppercase ${isSelected ? 'text-yellow-500' : 'text-zinc-300'}`}>{ex.name}</p>
-                                        <p className="text-[10px] text-zinc-600 font-bold uppercase">{ex.muscle}</p>
+                                        <p className="text-[10px] text-zinc-600 font-bold uppercase">
+                                            {ex.muscle}
+                                            {/* En modo PRO mostramos también el músculo concreto si lo tiene */}
+                                            {isPro && ex.muscleDetail && (
+                                                <span className="text-purple-400 normal-case"> · {ex.muscleDetail}</span>
+                                            )}
+                                        </p>
                                     </div>
                                 </div>
 
@@ -167,7 +230,10 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                 {isSelected ? <CheckCircle2 className="text-yellow-500" size={24} /> : <div className="w-6 h-6 rounded-full border-2 border-zinc-800"></div>}
                             </div>
                         );
-                    })
+                                })}
+                            </div>
+                        </div>
+                    ))
                 }
                 {filtered.length === 0 && !searchTerm && <div className="text-center py-10 text-zinc-700 text-xs font-bold uppercase">No hay ejercicios en esta categoría</div>}
             </div>

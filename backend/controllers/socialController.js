@@ -6,6 +6,7 @@ const Notification = require('../models/Notification');
 const { sendPushToUser } = require('./pushController');
 const { getMadridDateString, getMadridMonthString } = require('../utils/dateHelpers');
 const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
+const { getMuscleRanks } = require('../services/muscleRankService');
 
 // 🔥 Escapa caracteres especiales de regex para evitar ReDoS / patrones inesperados
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -28,6 +29,10 @@ const shapeFeedItem = (log, viewerId) => {
         caloriesBurned: obj.caloriesBurned,
         exercises: obj.exercises,
         date: obj.date,
+        // Contenido del post: foto y músculos trabajados (para el carrusel)
+        photo: obj.photo || '',
+        musclesWorked: obj.musclesWorked || [],
+        secondaryMuscles: obj.secondaryMuscles || [],
         likesCount: likes.length,
         likedByMe: likes.some(id => id.toString() === viewerId.toString()),
         comments: (obj.comments || []).map(c => ({
@@ -293,13 +298,19 @@ const getProfileItems = async (req, res) => {
     try {
         const { userId } = req.params;
         const viewerId = req.user._id;
-        const tab = ['workouts', 'food', 'missions'].includes(req.query.tab) ? req.query.tab : 'workouts';
+        const tab = ['workouts', 'food', 'missions', 'body'].includes(req.query.tab) ? req.query.tab : 'workouts';
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const skip = (page - 1) * FEED_PAGE_SIZE;
 
         // Aquí SÍ se bloquea: el contenido de una cuenta privada solo lo ven sus amigos
         const allowed = await canViewContent(viewerId, userId);
         if (!allowed) return res.status(403).json({ message: 'Esta cuenta es privada' });
+
+        // Pestaña "Cuerpo": nivel de cada grupo muscular (no es una lista paginada)
+        if (tab === 'body') {
+            const ranks = await getMuscleRanks(userId);
+            return res.json({ tab, ranks, items: [], hasMore: false });
+        }
 
         if (tab === 'workouts') {
             const logs = await WorkoutLog.find({ user: userId })

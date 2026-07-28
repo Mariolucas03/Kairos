@@ -31,9 +31,21 @@ const workoutLogSchema = mongoose.Schema({
         sets: [{
             weight: Number,
             reps: Number,
-            completed: Boolean
+            completed: Boolean,
+            // 'N' = serie normal, 'D' = dropset, para poder distinguirlas en el post
+            type: { type: String, enum: ['N', 'D'], default: 'N' }
         }]
     }],
+    // --- POST DEL ENTRENO (estilo Instagram) ---
+    // Foto opcional en base64, ya comprimida en el móvil (~200 KB).
+    // Se guarda aquí en vez de en un servicio externo para no depender de
+    // ninguna cuenta de terceros; el backend limita el tamaño al guardar.
+    photo: { type: String, default: '' },
+    // Grupos musculares trabajados, derivados EN EL SERVIDOR a partir de los
+    // ejercicios (no se confía en lo que mande el cliente).
+    musclesWorked: { type: [String], default: [] },
+    secondaryMuscles: { type: [String], default: [] },
+
     earnedXP: { type: Number, default: 0 },
     earnedCoins: { type: Number, default: 0 },
     date: {

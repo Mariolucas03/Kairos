@@ -12,6 +12,8 @@ const { askAI } = require('../services/aiService');
 // entre las 00:00 y las 02:00 se guardaba en el día ANTERIOR.
 const { getTodayDateString } = require('../utils/dateHelpers');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
+const { EXERCISE_CATALOG } = require('../utils/exerciseCatalog');
+const { getMuscleRanks, RANKS } = require('../services/muscleRankService');
 
 // ==========================================
 // 1. OBTENER RUTINAS
@@ -27,9 +29,15 @@ const getRoutines = async (req, res) => {
 
 const createRoutine = async (req, res) => {
     try {
-        const { name, exercises, difficulty, color } = req.body;
+        const { name, exercises, difficulty, color, defaultRest } = req.body;
         const routine = await Routine.create({
-            user: req.user._id, name, color: color || 'blue', exercises, difficulty: difficulty || 'Guerrero'
+            user: req.user._id,
+            name,
+            color: color || 'blue',
+            exercises,
+            difficulty: difficulty || 'Guerrero',
+            // El descanso lo enviaba el frontend pero aquí se ignoraba
+            defaultRest: parseInt(defaultRest) || 60
         });
         res.status(201).json(routine);
     } catch (error) {
@@ -67,6 +75,10 @@ const deleteRoutine = async (req, res) => {
 
 const getAllExercises = async (req, res) => {
     try {
+        // Nos aseguramos de que el catálogo base esté al día sin que el usuario
+        // tenga que llamar a /seed a mano (solo hace trabajo si falta algo).
+        await syncExerciseCatalog();
+
         const { muscle } = req.query;
         let query = {};
         if (muscle && muscle !== 'Todos') query.muscle = muscle;
@@ -92,7 +104,12 @@ const createCustomExercise = async (req, res) => {
         // grupo padre ('Espalda'); en modo normal llega ya el grupo. En ambos
         // casos `muscle` acaba guardando SIEMPRE un grupo válido, que es lo que
         // usan las estadísticas del cuerpo.
-        const grupo = resolveMuscleGroup(muscleDetail || muscle);
+        //
+        // Si el detalle no se reconoce, respetamos el grupo que venga en `muscle`
+        // en vez de caer en el genérico: así un músculo escrito de otra forma no
+        // manda el ejercicio a un grupo equivocado.
+        const grupoBase = resolveMuscleGroup(muscle);
+        const grupo = resolveMuscleGroup(muscleDetail || muscle, grupoBase);
         const detalle = muscleDetail && isSpecificMuscle(muscleDetail) ? muscleDetail.trim() : '';
 
         const exercise = await Exercise.create({
@@ -111,6 +128,18 @@ const createCustomExercise = async (req, res) => {
     }
 };
 
+// @desc  Rangos de cada grupo muscular (nivel según kg, reps y constancia)
+// @route GET /api/gym/muscle-ranks
+const getMuscleRanksController = async (req, res) => {
+    try {
+        const ranks = await getMuscleRanks(req.user._id);
+        res.json({ ranks, tiers: RANKS });
+    } catch (error) {
+        console.error('Error en getMuscleRanks:', error);
+        res.status(500).json({ message: 'Error calculando los rangos musculares' });
+    }
+};
+
 // @desc  Catálogo de músculos para que el frontend pinte los selectores
 // @route GET /api/gym/muscles
 const getMuscleCatalog = async (req, res) => {
@@ -122,24 +151,52 @@ const getMuscleCatalog = async (req, res) => {
     });
 };
 
+/**
+ * Sincroniza el catálogo base de ejercicios.
+ *
+ * Antes solo sembraba si la colección estaba VACÍA, así que ampliar la lista no
+ * servía de nada (los ejercicios nuevos no llegaban nunca). Ahora hace upsert
+ * por nombre, igual que el catálogo de la tienda, y respeta los ejercicios
+ * personalizados del usuario (isCustom: true), que nunca se tocan.
+ */
+const syncExerciseCatalog = async () => {
+    const baseCount = await Exercise.countDocuments({ isCustom: { $ne: true } });
+    if (baseCount === EXERCISE_CATALOG.length) return { synced: false, total: baseCount };
+
+    await Exercise.bulkWrite(EXERCISE_CATALOG.map(ex => ({
+        updateOne: {
+            filter: { name: ex.name, isCustom: { $ne: true } },
+            update: {
+                $set: {
+                    name: ex.name,
+                    muscle: ex.muscle,
+                    muscleDetail: ex.muscleDetail || '',
+                    secondary: ex.secondary || [],
+                    equipment: ex.equipment || 'Barra',
+                    isCardio: !!ex.isCardio,
+                    category: ex.isCardio ? 'cardio' : 'strength',
+                    isCustom: false,
+                    user: null
+                }
+            },
+            upsert: true
+        }
+    })));
+
+    return { synced: true, total: EXERCISE_CATALOG.length };
+};
+
 const seedExercises = async (req, res) => {
     try {
-        const count = await Exercise.countDocuments();
-        if (count > 0) return res.json({ message: 'Ya existen ejercicios' });
-
-        const basics = [
-            { name: 'Press de Banca', muscle: 'Pecho', equipment: 'Barra' },
-            { name: 'Sentadilla', muscle: 'Pierna', equipment: 'Barra' },
-            { name: 'Peso Muerto', muscle: 'Espalda', equipment: 'Barra' },
-            { name: 'Press Militar', muscle: 'Hombro', equipment: 'Barra' },
-            { name: 'Dominadas', muscle: 'Espalda', equipment: 'Peso Corporal' },
-            { name: 'Remo con Barra', muscle: 'Espalda', equipment: 'Barra' },
-            { name: 'Curl de Bíceps', muscle: 'Bíceps', equipment: 'Barra' },
-            { name: 'Fondos', muscle: 'Tríceps', equipment: 'Peso Corporal' }
-        ];
-        await Exercise.insertMany(basics);
-        res.json({ message: 'Ejercicios base creados' });
+        const result = await syncExerciseCatalog();
+        res.json({
+            message: result.synced
+                ? `Catálogo sincronizado (${result.total} ejercicios)`
+                : 'El catálogo ya está al día',
+            total: result.total
+        });
     } catch (error) {
+        console.error('Error en seed de ejercicios:', error);
         res.status(500).json({ message: 'Error en seed' });
     }
 };
@@ -149,7 +206,37 @@ const seedExercises = async (req, res) => {
 // ==========================================
 const saveWorkoutLog = async (req, res) => {
     try {
-        const { routineId, routineName, duration, exercises, intensity } = req.body;
+        const { routineId, routineName, duration, exercises, intensity, photo } = req.body;
+
+        // 📸 La foto llega ya comprimida desde el móvil. Aquí solo validamos:
+        // ~400 KB en base64 es el techo, para que la base de datos no se dispare.
+        let fotoFinal = '';
+        if (photo) {
+            if (typeof photo !== 'string' || !photo.startsWith('data:image/')) {
+                return res.status(400).json({ message: 'Formato de imagen no válido' });
+            }
+            if (photo.length > 400 * 1024) {
+                return res.status(413).json({ message: 'La foto pesa demasiado. Inténtalo de nuevo.' });
+            }
+            fotoFinal = photo;
+        }
+
+        // 💪 Músculos trabajados: se derivan EN EL SERVIDOR desde el catálogo,
+        // no de lo que diga el cliente (que podría mentir para inflar rangos).
+        const nombres = (exercises || []).map(e => (e.name || '').toLowerCase());
+        const fichas = await Exercise.find({
+            $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
+        }).select('name muscle secondary').lean();
+
+        const principales = new Set();
+        const secundarios = new Set();
+        fichas.forEach(f => {
+            if (!nombres.includes(f.name.toLowerCase())) return;
+            principales.add(resolveMuscleGroup(f.muscle));
+            (f.secondary || []).forEach(s => secundarios.add(resolveMuscleGroup(s)));
+        });
+        // Un músculo principal no debe aparecer también como secundario
+        principales.forEach(m => secundarios.delete(m));
 
         const lastWeightLog = await DailyLog.findOne({ user: req.user._id, weight: { $gt: 0 } }).sort({ date: -1 }).lean();
         const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
@@ -192,7 +279,10 @@ const saveWorkoutLog = async (req, res) => {
 
         const log = await WorkoutLog.create({
             user: req.user._id, routine: routineId, routineName: routineName || 'Entrenamiento Libre',
-            duration, exercises, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date()
+            duration, exercises, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
+            photo: fotoFinal,
+            musclesWorked: [...principales],
+            secondaryMuscles: [...secundarios]
         });
 
         const today = getTodayDateString();
@@ -523,7 +613,7 @@ const chatRoutineGenerator = async (req, res) => {
 
 module.exports = {
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
-    getAllExercises, createCustomExercise, seedExercises, getMuscleCatalog,
+    getAllExercises, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
     chatRoutineGenerator

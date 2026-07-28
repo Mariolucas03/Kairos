@@ -42,9 +42,13 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         const formatted = selectedList.map(ex => ({
             name: ex.name,
             muscle: ex.muscle,
+            // Guardamos también qué músculos trabaja, para mostrarlo en la rutina
+            muscleDetail: ex.muscleDetail || '',
+            secondary: ex.secondary || [],
             sets: 3, // Valor inicial por defecto
             reps: "10-12",
-            targetWeight: 0
+            targetWeight: 0,
+            rest: 0 // 0 = usa el descanso general de la rutina
         }));
         setAddedExercises([...addedExercises, ...formatted]);
         setShowExerciseSelector(false);

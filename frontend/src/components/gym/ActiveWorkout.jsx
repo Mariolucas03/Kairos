@@ -1,13 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 import ExerciseSelector from './ExerciseSelector';
+import BodyMap from '../body/BodyMap';
+import { compressImage } from '../../utils/imageCompressor';
 
 // ==========================================
 // SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
@@ -127,6 +129,42 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [toast, setToast] = useState(null);
     const [showExitAlert, setShowExitAlert] = useState(false);
     const [showFinishAlert, setShowFinishAlert] = useState(false);
+    // Foto del entreno (se comprime en el móvil antes de subirla)
+    const [photo, setPhoto] = useState(null);
+    const [compressing, setCompressing] = useState(false);
+
+    const handlePhotoChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setCompressing(true);
+        try {
+            setPhoto(await compressImage(file));
+        } catch (err) {
+            setToast({ message: err.message || 'No se pudo procesar la imagen', type: 'error' });
+        } finally {
+            setCompressing(false);
+        }
+    };
+
+    // Cifras y músculos de la sesión, para la pantalla de resumen
+    const resumen = useMemo(() => {
+        let totalSets = 0, volumen = 0;
+        const musculos = new Set();
+
+        exercises.forEach(ex => {
+            const hechas = ex.setsData.filter(s => s.completed);
+            if (hechas.length === 0) return;
+            totalSets += hechas.length;
+            hechas.forEach(s => {
+                const kg = parseFloat(String(s.kg).replace(',', '.')) || 0;
+                const reps = parseFloat(String(s.reps).replace(',', '.')) || 0;
+                volumen += kg * reps;
+            });
+            if (ex.muscle) musculos.add(ex.muscle);
+        });
+
+        return { totalSets, volumen: Math.round(volumen), musculos: [...musculos] };
+    }, [exercises]);
     const [swapIndex, setSwapIndex] = useState(null);
     const [showSelector, setShowSelector] = useState(false);
 
@@ -340,7 +378,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         reps: parseFloat(String(s.reps).replace(',', '.')) || 0,
                         type: s.type || 'N'
                     }))
-                })).filter(ex => ex.sets.length > 0)
+                })).filter(ex => ex.sets.length > 0),
+                // La foto viaja ya comprimida; el servidor la valida y deriva
+                // por su cuenta los músculos trabajados a partir de los ejercicios.
+                photo: photo || undefined
             };
 
             const res = await api.post('/gym/log', logData);
@@ -502,15 +543,71 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 </div>
             )}
 
+            {/* --- RESUMEN DE FIN DE SESIÓN (estilo Symmetry) --- */}
             {showFinishAlert && (
-                <div className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
-                    <div className="bg-zinc-950 border border-yellow-500/30 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative text-center">
-                        <div className="bg-yellow-500/10 p-4 rounded-full text-yellow-500 inline-block mb-4"><Trophy size={32} /></div>
-                        <h3 className="text-white font-black text-lg uppercase">¿Terminar Sesión?</h3>
-                        <div className="flex gap-3 w-full mt-4">
+                <div className="fixed inset-0 z-[10000] bg-black/95 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto animate-in fade-in">
+                    <div className="bg-zinc-950 border border-yellow-500/30 p-5 rounded-3xl w-full max-w-sm shadow-2xl my-6">
+                        <div className="text-center mb-4">
+                            <div className="bg-yellow-500/10 p-3 rounded-full text-yellow-500 inline-block mb-2"><Trophy size={28} /></div>
+                            <h3 className="text-white font-black text-lg uppercase italic">Resumen del entreno</h3>
+                        </div>
+
+                        {/* Cifras de la sesión */}
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                            {[
+                                { label: 'Tiempo', value: `${Math.max(1, Math.round((Date.now() - startTime) / 60000))}m` },
+                                { label: 'Series', value: resumen.totalSets },
+                                { label: 'Volumen', value: resumen.volumen >= 1000 ? `${(resumen.volumen / 1000).toFixed(1)}t` : `${resumen.volumen}kg` }
+                            ].map(s => (
+                                <div key={s.label} className="bg-black border border-white/5 rounded-2xl py-2.5 text-center">
+                                    <div className="text-lg font-black text-white leading-none">{s.value}</div>
+                                    <div className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{s.label}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Músculos trabajados sobre el cuerpo */}
+                        {resumen.musculos.length > 0 && (
+                            <div className="bg-black border border-white/5 rounded-2xl p-3 mb-4">
+                                <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center mb-1">Músculos trabajados</p>
+                                <div className="h-52 flex items-center justify-center">
+                                    <BodyMap highlight={resumen.musculos} showToggle={false} />
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 justify-center mt-1">
+                                    {resumen.musculos.map(m => (
+                                        <span key={m} className="text-[9px] font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 px-2 py-0.5 rounded-lg uppercase">{m}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Foto del entreno */}
+                        <div className="mb-4">
+                            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Foto (opcional)</p>
+                            {photo ? (
+                                <div className="relative">
+                                    <img src={photo} alt="Foto del entreno" className="w-full h-40 object-cover rounded-2xl border border-white/10" />
+                                    <button
+                                        onClick={() => setPhoto(null)}
+                                        className="absolute top-2 right-2 bg-black/80 p-1.5 rounded-full text-white border border-white/20"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <label className={`w-full h-20 border-2 border-dashed border-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-500 cursor-pointer hover:border-zinc-700 transition-colors ${compressing ? 'opacity-50' : ''}`}>
+                                    {compressing
+                                        ? <><Loader2 size={16} className="animate-spin" /> <span className="text-xs font-bold">Preparando...</span></>
+                                        : <><Camera size={18} /> <span className="text-xs font-bold uppercase">Añadir foto</span></>}
+                                    <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} disabled={compressing} />
+                                </label>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3 w-full">
                             <button onClick={() => setShowFinishAlert(false)} disabled={finishing} className="flex-1 bg-zinc-900 text-white py-3 rounded-xl font-bold text-xs uppercase border border-zinc-800 disabled:opacity-50">Seguir</button>
-                            <button onClick={confirmFinish} disabled={finishing} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                {finishing ? <Loader2 className="animate-spin" size={16} /> : 'Terminar'}
+                            <button onClick={confirmFinish} disabled={finishing || compressing} className="flex-1 bg-yellow-500 text-black py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                {finishing ? <Loader2 className="animate-spin" size={16} /> : 'Publicar'}
                             </button>
                         </div>
                     </div>

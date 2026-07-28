@@ -1,35 +1,116 @@
 const ShopItem = require('../models/ShopItem');
 const User = require('../models/User');
 
-// --- DATOS SEMILLA (Auto-relleno) ---
+/**
+ * CATÁLOGO DE LA TIENDA
+ *
+ * ⚠️ Los iconos son EMOJI, no rutas de imagen. El catálogo antiguo apuntaba a
+ * '/avatars/zeus.png', '/chests/gold_chest.png', etc., pero esas carpetas no
+ * existen en `frontend/public/`: todos esos items se veían rotos. El frontend
+ * ya distingue emoji de ruta (Shop.jsx), así que con emoji se ve todo bien.
+ * Si algún día añades los PNG reales, basta con cambiar el campo `icon`.
+ */
 const SEED_ITEMS = [
-    { name: 'Caballero Dorado', price: 500, category: 'avatar', icon: '/avatars/caballero_dorado.png', description: 'Armadura legendaria.' },
-    { name: 'Zeus', price: 10, category: 'avatar', icon: '/avatars/zeus.png', description: 'El dios del rayo.' },
-    { name: 'Diosa', price: 2100, category: 'avatar', icon: '/avatars/ari.png', description: 'La diosa de la sabiduría.' },
-    { name: 'Frasco de Sabiduría', price: 40, category: 'consumable', icon: '/consumables/xp_potion.png', effectType: 'xp', effectValue: 100, description: '+100 XP.' },
-    { name: 'Poción Vital', price: 100, category: 'consumable', icon: '/consumables/life_potion.png', description: '+1 HP.', effectType: 'heal', effectValue: 1 },
-    { name: 'Marco de Oro', price: 300, category: 'frame', icon: '/frames/marco_oro.png', description: 'Brillante.' },
-    { name: 'Marco de rayos', price: 10, category: 'frame', icon: '/frames/rayos.png', description: 'Energía pura.' },
-    { name: 'Dragón Infernal', price: 1, category: 'pet', icon: '/pets/dragon.png', description: 'Bestia legendaria.' },
-    { name: 'Serpiente de Dragón', price: 1, category: 'pet', icon: '/pets/snake.png', description: 'Sigilosa y letal.' },
-    { name: 'El Veterano', price: 500, category: 'title', icon: '📜', description: 'Para quienes han visto mucho.' },
-    { name: 'La Leyenda', price: 2000, category: 'title', icon: '👾', description: 'Legendario.' },
-    { name: 'Cofre Roñoso', price: 50, category: 'chest', icon: '/chests/wood_chest.png', description: 'Riesgo bajo.' },
-    { name: 'Cofre Dorado', price: 250, category: 'chest', icon: '/chests/gold_chest.png', description: 'Equilibrado.' },
-    { name: 'Cofre Legendario', price: 1000, category: 'chest', icon: '/chests/legendary_chest.png', description: 'Alto riesgo.' },
-    { name: 'Modo Oscuro', price: 0, category: 'theme', icon: '🌙', description: 'Clásico.', effectType: 'dark' },
-    { name: 'Modo Claro', price: 1, category: 'theme', icon: '☀️', description: 'Brillante.', effectType: 'light' },
+    // ================= AVATARES =================
+    { name: 'Novato', price: 0, category: 'avatar', icon: '🙂', rarity: 'comun', description: 'Todo el mundo empieza por aquí.' },
+    { name: 'Boxeador', price: 150, category: 'avatar', icon: '🥊', rarity: 'comun', description: 'Puños de acero.' },
+    { name: 'Corredor', price: 150, category: 'avatar', icon: '🏃', rarity: 'comun', description: 'Kilómetros en las piernas.' },
+    { name: 'Halterófilo', price: 250, category: 'avatar', icon: '🏋️', rarity: 'raro', description: 'La barra es tu religión.' },
+    { name: 'Ninja', price: 400, category: 'avatar', icon: '🥷', rarity: 'raro', description: 'Entrena de madrugada.' },
+    { name: 'Vikingo', price: 600, category: 'avatar', icon: '🪓', rarity: 'raro', description: 'Fuerza bruta del norte.' },
+    { name: 'Zeus', price: 900, category: 'avatar', icon: '⚡', rarity: 'epico', description: 'El dios del rayo.' },
+    { name: 'Caballero Dorado', price: 1200, category: 'avatar', icon: '🛡️', rarity: 'epico', description: 'Armadura legendaria.' },
+    { name: 'Samurái', price: 1400, category: 'avatar', icon: '⚔️', rarity: 'epico', description: 'Disciplina absoluta.' },
+    { name: 'Diosa', price: 2100, category: 'avatar', icon: '👑', rarity: 'legendario', description: 'La diosa de la sabiduría.' },
+    { name: 'Titán', price: 3000, category: 'avatar', icon: '🗿', rarity: 'legendario', description: 'Inamovible.' },
+    { name: 'Fénix', price: 4000, category: 'avatar', icon: '🔥', rarity: 'legendario', description: 'Renace de sus cenizas.' },
+
+    // ================= MARCOS =================
+    { name: 'Marco de Hierro', price: 80, category: 'frame', icon: '⬛', rarity: 'comun', description: 'Sencillo y sólido.' },
+    { name: 'Marco de Bronce', price: 150, category: 'frame', icon: '🟫', rarity: 'comun', description: 'El primer escalón.' },
+    { name: 'Marco de Plata', price: 350, category: 'frame', icon: '⬜', rarity: 'raro', description: 'Brillo discreto.' },
+    { name: 'Marco de Rayos', price: 500, category: 'frame', icon: '🌩️', rarity: 'raro', description: 'Energía pura.' },
+    { name: 'Marco de Oro', price: 800, category: 'frame', icon: '🟨', rarity: 'epico', description: 'Brillante.' },
+    { name: 'Marco de Hielo', price: 900, category: 'frame', icon: '🧊', rarity: 'epico', description: 'Sangre fría.' },
+    { name: 'Marco Infernal', price: 1600, category: 'frame', icon: '😈', rarity: 'legendario', description: 'Forjado en llamas.' },
+    { name: 'Marco Cósmico', price: 2500, category: 'frame', icon: '🌌', rarity: 'legendario', description: 'Más allá del gimnasio.' },
+
+    // ================= MASCOTAS =================
+    { name: 'Gatito Gym', price: 120, category: 'pet', icon: '🐱', rarity: 'comun', description: 'Te mira mientras entrenas.' },
+    { name: 'Perro Fiel', price: 120, category: 'pet', icon: '🐶', rarity: 'comun', description: 'Nunca falta a una sesión.' },
+    { name: 'Búho Nocturno', price: 300, category: 'pet', icon: '🦉', rarity: 'raro', description: 'Para los turnos de noche.' },
+    { name: 'Lobo', price: 450, category: 'pet', icon: '🐺', rarity: 'raro', description: 'Instinto de manada.' },
+    { name: 'Serpiente', price: 500, category: 'pet', icon: '🐍', rarity: 'raro', description: 'Sigilosa y letal.' },
+    { name: 'Tigre', price: 850, category: 'pet', icon: '🐯', rarity: 'epico', description: 'Explosividad pura.' },
+    { name: 'Águila', price: 1000, category: 'pet', icon: '🦅', rarity: 'epico', description: 'Visión de campeón.' },
+    { name: 'Dragón Infernal', price: 2200, category: 'pet', icon: '🐉', rarity: 'legendario', description: 'Bestia legendaria.' },
+
+    // ================= TÍTULOS =================
+    { name: 'Principiante', price: 0, category: 'title', icon: '🌱', rarity: 'comun', description: 'El principio de todo.' },
+    { name: 'Constante', price: 200, category: 'title', icon: '📆', rarity: 'comun', description: 'No fallas ni un día.' },
+    { name: 'Sin Excusas', price: 350, category: 'title', icon: '🚫', rarity: 'raro', description: 'Ni lluvia ni pereza.' },
+    { name: 'Máquina', price: 500, category: 'title', icon: '🤖', rarity: 'raro', description: 'Funcionas sin descanso.' },
+    { name: 'El Veterano', price: 800, category: 'title', icon: '📜', rarity: 'epico', description: 'Para quienes han visto mucho.' },
+    { name: 'Bestia Parda', price: 1200, category: 'title', icon: '🐻', rarity: 'epico', description: 'Respeto en la sala.' },
+    { name: 'La Leyenda', price: 2000, category: 'title', icon: '👾', rarity: 'legendario', description: 'Legendario.' },
+    { name: 'Inmortal', price: 3500, category: 'title', icon: '♾️', rarity: 'legendario', description: 'Ya no eres humano.' },
+
+    // ================= POCIONES =================
+    { name: 'Chispa de XP', price: 25, category: 'consumable', icon: '✨', rarity: 'comun', effectType: 'xp', effectValue: 50, description: '+50 XP al instante.' },
+    { name: 'Frasco de Sabiduría', price: 40, category: 'consumable', icon: '🧪', rarity: 'comun', effectType: 'xp', effectValue: 100, description: '+100 XP al instante.' },
+    { name: 'Elixir de Maestría', price: 150, category: 'consumable', icon: '⚗️', rarity: 'raro', effectType: 'xp', effectValue: 500, description: '+500 XP al instante.' },
+    { name: 'Vendaje', price: 60, category: 'consumable', icon: '🩹', rarity: 'comun', effectType: 'heal', effectValue: 10, description: 'Recupera 10 de vida.' },
+    { name: 'Poción Vital', price: 100, category: 'consumable', icon: '❤️', rarity: 'raro', effectType: 'heal', effectValue: 25, description: 'Recupera 25 de vida.' },
+    { name: 'Néctar de los Dioses', price: 400, category: 'consumable', icon: '🏺', rarity: 'epico', effectType: 'heal', effectValue: 100, description: 'Restaura toda tu vida.' },
+
+    // ================= COFRES =================
+    { name: 'Cofre Roñoso', price: 50, category: 'chest', icon: '📦', rarity: 'comun', description: 'Riesgo bajo, premio bajo.' },
+    { name: 'Cofre de Plata', price: 120, category: 'chest', icon: '🎁', rarity: 'raro', description: 'Algo mejor que el anterior.' },
+    { name: 'Cofre Dorado', price: 250, category: 'chest', icon: '🧰', rarity: 'epico', description: 'Equilibrado.' },
+    { name: 'Cofre Legendario', price: 1000, category: 'chest', icon: '💎', rarity: 'legendario', description: 'Alto riesgo, alta recompensa.' },
+
+    // ================= TEMAS =================
+    { name: 'Modo Oscuro', price: 0, category: 'theme', icon: '🌙', rarity: 'comun', description: 'El clásico de Kairos.', effectType: 'dark' },
+    { name: 'Modo Claro', price: 100, category: 'theme', icon: '☀️', rarity: 'comun', description: 'Para los valientes.', effectType: 'light' },
+    { name: 'Neón', price: 600, category: 'theme', icon: '🟪', rarity: 'raro', description: 'Estética arcade.', effectType: 'neon' },
+    { name: 'Sangre', price: 900, category: 'theme', icon: '🟥', rarity: 'epico', description: 'Rojo intenso.', effectType: 'blood' },
+    { name: 'Oro Puro', price: 1800, category: 'theme', icon: '🟡', rarity: 'legendario', description: 'Lujo absoluto.', effectType: 'gold' },
 ];
+
+/**
+ * Sincroniza el catálogo del sistema con SEED_ITEMS.
+ *
+ * Antes solo sembraba si la tienda estaba COMPLETAMENTE vacía, así que al
+ * ampliar el catálogo los items nuevos no aparecían nunca y los antiguos se
+ * quedaban con sus iconos rotos. Ahora hace un upsert por nombre: añade los que
+ * falten y actualiza icono/precio/rareza de los existentes, sin tocar las
+ * recompensas personales del usuario (category 'reward').
+ */
+const syncSystemCatalog = async () => {
+    const systemItemsCount = await ShopItem.countDocuments({ category: { $ne: 'reward' } });
+    if (systemItemsCount === SEED_ITEMS.length) return; // Ya está al día
+
+    console.log(`🏪 Sincronizando catálogo (${systemItemsCount} → ${SEED_ITEMS.length} items)...`);
+
+    await ShopItem.bulkWrite(SEED_ITEMS.map(item => ({
+        updateOne: {
+            filter: { name: item.name, category: item.category, user: null },
+            update: { $set: item },
+            upsert: true
+        }
+    })));
+
+    // Retiramos items de sistema que ya no estén en el catálogo
+    await ShopItem.deleteMany({
+        category: { $ne: 'reward' },
+        name: { $nin: SEED_ITEMS.map(i => i.name) }
+    });
+};
 
 // 1. OBTENER TIENDA
 const getShopItems = async (req, res) => {
     try {
-        const systemItemsCount = await ShopItem.countDocuments({ category: { $ne: 'reward' } });
-
-        if (systemItemsCount === 0) {
-            console.log("🏪 Inicializando tienda del sistema...");
-            await ShopItem.insertMany(SEED_ITEMS);
-        }
+        await syncSystemCatalog();
 
         const items = await ShopItem.find({
             $or: [

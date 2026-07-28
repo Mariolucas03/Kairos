@@ -3,11 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
     Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
-    Flame, Shield, Lock, Pencil, Check, UserPlus
+    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding
 } from 'lucide-react';
 import api from '../../services/api';
 import BackButton from '../../components/common/BackButton';
 import WorkoutPostCard from '../../components/social/WorkoutPostCard';
+import BodyMap from '../../components/body/BodyMap';
 import { getLevelStyle, customAnimationsStyle } from '../../utils/socialHelpers';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
@@ -15,8 +16,68 @@ const fetcher = (url) => api.get(url).then(res => res.data);
 const TABS = [
     { key: 'workouts', label: 'Entrenos', icon: Dumbbell },
     { key: 'food', label: 'Comida', icon: Utensils },
-    { key: 'missions', label: 'Misiones', icon: ScrollText }
+    { key: 'missions', label: 'Misiones', icon: ScrollText },
+    { key: 'body', label: 'Cuerpo', icon: PersonStanding }
 ];
+
+// --- PESTAÑA CUERPO: mapa + nivel de cada grupo muscular ---
+function BodyTab({ ranks }) {
+    if (!ranks) return null;
+
+    // De mayor a menor nivel, para que se vea arriba lo más entrenado
+    const ordenados = Object.entries(ranks).sort((a, b) => b[1].points - a[1].points);
+    const conActividad = ordenados.filter(([, r]) => r.points > 0);
+
+    return (
+        <div className="pb-4">
+            <div className="bg-zinc-950 border border-white/5 rounded-[24px] p-4 mb-4">
+                <BodyMap levels={ranks} />
+            </div>
+
+            {conActividad.length === 0 && (
+                <div className="text-center py-8 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl mb-4">
+                    <p className="text-xs">Todavía no hay entrenos registrados.</p>
+                    <p className="text-[10px] mt-1">Los músculos suben de nivel con el peso, las repeticiones y la constancia.</p>
+                </div>
+            )}
+
+            <div className="space-y-2">
+                {ordenados.map(([grupo, r]) => (
+                    <div key={grupo} className="bg-zinc-950 border border-white/5 rounded-2xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.points ? r.rankColor : '#3f3f46' }} />
+                                <span className="text-xs font-black text-white uppercase truncate">{grupo}</span>
+                            </div>
+                            <span
+                                className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0"
+                                style={{ color: r.rankColor, borderColor: `${r.rankColor}55`, backgroundColor: `${r.rankColor}15` }}
+                            >
+                                {r.rankLabel}
+                            </span>
+                        </div>
+
+                        <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/10">
+                            <div
+                                className="h-full rounded-full transition-all duration-700"
+                                style={{ width: `${r.progress}%`, backgroundColor: r.rankColor }}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between mt-1.5">
+                            <span className="text-[9px] text-zinc-600 font-bold">
+                                {r.volume >= 1000 ? `${Math.round(r.volume / 1000)}k` : r.volume} kg·rep · {r.weeks} {r.weeks === 1 ? 'semana' : 'semanas'}
+                            </span>
+                            <span className="text-[9px] text-zinc-600 font-bold">
+                                {r.nextRankLabel ? `${r.progress}% → ${r.nextRankLabel}` : 'Máximo'}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 const formatDate = (dateStr) =>
     new Date(`${dateStr}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -234,7 +295,7 @@ export default function UserProfilePage() {
                 )}
                 {profile.streak?.current > 0 && (
                     <p className="text-[10px] text-orange-400 font-bold flex items-center gap-1 mb-2">
-                        <Flame size={11} /> {profile.streak.current} días de racha
+                        <Flame size={11} /> {profile.streak.current} {profile.streak.current === 1 ? 'día' : 'días'} de racha
                     </p>
                 )}
 
@@ -308,6 +369,8 @@ export default function UserProfilePage() {
                 </div>
             ) : loadingItems && !itemsData ? (
                 <div className="text-center py-16 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>
+            ) : tab === 'body' ? (
+                <BodyTab ranks={itemsData?.ranks} />
             ) : items.length === 0 ? (
                 <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
                     {tab === 'workouts' && <><Dumbbell className="mx-auto mb-3 opacity-50" size={32} /><p className="text-xs">Sin entrenos publicados.</p></>}

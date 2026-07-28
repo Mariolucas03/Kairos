@@ -57,20 +57,26 @@ export default function ClanPreviewModal({ clanId, currentUserId, userClanId, on
                                     <span>Miembros</span>
                                     {clanData.minLevel > 1 && <span className="flex items-center gap-1 text-red-400"><Lock size={10} /> Min Lvl {clanData.minLevel}</span>}
                                 </h3>
-                                <div className="space-y-2">
-                                    {[...clanData.members]
-                                        .sort((a, b) => RANK_CONFIG[b.clanRank || 'esclavo'].value - RANK_CONFIG[a.clanRank || 'esclavo'].value)
-                                        .map((member, idx) => (
+                                <div>
+                                    {(() => {
+                                        // Mismo criterio que en tu clan: ordenados por aporte semanal
+                                        const ordenados = [...clanData.members]
+                                            .sort((a, b) => (b.weeklyContribution || 0) - (a.weeklyContribution || 0));
+                                        const tope = ordenados[0]?.weeklyContribution || 0;
+
+                                        return ordenados.map((member, idx) => (
                                             <ClanMemberCard
                                                 key={member._id || idx}
                                                 member={member}
+                                                position={idx + 1}
+                                                maxContribution={tope}
                                                 myRank={null}
                                                 currentUserId={currentUserId}
                                                 onUpdateRank={() => { }}
                                                 onKick={() => { }}
                                             />
-                                        ))
-                                    }
+                                        ));
+                                    })()}
                                 </div>
                             </div>
                         </div>

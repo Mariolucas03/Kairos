@@ -52,7 +52,11 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret']
 }));
 
-app.use(express.json());
+// 1 MB: las fotos de los entrenos viajan en base64 dentro del JSON y ya vienen
+// comprimidas a ~200 KB desde el móvil. Con el límite por defecto (100 KB) el
+// servidor las rechazaba con "request entity too large" antes incluso de que
+// el controlador pudiera validarlas.
+app.use(express.json({ limit: '1mb' }));
 
 // Seguridad: Prevenir inyección NoSQL
 app.use(mongoSanitize());

@@ -13,7 +13,7 @@ import ClanMemberCard from '../../components/social/ClanMemberCard';
 import WeeklyEventWidget from '../../components/social/WeeklyEventWidget';
 import ClanPreviewModal from '../../components/social/ClanPreviewModal';
 import { useAuthStore } from '../../store/useAuthStore';
-import { customAnimationsStyle, RANK_CONFIG } from '../../utils/socialHelpers';
+import { customAnimationsStyle, RANK_CONFIG, EVENT_CONFIG } from '../../utils/socialHelpers';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -201,22 +201,36 @@ export default function ClansPage() {
                     )}
 
                     <div>
-                        <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3">Miembros</h3>
-                        <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
-                            {myClan.members
-                                .filter(m => m)
-                                .sort((a, b) => RANK_CONFIG[b.clanRank || 'esclavo'].value - RANK_CONFIG[a.clanRank || 'esclavo'].value)
-                                .map((member, index) => (
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-xs font-bold text-zinc-500 uppercase">Miembros</h3>
+                            <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Por aporte semanal</span>
+                        </div>
+                        <div className="space-y-0 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                            {(() => {
+                                // Ordenamos por contribución de la semana (como un ranking interno).
+                                // El backend ya devuelve `weeklyContribution` en cada miembro.
+                                const ordenados = [...myClan.members].filter(Boolean)
+                                    .sort((a, b) => (b.weeklyContribution || 0) - (a.weeklyContribution || 0));
+                                const tope = ordenados[0]?.weeklyContribution || 0;
+                                const unidad = myClan.eventStats?.type
+                                    ? EVENT_CONFIG[myClan.eventStats.type]?.unit
+                                    : '';
+
+                                return ordenados.map((member, index) => (
                                     <ClanMemberCard
                                         key={member._id || index}
                                         member={member}
+                                        position={index + 1}
+                                        maxContribution={tope}
+                                        unit={unidad}
                                         myRank={myRank}
                                         currentUserId={currentUserId}
                                         onUpdateRank={handleUpdateRank}
                                         onViewProfile={member._id !== currentUserId ? (id) => navigate(`/social/user/${id}`) : undefined}
                                         onKick={(m) => setConfirmAction({ message: `¿Expulsar a ${m.username}?`, onConfirm: () => handleKickMember(m._id) })}
                                     />
-                                ))}
+                                ));
+                            })()}
                         </div>
                         {isLeader && (
                             <p className="text-[9px] text-zinc-600 mt-3 text-center uppercase tracking-wide">

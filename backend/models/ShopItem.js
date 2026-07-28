@@ -24,6 +24,12 @@ const shopItemSchema = new mongoose.Schema({
         ]
     },
     icon: { type: String, default: '📦' },
+    // Rareza: se usa para pintar borde/brillo por tier y dar sensación de colección
+    rarity: {
+        type: String,
+        enum: ['comun', 'raro', 'epico', 'legendario'],
+        default: 'comun'
+    },
     sprite: { type: String }, // Aquí irá la TIRA DE IMÁGENES (Animación)
     description: { type: String, default: '' },
     // Para lógica de uso (ej: 'heal', 'xp', 'random_low')
