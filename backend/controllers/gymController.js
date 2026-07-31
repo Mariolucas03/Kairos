@@ -238,6 +238,33 @@ const saveWorkoutLog = async (req, res) => {
         // Un músculo principal no debe aparecer también como secundario
         principales.forEach(m => secundarios.delete(m));
 
+        // 🏆 RÉCORDS PERSONALES
+        // Se comparan los kilos de esta sesión con el máximo histórico de cada
+        // ejercicio ANTES de guardar este log (si no, el propio entreno sería su
+        // propio récord). Solo cuenta si ya había marca previa: la primera vez
+        // que haces un ejercicio no es una mejora, es un punto de partida.
+        const nombresReales = (exercises || []).map(e => e.name).filter(Boolean);
+        const marcasPrevias = await WorkoutLog.aggregate([
+            { $match: { user: req.user._id, 'exercises.name': { $in: nombresReales } } },
+            { $unwind: '$exercises' },
+            { $match: { 'exercises.name': { $in: nombresReales } } },
+            { $unwind: '$exercises.sets' },
+            { $group: { _id: '$exercises.name', max: { $max: '$exercises.sets.weight' } } }
+        ]);
+        const maxPrevio = {};
+        marcasPrevias.forEach(m => { maxPrevio[m._id] = m.max || 0; });
+
+        const records = [];
+        (exercises || []).forEach(ex => {
+            const sets = ex.sets || [];
+            if (!sets.length) return;
+            const mejor = sets.reduce((a, s) => (s.weight > a.weight ? s : a), sets[0]);
+            const anterior = maxPrevio[ex.name];
+            if (anterior > 0 && mejor.weight > anterior) {
+                records.push({ name: ex.name, weight: mejor.weight, reps: mejor.reps, previous: anterior });
+            }
+        });
+
         const lastWeightLog = await DailyLog.findOne({ user: req.user._id, weight: { $gt: 0 } }).sort({ date: -1 }).lean();
         const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
 
@@ -282,7 +309,8 @@ const saveWorkoutLog = async (req, res) => {
             duration, exercises, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
             photo: fotoFinal,
             musclesWorked: [...principales],
-            secondaryMuscles: [...secundarios]
+            secondaryMuscles: [...secundarios],
+            records
         });
 
         const today = getTodayDateString();

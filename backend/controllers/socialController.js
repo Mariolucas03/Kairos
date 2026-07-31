@@ -33,6 +33,7 @@ const shapeFeedItem = (log, viewerId) => {
         photo: obj.photo || '',
         musclesWorked: obj.musclesWorked || [],
         secondaryMuscles: obj.secondaryMuscles || [],
+        records: obj.records || [],
         likesCount: likes.length,
         likedByMe: likes.some(id => id.toString() === viewerId.toString()),
         comments: (obj.comments || []).map(c => ({
@@ -659,8 +660,36 @@ const markNotificationsRead = async (req, res) => {
     }
 };
 
+// @desc    Contador para el puntito rojo (footer y buzón)
+// @route   GET /api/social/badge
+// Solo cuenta, sin traer documentos: lo pide el footer en TODAS las pantallas,
+// así que tiene que ser barato.
+const getBadge = async (req, res) => {
+    try {
+        const [actividad, usuario] = await Promise.all([
+            Notification.countDocuments({ user: req.user._id, read: false }),
+            User.findById(req.user._id).select('friendRequests missionRequests challengeRequests').lean()
+        ]);
+
+        const solicitudes = (usuario?.friendRequests || []).length;
+        const misiones = (usuario?.missionRequests || []).length;
+        const retos = (usuario?.challengeRequests || []).length;
+
+        res.json({
+            activity: actividad,
+            requests: solicitudes,
+            missions: misiones,
+            challenges: retos,
+            total: actividad + solicitudes + misiones + retos
+        });
+    } catch (error) {
+        console.error('Error en getBadge:', error);
+        res.status(500).json({ message: 'Error cargando avisos' });
+    }
+};
+
 module.exports = {
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
     getFeed, toggleLike, addComment, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
-    removeFriend, getNotifications, markNotificationsRead
+    removeFriend, getNotifications, markNotificationsRead, getBadge
 };

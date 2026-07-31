@@ -15,7 +15,8 @@ const {
     getMonthlyLeaderboard,
     removeFriend,
     getNotifications,
-    markNotificationsRead
+    markNotificationsRead,
+    getBadge
 } = require('../controllers/socialController');
 const protect = require('../middleware/authMiddleware');
 
@@ -38,5 +39,7 @@ router.get('/profile/:userId/items', protect, getProfileItems);
 // Notificaciones de me gusta y comentarios
 router.get('/notifications', protect, getNotifications);
 router.post('/notifications/read', protect, markNotificationsRead);
+// Contador ligero para el punto rojo del footer
+router.get('/badge', protect, getBadge);
 
 module.exports = router;

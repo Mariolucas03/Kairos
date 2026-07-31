@@ -9,18 +9,14 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
 
     if (!clan || !clan.eventStats) return null;
 
-    const { type, total, goal, myClaims } = clan.eventStats;
+    const { type, total, goal, myClaims, tiers } = clan.eventStats;
     const config = EVENT_CONFIG[type] || EVENT_CONFIG.volume;
     const EventIcon = config.icon;
     const percent = Math.min((total / goal) * 100, 100);
 
-    const milestones = [
-        { tier: 1, target: goal * 0.1, label: 'Bronce', xp: 50, coins: 100 },
-        { tier: 2, target: goal * 0.5, label: 'Plata', xp: 150, coins: 300 },
-        { tier: 3, target: goal, label: 'Oro', xp: 500, coins: 1000 },
-        { tier: 4, target: goal * 1.5, label: 'Platino', xp: 1000, coins: 2500 },
-        { tier: 5, target: goal * 2, label: 'Diamante', xp: 2500, coins: 5000 }
-    ];
+    // Los escalones y sus premios vienen del servidor: así lo que se ve aquí es
+    // exactamente lo que se va a entregar al reclamar.
+    const milestones = tiers || [];
 
     const sortedMembers = [...(clan.members || [])].sort((a, b) => (b.weeklyContribution || 0) - (a.weeklyContribution || 0));
     const claims = myClaims || [];
@@ -137,6 +133,12 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                                             <div>
                                                 <h4 className="text-white font-bold uppercase">{m.label}</h4>
                                                 <p className="text-xs text-zinc-500">{Math.round(m.target).toLocaleString()} {config.unit}</p>
+                                                {/* Premio exacto que entrega el servidor */}
+                                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                                    <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">+{m.xp} XP</span>
+                                                    <span className="text-[9px] font-black text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded">+{m.coins} 🪙</span>
+                                                    <span className="text-[9px] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded">+{m.chips} 🎰</span>
+                                                </div>
                                             </div>
                                         </div>
                                         {isClaimed

@@ -14,8 +14,10 @@ const workoutLogSchema = Joi.object({
             // Array de sets dentro de cada ejercicio
             sets: Joi.array().items(
                 Joi.object({
-                    weight: Joi.number().required(), // Asegura que sean números
-                    reps: Joi.number().required(),
+                    // Nunca negativos: un peso en negativo falseaba el volumen
+                    // total y los récords personales
+                    weight: Joi.number().min(0).max(1000).required(),
+                    reps: Joi.number().min(0).max(1000).required(),
                     completed: Joi.boolean().optional(),
                     // 'N' = serie normal, 'D' = dropset. El frontend ya lo enviaba,
                     // pero al no estar declarado aquí stripUnknown lo borraba.

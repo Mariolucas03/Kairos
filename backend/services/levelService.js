@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const Clan = require('../models/Clan'); // <--- IMPORTANTE: Importar modelo Clan
+const DailyLog = require('../models/DailyLog');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 const calculateNextLevelXP = (level) => level * 100;
 
@@ -81,6 +83,29 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
     }
 
     const savedUser = await user.save();
+
+    // --- 📒 REGISTRO DIARIO DE LO GANADO ---
+    // ⚠️ `gains.xp` y `gains.coins` se creaban a 0 y nadie los volvía a tocar.
+    // De ahí colgaban dos cosas que por tanto siempre daban cero: el evento
+    // semanal de clan "Era de Sabiduría" (imposible de completar, así que sus
+    // recompensas eran inalcanzables) y el ranking mensual, que agrega
+    // justamente este campo. Se apunta aquí, que es por donde pasan todas las
+    // recompensas del juego.
+    const xpGanado = parseInt(xpReward) || 0;
+    const monedasGanadas = parseInt(coinReward) || 0;
+
+    if (xpGanado || monedasGanadas) {
+        try {
+            await DailyLog.updateOne(
+                { user: userId, date: getMadridDateString() },
+                { $inc: { 'gains.xp': xpGanado, 'gains.coins': monedasGanadas } },
+                { upsert: true }
+            );
+        } catch (e) {
+            // Que no se pierda la recompensa por no poder apuntarla en el diario
+            console.error('No se pudo registrar gains del día:', e.message);
+        }
+    }
 
     return {
         user: savedUser,

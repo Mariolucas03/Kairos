@@ -10,6 +10,7 @@ import LoadingScreen from '../components/common/LoadingScreen';
 import { useAuthStore } from '../store/useAuthStore';
 import WorkoutPostCard from '../components/social/WorkoutPostCard';
 import InboxModal from '../components/social/InboxModal';
+import useSocialBadge from '../hooks/useSocialBadge';
 import { customAnimationsStyle } from '../utils/socialHelpers';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
@@ -34,7 +35,9 @@ export default function Social() {
     const missionInvites = user?.missionRequests || [];
     const notifications = notifData?.items || [];
     const unreadNotifs = notifData?.unread || 0;
-    const totalNotifications = requests.length + missionInvites.length + unreadNotifs;
+
+    // Mismo contador que el punto rojo del footer, para que no se contradigan
+    const { total: totalNotifications, refreshBadge } = useSocialBadge();
 
     // Al abrir el buzón damos por leídas las notificaciones de actividad
     const openInbox = async () => {
@@ -43,6 +46,7 @@ export default function Social() {
             try {
                 await api.post('/social/notifications/read');
                 mutateNotifs();
+                refreshBadge();
             } catch (e) { /* si falla, se reintenta al siguiente refresco */ }
         }
     };
@@ -115,6 +119,7 @@ export default function Social() {
         try {
             await api.post('/social/respond', { requesterId: rid, action });
             mutateFriends();
+            refreshBadge();
             if (action === 'accept') mutateFeed();
         } catch (e) {
             mutateFriends();
@@ -126,18 +131,22 @@ export default function Social() {
         try {
             await api.post('/missions/respond', { missionId: mid, action });
             setUser({ ...user, missionRequests: (user.missionRequests || []).filter(m => m._id !== mid) });
+            refreshBadge();
             setToast({ message: 'Hecho', type: 'success' });
         } catch (e) {
             setToast({ message: 'No se pudo procesar la invitación', type: 'error' });
         }
     };
 
+    // Orden por alcance, de lo más cercano a lo más amplio: buscas gente →
+    // tus amigos → tu clan → el ranking global. El buzón queda el último,
+    // separado, porque es el único que lleva el punto rojo (como en IG).
     const ACTIONS = [
-        { key: 'inbox', icon: Mail, label: 'Buzón', onClick: openInbox, badge: totalNotifications },
-        { key: 'clan', icon: Shield, label: 'Clan', onClick: () => navigate('/social/clans') },
-        { key: 'friends', icon: Users, label: 'Amigos', onClick: () => navigate('/social/friends') },
         { key: 'search', icon: Search, label: 'Buscar', onClick: () => setSearchOpen(true) },
-        { key: 'ranking', icon: Trophy, label: 'Ranking', onClick: () => navigate('/social/ranking') }
+        { key: 'friends', icon: Users, label: 'Amigos', onClick: () => navigate('/social/friends') },
+        { key: 'clan', icon: Shield, label: 'Clan', onClick: () => navigate('/social/clans') },
+        { key: 'ranking', icon: Trophy, label: 'Ranking', onClick: () => navigate('/social/ranking') },
+        { key: 'inbox', icon: Mail, label: 'Buzón', onClick: openInbox, badge: totalNotifications }
     ];
 
     const isFirstLoad = !feedData && loadingFeed;

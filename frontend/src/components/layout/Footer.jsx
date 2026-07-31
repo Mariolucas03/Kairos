@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Users, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home } from 'lucide-react';
-import { useAuthStore } from '../../store/useAuthStore';
+import useSocialBadge from '../../hooks/useSocialBadge';
 
 export default function Footer() {
-    const user = useAuthStore(state => state.user);
     const location = useLocation();
     
     // Solo manejamos el botón central (+)
@@ -25,11 +24,11 @@ export default function Footer() {
         return () => { document.body.style.overflow = 'auto'; };
     }, [isFabOpen]);
 
-    const notificationCount = (user?.friendRequests?.length || 0) +
-        (user?.missionRequests?.length || 0) +
-        (user?.challengeRequests?.length || 0);
-
-    const hasNotifications = notificationCount > 0;
+    // 🔴 El punto rojo del icono de IG. Antes se calculaba desde el usuario
+    // guardado en el navegador, que no se actualizaba solo y nunca incluía los
+    // me gusta ni los comentarios: ahora sale del mismo contador que el buzón.
+    const { total: avisos } = useSocialBadge();
+    const hasNotifications = avisos > 0;
 
     const navItemsLeft = [
         { name: 'IG', path: '/social', icon: Users, hasBadge: hasNotifications },

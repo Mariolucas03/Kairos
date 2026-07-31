@@ -45,6 +45,15 @@ const workoutLogSchema = mongoose.Schema({
     // ejercicios (no se confía en lo que mande el cliente).
     musclesWorked: { type: [String], default: [] },
     secondaryMuscles: { type: [String], default: [] },
+    // Récords personales conseguidos en esta sesión (más peso que nunca en ese
+    // ejercicio). Se calculan al guardar comparando con el histórico, para no
+    // tener que recalcularlos cada vez que se pinta el feed.
+    records: [{
+        name: String,
+        weight: Number,
+        reps: Number,
+        previous: Number   // el récord anterior, para poder decir "+5 kg"
+    }],
 
     earnedXP: { type: Number, default: 0 },
     earnedCoins: { type: Number, default: 0 },

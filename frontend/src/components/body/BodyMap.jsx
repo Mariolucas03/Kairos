@@ -10,23 +10,72 @@ import { BODY_PARTS, MUSCLE_SHAPES, GROUPS_BY_VIEW } from './bodyPaths';
  *  2. Post del entreno en el feed   → resalta los músculos TRABAJADOS
  *  3. Resumen al terminar el entreno
  *
- * @param {Object} levels     { Pecho: { rankColor, rankLabel, progress } , ... }
- * @param {Array}  highlight  grupos a resaltar (modo "músculos trabajados")
- * @param {Array}  secondary  grupos implicados de forma secundaria
- * @param {string} accent     color de resaltado
+ * @param {Object}  levels     { Pecho: { rankColor, rankLabel, progress } , ... }
+ * @param {Array}   highlight  grupos a resaltar (modo "músculos trabajados")
+ * @param {Array}   secondary  grupos implicados de forma secundaria
+ * @param {string}  accent     color de resaltado
+ * @param {boolean} dual       pinta frente y espalda a la vez, sin botón de girar
  */
+
+// Una sola figura (frente o espalda)
+function Figura({ view, getFill, onSelectMuscle }) {
+    const shapes = MUSCLE_SHAPES[view] || {};
+    return (
+        <svg
+            viewBox="0 0 220 400"
+            className="w-full h-full"
+            style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}
+        >
+            {/* Silueta base, dibujada por partes */}
+            {BODY_PARTS.map((part, i) => (
+                part.type === 'ellipse'
+                    ? <ellipse key={i} cx={part.cx} cy={part.cy} rx={part.rx} ry={part.ry} fill="#18181b" stroke="#3f3f46" strokeWidth="1.5" />
+                    : <path key={i} d={part.d} fill="#18181b" stroke="#3f3f46" strokeWidth="1.5" strokeLinejoin="round" />
+            ))}
+
+            {/* Zonas musculares */}
+            {Object.entries(shapes).map(([group, paths]) => {
+                const { fill, opacity } = getFill(group);
+                const clickable = !!onSelectMuscle;
+                return (
+                    <g
+                        key={group}
+                        onClick={() => onSelectMuscle?.(group)}
+                        style={{ cursor: clickable ? 'pointer' : 'default' }}
+                        className="transition-opacity duration-500"
+                    >
+                        {paths.map((d, i) => (
+                            <path
+                                key={i}
+                                d={d}
+                                fill={fill}
+                                fillOpacity={opacity}
+                                stroke={fill}
+                                strokeOpacity={Math.min(1, opacity + 0.25)}
+                                strokeWidth="1"
+                                strokeLinejoin="round"
+                            />
+                        ))}
+                        <title>{group}</title>
+                    </g>
+                );
+            })}
+        </svg>
+    );
+}
+
 export default function BodyMap({
     levels = null,
     highlight = [],
     secondary = [],
     accent = '#eab308',
     showToggle = true,
+    dual = false,
     onSelectMuscle = null,
     className = ''
 }) {
     const [view, setView] = useState('front');
 
-    const shapes = MUSCLE_SHAPES[view] || {};
     const highlightSet = new Set(highlight);
     const secondarySet = new Set(secondary);
 
@@ -50,52 +99,31 @@ export default function BodyMap({
         return { fill: '#3f3f46', opacity: 0.3 };
     };
 
+    // --- MODO DOBLE: frente y espalda juntos, sin tener que girar nada ---
+    if (dual) {
+        return (
+            <div className={`w-full flex items-stretch justify-center gap-2 ${className}`}>
+                {['front', 'back'].map(v => (
+                    <div key={v} className="flex-1 min-w-0 flex flex-col items-center">
+                        <Figura view={v} getFill={getFill} onSelectMuscle={onSelectMuscle} />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
+                            {v === 'front' ? 'Frente' : 'Espalda'}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
     // ¿Hay algo destacado en la cara que NO se está viendo?
     const otherView = view === 'front' ? 'back' : 'front';
     const hayEnLaOtraCara = [...highlightSet].some(g => GROUPS_BY_VIEW[otherView].includes(g) && !GROUPS_BY_VIEW[view].includes(g));
 
     return (
         <div className={`relative w-full flex flex-col items-center ${className}`}>
-            <svg
-                viewBox="0 0 220 400"
-                className="w-full h-full max-h-[420px]"
-                style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}
-            >
-                {/* Silueta base, dibujada por partes */}
-                {BODY_PARTS.map((part, i) => (
-                    part.type === 'ellipse'
-                        ? <ellipse key={i} cx={part.cx} cy={part.cy} rx={part.rx} ry={part.ry} fill="#18181b" stroke="#3f3f46" strokeWidth="1.5" />
-                        : <path key={i} d={part.d} fill="#18181b" stroke="#3f3f46" strokeWidth="1.5" strokeLinejoin="round" />
-                ))}
-
-                {/* Zonas musculares */}
-                {Object.entries(shapes).map(([group, paths]) => {
-                    const { fill, opacity } = getFill(group);
-                    const clickable = !!onSelectMuscle;
-                    return (
-                        <g
-                            key={group}
-                            onClick={() => onSelectMuscle?.(group)}
-                            style={{ cursor: clickable ? 'pointer' : 'default' }}
-                            className="transition-opacity duration-500"
-                        >
-                            {paths.map((d, i) => (
-                                <path
-                                    key={i}
-                                    d={d}
-                                    fill={fill}
-                                    fillOpacity={opacity}
-                                    stroke={fill}
-                                    strokeOpacity={Math.min(1, opacity + 0.25)}
-                                    strokeWidth="1"
-                                    strokeLinejoin="round"
-                                />
-                            ))}
-                            <title>{group}</title>
-                        </g>
-                    );
-                })}
-            </svg>
+            <div className="w-full max-h-[420px] flex justify-center">
+                <Figura view={view} getFill={getFill} onSelectMuscle={onSelectMuscle} />
+            </div>
 
             {/* Girar el cuerpo */}
             {showToggle && (

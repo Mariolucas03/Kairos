@@ -1,21 +1,30 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BodyMap from '../body/BodyMap';
-import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2 } from 'lucide-react';
+import ZoomableImage from './ZoomableImage';
+import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy } from 'lucide-react';
 import api from '../../services/api';
 import { getLevelStyle } from '../../utils/socialHelpers';
 
 // --- HELPER: TIEMPO RELATIVO ---
+// Hasta una semana se cuenta en relativo ("hace 3 h"); a partir de ahí se pone
+// la fecha, como en Instagram, porque "hace 43 d" no le dice nada a nadie.
 const timeAgo = (dateStr) => {
-    const diffMs = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diffMs / 60000);
+    const fecha = new Date(dateStr);
+    const mins = Math.floor((Date.now() - fecha.getTime()) / 60000);
     if (mins < 1) return 'ahora';
-    if (mins < 60) return `hace ${mins}m`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `hace ${hours}h`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `hace ${days}d`;
-    return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    if (mins < 60) return `hace ${mins} min`;
+    const horas = Math.floor(mins / 60);
+    if (horas < 24) return `hace ${horas} h`;
+    const dias = Math.floor(horas / 24);
+    if (dias < 7) return `hace ${dias} d`;
+
+    const mismoAño = fecha.getFullYear() === new Date().getFullYear();
+    return fecha.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        ...(mismoAño ? {} : { year: 'numeric' })
+    });
 };
 
 export default function WorkoutPostCard({ post, linkProfile = true }) {
@@ -34,6 +43,7 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
 
     const author = post.user || {};
     const levelClass = getLevelStyle(author.level || 1);
+    const records = post.records || [];
 
     // Dentro del propio perfil no hace falta volver a navegar al mismo sitio
     const openProfile = () => {
@@ -91,14 +101,16 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
     };
 
     return (
-        <div className="bg-zinc-950 border border-white/5 rounded-[24px] mb-4 overflow-hidden shadow-sm">
+        // Publicación a sangre, sin marco ni esquinas: ocupa todo el ancho de la
+        // pantalla y se separa de la siguiente con una línea, como en Instagram.
+        <article className="-mx-4 mb-2 border-b border-white/[0.07] pb-2">
             {/* CABECERA */}
-            <div className="flex items-center gap-3 p-3">
+            <div className="flex items-center gap-3 px-4 py-3">
                 <button onClick={openProfile} disabled={!linkProfile} className="relative flex-shrink-0 active:scale-95 transition-transform disabled:cursor-default">
-                    <div className="w-11 h-11 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
+                    <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
                         {author.avatar ? <img src={author.avatar} className="w-full h-full object-cover" alt="av" /> : author.username?.charAt(0)}
                     </div>
-                    {author.frame && <img src={author.frame} className="absolute -top-1.5 -left-1.5 w-[56px] h-[56px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
+                    {author.frame && <img src={author.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
                 </button>
 
                 <div className="flex-1 min-w-0">
@@ -107,7 +119,7 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                     </button>
                     <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>Lvl {author.level}</span>
-                        <span className="text-[9px] text-zinc-600 font-bold">{timeAgo(post.date)}</span>
+                        <span className="text-[9px] text-zinc-500 font-bold">{timeAgo(post.date)}</span>
                     </div>
                 </div>
 
@@ -116,7 +128,7 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                 </div>
             </div>
 
-            {/* --- CARRUSEL DESLIZABLE (foto · cuerpo · ejercicios), como en IG --- */}
+            {/* --- CARRUSEL (foto · cuerpo · ejercicios) --- */}
             {slides.length > 0 && (
                 <div className="relative">
                     <div
@@ -125,45 +137,69 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                         className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
                     >
                         {slides.map((slide, i) => (
-                            <div key={i} className="min-w-full snap-center">
+                            // Formato cuadrado y a pantalla completa, como una publicación de IG
+                            <div key={i} className="min-w-full aspect-square snap-center relative">
                                 {slide === 'photo' && (
-                                    <img src={post.photo} alt="Foto del entreno" className="w-full h-72 object-cover" />
+                                    <ZoomableImage src={post.photo} alt="Foto del entreno" />
                                 )}
 
                                 {slide === 'body' && (
-                                    <div className="h-72 bg-black/40 flex flex-col items-center justify-center py-2">
+                                    // Fija: ni scroll ni giro, se ven las dos caras a la vez
+                                    <div className="w-full h-full bg-black flex flex-col items-center justify-center px-2 overflow-hidden">
                                         <BodyMap
                                             highlight={post.musclesWorked}
                                             secondary={post.secondaryMuscles}
                                             showToggle={false}
+                                            dual
+                                            className="flex-1 min-h-0 py-2"
                                         />
-                                        <div className="flex flex-wrap gap-1 justify-center px-4 mt-1">
+                                        <div className="flex flex-wrap gap-1 justify-center px-4 pb-3">
                                             {(post.musclesWorked || []).map(m => (
                                                 <span key={m} className="text-[9px] font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 px-2 py-0.5 rounded uppercase">{m}</span>
+                                            ))}
+                                            {(post.secondaryMuscles || []).map(m => (
+                                                <span key={m} className="text-[9px] font-bold bg-white/5 text-zinc-500 border border-white/10 px-2 py-0.5 rounded uppercase">{m}</span>
                                             ))}
                                         </div>
                                     </div>
                                 )}
 
                                 {slide === 'exercises' && (
-                                    <div className="h-72 bg-black/40 px-4 py-3 overflow-y-auto no-scrollbar">
+                                    // La única diapositiva que se desplaza en vertical
+                                    <div className="w-full h-full bg-black px-4 py-3 overflow-y-auto custom-scrollbar">
                                         <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Ejercicios</p>
                                         <div className="space-y-1.5">
-                                            {(post.exercises || []).map((ex, idx) => (
-                                                <div key={idx} className="bg-zinc-900/60 border border-white/5 rounded-xl px-3 py-2">
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-[11px] font-black text-white uppercase truncate pr-2">{ex.name}</span>
-                                                        <span className="text-[9px] font-bold text-zinc-500 shrink-0">{(ex.sets || []).length} {(ex.sets || []).length === 1 ? 'serie' : 'series'}</span>
+                                            {(post.exercises || []).map((ex, idx) => {
+                                                const record = records.find(r => r.name === ex.name);
+                                                return (
+                                                    <div key={idx} className={`rounded-xl px-3 py-2 border ${record ? 'bg-yellow-500/[0.07] border-yellow-500/30' : 'bg-zinc-900/60 border-white/5'}`}>
+                                                        <div className="flex items-center justify-between mb-1 gap-2">
+                                                            <span className="text-[11px] font-black text-white uppercase truncate">{ex.name}</span>
+                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                                {record && (
+                                                                    <span className="flex items-center gap-0.5 text-[8px] font-black text-black bg-yellow-500 px-1.5 py-0.5 rounded uppercase">
+                                                                        <Trophy size={8} /> PR
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-[9px] font-bold text-zinc-500">{(ex.sets || []).length} {(ex.sets || []).length === 1 ? 'serie' : 'series'}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {(ex.sets || []).map((s, j) => (
+                                                                <span key={j} className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${s.type === 'D' ? 'text-purple-300 bg-purple-500/10 border-purple-500/30' : 'text-zinc-400 bg-black border-white/5'}`}>
+                                                                    {s.weight > 0 ? `${s.weight}kg × ${s.reps}` : `${s.reps} reps`}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                        {record && (
+                                                            <p className="text-[9px] font-bold text-yellow-500 mt-1.5">
+                                                                Récord personal: {record.weight} kg
+                                                                {record.previous > 0 && <span className="text-zinc-500"> (antes {record.previous} kg, +{Math.round((record.weight - record.previous) * 10) / 10})</span>}
+                                                            </p>
+                                                        )}
                                                     </div>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {(ex.sets || []).map((s, j) => (
-                                                            <span key={j} className="text-[9px] font-bold text-zinc-400 bg-black px-1.5 py-0.5 rounded border border-white/5">
-                                                                {s.weight > 0 ? `${s.weight}kg × ${s.reps}` : `${s.reps} reps`}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -171,9 +207,19 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                         ))}
                     </div>
 
+                    {/* 🏆 Cinta de récord, encima de la diapositiva */}
+                    {records.length > 0 && (
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-yellow-500 text-black px-2.5 py-1 rounded-full shadow-lg pointer-events-none">
+                            <Trophy size={11} />
+                            <span className="text-[9px] font-black uppercase tracking-widest">
+                                {records.length === 1 ? 'Récord personal' : `${records.length} récords`}
+                            </span>
+                        </div>
+                    )}
+
                     {/* Puntitos de posición */}
                     {slides.length > 1 && (
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/60 px-2 py-1 rounded-full backdrop-blur-sm">
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/60 px-2 py-1 rounded-full backdrop-blur-sm pointer-events-none">
                             {slides.map((_, i) => (
                                 <span key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === slideIndex ? 'bg-white w-3' : 'bg-white/40'}`} />
                             ))}
@@ -182,10 +228,22 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                 </div>
             )}
 
-            {/* CUERPO */}
-            <div className="px-4 py-3">
-                <h4 className="text-white font-black text-lg italic uppercase tracking-tighter mb-2">{post.routineName}</h4>
-                <div className="flex items-center gap-4 text-zinc-400">
+            {/* ACCIONES */}
+            <div className="flex items-center gap-5 px-4 pt-3">
+                <button onClick={handleLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
+                    <Heart size={24} className={liked ? 'text-red-500 fill-red-500' : 'text-white'} />
+                    <span className={`text-xs font-black ${liked ? 'text-red-500' : 'text-zinc-400'}`}>{likesCount}</span>
+                </button>
+                <button onClick={() => setShowComments(s => !s)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
+                    <MessageCircle size={24} className={showComments ? 'text-blue-400' : 'text-white'} />
+                    <span className={`text-xs font-black ${showComments ? 'text-blue-400' : 'text-zinc-400'}`}>{comments.length}</span>
+                </button>
+            </div>
+
+            {/* PIE: NOMBRE DEL ENTRENO Y CIFRAS */}
+            <div className="px-4 pt-2">
+                <h4 className="text-white font-black text-lg italic uppercase tracking-tighter leading-tight">{post.routineName}</h4>
+                <div className="flex items-center gap-4 text-zinc-400 mt-1">
                     <span className="flex items-center gap-1 text-xs font-bold"><Timer size={12} className="text-blue-400" /> {durationMin} min</span>
                     <span className="flex items-center gap-1 text-xs font-bold"><Flame size={12} className="text-orange-500" /> {Math.round(post.caloriesBurned || 0)} kcal</span>
                     {isGym
@@ -195,22 +253,10 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                 </div>
             </div>
 
-            {/* PIE: LIKE / COMENTARIOS */}
-            <div className="flex items-center gap-4 px-4 py-3 border-t border-white/5">
-                <button onClick={handleLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-                    <Heart size={20} className={liked ? 'text-red-500 fill-red-500' : 'text-zinc-500'} />
-                    <span className={`text-xs font-black ${liked ? 'text-red-500' : 'text-zinc-500'}`}>{likesCount}</span>
-                </button>
-                <button onClick={() => setShowComments(s => !s)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-                    <MessageCircle size={20} className={showComments ? 'text-blue-400' : 'text-zinc-500'} />
-                    <span className={`text-xs font-black ${showComments ? 'text-blue-400' : 'text-zinc-500'}`}>{comments.length}</span>
-                </button>
-            </div>
-
             {/* COMENTARIOS (DESPLEGABLE) */}
             {showComments && (
-                <div className="bg-black/40 border-t border-white/5 p-4 space-y-3 animate-in slide-in-from-top-2 fade-in duration-200">
-                    {comments.length === 0 && <p className="text-[10px] text-zinc-600 italic text-center">Sé el primero en comentar.</p>}
+                <div className="px-4 pt-3 space-y-3 animate-in slide-in-from-top-2 fade-in duration-200">
+                    {comments.length === 0 && <p className="text-[10px] text-zinc-600 italic">Sé el primero en comentar.</p>}
                     {comments.map((c, i) => (
                         <div key={c._id || i} className="flex items-start gap-2">
                             <div className="w-7 h-7 rounded-full bg-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500 border border-white/10 shrink-0 overflow-hidden">
@@ -239,6 +285,6 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                     </div>
                 </div>
             )}
-        </div>
+        </article>
     );
 }

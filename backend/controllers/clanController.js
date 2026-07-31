@@ -7,12 +7,54 @@ const levelService = require('../services/levelService');
 
 // --- CONFIGURACIÓN DE ROTACIÓN ---
 const EVENT_ROTATION = ['volume', 'missions', 'calories', 'xp'];
-const EVENT_GOALS = {
-    volume: 1000000,    // 1M Kg
-    missions: 300,      // 300 Misiones
-    calories: 50000,    // 50k Kcal
-    xp: 20000           // 20k XP
+
+// Meta POR MIEMBRO y por semana.
+// ⚠️ Antes eran cifras fijas para todo el clan (1.000.000 kg de volumen, 300
+// misiones...) que ni un clan lleno de 10 personas alcanzaba: el tier 3 estaba
+// fuera de alcance y los tiers 4 y 5 eran decorativos. Ahora la meta se escala
+// con la gente que hay dentro, así un clan de 3 tiene un objetivo de 3 y uno
+// de 10 tiene uno de 10, y las cifras están puestas sobre lo que una persona
+// constante hace de verdad en una semana.
+const EVENT_GOALS_PER_MEMBER = {
+    volume: 15000,      // 15.000 kg·rep ≈ 3 sesiones de pesas
+    missions: 12,       // 12 misiones ≈ 2 al día
+    calories: 2500,     // 2.500 kcal quemadas
+    xp: 1200            // 1.200 XP
 };
+
+// Un clan de una sola persona tampoco debería tenerlo regalado
+const MIN_MEMBERS_FOR_GOAL = 2;
+
+const getEventGoal = (eventType, memberCount = 1) => {
+    const porMiembro = EVENT_GOALS_PER_MEMBER[eventType] || EVENT_GOALS_PER_MEMBER.volume;
+    return porMiembro * Math.max(memberCount, MIN_MEMBERS_FOR_GOAL);
+};
+
+// Escalones de la barra: el tier 3 es la meta y los dos últimos son el "más allá"
+const TIER_FACTORS = { 1: 0.1, 2: 0.5, 3: 1, 4: 1.5, 5: 2 };
+
+const TIER_LABELS = { 1: 'Bronce', 2: 'Plata', 3: 'Oro', 4: 'Platino', 5: 'Diamante' };
+
+// Premio de cada escalón. Vive aquí arriba para que el frontend pinte
+// exactamente lo que el servidor va a entregar (antes la lista de premios de la
+// pantalla se escribía a mano y no mencionaba las fichas, que sí se daban).
+const EVENT_REWARDS = {
+    1: { xp: 50, coins: 100, chips: 200 },
+    2: { xp: 150, coins: 300, chips: 600 },
+    3: { xp: 500, coins: 1000, chips: 2000 },
+    4: { xp: 1000, coins: 2500, chips: 5000 },
+    5: { xp: 2500, coins: 5000, chips: 10000 }
+};
+
+const buildTiers = (goal) => Object.keys(TIER_FACTORS).map(t => {
+    const tier = Number(t);
+    return {
+        tier,
+        label: TIER_LABELS[tier],
+        target: Math.round(goal * TIER_FACTORS[tier]),
+        ...EVENT_REWARDS[tier]
+    };
+});
 
 // Helper: Obtener el Lunes a las 04:00 AM
 const getCurrentWeekStart = () => {
@@ -89,7 +131,7 @@ const getMyClan = asyncHandler(async (req, res) => {
 
     const weekStart = getCurrentWeekStart();
     const eventType = getCurrentEventType(weekStart);
-    const goal = EVENT_GOALS[eventType];
+    const goal = getEventGoal(eventType, clan.members.length);
 
     // Resetear si cambió la semana (Operación Segura)
     if (!clan.weeklyEvent || !clan.weeklyEvent.startDate || new Date(clan.weeklyEvent.startDate).getTime() !== weekStart.getTime()) {
@@ -113,6 +155,9 @@ const getMyClan = asyncHandler(async (req, res) => {
         type: eventType,
         total: clanTotal,
         goal: goal,
+        // Los escalones los manda el servidor para que la pantalla no pueda
+        // enseñar metas ni premios distintos de los que se van a entregar
+        tiers: buildTiers(goal),
         myClaims: clan.weeklyEvent.claims
             .filter(c => c.user.toString() === req.user._id.toString())
             .map(c => c.tier)
@@ -137,18 +182,12 @@ const claimEventReward = asyncHandler(async (req, res) => {
     }
 
     const eventType = getCurrentEventType(weekStart);
-    const goal = EVENT_GOALS[eventType];
+    const goal = getEventGoal(eventType, clan.members.length);
     const { clanTotal } = await getClanMetrics(clan.members, weekStart, eventType);
 
-    const targets = {
-        1: goal * 0.1,
-        2: goal * 0.5,
-        3: goal,
-        4: goal * 1.5,
-        5: goal * 2.0
-    };
-
-    if (clanTotal < targets[tier]) { res.status(400); throw new Error('Meta no alcanzada'); }
+    const factor = TIER_FACTORS[tier];
+    if (!factor) { res.status(400); throw new Error('Recompensa no válida'); }
+    if (clanTotal < goal * factor) { res.status(400); throw new Error('Meta no alcanzada'); }
 
     // 🔥 ATÓMICO: Añadimos el claim SOLO si no existe (evita doble recompensa)
     const clanUpdate = await Clan.findOneAndUpdate(
@@ -166,18 +205,15 @@ const claimEventReward = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('Ya has reclamado esta recompensa.');
     }
 
-    const REWARDS = {
-        1: { xp: 50, coins: 100, chips: 200 },
-        2: { xp: 150, coins: 300, chips: 600 },
-        3: { xp: 500, coins: 1000, chips: 2000 },
-        4: { xp: 1000, coins: 2500, chips: 5000 },
-        5: { xp: 2500, coins: 5000, chips: 10000 }
-    };
-
-    const prize = REWARDS[tier];
+    const prize = EVENT_REWARDS[tier];
     const result = await levelService.addRewards(userId, prize.xp, prize.coins, prize.chips);
 
-    res.json({ message: `¡Recompensa Tier ${tier} obtenida!`, user: result.user, leveledUp: result.leveledUp });
+    res.json({
+        message: `¡${TIER_LABELS[tier]}! +${prize.xp} XP · +${prize.coins} monedas · +${prize.chips} fichas`,
+        rewards: prize,
+        user: result.user,
+        leveledUp: result.leveledUp
+    });
 });
 
 // @desc    Buscar clanes (Ranking)
@@ -403,7 +439,7 @@ const getClanDetails = asyncHandler(async (req, res) => {
 
     const weekStart = getCurrentWeekStart();
     const eventType = getCurrentEventType(weekStart);
-    const goal = EVENT_GOALS[eventType];
+    const goal = getEventGoal(eventType, clan.members.length);
     const { memberStats, clanTotal } = await getClanMetrics(clan.members.map(m => m._id), weekStart, eventType);
 
     const clanObj = clan.toObject();
