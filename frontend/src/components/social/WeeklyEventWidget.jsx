@@ -45,7 +45,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
 
     if (isPreview) {
         return (
-            <div className={`bg-zinc-900 border ${config.border} rounded-[32px] p-5 mb-8 relative overflow-hidden shadow-lg z-10`}>
+            <div className={`bg-zinc-900 border ${config.border} rounded-2xl p-4 mb-6 relative overflow-hidden shadow-lg z-10`}>
                 {headerCard}
             </div>
         );
@@ -159,7 +159,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
 
     return (
         <>
-            <div onClick={() => setIsOpen(true)} className={`bg-zinc-900 border ${config.border} rounded-[32px] p-5 mb-8 relative overflow-hidden shadow-lg cursor-pointer group active:scale-[0.99] z-10`}>
+            <div onClick={() => setIsOpen(true)} className={`bg-zinc-900 border ${config.border} rounded-2xl p-4 relative overflow-hidden shadow-lg cursor-pointer group active:scale-[0.99] z-10`}>
                 {headerCard}
                 <p className="text-center text-[9px] text-zinc-500 font-bold mt-2 uppercase tracking-widest flex items-center justify-center gap-1">
                     Ver Ranking <ChevronDown size={12} />

@@ -30,6 +30,7 @@ import ActiveWorkout from '../../components/gym/ActiveWorkout';
 
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
+import useHeartbeat from '../../hooks/useHeartbeat';
 
 function LayoutContent() {
     const navigate = useNavigate();
@@ -42,6 +43,10 @@ function LayoutContent() {
     const isUiHidden = useAuthStore(state => state.isUiHidden);
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const logout = useAuthStore(state => state.logout);
+
+    // 🟢 Latido de presencia: mantiene el punto verde de "en línea" en la lista
+    // de amigos mientras la app está abierta en primer plano.
+    useHeartbeat(!!user);
 
     // Sincronización con Backend
     // 🔥 Solo al montar el shell autenticado (login / recarga de página), NO en cada

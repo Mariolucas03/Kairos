@@ -56,6 +56,21 @@ const buildTiers = (goal) => Object.keys(TIER_FACTORS).map(t => {
     };
 });
 
+/**
+ * Un clan sin nadie dentro no debe seguir existiendo: ocupaba sitio en el
+ * explorador, se podía "entrar" en él y su nombre quedaba pillado para siempre
+ * (el nombre es único). Se llama después de cada salida o expulsión.
+ */
+const borrarClanSiVacio = async (clanId) => {
+    if (!clanId) return false;
+    const clan = await Clan.findById(clanId).select('members').lean();
+    if (!clan) return false;
+    if ((clan.members || []).length > 0) return false;
+    await Clan.findByIdAndDelete(clanId);
+    console.log(`🏰 Clan ${clanId} eliminado: se quedó sin miembros`);
+    return true;
+};
+
 // Helper: Obtener el Lunes a las 04:00 AM
 const getCurrentWeekStart = () => {
     const now = new Date();
@@ -218,7 +233,15 @@ const claimEventReward = asyncHandler(async (req, res) => {
 
 // @desc    Buscar clanes (Ranking)
 const searchClans = asyncHandler(async (req, res) => {
-    const clans = await Clan.find({})
+    // Los clanes vacíos se borran en cuanto se detectan: puede quedar alguno de
+    // antes de que existiera esa limpieza, y no tiene sentido enseñarlos.
+    const vacios = await Clan.find({ $or: [{ members: { $size: 0 } }, { members: { $exists: false } }] }).select('_id').lean();
+    if (vacios.length) {
+        await Clan.deleteMany({ _id: { $in: vacios.map(c => c._id) } });
+        console.log(`🏰 ${vacios.length} clan(es) vacío(s) eliminados`);
+    }
+
+    const clans = await Clan.find({ 'members.0': { $exists: true } })
         .sort({ totalPower: -1 })
         .limit(20)
         .select('name members totalPower icon description type');
@@ -346,6 +369,7 @@ const leaveClan = asyncHandler(async (req, res) => {
     }
 
     user.clan = null; user.clanRank = null; await user.save();
+    await borrarClanSiVacio(clan._id);
     res.json({ message: 'Has abandonado el clan.' });
 });
 
@@ -368,6 +392,7 @@ const kickMember = asyncHandler(async (req, res) => {
     });
 
     target.clan = null; target.clanRank = null; await target.save();
+    await borrarClanSiVacio(requester.clan);
     res.json({ message: 'Miembro expulsado de la alianza.' });
 });
 

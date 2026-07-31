@@ -149,66 +149,70 @@ export default function ClansPage() {
             />
 
             {myClan ? (
-                <div className="bg-zinc-900 border border-white/10 rounded-[32px] p-6 relative overflow-hidden shadow-2xl mb-8">
+                <div className="bg-zinc-900 border border-white/10 rounded-3xl p-4 relative overflow-hidden shadow-2xl mb-6">
                     <div className="absolute top-0 right-0 p-10 opacity-10 bg-purple-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
 
-                    {/* CABECERA: estandarte + nombre alineados, acciones ancladas
-                        arriba a la derecha de la tarjeta. Antes los botones iban
-                        dentro de la misma columna que el nombre, así que dejaban
-                        un hueco vacío al lado del emoji y todo bailaba. */}
-                    <div className="relative z-10 mb-5">
-                        <div className="absolute top-0 right-0 flex gap-2">
-                            {isLeader && (
-                                <button onClick={openEditClan} aria-label="Editar clan" className="bg-zinc-800 p-2 rounded-xl text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
-                                    <Edit size={16} />
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setConfirmAction({ message: '¿Seguro que quieres salir del clan?', onConfirm: handleLeaveClan })}
-                                aria-label="Salir del clan"
-                                className="bg-red-900/20 p-2 rounded-xl text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors"
-                            >
-                                <LogOut size={16} />
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-4 pr-24">
-                            <div className="text-4xl bg-black w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner border border-zinc-800 shrink-0">
+                    {/* CABECERA en una sola fila: estandarte · nombre · acciones.
+                        Los botones ya no van en posición absoluta (obligaban a
+                        reservar hueco a mano y el nombre se quedaba sin sitio):
+                        ocupan su propia columna y el nombre se lleva el resto,
+                        partiéndose en dos líneas si hace falta en vez de cortarse. */}
+                    <div className="relative z-10 mb-4">
+                        <div className="flex items-start gap-3">
+                            <div className="text-3xl bg-black w-12 h-12 rounded-xl flex items-center justify-center shadow-inner border border-zinc-800 shrink-0">
                                 {myClan.icon}
                             </div>
-                            <div className="min-w-0">
-                                <h2 className="text-2xl font-black text-white uppercase italic break-words leading-none">{myClan.name}</h2>
-                                <span className="inline-block mt-1.5 text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-black border border-white/10 px-2 py-0.5 rounded">
+
+                            <div className="flex-1 min-w-0">
+                                <h2 className="text-lg font-black text-white uppercase italic leading-tight break-words">
+                                    {myClan.name}
+                                </h2>
+                                <span className="inline-block mt-1 text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-black border border-white/10 px-2 py-0.5 rounded">
                                     {RANK_CONFIG[myRank].label}
                                 </span>
+                            </div>
+
+                            <div className="flex gap-1.5 shrink-0">
+                                {isLeader && (
+                                    <button onClick={openEditClan} aria-label="Editar clan" className="bg-zinc-800 p-1.5 rounded-lg text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
+                                        <Edit size={14} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setConfirmAction({ message: '¿Seguro que quieres salir del clan?', onConfirm: handleLeaveClan })}
+                                    aria-label="Salir del clan"
+                                    className="bg-red-900/20 p-1.5 rounded-lg text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors"
+                                >
+                                    <LogOut size={14} />
+                                </button>
                             </div>
                         </div>
 
                         {myClan.description && (
-                            <p className="text-[11px] text-zinc-400 italic mt-3 leading-snug">"{myClan.description}"</p>
+                            <p className="text-[11px] text-zinc-400 italic mt-2.5 leading-snug">"{myClan.description}"</p>
                         )}
 
-                        {/* Cifras del clan en celdas iguales, para que no se descuadren
+                        {/* Cifras en celdas iguales, para que no se descuadren
                             aunque el poder pase de 3 a 6 dígitos */}
-                        <div className="grid grid-cols-3 gap-2 mt-4">
-                            <div className="bg-black/60 border border-white/10 rounded-2xl py-2.5 px-2 text-center">
+                        <div className="grid grid-cols-3 gap-1.5 mt-3">
+                            <div className="bg-black/60 border border-white/10 rounded-xl py-2 px-1 text-center">
                                 <div className="flex items-center justify-center gap-1 text-purple-300">
-                                    <Zap size={12} fill="currentColor" />
-                                    <span className="text-sm font-black leading-none">{myClan.totalPower}</span>
+                                    <Zap size={11} fill="currentColor" />
+                                    <span className="text-xs font-black leading-none">{myClan.totalPower}</span>
                                 </div>
                                 <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Poder</span>
                             </div>
-                            <div className="bg-black/60 border border-white/10 rounded-2xl py-2.5 px-2 text-center">
+                            <div className="bg-black/60 border border-white/10 rounded-xl py-2 px-1 text-center">
                                 <div className="flex items-center justify-center gap-1 text-zinc-200">
-                                    <Users size={12} />
-                                    <span className="text-sm font-black leading-none">{myClan.members.length}/10</span>
+                                    <Users size={11} />
+                                    <span className="text-xs font-black leading-none">{myClan.members.length}/10</span>
                                 </div>
                                 <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Miembros</span>
                             </div>
-                            <div className="bg-black/60 border border-white/10 rounded-2xl py-2.5 px-2 text-center">
+                            <div className="bg-black/60 border border-white/10 rounded-xl py-2 px-1 text-center min-w-0">
                                 <div className="flex items-center justify-center gap-1 text-yellow-500 min-w-0">
-                                    <Crown size={12} className="shrink-0" />
-                                    <span className="text-sm font-black leading-none truncate">
+                                    <Crown size={11} className="shrink-0" />
+                                    <span className="text-xs font-black leading-none truncate">
                                         {myClan.members.find(m => String(m._id) === String(myClan.leader))?.username || '—'}
                                     </span>
                                 </div>
@@ -218,7 +222,7 @@ export default function ClansPage() {
                     </div>
 
                     {myClan.eventStats && (
-                        <div className="mb-6 relative z-10">
+                        <div className="mb-4 relative z-10">
                             <WeeklyEventWidget clan={myClan} onClaim={handleClaimReward} />
                         </div>
                     )}

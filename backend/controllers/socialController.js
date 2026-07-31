@@ -660,6 +660,23 @@ const markNotificationsRead = async (req, res) => {
     }
 };
 
+// @desc    Latido: "sigo con la app abierta"
+// @route   POST /api/social/heartbeat
+// El indicador de conexión se apoyaba en que alguna pantalla estuviera
+// refrescando datos por su cuenta, y `protect` además solo reescribe
+// `lastActive` cada 5 minutos. Si te quedabas quieto en una pantalla sin
+// sondeos, aparecías desconectado con la app abierta. Esto lo hace explícito:
+// el frontend lo llama cada pocos minutos mientras la app está en primer plano.
+const heartbeat = async (req, res) => {
+    try {
+        await User.updateOne({ _id: req.user._id }, { $set: { lastActive: new Date() } });
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Error en heartbeat:', error);
+        res.status(500).json({ message: 'Error registrando actividad' });
+    }
+};
+
 // @desc    Contador para el puntito rojo (footer y buzón)
 // @route   GET /api/social/badge
 // Solo cuenta, sin traer documentos: lo pide el footer en TODAS las pantallas,
@@ -691,5 +708,5 @@ const getBadge = async (req, res) => {
 module.exports = {
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
     getFeed, toggleLike, addComment, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
-    removeFriend, getNotifications, markNotificationsRead, getBadge
+    removeFriend, getNotifications, markNotificationsRead, getBadge, heartbeat
 };

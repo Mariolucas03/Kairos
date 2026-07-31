@@ -102,8 +102,9 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
 
     return (
         // Publicación a sangre, sin marco ni esquinas: ocupa todo el ancho de la
-        // pantalla y se separa de la siguiente con una línea, como en Instagram.
-        <article className="-mx-4 mb-2 border-b border-white/[0.07] pb-2">
+        // pantalla. Entre una y otra queda una banda oscura rematada por una
+        // línea clara, para que se vea de un vistazo dónde acaba cada una.
+        <article className="-mx-4 pb-4 mb-4 border-b-4 border-white/20">
             {/* CABECERA */}
             <div className="flex items-center gap-3 px-4 py-3">
                 <button onClick={openProfile} disabled={!linkProfile} className="relative flex-shrink-0 active:scale-95 transition-transform disabled:cursor-default">

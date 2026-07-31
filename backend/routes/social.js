@@ -16,7 +16,8 @@ const {
     removeFriend,
     getNotifications,
     markNotificationsRead,
-    getBadge
+    getBadge,
+    heartbeat
 } = require('../controllers/socialController');
 const protect = require('../middleware/authMiddleware');
 
@@ -41,5 +42,7 @@ router.get('/notifications', protect, getNotifications);
 router.post('/notifications/read', protect, markNotificationsRead);
 // Contador ligero para el punto rojo del footer
 router.get('/badge', protect, getBadge);
+// Latido de "estoy conectado" (indicador verde en la lista de amigos)
+router.post('/heartbeat', protect, heartbeat);
 
 module.exports = router;
