@@ -156,20 +156,23 @@ export default function Social() {
             <style>{customAnimationsStyle}</style>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* --- CABECERA CON LOS 5 BOTONES --- */}
-            <div className="flex items-start justify-between gap-3 mb-6">
+            {/* --- CABECERA ---
+                Título arriba y los 5 botones en su propia fila. Antes iban todos
+                en la misma línea, y en un móvil el subtítulo se quedaba sin sitio
+                y se partía en dos renglones contra los botones. */}
+            <div className="mb-5">
                 {!searchOpen && (
-                    <div className="min-w-0">
-                        <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2">
+                    <div className="flex items-baseline gap-2 mb-3">
+                        <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2 shrink-0">
                             <Rss size={22} className="text-yellow-500" /> FEED
                         </h1>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Entrenos de tus amigos</p>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest truncate">Entrenos de tus amigos</p>
                     </div>
                 )}
 
                 {searchOpen ? (
                     /* La lupa se convierte en un campo a lo ancho */
-                    <div className="flex-1 relative animate-in slide-in-from-right-4 fade-in duration-200">
+                    <div className="relative animate-in slide-in-from-right-4 fade-in duration-200">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-500" size={18} />
                         <input
                             ref={searchInputRef}
@@ -184,14 +187,14 @@ export default function Social() {
                         </button>
                     </div>
                 ) : (
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center justify-between gap-1.5">
                         {ACTIONS.map(({ key, icon: Icon, label, onClick, badge }) => (
                             <button
                                 key={key}
                                 onClick={onClick}
                                 title={label}
                                 aria-label={label}
-                                className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-2xl text-zinc-300 hover:text-white hover:border-yellow-500/50 active:scale-95 transition-all relative"
+                                className="flex-1 bg-zinc-900 border border-zinc-800 py-2.5 rounded-2xl text-zinc-300 hover:text-white hover:border-yellow-500/50 active:scale-95 transition-all relative flex items-center justify-center"
                             >
                                 <Icon size={18} />
                                 {badge > 0 && (

@@ -21,9 +21,12 @@ export const BODY_IMAGE = '/body/muscles.jpg';
 export const BODY_IMAGE_SIZE = { width: 1170, height: 1150 };
 
 /** Recorte de cada figura dentro de la imagen */
+// ⚠️ Los dos recortes se cortan justo en la mitad de la lámina (x=585). Antes
+// se ajustaban al contorno de cada figura y se solapaban unos píxeles, así que
+// en el borde de cada panel asomaba la mano de la figura de al lado.
 export const VIEW_BOX = {
-    front: '43 29 547 1054',
-    back: '578 28 549 1056'
+    front: '43 25 542 1062',
+    back: '585 25 542 1062'
 };
 
 /** Zonas coloreables por vista */

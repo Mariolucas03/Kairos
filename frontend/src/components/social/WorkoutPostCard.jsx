@@ -129,6 +129,21 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                 </div>
             </div>
 
+            {/* TITULAR DEL ENTRENO: va ENCIMA de la imagen porque no es un pie de
+                foto, es de qué va la publicación; así se sabe qué estás mirando
+                antes de mirarlo. */}
+            <div className="px-4 pb-3">
+                <h4 className="text-white font-black text-lg italic uppercase tracking-tighter leading-tight">{post.routineName}</h4>
+                <div className="flex items-center gap-4 text-zinc-400 mt-1">
+                    <span className="flex items-center gap-1 text-xs font-bold"><Timer size={12} className="text-blue-400" /> {durationMin} min</span>
+                    <span className="flex items-center gap-1 text-xs font-bold"><Flame size={12} className="text-orange-500" /> {Math.round(post.caloriesBurned || 0)} kcal</span>
+                    {isGym
+                        ? <span className="flex items-center gap-1 text-xs font-bold"><Dumbbell size={12} className="text-yellow-500" /> {post.exercises?.length || 0} ejerc.</span>
+                        : post.distance > 0 && <span className="flex items-center gap-1 text-xs font-bold"><MapPin size={12} className="text-cyan-400" /> {post.distance} km</span>
+                    }
+                </div>
+            </div>
+
             {/* --- CARRUSEL (foto · cuerpo · ejercicios) --- */}
             {slides.length > 0 && (
                 <div className="relative">
@@ -154,7 +169,9 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                                             dual
                                             className="flex-1 min-h-0 py-2"
                                         />
-                                        <div className="flex flex-wrap gap-1 justify-center px-4 pb-3">
+                                        {/* pb-8: deja libre la franja de abajo, donde van
+                                            los puntitos del carrusel (se pisaban) */}
+                                        <div className="flex flex-wrap gap-1 justify-center px-4 pb-8">
                                             {(post.musclesWorked || []).map(m => (
                                                 <span key={m} className="text-[9px] font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 px-2 py-0.5 rounded uppercase">{m}</span>
                                             ))}
@@ -239,19 +256,6 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                     <MessageCircle size={24} className={showComments ? 'text-blue-400' : 'text-white'} />
                     <span className={`text-xs font-black ${showComments ? 'text-blue-400' : 'text-zinc-400'}`}>{comments.length}</span>
                 </button>
-            </div>
-
-            {/* PIE: NOMBRE DEL ENTRENO Y CIFRAS */}
-            <div className="px-4 pt-2">
-                <h4 className="text-white font-black text-lg italic uppercase tracking-tighter leading-tight">{post.routineName}</h4>
-                <div className="flex items-center gap-4 text-zinc-400 mt-1">
-                    <span className="flex items-center gap-1 text-xs font-bold"><Timer size={12} className="text-blue-400" /> {durationMin} min</span>
-                    <span className="flex items-center gap-1 text-xs font-bold"><Flame size={12} className="text-orange-500" /> {Math.round(post.caloriesBurned || 0)} kcal</span>
-                    {isGym
-                        ? <span className="flex items-center gap-1 text-xs font-bold"><Dumbbell size={12} className="text-yellow-500" /> {post.exercises?.length || 0} ejerc.</span>
-                        : post.distance > 0 && <span className="flex items-center gap-1 text-xs font-bold"><MapPin size={12} className="text-cyan-400" /> {post.distance} km</span>
-                    }
-                </div>
             </div>
 
             {/* COMENTARIOS (DESPLEGABLE) */}

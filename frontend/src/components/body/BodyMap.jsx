@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { BODY_IMAGE, BODY_IMAGE_SIZE, VIEW_BOX, MUSCLE_SHAPES, GROUPS_BY_VIEW } from './bodyPaths';
 
@@ -21,37 +21,58 @@ import { BODY_IMAGE, BODY_IMAGE_SIZE, VIEW_BOX, MUSCLE_SHAPES, GROUPS_BY_VIEW } 
 // Una figura: la lámina recortada + las zonas de color encima
 function Figura({ view, getFill, onSelectMuscle }) {
     const shapes = MUSCLE_SHAPES[view] || {};
+    const idBase = useId();
+    const recorte = `recorte-${view}-${idBase}`;
+    const [vx, vy, vw, vh] = VIEW_BOX[view].split(' ').map(Number);
+
     return (
         <svg viewBox={VIEW_BOX[view]} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-            {/* La lámina completa; el viewBox se encarga de enseñar solo esta cara */}
-            <image
-                href={BODY_IMAGE}
-                x="0"
-                y="0"
-                width={BODY_IMAGE_SIZE.width}
-                height={BODY_IMAGE_SIZE.height}
-                preserveAspectRatio="none"
-            />
+            {/* ⚠️ Un SVG NO recorta por el viewBox: si el hueco es más ancho que
+                el recorte (pasa siempre, porque la figura es muy alargada), en
+                los laterales se sigue dibujando lo que hay fuera. Por eso asomaba
+                la mano de la otra figura. Con este recorte explícito, fuera del
+                viewBox no se pinta nada. */}
+            <defs>
+                <clipPath id={recorte}>
+                    <rect x={vx} y={vy} width={vw} height={vh} />
+                </clipPath>
+            </defs>
 
-            {/* Zonas musculares. Con mezcla "screen" el relleno tiñe el interior
-                oscuro del músculo pero deja intactas las líneas blancas del dibujo. */}
-            <g style={{ mixBlendMode: 'screen' }}>
-                {Object.entries(shapes).map(([group, paths]) => {
-                    const { fill, opacity } = getFill(group);
-                    return (
-                        <g
-                            key={group}
-                            onClick={() => onSelectMuscle?.(group)}
-                            style={{ cursor: onSelectMuscle ? 'pointer' : 'default' }}
-                            className="transition-opacity duration-500"
-                        >
-                            {paths.map((d, i) => (
-                                <path key={i} d={d} fill={fill} fillOpacity={opacity} />
-                            ))}
-                            <title>{group}</title>
-                        </g>
-                    );
-                })}
+            <g clipPath={`url(#${recorte})`}>
+                {/* La lámina completa; el viewBox enseña solo esta cara.
+                    El contraste aplasta a negro el gris del fondo del dibujo,
+                    que si no recortaba cada figura en un rectángulo más claro
+                    que la pantalla. */}
+                <image
+                    href={BODY_IMAGE}
+                    x="0"
+                    y="0"
+                    width={BODY_IMAGE_SIZE.width}
+                    height={BODY_IMAGE_SIZE.height}
+                    preserveAspectRatio="none"
+                    style={{ filter: 'contrast(1.7)' }}
+                />
+
+                {/* Zonas musculares. Con mezcla "screen" el relleno tiñe el interior
+                    oscuro del músculo pero deja intactas las líneas blancas del dibujo. */}
+                <g style={{ mixBlendMode: 'screen' }}>
+                    {Object.entries(shapes).map(([group, paths]) => {
+                        const { fill, opacity } = getFill(group);
+                        return (
+                            <g
+                                key={group}
+                                onClick={() => onSelectMuscle?.(group)}
+                                style={{ cursor: onSelectMuscle ? 'pointer' : 'default' }}
+                                className="transition-opacity duration-500"
+                            >
+                                {paths.map((d, i) => (
+                                    <path key={i} d={d} fill={fill} fillOpacity={opacity} />
+                                ))}
+                                <title>{group}</title>
+                            </g>
+                        );
+                    })}
+                </g>
             </g>
         </svg>
     );
