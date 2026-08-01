@@ -5,13 +5,19 @@ const { MUSCLE_GROUPS, resolveMuscleGroup } = require('../utils/muscles');
 /**
  * RANGOS POR MÚSCULO
  *
- * Cada grupo muscular sube de rango con tres factores, los que pidió el usuario:
- *   1. Peso levantado  → volumen = Σ (kg × repeticiones)
- *   2. Repeticiones    → van dentro del volumen
- *   3. Constancia      → semanas DISTINTAS en las que has entrenado ese músculo
+ * Un músculo sube de rango por los KILOS ACUMULADOS que le has metido:
  *
- * La constancia es la clave para que no se pueda subir de rango en un solo día
- * a base de volumen bruto: entrenar 10 semanas seguidas pesa mucho en la nota.
+ *     volumen = Σ (kg × repeticiones)   de todas tus sesiones, desde siempre
+ *
+ * Si en una sesión de press banca mueves 4.000 kg, esos 4.000 se suman a Pecho;
+ * cuando el total llegue a 10.000 el músculo pasa a Madera, a 20.000 a Bronce,
+ * y así hasta Leyenda. Diez rangos, cada uno con su color.
+ *
+ * 💡 EL PROBLEMA DE LOS EJERCICIOS QUE TRABAJAN VARIOS MÚSCULOS
+ * Un press militar es hombro, pero también pecho y tríceps. Por eso cada
+ * ejercicio no tiene "un" músculo sino un PRINCIPAL y una lista de SECUNDARIOS:
+ * el principal se lleva el volumen entero y cada secundario un 40%. Así el press
+ * militar da 4.000 a Hombro y 1.600 a Pecho y a Tríceps, sin tener que elegir.
  *
  * No se guarda nada nuevo en base de datos: todo se deriva de los WorkoutLog que
  * ya existen, así que los entrenos antiguos también cuentan desde el primer día.
@@ -20,21 +26,23 @@ const { MUSCLE_GROUPS, resolveMuscleGroup } = require('../utils/muscles');
 // Un músculo secundario aporta menos que el principal
 const SECONDARY_FACTOR = 0.4;
 
-// Cada semana distinta entrenada suma como este volumen (premia la constancia)
-const WEEK_BONUS = 1500;
-
 // El cardio no tiene kg: puntúa por minutos
 const CARDIO_POINTS_PER_MINUTE = 25;
 
+// Diez rangos. Los dos primeros escalones son los que pidió el usuario
+// (10.000 → Madera, 20.000 → Bronce) y a partir de ahí cada uno cuesta
+// alrededor de un 70% más que el anterior.
 const RANKS = [
     { key: 'novato', label: 'Novato', min: 0, color: '#71717a' },
-    { key: 'iniciado', label: 'Iniciado', min: 5000, color: '#a1a1aa' },
-    { key: 'bronce', label: 'Bronce', min: 20000, color: '#b45309' },
-    { key: 'plata', label: 'Plata', min: 50000, color: '#94a3b8' },
-    { key: 'oro', label: 'Oro', min: 120000, color: '#eab308' },
-    { key: 'platino', label: 'Platino', min: 250000, color: '#22d3ee' },
-    { key: 'diamante', label: 'Diamante', min: 500000, color: '#a855f7' },
-    { key: 'elite', label: 'Élite', min: 1000000, color: '#ef4444' }
+    { key: 'madera', label: 'Madera', min: 10000, color: '#a16207' },
+    { key: 'bronce', label: 'Bronce', min: 20000, color: '#c2703a' },
+    { key: 'hierro', label: 'Hierro', min: 40000, color: '#64748b' },
+    { key: 'plata', label: 'Plata', min: 75000, color: '#cbd5e1' },
+    { key: 'oro', label: 'Oro', min: 130000, color: '#eab308' },
+    { key: 'platino', label: 'Platino', min: 220000, color: '#22d3ee' },
+    { key: 'diamante', label: 'Diamante', min: 380000, color: '#60a5fa' },
+    { key: 'maestro', label: 'Maestro', min: 650000, color: '#a855f7' },
+    { key: 'leyenda', label: 'Leyenda', min: 1000000, color: '#ef4444' }
 ];
 
 /** Devuelve el rango alcanzado y el progreso hacia el siguiente (0-100). */
@@ -151,17 +159,16 @@ const getMuscleRanks = async (userId) => {
         });
     });
 
-    // Puntuación final = volumen + bonus por constancia
+    // La puntuación ES el volumen acumulado: kilos movidos, sin más vueltas
     const result = {};
     MUSCLE_GROUPS.forEach(g => {
         const s = stats[g];
-        const weeks = s.weeks.size;
-        const points = Math.round(s.volume + weeks * WEEK_BONUS);
+        const points = Math.round(s.volume);
 
         result[g] = {
             points,
-            volume: Math.round(s.volume),
-            weeks,
+            volume: points,
+            weeks: s.weeks.size,
             sets: s.sets,
             reps: s.reps,
             bestWeight: s.bestWeight,
@@ -172,4 +179,57 @@ const getMuscleRanks = async (userId) => {
     return result;
 };
 
-module.exports = { getMuscleRanks, getRankForPoints, RANKS };
+/**
+ * Historial de un ejercicio para las gráficas de progreso.
+ * Por cada día entrenado devuelve el mejor peso, el volumen y las series.
+ */
+const getExerciseProgress = async (userId, exerciseName) => {
+    const logs = await WorkoutLog.find({
+        user: userId,
+        'exercises.name': exerciseName
+    }).select('date exercises').sort({ date: 1 }).lean();
+
+    const puntos = [];
+    logs.forEach(log => {
+        (log.exercises || []).forEach(ex => {
+            if (ex.name !== exerciseName) return;
+            let volumen = 0, mejorPeso = 0, mejorReps = 0, reps = 0;
+            (ex.sets || []).forEach(set => {
+                const kg = Number(set.weight) || 0;
+                const r = Number(set.reps) || 0;
+                volumen += kg > 0 ? kg * r : r * 2;
+                reps += r;
+                // El récord es el peso más alto y, a igualdad de peso, más reps
+                if (kg > mejorPeso || (kg === mejorPeso && r > mejorReps)) {
+                    mejorPeso = kg;
+                    mejorReps = r;
+                }
+            });
+            puntos.push({
+                date: log.date,
+                volume: Math.round(volumen),
+                bestWeight: mejorPeso,
+                bestReps: mejorReps,
+                sets: (ex.sets || []).length,
+                reps
+            });
+        });
+    });
+
+    // Récord absoluto: el peso más alto y con cuántas repeticiones se hizo
+    const record = puntos.reduce((mejor, p) => {
+        if (!mejor) return p;
+        if (p.bestWeight > mejor.bestWeight) return p;
+        if (p.bestWeight === mejor.bestWeight && p.bestReps > mejor.bestReps) return p;
+        return mejor;
+    }, null);
+
+    return {
+        name: exerciseName,
+        sessions: puntos.length,
+        points: puntos,
+        record: record ? { weight: record.bestWeight, reps: record.bestReps, date: record.date } : null
+    };
+};
+
+module.exports = { getMuscleRanks, getExerciseProgress, getRankForPoints, RANKS };

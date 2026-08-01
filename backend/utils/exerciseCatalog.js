@@ -28,7 +28,7 @@ const EXERCISE_CATALOG = [
     { name: 'Pullover', muscle: 'Pecho', muscleDetail: 'Serrato anterior', secondary: ['Espalda'], equipment: 'Mancuernas' },
 
     // ================= ESPALDA =================
-    { name: 'Dominadas', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps'], equipment: 'Peso Corporal' },
+    { name: 'Dominadas', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps', 'Hombro'], equipment: 'Peso Corporal' },
     { name: 'Jalón al Pecho', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps'], equipment: 'Polea' },
     { name: 'Remo con Barra', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps', 'Hombro'], equipment: 'Barra' },
     { name: 'Remo con Mancuerna', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps'], equipment: 'Mancuernas' },
@@ -42,9 +42,9 @@ const EXERCISE_CATALOG = [
     { name: 'Pull-over en Polea', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: [], equipment: 'Polea' },
 
     // ================= HOMBRO =================
-    { name: 'Press Militar', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps'], equipment: 'Barra' },
-    { name: 'Press de Hombro con Mancuernas', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps'], equipment: 'Mancuernas' },
-    { name: 'Press Arnold', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps'], equipment: 'Mancuernas' },
+    { name: 'Press Militar', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps', 'Pecho'], equipment: 'Barra' },
+    { name: 'Press de Hombro con Mancuernas', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps', 'Pecho'], equipment: 'Mancuernas' },
+    { name: 'Press Arnold', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps', 'Pecho'], equipment: 'Mancuernas' },
     { name: 'Elevaciones Laterales', muscle: 'Hombro', muscleDetail: 'Deltoides lateral', secondary: [], equipment: 'Mancuernas' },
     { name: 'Elevaciones Frontales', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: [], equipment: 'Mancuernas' },
     { name: 'Pájaros (Deltoide Posterior)', muscle: 'Hombro', muscleDetail: 'Deltoides posterior', secondary: ['Espalda'], equipment: 'Mancuernas' },

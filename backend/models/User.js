@@ -22,9 +22,15 @@ const userSchema = new mongoose.Schema({
     clan: { type: mongoose.Schema.Types.ObjectId, ref: 'Clan', default: null },
     clanRank: { type: String, enum: ['esclavo', 'recluta', 'guerrero', 'rey', 'dios', null], default: null },
 
-    // Modo del gimnasio: 'normal' trabaja con grupos musculares (Pecho, Espalda...)
-    // y 'pro' permite elegir el músculo concreto (Dorsal ancho, Vasto lateral...).
-    gymMode: { type: String, enum: ['normal', 'pro'], default: 'normal' },
+    // Qué secciones de tu perfil pueden ver los demás. Es independiente de
+    // `isPrivate`: primero decides SI alguien puede entrar (privado o no) y
+    // luego QUÉ le enseñas. Todo visible por defecto.
+    visibility: {
+        workouts: { type: Boolean, default: true },
+        food: { type: Boolean, default: true },
+        missions: { type: Boolean, default: true },
+        body: { type: Boolean, default: true }
+    },
 
     // Datos Físicos
     physicalStats: {

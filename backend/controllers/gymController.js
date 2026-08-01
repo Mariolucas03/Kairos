@@ -13,7 +13,8 @@ const { askAI } = require('../services/aiService');
 const { getTodayDateString } = require('../utils/dateHelpers');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 const { EXERCISE_CATALOG } = require('../utils/exerciseCatalog');
-const { getMuscleRanks, RANKS } = require('../services/muscleRankService');
+const { SPORTS, getSport, estimateCalories } = require('../utils/sportCatalog');
+const { getMuscleRanks, getExerciseProgress, RANKS } = require('../services/muscleRankService');
 
 // ==========================================
 // 1. OBTENER RUTINAS
@@ -96,26 +97,38 @@ const getAllExercises = async (req, res) => {
 
 const createCustomExercise = async (req, res) => {
     try {
-        const { name, muscle, muscleDetail } = req.body;
+        const { name, muscle, muscleDetail, secondary } = req.body;
         if (!name) return res.status(400).json({ message: 'Falta el nombre del ejercicio' });
         if (!muscle && !muscleDetail) return res.status(400).json({ message: 'Falta el músculo' });
 
-        // En modo PRO llega `muscleDetail` (ej: 'Dorsal ancho') y derivamos su
-        // grupo padre ('Espalda'); en modo normal llega ya el grupo. En ambos
-        // casos `muscle` acaba guardando SIEMPRE un grupo válido, que es lo que
-        // usan las estadísticas del cuerpo.
-        //
-        // Si el detalle no se reconoce, respetamos el grupo que venga en `muscle`
-        // en vez de caer en el genérico: así un músculo escrito de otra forma no
-        // manda el ejercicio a un grupo equivocado.
+        // `muscle` acaba guardando SIEMPRE un grupo válido, que es lo que usan
+        // las estadísticas del cuerpo. Si llega un músculo concreto se deriva su
+        // grupo padre; si no se reconoce, se respeta el grupo recibido en vez de
+        // caer en el genérico y mandar el ejercicio a un grupo equivocado.
         const grupoBase = resolveMuscleGroup(muscle);
         const grupo = resolveMuscleGroup(muscleDetail || muscle, grupoBase);
         const detalle = muscleDetail && isSpecificMuscle(muscleDetail) ? muscleDetail.trim() : '';
 
+        // Músculos secundarios: reciben una fracción del volumen en los rangos.
+        // Es lo que permite que un press militar cuente para hombro Y para pecho.
+        const secundarios = [...new Set(
+            (Array.isArray(secondary) ? secondary : [])
+                .map(s => resolveMuscleGroup(s, null))
+                .filter(g => g && g !== grupo)
+        )];
+
+        const nombreLimpio = String(name).trim().slice(0, 60);
+        const yaExiste = await Exercise.findOne({
+            name: new RegExp(`^${nombreLimpio.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+            $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
+        }).lean();
+        if (yaExiste) return res.status(409).json({ message: 'Ya existe un ejercicio con ese nombre' });
+
         const exercise = await Exercise.create({
-            name: String(name).trim().slice(0, 60),
+            name: nombreLimpio,
             muscle: grupo,
             muscleDetail: detalle,
+            secondary: secundarios,
             category: 'strength',
             user: req.user._id,
             isCustom: true
@@ -143,11 +156,11 @@ const getMuscleRanksController = async (req, res) => {
 // @desc  Catálogo de músculos para que el frontend pinte los selectores
 // @route GET /api/gym/muscles
 const getMuscleCatalog = async (req, res) => {
+    // Ya no hay modo normal/pro: siempre se ven los 8 grupos y, al crear un
+    // ejercicio, los músculos secundarios que quieras añadirle.
     res.json({
         groups: MUSCLE_GROUPS,
-        specific: SPECIFIC_MUSCLES,
-        // El modo lo decide el usuario en Ajustes
-        mode: req.user.gymMode || 'normal'
+        specific: SPECIFIC_MUSCLES
     });
 };
 
@@ -159,9 +172,22 @@ const getMuscleCatalog = async (req, res) => {
  * por nombre, igual que el catálogo de la tienda, y respeta los ejercicios
  * personalizados del usuario (isCustom: true), que nunca se tocan.
  */
-const syncExerciseCatalog = async () => {
-    const baseCount = await Exercise.countDocuments({ isCustom: { $ne: true } });
-    if (baseCount === EXERCISE_CATALOG.length) return { synced: false, total: baseCount };
+// Huella del catálogo: si cambia cualquier dato (músculo, secundarios,
+// equipamiento...) cambia la huella y se vuelve a sincronizar.
+// ⚠️ Antes se comparaba solo el NÚMERO de ejercicios, así que corregir los
+// músculos de un ejercicio que ya existía no llegaba nunca a la base de datos:
+// el catálogo seguía teniendo la versión vieja para siempre.
+const CATALOG_FINGERPRINT = require('crypto')
+    .createHash('sha1')
+    .update(JSON.stringify(EXERCISE_CATALOG))
+    .digest('hex');
+
+let ultimaHuellaSincronizada = null;
+
+const syncExerciseCatalog = async ({ force = false } = {}) => {
+    if (!force && ultimaHuellaSincronizada === CATALOG_FINGERPRINT) {
+        return { synced: false, total: EXERCISE_CATALOG.length };
+    }
 
     await Exercise.bulkWrite(EXERCISE_CATALOG.map(ex => ({
         updateOne: {
@@ -183,12 +209,14 @@ const syncExerciseCatalog = async () => {
         }
     })));
 
+    ultimaHuellaSincronizada = CATALOG_FINGERPRINT;
     return { synced: true, total: EXERCISE_CATALOG.length };
 };
 
 const seedExercises = async (req, res) => {
     try {
-        const result = await syncExerciseCatalog();
+        // Llamarlo a mano siempre reescribe, para poder forzar la corrección
+        const result = await syncExerciseCatalog({ force: true });
         res.json({
             message: result.synced
                 ? `Catálogo sincronizado (${result.total} ejercicios)`
@@ -343,36 +371,59 @@ const saveWorkoutLog = async (req, res) => {
 
 const saveSportLog = async (req, res) => {
     try {
-        const { name, time, intensity, distance } = req.body;
+        const { sportId, name, time, intensity, distance, calories } = req.body;
+
+        const minutos = Number(time) || 0;
+        if (minutos <= 0) return res.status(400).json({ message: 'Indica cuántos minutos has entrenado' });
+
+        const sport = getSport(sportId);
+        const nombreFinal = (name || sport?.name || 'Actividad').trim();
+
         const lastWeightLog = await DailyLog.findOne({ user: req.user._id, weight: { $gt: 0 } }).sort({ date: -1 }).lean();
         const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
-        let caloriesBurned = 0;
 
-        const prompt = `Calcula calorías NETAS (sin basal) para:
-            - Actividad: "${name}" - Tiempo: ${time} min - Intensidad: ${intensity} - Peso: ${userWeight} kg - Distancia: ${distance || 'N/A'}
+        // Estimación propia por MET: sirve de plan B y de tope de cordura
+        const estimadas = estimateCalories({ sportId, minutes: minutos, weightKg: userWeight, intensity });
+
+        let caloriesBurned;
+        let origen;
+
+        if (Number(calories) > 0) {
+            // 1º Las que trae el usuario (reloj / pulsómetro): mandan siempre
+            caloriesBurned = Math.round(Number(calories));
+            origen = 'reloj';
+        } else {
+            const prompt = `Calcula calorías NETAS (sin basal) para:
+            - Actividad: "${nombreFinal}" - Tiempo: ${minutos} min - Intensidad: ${intensity} - Peso: ${userWeight} kg - Distancia: ${distance || 'N/A'}
             Responde SOLO JSON: { "calories": numero_entero }`;
 
-        const ai = await askAI({
-            system: prompt,
-            temperature: 0.1,
-            validate: (d) => typeof d.calories === 'number' && d.calories > 0
-        });
+            const ai = await askAI({
+                system: prompt,
+                temperature: 0.1,
+                // Se descarta cualquier disparate: la IA a veces devuelve 5.000 kcal
+                // por media hora de yoga. Solo vale si está entre la mitad y el
+                // triple de lo que dice la fórmula MET.
+                validate: (d) => typeof d.calories === 'number'
+                    && d.calories > estimadas * 0.4
+                    && d.calories < estimadas * 3
+            });
 
-        if (ai.ok) {
-            caloriesBurned = Math.round(ai.data.calories);
-        } else {
-            // Plan B determinista: fórmula MET estándar
-            const mets = intensity === 'Media' ? 6 : intensity === 'Alta' ? 8 : 4;
-            caloriesBurned = Math.round(mets * userWeight * (time / 60));
+            if (ai.ok) {
+                caloriesBurned = Math.round(ai.data.calories);
+                origen = 'ia';
+            } else {
+                caloriesBurned = estimadas;
+                origen = 'formula';
+            }
         }
 
         const log = await WorkoutLog.create({
-            user: req.user._id, routineName: name, duration: time * 60, intensity, distance, type: 'sport', caloriesBurned, date: new Date()
+            user: req.user._id, routineName: nombreFinal, duration: minutos * 60, intensity, distance, type: 'sport', caloriesBurned, date: new Date()
         });
 
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: getTodayDateString() },
-            { $push: { sportWorkouts: { routineName: name, duration: time, intensity, distance, caloriesBurned, timestamp: new Date() } } },
+            { $push: { sportWorkouts: { routineName: nombreFinal, duration: minutos, intensity, distance, caloriesBurned, timestamp: new Date() } } },
             { upsert: true }
         );
 
@@ -380,9 +431,50 @@ const saveSportLog = async (req, res) => {
         const gameCoinsReward = Math.max(5, Math.ceil(caloriesBurned * 0.35));
         const result = await levelService.addRewards(req.user._id, xpReward, 0, gameCoinsReward);
 
-        res.status(201).json({ message: `Registrado: ${caloriesBurned} kcal`, log, user: result.user, leveledUp: result.leveledUp });
+        res.status(201).json({
+            message: `Registrado: ${caloriesBurned} kcal`,
+            calorieSource: origen,   // reloj | ia | formula, para poder avisar en pantalla
+            log, user: result.user, leveledUp: result.leveledUp
+        });
     } catch (error) {
+        console.error('Error en saveSportLog:', error);
         res.status(500).json({ message: 'Error registrando deporte' });
+    }
+};
+
+// @desc    Catálogo de deportes para la pestaña "Otros"
+// @route   GET /api/gym/sports
+const getSportCatalog = async (req, res) => {
+    res.json(SPORTS);
+};
+
+// @desc    Progreso histórico de un ejercicio (para las gráficas)
+// @route   GET /api/gym/progress/:name
+const getExerciseProgressController = async (req, res) => {
+    try {
+        const data = await getExerciseProgress(req.user._id, req.params.name);
+        res.json(data);
+    } catch (error) {
+        console.error('Error en getExerciseProgress:', error);
+        res.status(500).json({ message: 'Error cargando el progreso' });
+    }
+};
+
+// @desc    Ejercicios que el usuario ha hecho alguna vez (para elegir gráfica)
+// @route   GET /api/gym/progress
+const getTrainedExercises = async (req, res) => {
+    try {
+        const filas = await WorkoutLog.aggregate([
+            { $match: { user: req.user._id, type: 'gym' } },
+            { $unwind: '$exercises' },
+            { $group: { _id: '$exercises.name', sesiones: { $sum: 1 }, ultima: { $max: '$date' } } },
+            { $sort: { sesiones: -1 } },
+            { $limit: 60 }
+        ]);
+        res.json(filas.map(f => ({ name: f._id, sessions: f.sesiones, last: f.ultima })));
+    } catch (error) {
+        console.error('Error en getTrainedExercises:', error);
+        res.status(500).json({ message: 'Error cargando ejercicios' });
     }
 };
 
@@ -642,7 +734,8 @@ const chatRoutineGenerator = async (req, res) => {
 module.exports = {
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
     getAllExercises, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
-    saveWorkoutLog, saveSportLog,
+    saveWorkoutLog, saveSportLog, getSportCatalog,
+    getExerciseProgressController, getTrainedExercises,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
     chatRoutineGenerator
 };

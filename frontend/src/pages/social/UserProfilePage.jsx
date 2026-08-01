@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
     Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
-    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding
+    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X
 } from 'lucide-react';
 import api from '../../services/api';
 import BackButton from '../../components/common/BackButton';
@@ -30,14 +30,15 @@ function BodyTab({ ranks }) {
 
     return (
         <div className="pb-4">
+            {/* Frente y espalda a la vez, sin tener que girar nada */}
             <div className="bg-zinc-950 border border-white/5 rounded-[24px] p-4 mb-4">
-                <BodyMap levels={ranks} />
+                <BodyMap levels={ranks} dual />
             </div>
 
             {conActividad.length === 0 && (
                 <div className="text-center py-8 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl mb-4">
                     <p className="text-xs">Todavía no hay entrenos registrados.</p>
-                    <p className="text-[10px] mt-1">Los músculos suben de nivel con el peso, las repeticiones y la constancia.</p>
+                    <p className="text-[10px] mt-1">Los músculos suben de rango con los kilos acumulados.</p>
                 </div>
             )}
 
@@ -142,11 +143,96 @@ function MissionDayCard({ item }) {
     );
 }
 
+// ==========================================
+// CUADRÍCULA ESTILO INSTAGRAM
+// Cuadros pequeños con lo justo para reconocer cada cosa de un vistazo;
+// el detalle completo se abre al tocarlos. Antes cada entrada era una tarjeta
+// enorme y había que hacer scroll eterno para ver tres entrenos.
+// ==========================================
+function CuadroEntreno({ item, onOpen }) {
+    const musculos = item.musclesWorked || [];
+    return (
+        <button onClick={onOpen} className="relative aspect-square bg-black border border-white/5 overflow-hidden active:opacity-70 transition-opacity">
+            {item.photo ? (
+                <img src={item.photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            ) : musculos.length > 0 ? (
+                <div className="absolute inset-0 p-1 pb-4">
+                    <BodyMap highlight={musculos} secondary={item.secondaryMuscles} showToggle={false} dual labels={false} className="h-full" />
+                </div>
+            ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <Dumbbell size={26} className="text-zinc-800" />
+                </div>
+            )}
+
+            {/* Nombre de la rutina siempre legible, sobre un degradado */}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-1.5 pt-4 pb-1.5">
+                <p className="text-[9px] font-black text-white uppercase leading-tight line-clamp-2 text-left">{item.routineName}</p>
+            </div>
+
+            {(item.records || []).length > 0 && (
+                <span className="absolute top-1 right-1 bg-yellow-500 text-black text-[7px] font-black px-1 py-0.5 rounded uppercase">PR</span>
+            )}
+        </button>
+    );
+}
+
+function CuadroComida({ item, onOpen }) {
+    return (
+        <button onClick={onOpen} className="relative aspect-square bg-zinc-950 border border-white/5 flex flex-col items-center justify-center active:opacity-70 transition-opacity px-1">
+            <Flame size={16} className="text-orange-500 mb-1" />
+            <span className="text-xl font-black text-white leading-none">{(item.totalCalories || 0).toLocaleString('es-ES')}</span>
+            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">kcal</span>
+            <span className="absolute bottom-1.5 text-[8px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
+        </button>
+    );
+}
+
+function CuadroMisiones({ item, onOpen }) {
+    const total = Math.max(item.total || 0, item.completed || 0, 1);
+    const pct = Math.round(((item.completed || 0) / total) * 100);
+    return (
+        <button onClick={onOpen} className="relative aspect-square bg-zinc-950 border border-white/5 flex flex-col items-center justify-center active:opacity-70 transition-opacity px-2">
+            <span className="text-xl font-black text-white leading-none">
+                {item.completed}<span className="text-zinc-600 text-sm">/{total}</span>
+            </span>
+            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-0.5">misiones</span>
+            <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/5 mt-2">
+                <div className="h-full bg-green-500 rounded-full" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="absolute bottom-1.5 text-[8px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
+        </button>
+    );
+}
+
+// Detalle a pantalla completa al tocar un cuadro
+function DetalleModal({ children, onClose }) {
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = ''; };
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex flex-col animate-in fade-in duration-150">
+            <div className="flex justify-end p-3 shrink-0 safe-top">
+                <button onClick={onClose} className="bg-zinc-900 border border-white/10 p-2.5 rounded-full text-zinc-300 active:scale-90 transition-transform">
+                    <X size={20} />
+                </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-10 custom-scrollbar">
+                {children}
+            </div>
+        </div>
+    );
+}
+
 export default function UserProfilePage() {
     const { userId } = useParams();
     const navigate = useNavigate();
 
     const [tab, setTab] = useState('workouts');
+    // Cuadro abierto a pantalla completa (null = solo la rejilla)
+    const [detalle, setDetalle] = useState(null);
 
     const { data: profileData, error: profileError, isLoading: loadingProfile } =
         useSWR(userId ? `/social/profile/${userId}` : null, fetcher);
@@ -337,23 +423,26 @@ export default function UserProfilePage() {
                 </div>
             </div>
 
-            {/* --- PESTAÑAS ESTILO IG --- */}
+            {/* --- PESTAÑAS ESTILO IG ---
+                Solo salen las secciones que esta persona ha decidido enseñar
+                (en Ajustes). Si tiene la comida apagada, esa pestaña no existe. */}
             <div className="flex border-t border-white/10 -mx-4 mb-4 sticky top-0 bg-black/95 backdrop-blur-md z-20">
-                {TABS.map(({ key, label, icon: Icon }) => {
-                    const active = tab === key;
-                    return (
-                        <button
-                            key={key}
-                            onClick={() => canViewContent && setTab(key)}
-                            disabled={!canViewContent}
-                            className={`flex-1 py-3.5 flex flex-col items-center gap-1 relative transition-colors ${!canViewContent ? 'text-zinc-800 cursor-default' : active ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}
-                        >
-                            <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-                            <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
-                            {active && canViewContent && <div className="absolute top-0 left-0 right-0 h-0.5 bg-yellow-500" />}
-                        </button>
-                    );
-                })}
+                {TABS.filter(t => profile.visibility ? profile.visibility[t.key] !== false : true)
+                    .map(({ key, label, icon: Icon }) => {
+                        const active = tab === key;
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => { if (canViewContent) { setTab(key); setDetalle(null); } }}
+                                disabled={!canViewContent}
+                                className={`flex-1 py-3.5 flex flex-col items-center gap-1 relative transition-colors ${!canViewContent ? 'text-zinc-800 cursor-default' : active ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}
+                            >
+                                <Icon size={20} strokeWidth={active ? 2.5 : 2} />
+                                <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
+                                {active && canViewContent && <div className="absolute top-0 left-0 right-0 h-0.5 bg-yellow-500" />}
+                            </button>
+                        );
+                    })}
             </div>
 
             {/* --- CUENTA PRIVADA: se ve quién es, pero no su contenido --- */}
@@ -379,19 +468,31 @@ export default function UserProfilePage() {
                 </div>
             ) : (
                 <>
-                    {tab === 'workouts' && items.map(item => (
-                        <WorkoutPostCard key={item._id} post={item} linkProfile={false} />
-                    ))}
-                    {tab === 'food' && items.map(item => <FoodDayCard key={item._id} item={item} />)}
-                    {tab === 'missions' && items.map(item => <MissionDayCard key={item._id} item={item} />)}
+                    {/* Rejilla de 3 columnas a sangre, como el perfil de Instagram */}
+                    <div className="grid grid-cols-3 gap-[2px] -mx-4">
+                        {items.map(item => (
+                            tab === 'workouts' ? <CuadroEntreno key={item._id} item={item} onOpen={() => setDetalle(item)} />
+                                : tab === 'food' ? <CuadroComida key={item._id} item={item} onOpen={() => setDetalle(item)} />
+                                    : <CuadroMisiones key={item._id} item={item} onOpen={() => setDetalle(item)} />
+                        ))}
+                    </div>
 
                     {hasMore && (
-                        <button onClick={loadMore} disabled={loadingMore} className="w-full py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
+                        <button onClick={loadMore} disabled={loadingMore} className="w-full mt-3 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
                             {loadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
                             Cargar más
                         </button>
                     )}
                 </>
+            )}
+
+            {/* Detalle completo del cuadro que hayas tocado */}
+            {detalle && (
+                <DetalleModal onClose={() => setDetalle(null)}>
+                    {tab === 'workouts' && <WorkoutPostCard post={detalle} linkProfile={false} />}
+                    {tab === 'food' && <FoodDayCard item={detalle} />}
+                    {tab === 'missions' && <MissionDayCard item={detalle} />}
+                </DetalleModal>
             )}
         </div>
     );

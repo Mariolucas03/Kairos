@@ -465,10 +465,17 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 <span className="text-yellow-500 text-sm shrink-0">#{exIdx + 1}</span> {ex.name}
                             </h3>
                             <div className="flex items-center gap-2">
+                                {/* Récord: los kilos solos no dicen nada (no es lo mismo
+                                    100 kg a 1 repetición que 100 kg a 8), así que va
+                                    siempre acompañado de las reps con las que se hizo. */}
                                 {ex.pr && ex.pr.value1RM > 0 && (
-                                    <div className="flex items-center gap-1 bg-zinc-900/50 px-2 py-1.5 rounded-lg border border-zinc-800">
-                                        <Trophy size={14} className="text-yellow-600" />
-                                        <span className="text-xs font-black text-yellow-500 whitespace-nowrap">{ex.pr.weight} <span className="text-[10px] text-zinc-500">KG</span></span>
+                                    <div className="flex items-center gap-1.5 bg-zinc-900/50 px-2 py-1.5 rounded-lg border border-zinc-800" title="Tu mejor serie en este ejercicio">
+                                        <Trophy size={14} className="text-yellow-600 shrink-0" />
+                                        <span className="text-xs font-black text-yellow-500 whitespace-nowrap">
+                                            {ex.pr.weight}<span className="text-[10px] text-zinc-500">kg</span>
+                                            <span className="text-zinc-600 mx-0.5">×</span>
+                                            {ex.pr.reps}
+                                        </span>
                                     </div>
                                 )}
                                 <button onClick={() => handleOpenSwap(exIdx)} className="p-1.5 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 active:scale-95"><RefreshCw size={16} /></button>

@@ -67,6 +67,28 @@ const canViewContent = async (viewerId, ownerId) => {
 };
 
 /**
+ * ¿Y esa SECCIÓN en concreto?
+ *
+ * Son dos decisiones distintas y encadenadas: `isPrivate` dice quién puede
+ * entrar en tu perfil, y `visibility` qué le enseñas una vez dentro. Puedes
+ * tener el perfil abierto pero la comida escondida.
+ * En tu propio perfil lo ves todo, ocultes lo que ocultes.
+ */
+const SECTION_KEYS = { workouts: 'workouts', food: 'food', missions: 'missions', body: 'body' };
+
+const canViewSection = async (viewerId, ownerId, section) => {
+    if (viewerId.toString() === ownerId.toString()) return true;
+    if (!(await canViewContent(viewerId, ownerId))) return false;
+
+    const key = SECTION_KEYS[section];
+    if (!key) return true;
+
+    const owner = await User.findById(ownerId).select('visibility').lean();
+    // Sin campo (cuentas antiguas) se considera visible
+    return owner?.visibility?.[key] !== false;
+};
+
+/**
  * Crea la notificación para el dueño del entreno y le manda el aviso push.
  *
  * Nunca notifica acciones sobre uno mismo (dar me gusta a tu propio entreno no
@@ -233,7 +255,7 @@ const getFriendProfile = async (req, res) => {
         // Antes esto devolvía 403 si no erais amigos y ni siquiera podías ver
         // quién era la persona para mandarle solicitud.
         const profile = await User.findById(userId)
-            .select('username avatar frame pet level title bio isPrivate currentXP nextLevelXP streak friends friendRequests clan clanRank')
+            .select('username avatar frame pet level title bio isPrivate visibility currentXP nextLevelXP streak friends friendRequests clan clanRank')
             .populate('clan', 'name icon')
             .lean();
 
@@ -274,7 +296,16 @@ const getFriendProfile = async (req, res) => {
                 nextLevelXP: profile.nextLevelXP,
                 streak: profile.streak,
                 clan: profile.clan,
-                clanRank: profile.clanRank
+                clanRank: profile.clanRank,
+                // Qué pestañas tiene sentido enseñar (en tu propio perfil, todas)
+                visibility: isMe
+                    ? { workouts: true, food: true, missions: true, body: true }
+                    : {
+                        workouts: profile.visibility?.workouts !== false,
+                        food: profile.visibility?.food !== false,
+                        missions: profile.visibility?.missions !== false,
+                        body: profile.visibility?.body !== false
+                    }
             },
             counts: {
                 workouts: workoutsCount,
@@ -303,9 +334,14 @@ const getProfileItems = async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const skip = (page - 1) * FEED_PAGE_SIZE;
 
-        // Aquí SÍ se bloquea: el contenido de una cuenta privada solo lo ven sus amigos
+        // Dos filtros: la cuenta privada solo la ven sus amigos, y además el
+        // dueño puede haber escondido esta sección en concreto.
         const allowed = await canViewContent(viewerId, userId);
         if (!allowed) return res.status(403).json({ message: 'Esta cuenta es privada' });
+
+        if (!(await canViewSection(viewerId, userId, tab))) {
+            return res.status(403).json({ message: 'Esta sección está oculta', hidden: true });
+        }
 
         // Pestaña "Cuerpo": nivel de cada grupo muscular (no es una lista paginada)
         if (tab === 'body') {

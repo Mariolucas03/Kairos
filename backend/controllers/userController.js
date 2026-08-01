@@ -150,7 +150,7 @@ const claimDailyReward = asyncHandler(async (req, res) => {
 // ==========================================
 // @route PUT /api/users/profile
 const updateProfileSettings = asyncHandler(async (req, res) => {
-    const { bio, isPrivate, gymMode } = req.body;
+    const { bio, isPrivate, visibility } = req.body;
 
     const updates = {};
 
@@ -163,10 +163,12 @@ const updateProfileSettings = asyncHandler(async (req, res) => {
         updates.isPrivate = !!isPrivate;
     }
 
-    // El modo de gym (normal/pro) también se configura desde esta pantalla
-    if (gymMode !== undefined) {
-        if (!['normal', 'pro'].includes(gymMode)) { res.status(400); throw new Error('Modo de gym inválido'); }
-        updates.gymMode = gymMode;
+    // Qué secciones enseñas. Se escriben campo a campo (no el objeto entero)
+    // para que mandar solo una no borre las demás.
+    if (visibility && typeof visibility === 'object') {
+        ['workouts', 'food', 'missions', 'body'].forEach(k => {
+            if (visibility[k] !== undefined) updates[`visibility.${k}`] = !!visibility[k];
+        });
     }
 
     if (Object.keys(updates).length === 0) { res.status(400); throw new Error('Nada que actualizar'); }

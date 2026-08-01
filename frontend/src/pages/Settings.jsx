@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Lock, Globe, LogOut, Save, Loader2,
-    Dumbbell, User as UserIcon, ChevronRight
+    Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -12,6 +12,16 @@ import { useAuthStore } from '../store/useAuthStore';
 
 const BIO_MAX = 150;
 
+// Secciones que puedes enseñar u ocultar por separado
+const SECCIONES = [
+    { key: 'workouts', label: 'Entrenos', icon: Dumbbell, desc: 'Tus sesiones de gym y deporte' },
+    { key: 'body', label: 'Cuerpo', icon: PersonStanding, desc: 'El nivel de cada músculo' },
+    { key: 'food', label: 'Comida', icon: Utensils, desc: 'Lo que comes y tus calorías' },
+    { key: 'missions', label: 'Misiones', icon: ScrollText, desc: 'Las misiones que completas' }
+];
+
+const VISIBILIDAD_POR_DEFECTO = { workouts: true, body: true, food: true, missions: true };
+
 export default function Settings() {
     const navigate = useNavigate();
     const user = useAuthStore(state => state.user);
@@ -20,7 +30,7 @@ export default function Settings() {
 
     const [bio, setBio] = useState('');
     const [isPrivate, setIsPrivate] = useState(false);
-    const [gymMode, setGymMode] = useState('normal');
+    const [visibility, setVisibility] = useState(VISIBILIDAD_POR_DEFECTO);
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState(null);
     const [confirmLogout, setConfirmLogout] = useState(false);
@@ -30,20 +40,21 @@ export default function Settings() {
         if (!user) return;
         setBio(user.bio || '');
         setIsPrivate(!!user.isPrivate);
-        setGymMode(user.gymMode || 'normal');
+        setVisibility({ ...VISIBILIDAD_POR_DEFECTO, ...(user.visibility || {}) });
     }, [user]);
 
+    const visActual = { ...VISIBILIDAD_POR_DEFECTO, ...(user?.visibility || {}) };
     const dirty = user && (
         (user.bio || '') !== bio ||
         !!user.isPrivate !== isPrivate ||
-        (user.gymMode || 'normal') !== gymMode
+        SECCIONES.some(s => visActual[s.key] !== visibility[s.key])
     );
 
     const handleSave = async () => {
         if (saving) return;
         setSaving(true);
         try {
-            const res = await api.put('/users/profile', { bio, isPrivate, gymMode });
+            const res = await api.put('/users/profile', { bio, isPrivate, visibility });
             setUser(prev => ({ ...prev, ...res.data.user }));
             setToast({ message: 'Ajustes guardados', type: 'success' });
         } catch (e) {
@@ -113,9 +124,14 @@ export default function Settings() {
                 </div>
             </section>
 
-            {/* --- PRIVACIDAD --- */}
+            {/* --- PRIVACIDAD ---
+                Dos decisiones encadenadas y explicadas por separado, que es lo
+                que costaba entender: 1) QUIÉN puede entrar en tu perfil,
+                2) QUÉ le enseñas una vez dentro. */}
             <section className="mb-6">
-                <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Privacidad</h2>
+                <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+                    1 · Quién puede ver tu perfil
+                </h2>
                 <div className="bg-zinc-950 border border-white/5 rounded-[24px] overflow-hidden">
                     <button
                         onClick={() => setIsPrivate(!isPrivate)}
@@ -128,45 +144,52 @@ export default function Settings() {
                             <p className="text-white font-bold text-sm">{isPrivate ? 'Cuenta privada' : 'Cuenta pública'}</p>
                             <p className="text-[10px] text-zinc-500 leading-tight mt-0.5">
                                 {isPrivate
-                                    ? 'Solo tus amigos ven tus entrenos, comida y misiones.'
-                                    : 'Cualquiera puede ver tus entrenos, comida y misiones.'}
+                                    ? 'Solo tus amigos pueden entrar en tu perfil.'
+                                    : 'Cualquiera puede entrar en tu perfil.'}
                             </p>
                         </div>
-                        {/* Interruptor */}
                         <div className={`w-12 h-7 rounded-full p-1 transition-colors shrink-0 ${isPrivate ? 'bg-yellow-500' : 'bg-zinc-700'}`}>
                             <div className={`w-5 h-5 rounded-full bg-white transition-transform ${isPrivate ? 'translate-x-5' : 'translate-x-0'}`} />
                         </div>
                     </button>
                     <p className="text-[10px] text-zinc-600 px-4 pb-3 leading-tight">
-                        Tu foto, nombre, descripción y contadores siempre son visibles, aunque tengas la cuenta privada.
+                        Tu foto, nombre, descripción y contadores se ven siempre, tengas la cuenta como la tengas.
                     </p>
                 </div>
             </section>
 
-            {/* --- GIMNASIO --- */}
+            {/* --- QUÉ ENSEÑAS --- */}
             <section className="mb-6">
-                <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Gimnasio</h2>
-                <div className="bg-zinc-950 border border-white/5 rounded-[24px] p-4">
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-                        <Dumbbell size={11} /> Nivel de detalle
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {[
-                            { id: 'normal', titulo: 'Normal', desc: 'Grupos musculares (Pecho, Espalda, Pierna...)' },
-                            { id: 'pro', titulo: 'Pro', desc: 'Músculo concreto (Dorsal ancho, Vasto lateral...)' }
-                        ].map(m => (
+                <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1 ml-1">
+                    2 · Qué enseñas de ti
+                </h2>
+                <p className="text-[10px] text-zinc-600 mb-3 ml-1 leading-tight">
+                    Puedes apagar una sección aunque tengas la cuenta pública. Tú siempre la ves.
+                </p>
+                <div className="bg-zinc-950 border border-white/5 rounded-[24px] overflow-hidden divide-y divide-white/5">
+                    {SECCIONES.map(({ key, label, icon: Icon, desc }) => {
+                        const visible = visibility[key] !== false;
+                        return (
                             <button
-                                key={m.id}
-                                onClick={() => setGymMode(m.id)}
-                                className={`p-3 rounded-2xl border text-left transition-all ${gymMode === m.id
-                                    ? 'bg-yellow-500/10 border-yellow-500/50 ring-1 ring-yellow-500/20'
-                                    : 'bg-black border-zinc-800 hover:border-zinc-700'}`}
+                                key={key}
+                                onClick={() => setVisibility(v => ({ ...v, [key]: !visible }))}
+                                className="w-full p-4 flex items-center gap-4 active:bg-white/5 transition-colors"
                             >
-                                <p className={`font-black text-sm uppercase ${gymMode === m.id ? 'text-yellow-500' : 'text-zinc-300'}`}>{m.titulo}</p>
-                                <p className="text-[9px] text-zinc-500 leading-tight mt-1">{m.desc}</p>
+                                <div className={`p-2.5 rounded-xl border ${visible ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-500' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+                                    <Icon size={18} />
+                                </div>
+                                <div className="flex-1 min-w-0 text-left">
+                                    <p className={`font-bold text-sm ${visible ? 'text-white' : 'text-zinc-500'}`}>{label}</p>
+                                    <p className="text-[10px] text-zinc-500 leading-tight mt-0.5 flex items-center gap-1">
+                                        {visible ? <Eye size={10} /> : <EyeOff size={10} />} {desc}
+                                    </p>
+                                </div>
+                                <div className={`w-12 h-7 rounded-full p-1 transition-colors shrink-0 ${visible ? 'bg-yellow-500' : 'bg-zinc-700'}`}>
+                                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${visible ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </div>
                             </button>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
             </section>
 

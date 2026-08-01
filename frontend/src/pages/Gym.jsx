@@ -4,15 +4,15 @@ import { useState, useRef } from 'react';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
 import {
-    Plus, Play, Trash2, Dumbbell, X, Bike, Activity, Loader2, MapPin,
-    Timer, Edit, Footprints, Waves, PersonStanding, Flame,
-    Save, Lock
+    Plus, Play, Trash2, Dumbbell, Activity, Timer, Edit, PersonStanding, Lock
 } from 'lucide-react';
 
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import LoadingScreen from '../components/common/LoadingScreen';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
+import BodyTab from '../components/gym/BodyTab';
+import SportsTab from '../components/gym/SportsTab';
 import { useWorkout } from '../context/WorkoutContext';
 import { useSmoothMount } from '../hooks/useSmoothMount';
 
@@ -22,14 +22,11 @@ import useSWR from 'swr';
 // Fetcher global para SWR
 const fetcher = (url) => api.get(url).then(res => res.data);
 
-// --- CONSTANTES DEPORTE ---
-const SPORT_ACTIVITIES = [
-    { id: 'Caminar', icon: <Footprints size={24} />, color: 'text-emerald-400', bg: 'bg-emerald-900/20 border-emerald-500/30' },
-    { id: 'Correr', icon: <PersonStanding size={24} />, color: 'text-orange-400', bg: 'bg-orange-900/20 border-orange-500/30' },
-    { id: 'Ciclismo', icon: <Bike size={24} />, color: 'text-cyan-400', bg: 'bg-cyan-900/20 border-cyan-500/30' },
-    { id: 'Natación', icon: <Waves size={24} />, color: 'text-blue-400', bg: 'bg-blue-900/20 border-blue-500/30' },
-    { id: 'Fútbol', icon: <Activity size={24} />, color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-500/30' },
-    { id: 'Padel', icon: <Activity size={24} />, color: 'text-lime-400', bg: 'bg-lime-900/20 border-lime-500/30' },
+// Las tres pestañas de la sección
+const PESTANAS = [
+    { id: 'gym', label: 'Gym', icon: Dumbbell },
+    { id: 'body', label: 'Cuerpo', icon: PersonStanding },
+    { id: 'otros', label: 'Otros', icon: Activity }
 ];
 
 const COLOR_THEMES = {
@@ -121,50 +118,6 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
     );
 };
 
-const SwipeableSportCard = ({ workout, onDelete }) => {
-    const [offsetX, setOffsetX] = useState(0);
-    const [isDragging, setIsDragging] = useState(false);
-    const startX = useRef(0);
-
-    const handleTouchStart = (e) => { startX.current = e.touches[0].clientX; setIsDragging(true); };
-    const handleTouchMove = (e) => {
-        if (!isDragging) return;
-        const diff = e.touches[0].clientX - startX.current;
-        if (Math.abs(diff) < 200) setOffsetX(diff);
-    };
-    const handleTouchEnd = () => { setIsDragging(false); if (Math.abs(offsetX) > 100) onDelete(); setOffsetX(0); };
-
-    return (
-        <div className="relative w-full h-[72px] mb-3 select-none touch-pan-y overflow-hidden rounded-2xl">
-            <div className="absolute inset-0 bg-red-900/20 border border-red-500/30 flex items-center justify-center transition-all">
-                <Trash2 className={`text-red-500 transition-opacity ${Math.abs(offsetX) > 50 ? 'opacity-100' : 'opacity-30'}`} />
-            </div>
-            <div
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                style={{ transform: `translateX(${offsetX}px)`, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
-                className="absolute inset-0 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex justify-between items-center shadow-md z-10 will-change-transform"
-            >
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-lime-500/10 flex items-center justify-center text-lime-400 border border-lime-500/20"><Activity size={18} /></div>
-                    <div>
-                        <h4 className="font-bold text-white text-sm uppercase tracking-tight">{workout.routineName}</h4>
-                        <div className="flex items-center gap-3 mt-0.5">
-                            <span className="text-[10px] text-zinc-400 font-bold"><Timer size={10} className="inline mr-1" />{Math.round(workout.duration)}m</span>
-                            {workout.distance > 0 && <span className="text-[10px] text-blue-400 font-bold"><MapPin size={10} className="inline mr-1" />{workout.distance}km</span>}
-                        </div>
-                    </div>
-                </div>
-                <div className="flex flex-col items-end">
-                    <span className="text-base font-black text-white">{Math.round(workout.caloriesBurned)}</span>
-                    <span className="text-[8px] font-bold text-orange-500 uppercase">KCAL</span>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 export default function Gym() {
     // 🔥 USAMOS ZUSTAND PARA ESTADO GLOBAL
     const user = useAuthStore(state => state.user);
@@ -189,23 +142,12 @@ export default function Gym() {
     const [toast, setToast] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
-    const [showSportModal, setShowSportModal] = useState(false);
-    const [isSavingSport, setIsSavingSport] = useState(false);
-    const [sportForm, setSportForm] = useState({ name: '', time: '', distance: '' });
-    const [intensity, setIntensity] = useState('Media');
+    const [tab, setTab] = useState('gym');
 
     const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
     const openCreateRoutine = (r) => { setRoutineToEdit(r); setShowCreateModal(true); setIsUiHidden(true); };
     const closeCreateRoutine = () => { setShowCreateModal(false); setIsUiHidden(false); };
-
-    const openSportModal = () => {
-        setSportForm({ name: '', time: '', distance: '' });
-        setIntensity('Media');
-        setShowSportModal(true);
-        setIsUiHidden(true);
-    };
-    const closeSportModal = () => { setShowSportModal(false); setIsUiHidden(false); };
 
     const openActiveWorkout = (r) => {
         if (activeRoutine && activeRoutine._id === r._id) return;
@@ -235,135 +177,102 @@ export default function Gym() {
         }
     };
 
-    const handleSaveSport = async () => {
-        if (!sportForm.name || !sportForm.time) return showToast('Faltan datos', 'error');
-        setIsSavingSport(true);
-        try {
-            const payload = { ...sportForm, name: sportForm.name, time: Number(sportForm.time), distance: sportForm.distance ? Number(sportForm.distance) : null, intensity };
-            const res = await api.post('/gym/sport', payload);
-            if (res.data.user) setUser(res.data.user);
-
-            closeSportModal();
-            // Revalida los datos deportivos en caché (SWR)
-            mutateDaily();
-            showToast(`+${res.data.log.caloriesBurned} kcal`, "success");
-        } catch (e) {
-            showToast('Error', 'error');
-        } finally {
-            setIsSavingSport(false);
-        }
-    };
-
-    const handleDeleteSport = () => showToast("Usa la web para borrar", "info");
 
     // 🔥 PANTALLA DE CARGA CON LA PROTECCIÓN DEL BOTÓN (SMOOTH MOUNT)
     if (!isSmoothMounted || isFirstLoad) return <LoadingScreen message="Preparando zona de entreno..." />;
 
     return (
-        <div className="animate-in fade-in space-y-8 pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen">
+        <div className="animate-in fade-in pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER GYM */}
-            <div className="flex justify-between items-end px-1 pt-2">
-                <div>
-                    <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">Zona de Entreno</h1>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Supera tus límites</p>
-                </div>
+            {/* CABECERA */}
+            <div className="px-1 pt-2 mb-4">
+                <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">Zona de Entreno</h1>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Supera tus límites</p>
             </div>
 
-            {/* SECCIÓN 1: DEPORTE (CARDIO) */}
-            <div>
-                <h3 className="text-lime-500 text-xs font-bold uppercase tracking-widest mb-3 ml-2">Cardio & Actividades</h3>
-
-                <div onClick={openSportModal} className="bg-zinc-900/50 border border-lime-500/20 rounded-3xl p-5 flex items-center justify-between cursor-pointer active:scale-95 transition-all hover:bg-zinc-900 group mb-4 shadow-lg">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-lime-500/10 flex items-center justify-center text-lime-400 group-hover:bg-lime-500 group-hover:text-black transition-colors border border-lime-500/10"><Plus size={24} /></div>
-                        <div><h3 className="text-white font-black text-lg italic uppercase tracking-tight">Registrar</h3><p className="text-xs text-zinc-500 font-bold uppercase">Cardio, Deportes...</p></div>
-                    </div>
-                </div>
-
-                {todaySports.length > 0 && (
-                    <div className="space-y-2">
-                        {todaySports.map((sport, idx) => <SwipeableSportCard key={idx} workout={sport} onDelete={handleDeleteSport} />)}
-                    </div>
-                )}
+            {/* PESTAÑAS: Gym · Cuerpo · Otros */}
+            <div className="flex bg-zinc-950 border border-white/5 p-1 rounded-2xl mb-6 sticky top-0 z-30">
+                {PESTANAS.map(({ id, label, icon: Icon }) => (
+                    <button
+                        key={id}
+                        onClick={() => setTab(id)}
+                        className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-wide transition-all ${
+                            tab === id ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/10' : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                    >
+                        <Icon size={14} strokeWidth={tab === id ? 2.6 : 2} /> {label}
+                    </button>
+                ))}
             </div>
 
-            {/* SECCIÓN 2: PESAS (RUTINAS) */}
-            <div>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-yellow-500 text-xs font-bold uppercase tracking-widest ml-2">Mis Rutinas</h3>
-                    <button onClick={() => openCreateRoutine(null)} className="bg-zinc-900 text-zinc-400 hover:text-white px-4 py-2 rounded-xl border border-zinc-800 active:scale-95 transition-all flex items-center gap-2 hover:bg-zinc-800"><Plus size={14} strokeWidth={3} /> <span className="text-[10px] font-black uppercase">Nueva</span></button>
-                </div>
+            {/* --- GYM: TUS RUTINAS --- */}
+            {tab === 'gym' && (
+                <div className="animate-in fade-in duration-200">
+                    <button
+                        onClick={() => openCreateRoutine(null)}
+                        className="w-full bg-yellow-500 text-black rounded-2xl py-4 flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs active:scale-[0.98] transition-transform border-b-4 border-yellow-600 mb-5"
+                    >
+                        <Plus size={18} strokeWidth={3} /> Nueva rutina
+                    </button>
 
-                <div className="pb-24">
-                    {routines.length === 0 ? (
-                        <div onClick={() => openCreateRoutine(null)} className="text-center py-12 border-2 border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20 cursor-pointer hover:border-yellow-500/30 transition-colors group">
-                            <Dumbbell className="mx-auto text-zinc-700 mb-3 group-hover:text-yellow-500 transition-colors" size={32} />
-                            <p className="text-zinc-600 text-xs font-bold uppercase group-hover:text-yellow-100/50">Crear primera rutina</p>
-                        </div>
-                    ) : (
-                        routines.map((routine) => (
-                            <SwipeableRoutineCard
-                                key={routine._id}
-                                routine={routine}
-                                onPlay={() => openActiveWorkout(routine)}
-                                onDelete={() => handleDeleteRoutine(routine._id)}
-                                onEdit={() => handleEditRoutine(routine)}
-                                isLocked={activeRoutine && activeRoutine._id === routine._id}
-                            />
-                        ))
-                    )}
-                </div>
-            </div>
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest">Mis rutinas</h3>
+                        {routines.length > 0 && (
+                            <span className="text-[9px] font-bold text-zinc-600 uppercase">Desliza para editar o borrar</span>
+                        )}
+                    </div>
 
-            {/* MODALES */}
-            {showCreateModal && <CreateRoutineModal routineToEdit={routineToEdit} onClose={closeCreateRoutine} onRoutineCreated={() => { mutateRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }} />}
-
-            {showSportModal && (
-                <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
-                    <div className="bg-zinc-950 w-full max-w-sm rounded-[32px] border border-lime-500/20 p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-lime-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
-
-                        <div className="flex justify-between items-center relative z-10">
-                            <h2 className="text-xl font-black text-white italic uppercase tracking-tighter">NUEVO <span className="text-lime-500">DEPORTE</span></h2>
-                            <button onClick={closeSportModal} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={20} /></button>
-                        </div>
-
-                        <div className="space-y-6 relative z-10">
-                            <div>
-                                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest">Actividad</label>
-                                <input type="text" placeholder="Ej: Crossfit, Tenis..." value={sportForm.name} onChange={(e) => setSportForm({ ...sportForm, name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-base outline-none focus:ring-0 focus:border-lime-500/50 transition-all placeholder:text-zinc-600" autoFocus />
+                    <div className="pb-24">
+                        {routines.length === 0 ? (
+                            <div onClick={() => openCreateRoutine(null)} className="text-center py-14 border-2 border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20 cursor-pointer hover:border-yellow-500/30 transition-colors group">
+                                <Dumbbell className="mx-auto text-zinc-700 mb-3 group-hover:text-yellow-500 transition-colors" size={32} />
+                                <p className="text-zinc-500 text-xs font-black uppercase">Todavía no tienes rutinas</p>
+                                <p className="text-zinc-600 text-[10px] mt-1">Toca aquí para crear la primera</p>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col">
-                                    <label className="text-[10px] font-black text-zinc-500 uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Minutos</label>
-                                    <input type="number" inputMode="decimal" placeholder="0" value={sportForm.time} onChange={(e) => setSportForm({ ...sportForm, time: e.target.value })} className="w-full bg-transparent text-3xl font-black text-white outline-none border-none focus:ring-0 placeholder:text-zinc-700 p-0" />
-                                </div>
-                                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col">
-                                    <label className="text-[10px] font-black text-zinc-500 uppercase mb-1 flex items-center gap-1"><MapPin size={10} /> Km (Opc)</label>
-                                    <input type="number" inputMode="decimal" placeholder="-" value={sportForm.distance} onChange={(e) => setSportForm({ ...sportForm, distance: e.target.value })} className="w-full bg-transparent text-3xl font-black text-white outline-none border-none focus:ring-0 placeholder:text-zinc-700 p-0" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest">Intensidad</label>
-                                <div className="flex bg-black p-1 rounded-xl border border-zinc-800">
-                                    {['Baja', 'Media', 'Alta'].map((level) => (
-                                        <button key={level} onClick={() => setIntensity(level)} className={`flex-1 py-3 rounded-lg text-[10px] font-black uppercase transition-all ${intensity === level ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20' : 'text-zinc-500 hover:text-zinc-300'}`}>{level}</button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-2">
-                            <button onClick={handleSaveSport} disabled={isSavingSport} className="w-full py-4 bg-gradient-to-r from-lime-500 to-emerald-600 hover:from-lime-400 hover:to-emerald-500 text-black font-black rounded-2xl uppercase tracking-widest shadow-lg shadow-lime-900/20 active:scale-95 transition-all flex items-center justify-center gap-3 border-b-4 border-lime-700 text-sm">
-                                {isSavingSport ? <Loader2 className="animate-spin" /> : <Save size={18} />}{isSavingSport ? 'GUARDANDO...' : 'REGISTRAR ACTIVIDAD'}
-                            </button>
-                        </div>
+                        ) : (
+                            routines.map((routine) => (
+                                <SwipeableRoutineCard
+                                    key={routine._id}
+                                    routine={routine}
+                                    onPlay={() => openActiveWorkout(routine)}
+                                    onDelete={() => handleDeleteRoutine(routine._id)}
+                                    onEdit={() => handleEditRoutine(routine)}
+                                    isLocked={activeRoutine && activeRoutine._id === routine._id}
+                                />
+                            ))
+                        )}
                     </div>
                 </div>
+            )}
+
+            {/* --- CUERPO: RANGOS Y PROGRESO --- */}
+            {tab === 'body' && (
+                <div className="animate-in fade-in duration-200">
+                    <BodyTab />
+                </div>
+            )}
+
+            {/* --- OTROS: CUALQUIER DEPORTE --- */}
+            {tab === 'otros' && (
+                <div className="animate-in fade-in duration-200">
+                    <SportsTab
+                        hoy={todaySports}
+                        showToast={showToast}
+                        onSaved={(data) => {
+                            if (data.user) setUser(data.user);
+                            mutateDaily();
+                        }}
+                    />
+                </div>
+            )}
+
+            {showCreateModal && (
+                <CreateRoutineModal
+                    routineToEdit={routineToEdit}
+                    onClose={closeCreateRoutine}
+                    onRoutineCreated={() => { mutateRoutines(); showToast(routineToEdit ? "Actualizada" : "Creada", "success"); }}
+                />
             )}
         </div>
     );

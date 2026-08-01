@@ -1,57 +1,60 @@
 import React from 'react';
+import { Flame, Gift } from 'lucide-react';
+import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
-export default function StreakWidget({ streak = 0 }) {
+/**
+ * RACHA + COFRE DIARIO.
+ * El cofre vive aquí dentro (antes era un botón suelto en la cabecera).
+ * Sigue llamando exactamente a la misma función `openCalendar` del hook
+ * useDailyRewards, y `claimed` pinta el estado ya reclamado.
+ */
+export default function StreakWidget({ streak = 0, onOpenChest, claimed = false }) {
+    const accent = WIDGET_ACCENTS.streak;
     const isSingular = streak === 1;
 
-    // --- COLORES FLOW "FIRE" ---
-    const gradientClasses = "from-red-700 via-orange-600 to-yellow-500";
-    const textGradient = "from-red-600 via-orange-500 to-yellow-400";
-
     return (
-        // Contenedor Principal con el Borde de Fuego
-        <div className={`
-            h-full w-full relative rounded-[32px] overflow-hidden
-            group cursor-pointer active:scale-[0.98] transition-all duration-200
-            p-[2px] 
-            bg-gradient-to-tr ${gradientClasses}
-            shadow-[0_0_20px_rgba(234,88,12,0.3)]
-        `}>
-            {/* Contenedor Interior (Fondo Negro) */}
-            <div className="h-full w-full bg-zinc-950 rounded-[30px] p-5 relative overflow-hidden flex flex-col justify-between z-10">
+        <WidgetCard accent={accent} padding="px-[18px] py-4" className="h-full">
+            <div className="relative z-10 flex items-center gap-4">
 
-                {/* --- CABECERA --- */}
-                <div className="flex justify-start w-full relative z-20 pt-1">
-                    <h3 className="text-xl font-black text-white italic uppercase tracking-tighter leading-none">
-                        RACHA
-                    </h3>
+                <div
+                    className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(249,115,22,0.12)', color: accent }}
+                >
+                    <Flame size={22} />
                 </div>
 
-                {/* --- CONTENIDO CENTRAL: NÚMERO MÁS GRANDE Y DESPLAZADO A LA DERECHA --- */}
-                <div className="flex-1 flex items-center justify-center relative z-20 pb-4">
-                    {/* ml-6 para mover el bloque un poco a la derecha */}
-                    <div className="flex items-baseline gap-2 animate-in zoom-in duration-300 ml-6">
-                        {/* NÚMERO RECTO MÁS GRANDE (text-8xl) */}
-                        <span className={`text-8xl font-black tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-t ${textGradient} drop-shadow-md not-italic`}>
+                <div className="flex-1 min-w-0">
+                    <span className="block text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] leading-none not-italic">
+                        RACHA
+                    </span>
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                        <span className="text-2xl font-black text-white tracking-[-0.045em] leading-none not-italic">
                             {streak}
                         </span>
-                        {/* UNIDAD RECTA Y BLANCA */}
-                        <span className="text-2xl font-black uppercase text-white tracking-tighter not-italic">
-                            {isSingular ? 'DÍA' : 'DÍAS'}
+                        <span
+                            className="text-[11px] font-black tracking-[0.1em] leading-none not-italic"
+                            style={{ color: accent }}
+                        >
+                            {isSingular ? 'DÍA SEGUIDO' : 'DÍAS SEGUIDOS'}
                         </span>
                     </div>
                 </div>
 
-                {/* --- BARRA INFERIOR ARDIENTE --- */}
-                <div className="absolute bottom-0 left-0 w-full h-3 z-10">
-                    <div
-                        className={`h-full bg-gradient-to-r ${gradientClasses} shadow-[0_-4px_15px_rgba(220,38,38,0.6)]`}
-                        style={{ width: '100%' }}
-                    ></div>
-                </div>
-
-                {/* Luz de fondo ambiental */}
-                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-gradient-to-tr from-red-600/20 to-orange-600/20 rounded-full blur-3xl pointer-events-none z-0"></div>
+                {/* COFRE DIARIO */}
+                <button
+                    onClick={(e) => { e.stopPropagation(); onOpenChest && onOpenChest(); }}
+                    className={`
+                        shrink-0 flex items-center gap-2.5 rounded-2xl px-3.5 py-[11px] border transition-all active:scale-95
+                        ${claimed
+                            ? 'bg-white/[0.03] border-white/[0.07] text-zinc-600'
+                            : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/[0.18]'
+                        }
+                    `}
+                >
+                    <Gift size={19} className={claimed ? '' : 'animate-pulse'} />
+                    <span className="text-[10px] font-black tracking-[0.1em] not-italic">COFRE</span>
+                </button>
             </div>
-        </div>
+        </WidgetCard>
     );
 }

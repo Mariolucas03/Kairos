@@ -85,6 +85,7 @@ export default function BodyMap({
     accent = '#eab308',
     showToggle = true,
     dual = false,
+    labels = true,
     onSelectMuscle = null,
     className = ''
 }) {
@@ -120,9 +121,12 @@ export default function BodyMap({
                 {['front', 'back'].map(v => (
                     <div key={v} className="flex-1 min-w-0 flex flex-col items-center">
                         <Figura view={v} getFill={getFill} onSelectMuscle={onSelectMuscle} />
-                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
-                            {v === 'front' ? 'Frente' : 'Espalda'}
-                        </span>
+                        {/* En miniatura (la rejilla del perfil) las etiquetas solo estorban */}
+                        {labels && (
+                            <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
+                                {v === 'front' ? 'Frente' : 'Espalda'}
+                            </span>
+                        )}
                     </div>
                 ))}
             </div>

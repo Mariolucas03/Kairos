@@ -19,7 +19,10 @@ const {
     getBodyStatus,
     chatRoutineGenerator,
     getMuscleCatalog,
-    getMuscleRanksController
+    getMuscleRanksController,
+    getSportCatalog,
+    getExerciseProgressController,
+    getTrainedExercises
 } = require('../controllers/gymController');
 
 const protect = require('../middleware/authMiddleware');
@@ -46,6 +49,12 @@ router.post('/exercises', protect, createCustomExercise);
 // 🛡️ AQUÍ APLICAMOS LA VALIDACIÓN JOI ANTES DEL CONTROLADOR
 router.post('/log', protect, validate(workoutLogSchema), saveWorkoutLog);
 router.post('/sport', protect, saveSportLog);
+// Catálogo de deportes de la pestaña "Otros"
+router.get('/sports', protect, getSportCatalog);
+
+// Progreso por ejercicio (gráficas de la pestaña "Cuerpo")
+router.get('/progress', protect, getTrainedExercises);
+router.get('/progress/:name', protect, getExerciseProgressController);
 
 // Generador de rutinas con IA.
 // La función existía en el controlador pero NUNCA se enrutó: el endpoint

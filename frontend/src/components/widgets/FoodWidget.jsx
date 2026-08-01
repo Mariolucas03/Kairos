@@ -1,181 +1,141 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Utensils, Flame, Sunrise, Sun, Moon, Coffee, Zap } from 'lucide-react';
+import { X, Sunrise, Sun, Moon, Coffee, Zap } from 'lucide-react';
+import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
 export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = {} }) {
     const [isOpen, setIsOpen] = useState(false);
 
-    // --- LÓGICA ---
     const safeCurrent = Math.round(Number(currentKcal) || 0);
     const safeLimit = Math.round(Number(limitKcal) || 2100);
     const percentage = Math.min((safeCurrent / safeLimit) * 100, 100);
     const isOverLimit = safeCurrent > safeLimit;
+    const remaining = safeLimit - safeCurrent;
 
-    // Configuración Círculo
-    const radius = 42;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
+    const accent = isOverLimit ? '#ef4444' : WIDGET_ACCENTS.food;
 
-    // Formatear números
-    const f = (n) => n.toLocaleString('es-ES');
+    const f = (n) => Number(n || 0).toLocaleString('es-ES');
 
-    // Colores Flow vs Alerta
-    const gradientClasses = isOverLimit
-        ? "from-red-600 via-red-500 to-red-600"
-        : "from-[#009245] to-[#FCEE21]";
-
-    const shadowColor = isOverLimit ? "rgba(220, 38, 38, 0.4)" : "rgba(252, 238, 33, 0.4)";
-
-    // Configuración de comidas para el modal
     const MEAL_SECTIONS = [
-        { key: 'breakfast', label: 'DESAYUNO', icon: <Sunrise size={18} className="text-yellow-400" /> },
-        { key: 'lunch', label: 'COMIDA', icon: <Sun size={18} className="text-orange-500" /> },
-        { key: 'merienda', label: 'MERIENDA', icon: <Coffee size={18} className="text-amber-700" /> },
-        { key: 'dinner', label: 'CENA', icon: <Moon size={18} className="text-indigo-400" /> },
-        { key: 'snacks', label: 'SNACKS', icon: <Zap size={18} className="text-purple-400" /> },
+        { key: 'breakfast', label: 'DESAY.', modalLabel: 'DESAYUNO', icon: <Sunrise size={18} className="text-yellow-400" />, bar: '#65a30d' },
+        { key: 'lunch', label: 'COMIDA', modalLabel: 'COMIDA', icon: <Sun size={18} className="text-orange-500" />, bar: '#84cc16' },
+        { key: 'merienda', label: 'MERIEN.', modalLabel: 'MERIENDA', icon: <Coffee size={18} className="text-amber-700" />, bar: '#a3e635' },
+        { key: 'dinner', label: 'CENA', modalLabel: 'CENA', icon: <Moon size={18} className="text-indigo-400" />, bar: '#bef264' },
+        { key: 'snacks', label: 'SNACKS', modalLabel: 'SNACKS', icon: <Zap size={18} className="text-purple-400" />, bar: '#d9f99d' },
     ];
+
+    const kcalOf = (key) => {
+        const mealData = meals[key];
+        if (typeof mealData === 'number') return mealData;
+        if (Array.isArray(mealData)) return mealData.reduce((acc, item) => acc + (item.calories || 0), 0);
+        if (mealData && mealData.foods) return mealData.foods.reduce((acc, item) => acc + (item.calories || 0), 0);
+        return 0;
+    };
+
+    // Anillo
+    const R = 48;
+    const C = 2 * Math.PI * R;
+    const offset = C - (percentage / 100) * C;
 
     return (
         <>
-            {/* 1. WIDGET PEQUEÑO (PREVIEW) */}
-            <div
+            <WidgetCard
+                accent={accent}
                 onClick={() => setIsOpen(true)}
-                className={`
-                    h-full w-full relative rounded-[32px] overflow-hidden
-                    group cursor-pointer active:scale-[0.98] transition-all duration-200
-                    p-[2px] 
-                    bg-gradient-to-br ${gradientClasses}
-                    shadow-[0_0_25px_${shadowColor}]
-                `}
+                padding="p-5"
+                className="h-full"
             >
-                {/* Contenedor Interior (Negro) */}
-                <div className="h-full w-full bg-zinc-950 rounded-[30px] flex flex-col relative overflow-hidden z-10">
+                <div className="relative z-10 flex items-center gap-[18px]">
 
-                    {/* --- CABECERA --- */}
-                    <div className="px-5 pt-5 shrink-0 z-10">
-                        <h2 className="text-xl font-black text-white italic uppercase tracking-tighter leading-none">
-                            NUTRICIÓN
-                        </h2>
-                    </div>
-
-                    {/* --- CUERPO: GRÁFICO CIRCULAR --- */}
-                    <div className="flex-1 flex justify-center items-start relative z-20 pt-0 -mt-3.5">
-                        <div className="relative w-32 h-32 flex items-center justify-center">
-                            <svg className="transform -rotate-90 w-full h-full overflow-visible">
-                                <defs>
-                                    <linearGradient id="foodFlowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        {isOverLimit ? (
-                                            <>
-                                                <stop offset="0%" stopColor="#dc2626" />
-                                                <stop offset="100%" stopColor="#ef4444" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <stop offset="0%" stopColor="#009245" />
-                                                <stop offset="100%" stopColor="#FCEE21" />
-                                            </>
-                                        )}
-                                    </linearGradient>
-                                </defs>
-
-                                {/* Fondo círculo */}
-                                <circle cx="50%" cy="50%" r={radius} stroke="#27272a" strokeWidth="6" fill="transparent" />
-
-                                {/* Progreso círculo */}
-                                <circle
-                                    cx="50%" cy="50%" r={radius}
-                                    stroke="url(#foodFlowGradient)"
-                                    strokeWidth="6"
-                                    fill="transparent"
-                                    strokeDasharray={circumference}
-                                    strokeDashoffset={strokeDashoffset}
-                                    strokeLinecap="round"
-                                    className="transition-all duration-1000 ease-out drop-shadow-md"
-                                />
-                            </svg>
-
-                            {/* INFO CENTRAL */}
-                            <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                                <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${gradientClasses} uppercase not-italic`}>
-                                    {f(safeCurrent)}
-                                </span>
-                                <span className="text-[11px] font-black text-white uppercase tracking-tighter mt-1 not-italic">
-                                    KCAL
-                                </span>
-                            </div>
+                    {/* ANILLO */}
+                    <div className="relative w-28 h-28 shrink-0">
+                        <svg viewBox="0 0 112 112" className="w-full h-full -rotate-90">
+                            <circle cx="56" cy="56" r={R} fill="none" stroke="#1b1b1e" strokeWidth="9" />
+                            <circle
+                                cx="56" cy="56" r={R}
+                                fill="none"
+                                stroke={accent}
+                                strokeWidth="9"
+                                strokeLinecap="round"
+                                strokeDasharray={C}
+                                strokeDashoffset={offset}
+                                className="transition-all duration-1000 ease-out"
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-[27px] font-black text-white tracking-[-0.05em] leading-none not-italic">
+                                {f(safeCurrent)}
+                            </span>
+                            <span className="mt-1 text-[10px] font-black tracking-[0.16em] leading-none not-italic" style={{ color: accent }}>
+                                KCAL
+                            </span>
                         </div>
                     </div>
 
-                    {/* --- LÍMITE (ABAJO DERECHA) --- */}
-                    <div className="absolute bottom-3 right-3 z-20">
-                        <span className="text-[10px] font-black text-zinc-600 uppercase tracking-tighter not-italic">
-                            / {f(safeLimit)}
-                        </span>
-                    </div>
+                    {/* DESGLOSE */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] leading-none not-italic">
+                                NUTRICIÓN
+                            </span>
+                            <span className="text-[10px] font-black leading-none not-italic" style={{ color: accent }}>
+                                {isOverLimit ? `+${f(Math.abs(remaining))}` : `RESTAN ${f(remaining)}`}
+                            </span>
+                        </div>
 
-                    {/* --- BARRA INFERIOR FIJA --- */}
-                    <div className="absolute bottom-0 left-0 w-full h-3 z-0">
-                        <div className={`h-full w-full bg-gradient-to-r ${gradientClasses} shadow-[0_-2px_15px_${shadowColor}]`}></div>
+                        <div className="mt-3.5 flex flex-col gap-[9px]">
+                            {MEAL_SECTIONS.slice(0, 4).map((meal) => {
+                                const kcal = Math.round(kcalOf(meal.key));
+                                const pct = safeLimit > 0 ? Math.min((kcal / safeLimit) * 100, 100) : 0;
+                                const empty = kcal === 0;
+                                return (
+                                    <div key={meal.key} className="flex items-center gap-2">
+                                        <span className={`w-[58px] text-[9px] font-black uppercase tracking-[0.1em] leading-none not-italic ${empty ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                                            {meal.label}
+                                        </span>
+                                        <div className="flex-1 h-[5px] bg-[#18181b] rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: meal.bar }} />
+                                        </div>
+                                        <span className={`w-[34px] text-right text-[9px] font-black leading-none not-italic ${empty ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                                            {empty ? '—' : f(kcal)}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-
-                    {/* Luz ambiental */}
-                    <div className={`absolute -right-10 -bottom-10 w-40 h-40 rounded-full blur-3xl pointer-events-none bg-gradient-to-tr ${isOverLimit ? 'from-red-600/20' : 'from-[#009245]/20 to-[#FCEE21]/20'} opacity-30`}></div>
                 </div>
-            </div>
+            </WidgetCard>
 
-            {/* 2. MODAL DESPLEGABLE (DETALLE COMIDAS) */}
             {isOpen && createPortal(
-                <div
-                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
-                    onClick={() => setIsOpen(false)}
-                >
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true"></div>
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
                         className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Decoración Fondo */}
-                        <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${gradientClasses}`}></div>
-                        <div className={`absolute -top-20 -right-20 w-60 h-60 rounded-full blur-3xl pointer-events-none bg-gradient-to-bl ${isOverLimit ? 'from-red-600/10' : 'from-green-500/10'} opacity-10`}></div>
+                        <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
 
-                        {/* Header Modal */}
                         <div className="flex justify-between items-center relative z-10 shrink-0">
                             <h2 className="text-2xl font-black text-white uppercase flex items-center gap-2 tracking-tighter not-italic">
-                                DETALLE <span className={`text-transparent bg-clip-text bg-gradient-to-r ${gradientClasses} filter brightness-125`}>NUTRICIÓN</span>
+                                DETALLE <span style={{ color: accent }}>NUTRICIÓN</span>
                             </h2>
                             <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
 
-                        {/* RESUMEN GRANDE */}
                         <div className="flex flex-col items-center justify-center py-2 text-center shrink-0 relative z-10">
-                            <span className={`text-5xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${gradientClasses} drop-shadow-lg filter brightness-125 pb-2 pr-2`}>
-                                {f(safeCurrent)}
-                            </span>
+                            <span className="text-5xl font-black text-white tracking-tighter not-italic">{f(safeCurrent)}</span>
                             <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-1">
                                 DE {f(safeLimit)} KCAL
                             </span>
                         </div>
 
-                        {/* LISTA DE COMIDAS */}
                         <div className="flex flex-col gap-3 relative z-10 overflow-y-auto custom-scrollbar pr-1 flex-1 pb-2">
                             {MEAL_SECTIONS.map((meal) => {
-                                // Obtener kcal de cada comida (puede venir como número directo o como objeto meal con foods)
-                                const mealData = meals[meal.key];
-                                let mealKcal = 0;
-
-                                if (typeof mealData === 'number') {
-                                    mealKcal = mealData;
-                                } else if (mealData && Array.isArray(mealData)) {
-                                    // Si es un array de foods (estructura antigua o directa)
-                                    mealKcal = mealData.reduce((acc, item) => acc + (item.calories || 0), 0);
-                                } else if (mealData && mealData.foods) {
-                                    // Si es un objeto meal (estructura nueva)
-                                    mealKcal = mealData.foods.reduce((acc, item) => acc + (item.calories || 0), 0);
-                                }
-
+                                const mealKcal = kcalOf(meal.key);
                                 const mealPercent = safeCurrent > 0 ? Math.min((mealKcal / safeCurrent) * 100, 100) : 0;
 
                                 return (
@@ -186,7 +146,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                                                     {meal.icon}
                                                 </div>
                                                 <span className="text-xs font-black text-white uppercase tracking-wide">
-                                                    {meal.label}
+                                                    {meal.modalLabel}
                                                 </span>
                                             </div>
                                             <span className="text-sm font-black text-zinc-300">
@@ -194,18 +154,16 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                                             </span>
                                         </div>
 
-                                        {/* Barra de progreso de la comida */}
                                         <div className="w-full h-1.5 bg-black rounded-full overflow-hidden border border-white/5">
                                             <div
-                                                className={`h-full rounded-full ${isOverLimit ? 'bg-red-600' : 'bg-green-500'} opacity-80 shadow-[0_0_10px_currentColor] transition-all duration-500`}
-                                                style={{ width: `${mealPercent}%` }}
-                                            ></div>
+                                                className="h-full rounded-full transition-all duration-500"
+                                                style={{ width: `${mealPercent}%`, background: meal.bar }}
+                                            />
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
-
                     </div>
                 </div>,
                 document.body
