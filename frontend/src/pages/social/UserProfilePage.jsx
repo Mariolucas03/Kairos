@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
     Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
-    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X
+    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X, WifiOff, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import BackButton from '../../components/common/BackButton';
@@ -238,7 +238,7 @@ export default function UserProfilePage() {
     // Solo pedimos el contenido si tenemos permiso: en una cuenta privada ajena
     // esta petición daría 403 y llenaría la consola de errores.
     const puedeVer = profileData ? profileData.canViewContent !== false : false;
-    const { data: itemsData, isLoading: loadingItems } =
+    const { data: itemsData, error: itemsError, isLoading: loadingItems, mutate: mutateItems } =
         useSWR(userId && puedeVer ? `/social/profile/${userId}/items?tab=${tab}&page=1` : null, fetcher);
 
     // Paginación local por pestaña
@@ -461,6 +461,17 @@ export default function UserProfilePage() {
                 </div>
             ) : loadingItems && !itemsData ? (
                 <div className="text-center py-16 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>
+            ) : itemsError && !itemsData ? (
+                /* Si la petición falla no se puede decir "no hay nada": no se sabe.
+                   Antes se caía en el estado vacío y parecía que no tenías entrenos. */
+                <div className="text-center py-16 px-6 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
+                    <WifiOff className="mx-auto mb-3 opacity-50" size={30} />
+                    <p className="text-xs text-zinc-400 font-bold mb-1">No se ha podido cargar</p>
+                    <p className="text-[11px] mb-4">El servidor puede estar despertando.</p>
+                    <button onClick={() => mutateItems()} className="bg-yellow-500 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-2">
+                        <RefreshCw size={14} /> Reintentar
+                    </button>
+                </div>
             ) : tab === 'body' ? (
                 <BodyTab ranks={itemsData?.ranks} />
             ) : items.length === 0 ? (

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
-    Mail, Shield, Users, Search, Trophy, X, Loader2, ChevronDown, Rss, Dumbbell, UserPlus
+    Mail, Shield, Users, Search, Trophy, X, Loader2, ChevronDown, Rss, Dumbbell, UserPlus,
+    WifiOff, RefreshCw
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -24,8 +25,8 @@ export default function Social() {
     const setUser = useAuthStore(state => state.setUser);
     const navigate = useNavigate();
 
-    const { data: feedData, mutate: mutateFeed, isLoading: loadingFeed } = useSWR('/social/feed?page=1', fetcher);
-    const { data: friendsData, mutate: mutateFriends } = useSWR('/social/friends', fetcher);
+    const { data: feedData, error: feedError, mutate: mutateFeed, isLoading: loadingFeed } = useSWR('/social/feed?page=1', fetcher);
+    const { data: friendsData, error: friendsError, mutate: mutateFriends, isLoading: loadingFriends } = useSWR('/social/friends', fetcher);
     // Avisos de me gusta / comentarios. Se refrescan solos cada minuto para que
     // el contador del buzón no se quede obsoleto mientras navegas.
     const { data: notifData, mutate: mutateNotifs } = useSWR('/social/notifications', fetcher, { refreshInterval: 60000 });
@@ -149,7 +150,16 @@ export default function Social() {
         { key: 'inbox', icon: Mail, label: 'Buzón', onClick: openInbox, badge: totalNotifications }
     ];
 
-    const isFirstLoad = !feedData && loadingFeed;
+    // ⚠️ Antes esto solo miraba el feed. La lista de amigos viene de OTRA petición
+    // y su carga no se comprobaba: mientras estaba en camino, `friends` era [] y la
+    // pantalla soltaba un "añade amigos" a alguien que tiene amigos de sobra.
+    // Y si cualquiera de las dos fallaba, no había estado de error: se caía en el
+    // "no hay entrenos". Con el servidor despertando (tarda hasta 50 s) era justo
+    // lo que se veía. Ahora se distingue: cargando ≠ vacío ≠ ha fallado.
+    const isFirstLoad = (!feedData && loadingFeed) || (!friendsData && loadingFriends);
+    const huboError = (!feedData && feedError) || (!friendsData && friendsError);
+
+    const reintentar = () => { mutateFeed(); mutateFriends(); };
 
     return (
         <div className="pb-24 pt-6 px-4 min-h-screen animate-in fade-in select-none bg-black relative">
@@ -235,6 +245,17 @@ export default function Social() {
             {/* --- FEED --- */}
             {isFirstLoad ? (
                 <LoadingScreen message="Cargando feed..." full={false} />
+            ) : huboError ? (
+                <div className="text-center py-16 px-6 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
+                    <WifiOff className="mx-auto mb-3 opacity-50" size={32} />
+                    <p className="text-xs mb-1 text-zinc-400 font-bold">No se ha podido cargar el feed</p>
+                    <p className="text-[11px] leading-relaxed mb-4 max-w-[260px] mx-auto">
+                        El servidor puede estar despertando. Espera unos segundos y vuelve a intentarlo.
+                    </p>
+                    <button onClick={reintentar} className="bg-yellow-500 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-yellow-400 transition-colors inline-flex items-center gap-2">
+                        <RefreshCw size={14} /> Reintentar
+                    </button>
+                </div>
             ) : friends.length === 0 ? (
                 <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Users className="mx-auto mb-3 opacity-50" size={32} />
