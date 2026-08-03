@@ -5,6 +5,9 @@ import api from '../services/api';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
+// ⚠️ Se usaba más abajo sin importarlo: si esa condición se cumplía, la página
+// petaba con "LoadingScreen is not defined" en vez de mostrar la carga.
+import LoadingScreen from '../components/common/LoadingScreen';
 
 import MoodWidget from '../components/widgets/MoodWidget';
 import WeightWidget from '../components/widgets/WeightWidget';
@@ -96,10 +99,21 @@ export default function Profile() {
             case 'missions': return <div className={interactiveClass}><MissionsWidget completed={safeData.missionStats?.completed} total={safeData.missionStats?.total} completedMissions={safeData.missionStats?.listCompleted} /></div>;
             case 'sport': return <div className={interactiveClass}><SportWidget workouts={safeData.sportWorkouts || []} /></div>;
             case 'training': return <div className={interactiveClass}><TrainingWidget workouts={safeData.gymWorkouts || []} /></div>;
-            case 'food':
+            case 'food': {
                 const intake = safeData.nutrition?.totalKcal || safeData.totalKcal || 0;
-                const mealsData = safeData.nutrition?.meals || {};
+                // ⚠️ El backend devuelve `meals` como ARRAY [{name:'DESAYUNO', foods:[...]}],
+                // pero FoodWidget espera un objeto por comida. Antes se le pasaba el array
+                // tal cual, así que el desglose por comidas del perfil salía siempre a cero.
+                const rawMeals = safeData.nutrition?.meals || [];
+                const mealsData = Array.isArray(rawMeals) ? {
+                    breakfast: rawMeals.find(m => m.name === 'DESAYUNO')?.foods || [],
+                    lunch: rawMeals.find(m => m.name === 'COMIDA')?.foods || [],
+                    merienda: rawMeals.find(m => m.name === 'MERIENDA')?.foods || [],
+                    dinner: rawMeals.find(m => m.name === 'CENA')?.foods || [],
+                    snacks: rawMeals.find(m => m.name === 'SNACK')?.foods || []
+                } : rawMeals;
                 return <div className={interactiveClass}><FoodWidget currentKcal={intake} limitKcal={user?.macros?.calories} meals={mealsData} /></div>;
+            }
             case 'sleep': return <div className={staticClass}><SleepWidget hours={safeData.sleepHours || 0} onUpdate={noOp} /></div>;
             case 'steps': return <div className={staticClass}><StepsWidget steps={safeData.steps || 0} onUpdate={noOp} /></div>;
             case 'mood': return <div className={staticClass}><MoodWidget mood={safeData.mood} onUpdate={noOp} /></div>;

@@ -2,11 +2,22 @@ const asyncHandler = require('express-async-handler');
 const DailyLog = require('../models/DailyLog');
 const Mission = require('../models/Mission');
 const NutritionLog = require('../models/NutritionLog');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
-const getServerDateString = () => new Date().toISOString().split('T')[0];
+// ⚠️ ANTES: new Date().toISOString().split('T')[0], que da la fecha en UTC.
+// Entre las 00:00 y las 02:00 de Madrid eso es AYER, así que todo lo que
+// registrabas de madrugada (ánimo, peso, sueño, pasos) se guardaba en el día
+// anterior, y encima no cuadraba con foodController/gymController, que ya
+// usaban la fecha de Madrid: el log del día y el de nutrición apuntaban a
+// documentos distintos y los totales nunca se sincronizaban.
+const getServerDateString = () => getMadridDateString();
 
 const ensureDailyLog = async (userId, dateString, userStreak) => {
-    const dateObj = new Date(dateString);
+    // ⚠️ new Date('2026-08-03') se interpreta como medianoche UTC, y getDay()
+    // devuelve el día en la zona del servidor: con cualquier desfase negativo
+    // salía el día ANTERIOR y se contaban las misiones del día equivocado.
+    // Al fijar el mediodía, ningún huso horario puede cambiar el día.
+    const dateObj = new Date(`${dateString}T12:00:00`);
     const dayOfWeek = dateObj.getDay();
 
     const missionQuery = {

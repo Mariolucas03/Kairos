@@ -34,6 +34,8 @@ export default function Food() {
 
     // --- ESTADOS DE MODALES ---
     const [activeMealId, setActiveMealId] = useState(null);
+    // Nombre de la comida activa: el modal lo usa para preseleccionar carpeta
+    const [activeMealName, setActiveMealName] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [configModal, setConfigModal] = useState({ show: false, mode: 'manual' });
 
@@ -190,8 +192,9 @@ export default function Food() {
         }
     };
 
-    const handleOpenAdd = (mealId) => {
+    const handleOpenAdd = (mealId, mealName = '') => {
         setActiveMealId(mealId);
+        setActiveMealName(mealName);
         setShowSearch(true);
     };
 
@@ -312,7 +315,7 @@ export default function Food() {
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => handleOpenAdd(meal._id)}
+                                    onClick={() => handleOpenAdd(meal._id, meal.name)}
                                     className="bg-zinc-800 text-zinc-400 w-10 h-10 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700 flex items-center justify-center"
                                 >
                                     <Plus size={20} />
@@ -363,6 +366,7 @@ export default function Food() {
                     <div className="absolute inset-0 top-14 transform bg-zinc-950/50">
                         <FoodSearchModal
                             mealId={activeMealId}
+                            mealName={activeMealName}
                             onClose={() => setShowSearch(false)}
                             // 🔥 LE PASAMOS LA FUNCIÓN OPTIMISTA AL MODAL
                             onFoodAddedOptimistic={(foodData) => handleOptimisticAdd(foodData)}

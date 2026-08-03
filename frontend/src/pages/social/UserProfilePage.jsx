@@ -153,15 +153,13 @@ function CuadroEntreno({ item, onOpen }) {
     const musculos = item.musclesWorked || [];
     return (
         <button onClick={onOpen} className="relative aspect-square bg-black border border-white/5 overflow-hidden active:opacity-70 transition-opacity">
+            {/* Sin foto siempre se enseña el cuerpo: aunque el entreno no tenga
+                músculos guardados, la silueta es mejor pista que un cuadro vacío. */}
             {item.photo ? (
                 <img src={item.photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            ) : musculos.length > 0 ? (
+            ) : (
                 <div className="absolute inset-0 p-1 pb-4">
                     <BodyMap highlight={musculos} secondary={item.secondaryMuscles} showToggle={false} dual labels={false} className="h-full" />
-                </div>
-            ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <Dumbbell size={26} className="text-zinc-800" />
                 </div>
             )}
 
@@ -278,7 +276,7 @@ export default function UserProfilePage() {
     if (profileError) {
         const denied = profileError.response?.status === 403;
         return (
-            <div className="min-h-screen bg-black pt-6 px-4 pb-24">
+            <div className="min-h-screen bg-black pt-safe-page px-4 pb-24">
                 <div className="mb-8"><BackButton /></div>
                 <div className="text-center py-20 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Lock className="mx-auto mb-3 opacity-50" size={32} />
@@ -331,7 +329,7 @@ export default function UserProfilePage() {
     ];
 
     return (
-        <div className="min-h-screen bg-black pb-24 pt-6 px-4 animate-in fade-in select-none">
+        <div className="min-h-screen bg-black pb-24 pt-safe-page px-4 animate-in fade-in select-none">
             <style>{customAnimationsStyle}</style>
 
             {/* --- BARRA SUPERIOR --- */}
@@ -364,16 +362,21 @@ export default function UserProfilePage() {
 
             {/* --- INFO / NIVEL / XP --- */}
             <div className="mb-6">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-sm font-black text-white uppercase">{profile.username}</span>
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getLevelStyle(level)}`}>Lvl {level}</span>
-                    {profile.clan && (
-                        <span className="text-[9px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                            <Shield size={9} /> {profile.clan.icon} {profile.clan.name}
-                        </span>
-                    )}
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-black text-white uppercase truncate">{profile.username}</span>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase shrink-0 ${getLevelStyle(level)}`}>Lvl {level}</span>
                 </div>
                 <p className="text-[10px] text-yellow-500/80 italic font-bold tracking-wider uppercase mb-1">{profile.title || 'Novato'}</p>
+
+                {/* El clan va en su propia línea, no apretado junto al nombre */}
+                {profile.clan && (
+                    <div className="mb-2">
+                        <span className="text-[9px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-1 rounded-lg inline-flex items-center gap-1.5 max-w-full">
+                            <Shield size={9} className="shrink-0" />
+                            <span className="truncate">{profile.clan.icon} {profile.clan.name}</span>
+                        </span>
+                    </div>
+                )}
 
                 {/* Descripción del perfil */}
                 {profile.bio && (

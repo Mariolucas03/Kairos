@@ -37,6 +37,7 @@ const DiceGame = lazy(() => import('./pages/games/DiceGame'));
 const Roulette = lazy(() => import('./pages/games/Roulette'));
 const BlackJack = lazy(() => import('./pages/games/BlackJack'));
 const Slots = lazy(() => import('./pages/games/Slots'));
+const TowerGame = lazy(() => import('./pages/games/TowerGame'));
 
 // Fetcher único para toda la app
 const fetcher = (url) => api.get(url).then(res => res.data);
@@ -90,6 +91,7 @@ function App() {
                             <Route path="/games/roulette" element={<Roulette />} />
                             <Route path="/games/blackjack" element={<BlackJack />} />
                             <Route path="/games/slots" element={<Slots />} />
+                            <Route path="/games/tower" element={<TowerGame />} />
                         </Route>
                     </Routes>
                 </Suspense>

@@ -1,6 +1,15 @@
 node_modules/
 build/
 dist/
-.env
 .DS_Store
+
+# Variables de entorno: NINGUNA se sube.
+# ⚠️ Antes solo se ignoraba ".env", así que un ".env.local" (el que se usa para
+# desarrollo) se habría subido y en producción podría apuntar la app a
+# localhost. Se ignoran todas las variantes.
+.env
+.env.*
+!.env.example
 /frontend/.env
+/frontend/.env.*
+!/frontend/.env.example

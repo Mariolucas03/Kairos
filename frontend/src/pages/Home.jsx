@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, X, ToggleLeft, ToggleRight, Move, Lock, Unlock } from 'lucide-react';
+import { Settings, X, ToggleLeft, ToggleRight, Move, Lock, Unlock, CalendarDays, RotateCcw } from 'lucide-react';
+import api from '../services/api';
+import { getMadridDateString } from '../utils/dateHelpers';
+import DayCalendarModal from '../components/common/DayCalendarModal';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
 import { registerPush } from '../utils/pushNotifications';
@@ -88,6 +91,34 @@ export default function Home() {
     const { dailyData: logData, loading: logLoading, updateWidget, calculations } = useDailyLog(user);
     const { showRewardModal, rewardData, closeModal, claimReward, openCalendar, hasClaimedToday, claiming, toast, clearToast } = useDailyRewards(user, setUser);
     const [showSettings, setShowSettings] = useState(false);
+    // Aviso propio de la app para el alta de notificaciones (antes era un alert() del navegador)
+    const [pushMsg, setPushMsg] = useState(null);
+
+    // ── VIAJE EN EL TIEMPO ────────────────────────────────────────────────
+    // Con el botón de calendario puedes ver el home de cualquier día pasado.
+    // En modo historial los widgets son solo lectura (no se puede reescribir ayer).
+    const today = getMadridDateString();
+    const [showCalendar, setShowCalendar] = useState(false);
+    const [viewDate, setViewDate] = useState(today);
+    const [historyData, setHistoryData] = useState(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const isHistory = viewDate !== today;
+
+    useEffect(() => {
+        if (!isHistory) { setHistoryData(null); return; }
+        let cancelled = false;
+        setHistoryLoading(true);
+        api.get(`/daily/specific?date=${viewDate}`)
+            .then(res => { if (!cancelled) setHistoryData(res.data || {}); })
+            .catch(() => { if (!cancelled) setHistoryData({}); })
+            .finally(() => { if (!cancelled) setHistoryLoading(false); });
+        return () => { cancelled = true; };
+    }, [viewDate, isHistory]);
+
+    const handlePickDate = (date) => {
+        setViewDate(date);
+        setShowCalendar(false);
+    };
 
     // Volumen semanal: ahora se pinta dentro de RUTINA GYM
     const { stats: weeklyStats } = useWeeklyStats();
@@ -166,13 +197,22 @@ export default function Home() {
     };
 
     const getWidgetContent = (key) => {
-        if (!logData) return null;
+        // En modo historial pintamos el log de ese día; si no, el de hoy.
+        const data = isHistory ? (historyData || {}) : logData;
+        if (!data) return null;
+
         const wrapperClass = 'h-full w-full relative';
+        // Los widgets editables se congelan al mirar un día pasado.
+        const readOnlyClass = isHistory ? 'h-full pointer-events-none' : 'h-full';
+        const save = (type, value) => { if (!isHistory) updateWidget(type, value); };
+        const intake = isHistory
+            ? (data.nutrition?.totalKcal || data.totalKcal || 0)
+            : calculations.intake;
 
         switch (key) {
             case 'streak':
                 return (
-                    <div className="h-full">
+                    <div className={readOnlyClass}>
                         <StreakWidget
                             streak={user?.streak?.current}
                             onOpenChest={openCalendar}
@@ -180,19 +220,19 @@ export default function Home() {
                         />
                     </div>
                 );
-            case 'missions': return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><MissionsWidget completed={logData.missionStats?.completed} total={logData.missionStats?.total} completedMissions={logData.missionStats?.listCompleted} /></SmartWidgetWrapper>);
-            case 'sport': return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><SportWidget workouts={logData.sportWorkouts} /></SmartWidgetWrapper>);
+            case 'missions': return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><MissionsWidget completed={data.missionStats?.completed} total={data.missionStats?.total} completedMissions={data.missionStats?.listCompleted} /></SmartWidgetWrapper>);
+            case 'sport': return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><SportWidget workouts={data.sportWorkouts} /></SmartWidgetWrapper>);
             case 'training': return (
                 <SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}>
                     <TrainingWidget
-                        workouts={logData.gymWorkouts || []}
-                        weeklyVolume={weeklyStats.currentVolume}
-                        weeklyPercentage={weeklyStats.percentage}
+                        workouts={data.gymWorkouts || []}
+                        weeklyVolume={isHistory ? 0 : weeklyStats.currentVolume}
+                        weeklyPercentage={isHistory ? 0 : weeklyStats.percentage}
                     />
                 </SmartWidgetWrapper>
             );
             case 'food': {
-                const rawMeals = logData.nutrition?.meals || [];
+                const rawMeals = data.nutrition?.meals || [];
                 const structuredMeals = {
                     breakfast: rawMeals.find(m => m.name === 'DESAYUNO')?.foods || [],
                     lunch: rawMeals.find(m => m.name === 'COMIDA')?.foods || [],
@@ -200,16 +240,15 @@ export default function Home() {
                     dinner: rawMeals.find(m => m.name === 'CENA')?.foods || [],
                     snacks: rawMeals.find(m => m.name === 'SNACK')?.foods || []
                 };
-                return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><FoodWidget currentKcal={calculations.intake} limitKcal={user?.macros?.calories} meals={structuredMeals} /></SmartWidgetWrapper>);
+                return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><FoodWidget currentKcal={intake} limitKcal={user?.macros?.calories} meals={structuredMeals} /></SmartWidgetWrapper>);
             }
-            case 'sleep': return <div className="h-full"><SleepWidget hours={logData.sleepHours} onUpdate={(v) => updateWidget('sleepHours', v)} /></div>;
-            case 'steps': return <div className="h-full"><StepsWidget steps={logData.steps} onUpdate={(v) => updateWidget('steps', v)} /></div>;
-            case 'mood': return <div className="h-full"><MoodWidget mood={logData.mood} onUpdate={(v) => updateWidget('mood', v)} /></div>;
-            case 'weight': return <div className="h-full flex flex-col cursor-pointer"><WeightWidget initialWeight={logData.weight} history={[]} onUpdate={(v) => updateWidget('weight', v)} /></div>;
+            case 'sleep': return <div className={readOnlyClass}><SleepWidget hours={data.sleepHours} onUpdate={(v) => save('sleepHours', v)} /></div>;
+            case 'steps': return <div className={readOnlyClass}><StepsWidget steps={data.steps} onUpdate={(v) => save('steps', v)} /></div>;
+            case 'mood': return <div className={readOnlyClass}><MoodWidget mood={data.mood} onUpdate={(v) => save('mood', v)} /></div>;
+            case 'weight': return <div className={`${readOnlyClass} flex flex-col cursor-pointer`}><WeightWidget initialWeight={data.weight} history={[]} onUpdate={(v) => save('weight', v)} /></div>;
             case 'kcalBalance': {
-                const intake2 = logData.nutrition?.totalKcal || logData.totalKcal || 0;
-                const burned = (logData.sportWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0) + (logData.gymWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0);
-                return (<div className={wrapperClass}><KcalBalanceWidget intake={intake2} burned={burned} weight={logData.weight} /></div>);
+                const burned = (data.sportWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0) + (data.gymWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0);
+                return (<div className={wrapperClass}><KcalBalanceWidget intake={intake} burned={burned} weight={data.weight} /></div>);
             }
             default: return null;
         }
@@ -219,14 +258,15 @@ export default function Home() {
         return <LoadingScreen />;
     }
 
-    const now = new Date();
-    const weekday = now.toLocaleDateString('es-ES', { weekday: 'long' });
-    const dayMonth = now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+    const shownDate = new Date(`${viewDate}T12:00:00`);
+    const weekday = shownDate.toLocaleDateString('es-ES', { weekday: 'long' });
+    const dayMonth = shownDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
 
     return (
         <div className="pb-6 animate-in fade-in select-none bg-black min-h-screen">
             {showRewardModal && <DailyRewardModal data={rewardData} onClose={closeModal} onClaim={claimReward} claiming={claiming} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
+            {pushMsg && <Toast message={pushMsg.message} type={pushMsg.type} onClose={() => setPushMsg(null)} />}
 
             {/* CABECERA DE PÁGINA — la cabecera de perfil (avatar, XP, vida,
                 monedas) sigue viviendo en Header.jsx / Layout.jsx, sin tocar. */}
@@ -239,13 +279,38 @@ export default function Home() {
                         {dayMonth}
                     </p>
                 </div>
-                <button
-                    onClick={() => setShowSettings(true)}
-                    className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0"
-                >
-                    <Settings size={21} />
-                </button>
+                <div className="flex items-center gap-4 shrink-0">
+                    <button
+                        onClick={() => setShowCalendar(true)}
+                        aria-label="Ver otro día"
+                        className={`transition-colors ${isHistory ? 'text-yellow-500' : 'text-zinc-500 hover:text-zinc-200'}`}
+                    >
+                        <CalendarDays size={21} />
+                    </button>
+                    <button
+                        onClick={() => setShowSettings(true)}
+                        aria-label="Ajustes del home"
+                        className="text-zinc-500 hover:text-zinc-200 transition-colors"
+                    >
+                        <Settings size={21} />
+                    </button>
+                </div>
             </div>
+
+            {/* AVISO MODO HISTORIAL */}
+            {isHistory && (
+                <div className="mx-4 mt-4 bg-yellow-500/[0.12] border border-yellow-500/30 rounded-2xl p-3 flex justify-between items-center animate-in slide-in-from-top-2">
+                    <span className="text-yellow-500 font-black text-[11px] uppercase tracking-[0.1em] flex items-center gap-2">
+                        <CalendarDays size={16} /> VIENDO {viewDate.split('-').reverse().join('/')}
+                    </span>
+                    <button
+                        onClick={() => setViewDate(today)}
+                        className="bg-yellow-500 text-black px-3 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 active:scale-95"
+                    >
+                        <RotateCcw size={12} /> Hoy
+                    </button>
+                </div>
+            )}
 
             {/* AVISO MODO EDICIÓN */}
             {isDragEnabled && (
@@ -257,7 +322,7 @@ export default function Home() {
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={widgetOrder} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-4 gap-3 grid-flow-dense pb-24 px-4 pt-[18px]">
+                    <div className={`grid grid-cols-4 gap-3 grid-flow-dense pb-24 px-4 pt-[18px] transition-opacity duration-200 ${historyLoading ? 'opacity-40' : 'opacity-100'}`}>
                         {widgetOrder.map((key) => {
                             if (!visibleWidgets[key]) return null;
                             const content = getWidgetContent(key);
@@ -276,6 +341,14 @@ export default function Home() {
                     </div>
                 </SortableContext>
             </DndContext>
+
+            {showCalendar && (
+                <DayCalendarModal
+                    selectedDate={viewDate}
+                    onSelect={handlePickDate}
+                    onClose={() => setShowCalendar(false)}
+                />
+            )}
 
             {showSettings && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowSettings(false)}>
@@ -298,7 +371,7 @@ export default function Home() {
                             </div>
                             <div className="p-4 border border-white/5 rounded-3xl bg-zinc-900/50 flex justify-between items-center">
                                 <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">🔔 Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
-                                <button onClick={async () => { const success = await registerPush(); if (success) alert('¡Alertas activadas!'); else alert('No se pudo activar. Revisa permisos.'); }} className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform">ACTIVAR</button>
+                                <button onClick={async () => { const success = await registerPush(); setPushMsg(success ? { message: '¡Alertas activadas!', type: 'success' } : { message: 'No se pudo activar. Revisa los permisos.', type: 'error' }); }} className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform">ACTIVAR</button>
                             </div>
                             <div>
                                 <h3 className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-3 pl-1">Visibilidad</h3>

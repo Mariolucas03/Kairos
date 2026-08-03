@@ -168,10 +168,10 @@ export default function Shop() {
 
     const getFilteredItems = () => {
         if (!selectedCategory) return [];
-        if (activeTab === 'shop') return shopItems.filter(item => item.category === selectedCategory);
+        if (activeTab === 'shop') return shopItems.filter(item => item && item.category === selectedCategory);
         // Filtramos el inventario para mostrar items reales
         return (user?.inventory || [])
-            .filter(slot => slot.item && slot.item.category === selectedCategory);
+            .filter(slot => slot?.item && slot.item.category === selectedCategory);
     };
 
     const itemsToShow = getFilteredItems();
@@ -250,13 +250,16 @@ export default function Shop() {
                                 {itemsToShow.map(slotOrItem => {
                                     // Normalizamos: En tienda es 'item', en inventario 'slot.item'
                                     const item = activeTab === 'shop' ? slotOrItem : slotOrItem.item;
+                                    if (!item) return null;
 
-                                    // 🔥 LÓGICA DE PROPIEDAD MEJORADA
-                                    // Buscamos si el usuario tiene este item en su inventario comparando IDs
-                                    const isOwned = user?.inventory?.some(s => {
-                                        // Manejo seguro por si s.item es un objeto o un ID string
+                                    // 🔥 LÓGICA DE PROPIEDAD BLINDADA
+                                    // Un objeto del inventario puede apuntar a un item retirado del
+                                    // catálogo: entonces llega como null y hacer `s.item._id` reventaba
+                                    // el render entero (pantalla en negro justo después de comprar).
+                                    const isOwned = (user?.inventory || []).some(s => {
+                                        if (!s?.item) return false;
                                         const invItemId = s.item._id || s.item;
-                                        return invItemId === item._id;
+                                        return String(invItemId) === String(item._id);
                                     });
 
                                     // Categorías únicas

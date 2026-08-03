@@ -25,6 +25,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     // Estados UI
     const [showExerciseSelector, setShowExerciseSelector] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState(null);
 
     // Cargar datos si editamos
     useEffect(() => {
@@ -75,9 +76,10 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     };
 
     const handleSave = async () => {
-        if (!routineName.trim()) return alert("Ponle un nombre a la rutina");
-        if (addedExercises.length === 0) return alert("Añade al menos un ejercicio");
+        if (!routineName.trim()) return setErrorMsg("Ponle un nombre a la rutina");
+        if (addedExercises.length === 0) return setErrorMsg("Añade al menos un ejercicio");
 
+        setErrorMsg(null);
         setLoading(true);
         try {
             const payload = {
@@ -98,7 +100,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             onClose();
         } catch (error) {
             console.error(error);
-            alert("Error al guardar");
+            setErrorMsg(error.response?.data?.message || "No se pudo guardar la rutina");
         } finally {
             setLoading(false);
         }
@@ -121,6 +123,12 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                     <X size={20} />
                 </button>
             </div>
+
+            {errorMsg && (
+                <div onClick={() => setErrorMsg(null)} className="mx-6 mt-4 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl text-center cursor-pointer shrink-0">
+                    {errorMsg}
+                </div>
+            )}
 
             {/* BODY */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-black p-6 pb-32 space-y-8">

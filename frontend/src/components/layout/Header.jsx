@@ -111,36 +111,29 @@ export default function Header() {
                     </div>
 
                     <div className="flex flex-col gap-1.5 w-auto items-end">
-                        {/* Botón Monedas */}
-                        <Link
-                            to="/shop"
-                            state={{ openCategory: 'reward' }}
-                            className="relative flex items-center bg-zinc-900/90 border border-gold-500/30 hover:border-gold-500/80 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden transition-all active:scale-95 group"
-                        >
+                        {/* Contador Monedas (solo informativo, ya no navega) */}
+                        <div className="relative flex items-center bg-zinc-900/90 border border-gold-500/30 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden">
                             <span className={`relative z-10 text-gold-400 font-black w-full text-right pr-5 ${getFontSize(coins)}`}>
                                 {coins > 99999 ? (coins / 1000).toFixed(0) + 'k' : coins.toLocaleString()}
                             </span>
                             <img
                                 src={ICON_COINS}
                                 alt="C"
-                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100 group-hover:scale-110 transition-all"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100"
                             />
-                        </Link>
+                        </div>
 
-                        {/* Botón Fichas */}
-                        <Link
-                            to="/games"
-                            className="relative flex items-center bg-zinc-900/90 border border-purple-500/30 hover:border-purple-500/80 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden transition-all active:scale-95 group"
-                        >
+                        {/* Contador Fichas (solo informativo, ya no navega) */}
+                        <div className="relative flex items-center bg-zinc-900/90 border border-purple-500/30 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden">
                             <span className={`relative z-10 text-purple-300 font-black w-full text-right pr-5 ${getFontSize(gameCoins)}`}>
                                 {gameCoins > 99999 ? (gameCoins / 1000).toFixed(0) + 'k' : gameCoins.toLocaleString()}
                             </span>
                             <img
                                 src={ICON_CHIPS}
                                 alt="F"
-                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100 group-hover:scale-110 transition-all"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100"
                             />
-                        </Link>
+                        </div>
                     </div>
                 </div>
 

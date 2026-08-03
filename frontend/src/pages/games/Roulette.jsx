@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Info, X, Trash2, Undo2, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake } from 'lucide-react';
+import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
@@ -39,17 +39,21 @@ export default function Roulette() {
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
-    // SALDO VISUAL
-    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
-    const [visualBalance, setVisualBalance] = useState(currentFichas);
-
-    useEffect(() => { setVisualBalance(currentFichas); }, [currentFichas]);
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
     // Estados Juego
     const [selectedChip, setSelectedChip] = useState(10);
     const [bets, setBets] = useState([]);
+    const [lastBets, setLastBets] = useState([]);   // para "repetir apuesta"
+    const [errorMsg, setErrorMsg] = useState(null);
     const currentBetTotal = useMemo(() => bets.reduce((acc, b) => acc + b.amount, 0), [bets]);
+
+    // SALDO VISUAL — derivado, nunca un estado paralelo.
+    // Antes era un useState que se resincronizaba con el usuario global: si el
+    // usuario se refrescaba con apuestas puestas, el saldo volvía a subir y se
+    // podía apostar más de lo que había (el servidor lo rechazaba después).
+    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
+    const visualBalance = Math.max(0, currentFichas - currentBetTotal);
 
     // UI Modos
     const [paintMode, setPaintMode] = useState(false);
@@ -68,40 +72,31 @@ export default function Roulette() {
     const [showRain, setShowRain] = useState(false);
     const [isRainFading, setIsRainFading] = useState(false);
 
-    // --- ACTUALIZACIÓN DE SALDO ---
-    const updateBalanceInstant = (amountToAdd) => {
-        setVisualBalance(prev => Math.max(0, prev + amountToAdd));
-        setUser(prevUser => {
-            const current = prevUser.stats?.gameCoins ?? prevUser.gameCoins ?? 0;
-            const newBalance = Math.max(0, current + amountToAdd);
-            const updatedUser = { ...prevUser, gameCoins: newBalance, stats: { ...prevUser.stats, gameCoins: newBalance } };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            return updatedUser;
-        });
-    };
-
     // --- APUESTAS ---
     const placeBet = (type, value, numbersCovered, multiplier) => {
         if (spinning) return;
-        if (visualBalance < selectedChip) return;
-        setVisualBalance(prev => prev - selectedChip);
+        if (visualBalance < selectedChip) {
+            setErrorMsg('No te quedan fichas para esa apuesta');
+            return;
+        }
         const newBet = { id: Math.random(), amount: selectedChip, type, value, numbers: numbersCovered, multiplier };
         setBets(prev => [...prev, newBet]);
     };
 
     const undoLastBet = () => {
-        if (!spinning && bets.length > 0) {
-            const lastBet = bets[bets.length - 1];
-            setVisualBalance(prev => prev + lastBet.amount);
-            setBets(prev => prev.slice(0, -1));
-        }
+        if (!spinning && bets.length > 0) setBets(prev => prev.slice(0, -1));
     };
 
     const clearBets = () => {
-        if (!spinning && bets.length > 0) {
-            setVisualBalance(prev => prev + currentBetTotal);
-            setBets([]);
-        }
+        if (!spinning && bets.length > 0) setBets([]);
+    };
+
+    // Repetir la apuesta de la ronda anterior (clásico de cualquier ruleta)
+    const repeatBets = () => {
+        if (spinning || lastBets.length === 0) return;
+        const total = lastBets.reduce((a, b) => a + b.amount, 0);
+        if (total > currentFichas) { setErrorMsg('No te llegan las fichas para repetir'); return; }
+        setBets(lastBets.map(b => ({ ...b, id: Math.random() })));
     };
 
     // --- PINTAR ---
@@ -130,20 +125,26 @@ export default function Roulette() {
         setIsTableOpen(false);
         setSpinning(true);
         setResultModal(null);
+        setErrorMsg(null);
         setShowRain(false);
         setIsRainFading(false);
         setBallDistance(100);
+
+        const apuestaDeEstaRonda = bets;
 
         try {
             // 1. Pedir resultado al servidor
             const res = await api.post('/games/roulette', { bets });
             const { winNum, totalWin, user: updatedUser } = res.data;
 
-            // 2. Calcular animación exacta para que caiga en winNum
+            // 2. Calcular animación exacta para que caiga en winNum.
+            //    ⚠️ Hay que apuntar al CENTRO del gajo (+ medio segmento): con el
+            //    ángulo de inicio la bola caía justo en la raya entre dos números
+            //    y parecía que la ruleta mentía.
             const winIndex = WHEEL_NUMBERS.indexOf(winNum);
             const wheelSpins = 5;
             const currentRotationNormalized = wheelRotation % 360;
-            const targetAngle = winIndex * SEGMENT_ANGLE;
+            const targetAngle = winIndex * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
             const newWheelRotation = wheelRotation + (360 * wheelSpins) + (targetAngle - currentRotationNormalized);
 
             setWheelRotation(newWheelRotation);
@@ -153,6 +154,7 @@ export default function Roulette() {
             // 3. Finalizar y mostrar premios
             setTimeout(() => {
                 setSpinning(false);
+                setLastBets(apuestaDeEstaRonda);
                 setBets([]);
 
                 const isRed = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(winNum);
@@ -169,15 +171,14 @@ export default function Roulette() {
                 // Sincronizar el saldo devuelto por el servidor
                 setUser(updatedUser);
                 localStorage.setItem('user', JSON.stringify(updatedUser));
-                setVisualBalance(updatedUser.gameCoins ?? updatedUser.stats?.gameCoins ?? 0);
 
             }, SPIN_DURATION);
 
         } catch (error) {
             console.error(error);
-            alert(error.response?.data?.message || "Error al tirar");
+            // El saldo se recalcula solo al vaciar las apuestas: no hay rollback manual.
+            setErrorMsg(error.response?.data?.message || 'No se pudo tirar. Inténtalo otra vez.');
             setSpinning(false);
-            setVisualBalance(prev => prev + currentBetTotal); // Rollback
             setBets([]);
         }
     };
@@ -248,7 +249,19 @@ export default function Roulette() {
                     <div className="absolute inset-0 z-20 pointer-events-none" style={{ transform: `rotate(-${ballRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.1, 0, 0.1, 1)` : 'none' }}>
                         <div className="absolute top-0 left-1/2 -ml-1 w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_8px_white]" style={{ marginTop: `${(100 - ballDistance) / 2}%`, transition: spinning ? `margin-top 1s ease-in-out ${SPIN_DURATION - 1000}ms` : 'none' }}></div>
                     </div>
+
+                    {/* Marcador fijo: deja claro qué casilla es la ganadora */}
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+                        <div className="w-0 h-0 border-l-[9px] border-r-[9px] border-t-[14px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+                    </div>
                 </div>
+
+                {/* Aviso de error, en vez del alert() del navegador */}
+                {errorMsg && (
+                    <div onClick={() => setErrorMsg(null)} className="mt-4 mx-6 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl text-center animate-in fade-in cursor-pointer">
+                        {errorMsg}
+                    </div>
+                )}
             </div>
 
             {/* PANEL DESLIZANTE MESA */}
@@ -314,6 +327,8 @@ export default function Roulette() {
                     <div className="flex gap-1">
                         <button onClick={undoLastBet} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-zinc-400 disabled:opacity-30"><Undo2 size={20} /></button>
                         <button onClick={clearBets} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-red-400 disabled:opacity-30"><Trash2 size={20} /></button>
+                        {/* Repetir la apuesta anterior: lo normal en cualquier ruleta */}
+                        <button onClick={repeatBets} disabled={spinning || bets.length > 0 || lastBets.length === 0} title="Repetir apuesta" className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-yellow-400 disabled:opacity-30"><RotateCw size={20} /></button>
                     </div>
                     <button onClick={() => { if (bets.length === 0 && !isTableOpen) setIsTableOpen(true); else spin(); }} disabled={spinning} className={`flex-1 font-black py-4 rounded-xl text-xl uppercase tracking-widest shadow-xl border-b-4 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center gap-2 ${bets.length === 0 && !isTableOpen ? 'bg-zinc-700 text-white border-zinc-900' : 'bg-gradient-to-r from-yellow-500 to-yellow-700 text-black border-yellow-900'}`}>
                         {spinning ? 'GIRANDO...' : (bets.length === 0 && !isTableOpen) ? 'APOSTAR' : 'GIRAR'}

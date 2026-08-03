@@ -27,7 +27,6 @@ export default function Dice() {
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
-    const [visualBalance, setVisualBalance] = useState(user?.stats?.gameCoins ?? user?.gameCoins ?? 0);
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
     const [dices, setDices] = useState([1, 1]);
@@ -36,11 +35,19 @@ export default function Dice() {
     const [rolling, setRolling] = useState(false);
     const [resultModal, setResultModal] = useState(null);
     const [showRain, setShowRain] = useState(false);
+    const [errorMsg, setErrorMsg] = useState(null);
+
+    // SALDO DERIVADO, no un estado paralelo.
+    // Antes era un useState que además NO se resincronizaba con el usuario (los
+    // otros juegos sí lo hacen), y al fallar la tirada hacía
+    // `setVisualBalance(user?.stats?.gameCoins ?? 0)`: si `stats` no venía,
+    // el marcador se quedaba a CERO aunque tuvieras fichas de sobra.
+    const fichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
+    const visualBalance = rolling ? Math.max(0, fichas - bet) : fichas;
 
     const handleRoll = async () => {
         if (!selectedOption || visualBalance < bet || rolling) return;
-        setResultModal(null); setRolling(true); setShowRain(false);
-        setVisualBalance(prev => Math.max(0, prev - bet)); // Optimista
+        setResultModal(null); setRolling(true); setShowRain(false); setErrorMsg(null);
 
         try {
             const res = await api.post('/games/dice', { bet, prediction: selectedOption });
@@ -49,15 +56,25 @@ export default function Dice() {
             setRolling(false);
             if (res.data.won) { setShowRain(true); setTimeout(() => setShowRain(false), 3000); }
             setResultModal({ won: res.data.won, amount: res.data.payout, sum: res.data.sum });
-            setUser(res.data.user); setVisualBalance(res.data.user.gameCoins);
-        } catch (e) { alert("Error"); setRolling(false); setVisualBalance(user?.stats?.gameCoins ?? 0); }
+            setUser(res.data.user);
+        } catch (e) {
+            setErrorMsg(e.response?.data?.message || 'No se pudo tirar. Inténtalo otra vez.');
+            setRolling(false);
+        }
     };
 
     return (
         <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-40 pb-4 overflow-hidden select-none font-sans">
             {showRain && <ChipRain isFading={false} />}
             <div className="absolute top-12 left-4 right-4 flex justify-between z-50"><BackButton to="/games" /><div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-blue-500/50"><span className="text-blue-400 font-black text-xl">{visualBalance}</span><img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" /></div><div></div></div>
-            <div className="absolute top-28 w-full text-center z-10"><h1 className="text-4xl font-black italic text-cyan-400">NEON DICE</h1></div>
+            <div className="absolute top-28 w-full text-center z-10">
+                <h1 className="text-4xl font-black italic text-cyan-400">NEON DICE</h1>
+                {errorMsg && (
+                    <div onClick={() => setErrorMsg(null)} className="mx-6 mt-3 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl cursor-pointer">
+                        {errorMsg}
+                    </div>
+                )}
+            </div>
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-8 z-10">
                 <div className="relative w-full flex justify-center gap-6"><DigitalDie value={dices[0]} rolling={rolling} /><DigitalDie value={dices[1]} rolling={rolling} /></div>
                 <div className="bg-black/60 px-8 py-3 rounded-full border border-white/10"><span className="text-5xl font-black text-white">{rolling ? '?' : dices[0] + dices[1]}</span></div>

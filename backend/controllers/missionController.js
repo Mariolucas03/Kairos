@@ -3,6 +3,7 @@ const Mission = require('../models/Mission');
 const DailyLog = require('../models/DailyLog');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
+const { getMadridDateString } = require('../utils/dateHelpers');
 const mongoose = require('mongoose');
 
 // 🔥 TABLA DE RECOMPENSAS
@@ -165,7 +166,10 @@ const updateProgress = asyncHandler(async (req, res) => {
     }
 
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    // ⚠️ En UTC, entre las 00:00 y las 02:00 de Madrid esto devuelve AYER: la misión
+    // completada de madrugada sumaba en el registro del día anterior y, como el
+    // findOneAndUpdate va con upsert, podía crear un DailyLog fantasma con fecha mala.
+    const todayStr = getMadridDateString();
 
     // Resetear hábitos si es un nuevo día
     if (mission.type === 'habit' && mission.completed) {

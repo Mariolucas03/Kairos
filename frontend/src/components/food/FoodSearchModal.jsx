@@ -76,14 +76,25 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
     );
 };
 
+// La comida a la que estás añadiendo manda: es la carpeta que se preselecciona
+// tanto al filtrar tus guardados como al crear un alimento nuevo.
+const FOLDERS = ['Desayuno', 'Snack', 'Comida', 'Merienda', 'Cena'];
+
+const carpetaDeComida = (mealName = '') => {
+    const limpio = mealName.trim().toLowerCase();
+    return FOLDERS.find(f => f.toLowerCase() === limpio) || 'Desayuno';
+};
+
 // --- COMPONENTE PRINCIPAL ---
-export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic, onBackgroundSync, onShowToast }) {
+export default function FoodSearchModal({ mealId, mealName = '', onClose, onFoodAddedOptimistic, onBackgroundSync, onShowToast }) {
+    const carpetaDestino = carpetaDeComida(mealName);
+
     const [mode, setMode] = useState('search');
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [sortBy, setSortBy] = useState('name');
-    const [filterFolder, setFilterFolder] = useState('Todos');
+    const [filterFolder, setFilterFolder] = useState(carpetaDestino);
 
     const [aiInput, setAiInput] = useState('');
     const [aiImage, setAiImage] = useState(null);
@@ -95,11 +106,9 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
     const [aiDescription, setAiDescription] = useState('');
     const [aiHelperLoading, setAiHelperLoading] = useState(false);
 
-    const FOLDERS = ['Desayuno', 'Snack', 'Comida', 'Merienda', 'Cena'];
-
     const [manualForm, setManualForm] = useState({
         name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1,
-        folder: 'Desayuno'
+        folder: carpetaDestino
     });
     const searchInputRef = useRef(null);
 
@@ -110,6 +119,14 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
         try {
             const res = await api.get('/food/saved');
             setResults(res.data);
+
+            // Si en la carpeta de esta comida no tienes nada guardado, no tiene
+            // sentido enseñarte una lista vacía: se abre en "Todos". Solo mientras
+            // sigas en la carpeta que se eligió sola; si tú has tocado otra, manda la tuya.
+            if (filterFolder === carpetaDestino) {
+                const hayEnDestino = (res.data || []).some(item => item.folder === carpetaDestino);
+                if (!hayEnDestino) setFilterFolder('Todos');
+            }
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     };
@@ -126,6 +143,9 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
         try {
             const res = await api.get(`/food/search?query=${query}`);
             setResults(res.data);
+            // Al buscar se mira en TODAS las carpetas: si no, escribías el nombre
+            // de algo que tienes en "Cena" estando en "Desayuno" y no aparecía.
+            setFilterFolder('Todos');
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     };
@@ -190,7 +210,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
                 fat: analyzedData.fat || 0,
                 fiber: analyzedData.fiber || 0,
                 quantity: 1,
-                folder: 'Comida'
+                folder: carpetaDestino
             });
 
             onShowToast("¡Analizado! Revisa los datos y guarda.", "success");
@@ -204,11 +224,30 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
         }
     };
 
+    // Raciones: los macros del formulario son de UNA ración; al añadir se multiplica.
+    const raciones = Number(manualForm.quantity) || 1;
+    const porRaciones = (v) => Math.round((Number(v || 0) * raciones) * 10) / 10;
+
+    const cambiarRaciones = (delta) => {
+        setManualForm(p => {
+            const siguiente = Math.round(((Number(p.quantity) || 1) + delta) * 2) / 2; // pasos de 0,5
+            return { ...p, quantity: Math.min(20, Math.max(0.5, siguiente)) };
+        });
+    };
+
     // 🔥 FUNCIÓN OPTIMISTA PARA MANUAL / IA
     const handleAddToMealNow = async () => {
         if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
 
-        const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber) };
+        const foodData = {
+            ...manualForm,
+            quantity: raciones,
+            calories: porRaciones(manualForm.calories),
+            protein: porRaciones(manualForm.protein),
+            carbs: porRaciones(manualForm.carbs),
+            fat: porRaciones(manualForm.fat),
+            fiber: porRaciones(manualForm.fiber)
+        };
 
         // 1. Avisamos al padre al instante
         onFoodAddedOptimistic(foodData);
@@ -227,13 +266,14 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
     const handleSaveToList = async () => {
         if (!manualForm.name.trim() || manualForm.calories === '') { onShowToast("Nombre y Calorías obligatorios", "error"); return; }
         try {
-            const foodData = { ...manualForm, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber), servingSize: '1 ración' };
+            // En la lista se guarda SIEMPRE una ración: las raciones se eligen al añadir.
+            const foodData = { ...manualForm, quantity: 1, calories: Number(manualForm.calories), protein: Number(manualForm.protein), carbs: Number(manualForm.carbs), fat: Number(manualForm.fat), fiber: Number(manualForm.fiber), servingSize: '1 ración' };
             await api.post('/food/save', foodData);
             onShowToast("Guardado en carpeta " + manualForm.folder, "success");
             setMode('search');
             setQuery(manualForm.name);
             fetchSavedFoods();
-            setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1, folder: 'Desayuno' });
+            setManualForm({ name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '', quantity: 1, folder: carpetaDestino });
         } catch (e) { onShowToast("Error al guardar", "error"); }
     };
 
@@ -256,9 +296,17 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
     return (
         <div className="flex flex-col h-full w-full bg-zinc-950 text-white animate-in slide-in-from-bottom-10 duration-200">
             <div className="px-5 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
-                <h2 className="text-lg font-black uppercase tracking-wider text-white">
-                    {mode === 'review' ? 'Revisar Datos' : 'Añadir Alimento'}
-                </h2>
+                <div className="min-w-0">
+                    <h2 className="text-lg font-black uppercase tracking-wider text-white leading-none">
+                        {mode === 'review' ? 'Revisar Datos' : 'Añadir Alimento'}
+                    </h2>
+                    {/* Siempre a la vista a qué comida va lo que estás añadiendo */}
+                    {mealName && (
+                        <p className="text-[10px] font-black text-lime-500 uppercase tracking-widest mt-1.5 truncate">
+                            → {mealName}
+                        </p>
+                    )}
+                </div>
                 <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={20} /></button>
             </div>
 
@@ -275,38 +323,56 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-20 pt-4">
                 {mode === 'search' && (
                     <div className="space-y-4 animate-in fade-in duration-300">
-                        <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-                            <input ref={searchInputRef} type="text" placeholder="Buscar en mis alimentos..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white pl-11 pr-4 py-4 rounded-2xl outline-none focus:border-zinc-600 transition-all font-bold text-sm placeholder-zinc-600" />
+                        {/* Buscador + orden en la misma fila: antes el orden ocupaba
+                            una línea entera para dos botones */}
+                        <div className="flex gap-2">
+                            <div className="relative flex-1 min-w-0">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                                <input ref={searchInputRef} type="text" placeholder="Buscar en mis alimentos..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white pl-11 pr-4 py-4 rounded-2xl outline-none focus:border-zinc-600 transition-all font-bold text-sm placeholder-zinc-600" />
+                                {query && (
+                                    <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white p-1">
+                                        <X size={16} />
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setSortBy(s => (s === 'name' ? 'calories' : 'name'))}
+                                title="Cambiar orden"
+                                className="shrink-0 px-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-[10px] font-black uppercase text-zinc-400 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform"
+                            >
+                                <SortAsc size={14} className="text-zinc-500" />
+                                {sortBy === 'name' ? 'A-Z' : 'Kcal'}
+                            </button>
                         </div>
 
-                        <div className="flex flex-col gap-2">
-                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                                <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
-                                    <SortAsc size={14} className="text-zinc-500" />
-                                </div>
-                                <button onClick={() => setSortBy('name')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'name' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>A-Z</button>
-                                <button onClick={() => setSortBy('calories')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all ${sortBy === 'calories' ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800'}`}>Kcal</button>
-                            </div>
-
-                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                                <div className="flex items-center gap-1 bg-zinc-900 px-2 rounded-lg border border-zinc-800 shrink-0">
-                                    <Filter size={14} className="text-zinc-500" />
-                                </div>
-                                <button onClick={() => setFilterFolder('Todos')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === 'Todos' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>Todos</button>
-                                {FOLDERS.map(f => (
+                        {/* Carpetas: una sola fila, empezando por la de esta comida */}
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 items-center">
+                            <Filter size={14} className="text-zinc-600 shrink-0" />
+                            <button onClick={() => setFilterFolder('Todos')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === 'Todos' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>Todos</button>
+                            {FOLDERS.map(f => {
+                                const cuantos = results.filter(item => item.folder === f).length;
+                                return (
                                     <button key={f} onClick={() => setFilterFolder(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === f ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>
-                                        {f}
+                                        {f}{cuantos > 0 && <span className={filterFolder === f ? 'text-black/60' : 'text-zinc-700'}> {cuantos}</span>}
                                     </button>
-                                ))}
-                            </div>
+                                );
+                            })}
                         </div>
 
                         <div className="space-y-2">
                             {loading ? <div className="text-center py-10 text-zinc-600 font-bold uppercase text-xs animate-pulse">Cargando...</div> :
                                 processedResults.length > 0 ? processedResults.map((item, idx) => (
                                     <SwipeableFoodItem key={item._id || idx} item={item} onAdd={handleAddFood} onDelete={handleDeleteSavedFood} />
-                                )) : <div className="text-center py-10 text-zinc-700 font-bold uppercase text-xs">{query ? "No encontrado" : "No hay alimentos guardados"}</div>}
+                                )) : (
+                                    <div className="text-center py-12 px-6 border-2 border-dashed border-zinc-900 rounded-3xl">
+                                        <p className="text-zinc-600 font-bold uppercase text-xs">
+                                            {query ? 'Nada encontrado' : filterFolder !== 'Todos' ? `Sin alimentos en ${filterFolder}` : 'Todavía no tienes alimentos guardados'}
+                                        </p>
+                                        <button onClick={() => setMode('manual')} className="mt-4 bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2 active:scale-95 transition-transform">
+                                            <Plus size={14} /> Crear uno nuevo
+                                        </button>
+                                    </div>
+                                )}
                         </div>
                     </div>
                 )}
@@ -380,9 +446,27 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
                             </div>
                         </div>
 
+                        {/* RACIONES: los macros de arriba son de una ración; aquí
+                            eliges cuántas van al plato de hoy. */}
+                        <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Raciones</p>
+                                <p className="text-[10px] text-zinc-600 font-bold mt-1 truncate">
+                                    Total: {porRaciones(manualForm.calories || 0)} kcal
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <button onClick={() => cambiarRaciones(-0.5)} className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-black text-lg active:scale-90 transition-transform">−</button>
+                                <span className="w-10 text-center text-lg font-black text-white">{raciones}</span>
+                                <button onClick={() => cambiarRaciones(0.5)} className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-black text-lg active:scale-90 transition-transform">+</button>
+                            </div>
+                        </div>
+
                         <div className="pt-2 space-y-2">
                             <div className="grid grid-cols-1 gap-3">
-                                <button onClick={handleAddToMealNow} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/10"><Plus size={18} strokeWidth={3} /> Añadir a Comida Hoy</button>
+                                <button onClick={handleAddToMealNow} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-white/10">
+                                    <Plus size={18} strokeWidth={3} /> Añadir a {mealName || 'la comida'}
+                                </button>
                                 <button onClick={handleSaveToList} className="w-full bg-zinc-800 text-zinc-300 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-700 active:scale-95 transition-all flex items-center justify-center gap-2 border border-zinc-700"><Save size={16} /> Guardar en {manualForm.folder}</button>
                             </div>
                         </div>

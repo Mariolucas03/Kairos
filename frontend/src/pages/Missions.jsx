@@ -50,10 +50,15 @@ const getDeadlineText = (frequency) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
+// ⚠️ Estos valores tienen que ser EXACTAMENTE los del servidor
+// (backend/utils/scheduler.js → DAMAGE_RULES). Estaban al revés: la tarjeta de
+// una misión épica decía "-0 HP" cuando en realidad te quita 50.
 const getPotentialDamage = (diff) => {
-    const rules = { easy: 10, medium: 5, hard: 2, epic: 0 };
+    const rules = { easy: 5, medium: 10, hard: 20, epic: 50 };
     return rules[diff] !== undefined ? rules[diff] : 5;
 };
+
+const DAY_LABELS = { 0: 'D', 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S' };
 
 const getGradientStyles = (diff, completed) => {
     const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
@@ -169,7 +174,11 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const cardStyle = {
         transform: `translate3d(${dragX}px, 0, 0)`,
         transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-        touchAction: 'pan-y'
+        touchAction: 'pan-y',
+        // ⚠️ El halo iba en una clase de Tailwind con una variable interpolada
+        // dentro. Tailwind no interpola: generaba CSS roto (lo avisaba el build)
+        // y el resplandor de color no se veía nunca. Va como estilo en línea.
+        boxShadow: mission.completed ? 'none' : `0 0 25px ${styles.shadow}`
     };
 
     let bgAction = 'bg-transparent';
@@ -207,7 +216,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
 
             <div
                 style={cardStyle}
-                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} shadow-[0_0_25px_${styles.shadow}] ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
+                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
@@ -233,6 +242,21 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                                             {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
                                         </div>
                                     </div>
+
+                                    {/* Días en los que toca: antes no había forma de saberlo
+                                        sin abrir el modo gestión y editar la misión. */}
+                                    {mission.frequency === 'daily' && mission.specificDays?.length > 0 && (
+                                        <div className="flex items-center gap-1 mt-1.5">
+                                            {[1, 2, 3, 4, 5, 6, 0].map(d => (
+                                                <span
+                                                    key={d}
+                                                    className={`w-[15px] h-[15px] rounded-full flex items-center justify-center text-[8px] font-black ${mission.specificDays.includes(d) ? 'bg-zinc-700 text-white' : 'bg-zinc-900 text-zinc-700'}`}
+                                                >
+                                                    {DAY_LABELS[d]}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="absolute -top-1 -right-1 flex items-center gap-2">
                                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
@@ -270,7 +294,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                         {showInput && !isBinary && (
                             <form onSubmit={handleNumericSubmit} className="mt-3 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
                                 <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-                                <button type="submit" className={`px-3 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient} shadow-lg shadow-${styles.shadow.split(' ')[0]}`}><Check size={18} /></button>
+                                <button type="submit" className={`px-3 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient} shadow-lg`}><Check size={18} /></button>
                             </form>
                         )}
                     </div>
@@ -278,7 +302,9 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                     {isPending && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-[22px] z-30">
                             <Loader2 className="animate-spin text-zinc-500 mb-2" /><span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
-                            {amIOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(mission._id); }} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
+                            {/* Antes llamaba a onDelete, que no existe como prop:
+                                tocar "Cancelar invitación" reventaba la pantalla. */}
+                            {amIOwner && <button onClick={(e) => { e.stopPropagation(); onRequestDelete(mission); }} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
                         </div>
                     )}
                 </div>
@@ -339,6 +365,10 @@ export default function Missions() {
     const completedCount = filteredMissions.filter(m => m.completed).length;
     const totalCount = filteredMissions.length;
     const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+    // Vida que perderías esta noche si dejas así las misiones pendientes
+    const pendingDamage = filteredMissions
+        .filter(m => !m.completed && !(m.isCoop && m.invitationStatus === 'pending'))
+        .reduce((acc, m) => acc + getPotentialDamage(m.difficulty), 0);
 
     const handleOpenCreator = () => { setNewMission({ ...DEFAULTS, frequency: activeTab === 'all' ? 'daily' : activeTab }); setSelectedDays([]); setShowCreator(true); };
     const handleCloseCreator = () => setShowCreator(false);
@@ -447,7 +477,19 @@ export default function Missions() {
                                 <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>{freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANA' : freq === 'monthly' ? 'MES' : 'AÑO'}</button>
                             ))}
                         </div>
-                        <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800"><div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} /></div>
+                        <div className="mt-2 flex items-center gap-2">
+                            <div className="h-1.5 flex-1 bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
+                                <div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} />
+                            </div>
+                            {/* Cuántas llevas y cuánta vida te juegas si no las haces */}
+                            <span className="text-[10px] font-black text-zinc-400 tabular-nums shrink-0">{completedCount}/{totalCount}</span>
+                            {pendingDamage > 0 && (
+                                <span className="text-[10px] font-black text-red-400 flex items-center gap-1 shrink-0">
+                                    −{pendingDamage}
+                                    <img src={ICON_HEART} className="w-3.5 h-3.5 object-contain" alt="HP" />
+                                </span>
+                            )}
+                        </div>
                     </>
                 )}
                 {viewAllMode && <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2"><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Toca una misión para editarla</p></div>}
