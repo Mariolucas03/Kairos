@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, Lock, User, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, ArrowRight, Swords, UserCheck } from 'lucide-react';
 import api from '../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
+
+const ACENTO = '#eab308'; // oro
 
 export default function Login() {
     const navigate = useNavigate();
@@ -14,6 +16,8 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    // Qué campo está enfocado: el borde y el icono se tiñen del acento
+    const [campoActivo, setCampoActivo] = useState(null);
 
     // 🔥 AUTO-REDIRECCIÓN: Si ya hay sesión, salta el login
     useEffect(() => {
@@ -58,74 +62,94 @@ export default function Login() {
         }
     };
 
+    // Caja de campo: misma pieza para usuario y contraseña
+    const claseCampo = (nombre) =>
+        `w-full bg-black border rounded-[16px] py-[14px] text-white font-semibold text-sm outline-none transition-colors placeholder:text-zinc-700 ${campoActivo === nombre ? 'border-yellow-500/45' : 'border-white/[0.09]'}`;
+
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6 py-10 select-none">
+            <div className="w-full max-w-sm animate-in fade-in duration-300">
 
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-600 z-20"></div>
-            <div className="absolute -top-20 -right-20 w-80 h-80 bg-yellow-600/10 rounded-full blur-[80px] pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/5 rounded-full blur-[80px] pointer-events-none"></div>
-
-            <div className="w-full max-w-sm relative z-10 animate-in fade-in zoom-in duration-500">
-
-                <div className="text-center mb-10">
-                    <h1 className="text-5xl font-black italic text-white tracking-tighter mb-1">
+                {/* MARCA */}
+                <div className="flex flex-col items-center mb-9">
+                    <div
+                        className="w-16 h-16 rounded-[20px] flex items-center justify-center border"
+                        style={{ background: 'rgba(234,179,8,0.12)', borderColor: 'rgba(234,179,8,0.3)' }}
+                    >
+                        <Swords size={30} style={{ color: ACENTO }} />
+                    </div>
+                    <h1 className="mt-5 text-[40px] font-black text-white tracking-[-0.055em] leading-none not-italic">
                         KAIROS
                     </h1>
-                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">
-                        Sistema de Acceso
+                    <p className="mt-3 text-[9px] font-black text-zinc-600 uppercase tracking-[0.24em] not-italic">
+                        Sistema de acceso
                     </p>
                 </div>
 
-                <div className="bg-zinc-950 border border-white/10 rounded-[32px] p-6 shadow-2xl relative overflow-hidden">
+                {/* TARJETA DE ACCESO */}
+                <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-[28px] p-6 overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO}, transparent)` }} />
+                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: ACENTO }} />
 
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-yellow-500 blur-sm"></div>
-
-                    <h2 className="text-xl font-black text-white uppercase italic mb-6 flex items-center gap-2">
-                        <Lock size={20} className="text-yellow-500" /> Identificarse
+                    <h2 className="relative z-10 text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] flex items-center gap-2 mb-6 not-italic">
+                        <UserCheck size={16} style={{ color: ACENTO }} /> Identificarse
                     </h2>
 
                     {error && (
-                        <div className="mb-6 p-3 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-xs font-bold text-center animate-pulse">
+                        <div className="relative z-10 mb-5 p-3 bg-red-950/40 border border-red-500/30 rounded-2xl text-red-400 text-[11px] font-bold text-center not-italic">
                             {error}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Usuario / Alias</label>
-                            <div className="relative group">
-                                <User className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-yellow-500 transition-colors" size={18} />
+                    <form onSubmit={handleSubmit} className="relative z-10 space-y-4">
+                        <div>
+                            <label className="block text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] mb-2 not-italic">Usuario o alias</label>
+                            <div className="relative">
+                                <User
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors"
+                                    size={17}
+                                    style={{ color: campoActivo === 'username' ? ACENTO : '#52525b' }}
+                                />
                                 <input
                                     type="text"
                                     name="username"
                                     placeholder="Guerrero01"
                                     value={formData.username}
                                     onChange={handleChange}
+                                    onFocus={() => setCampoActivo('username')}
+                                    onBlur={() => setCampoActivo(null)}
                                     required
-                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-700"
+                                    className={`${claseCampo('username')} pl-12 pr-4`}
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
-                            <div className="relative group">
-                                <Lock className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-yellow-500 transition-colors" size={18} />
+                        <div>
+                            <label className="block text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] mb-2 not-italic">Contraseña</label>
+                            <div className="relative">
+                                <Lock
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors"
+                                    size={17}
+                                    style={{ color: campoActivo === 'password' ? ACENTO : '#52525b' }}
+                                />
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     name="password"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={handleChange}
+                                    onFocus={() => setCampoActivo('password')}
+                                    onBlur={() => setCampoActivo(null)}
                                     required
-                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-12 text-white font-bold text-sm focus:border-yellow-500 outline-none transition-all placeholder:text-zinc-700"
+                                    className={`${claseCampo('password')} pl-12 pr-12`}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-3.5 text-zinc-600 hover:text-white transition-colors"
+                                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white transition-colors"
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                                 </button>
                             </div>
                         </div>
@@ -133,23 +157,25 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mt-6 uppercase tracking-widest shadow-lg shadow-yellow-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full rounded-[18px] py-4 mt-6 font-black uppercase tracking-[0.16em] text-[12px] active:scale-[0.985] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed not-italic"
+                            style={{ background: ACENTO, color: '#000' }}
                         >
-                            {loading ? (
-                                <span className="animate-pulse">Autenticando...</span>
-                            ) : (
-                                <>Entrar <LogIn size={20} /></>
-                            )}
+                            {loading ? 'Autenticando...' : <>Entrar <ArrowRight size={18} strokeWidth={3} /></>}
                         </button>
                     </form>
                 </div>
 
-                <div className="mt-8 text-center">
-                    <p className="text-zinc-500 text-xs font-medium">
-                        ¿No tienes credenciales?
+                {/* PIE */}
+                <div className="mt-7 text-center">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">
+                        ¿Aún no tienes expediente?
                     </p>
-                    <Link to="/register" className="text-yellow-500 text-xs font-black uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1 mt-2 group">
-                        Solicitar Acceso <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    <Link
+                        to="/register"
+                        className="mt-2 inline-flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] hover:brightness-125 transition-all group not-italic"
+                        style={{ color: ACENTO }}
+                    >
+                        Solicitar acceso <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
                     </Link>
                 </div>
             </div>

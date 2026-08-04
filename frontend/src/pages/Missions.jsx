@@ -60,61 +60,21 @@ const getPotentialDamage = (diff) => {
 
 const DAY_LABELS = { 0: 'D', 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S' };
 
-const getGradientStyles = (diff, completed) => {
-    const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
-    const label = labels[diff] || diff;
+const ACENTO = '#f43f5e'; // rosa-rojo: el color de la sección de misiones
 
-    if (completed) return {
-        gradient: 'from-[#18181b] to-[#09090b]',
-        shadow: 'rgba(0,0,0,0)',
-        textGradient: 'from-zinc-600 to-zinc-500',
-        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900',
-        iconColor: 'text-zinc-700',
-        label: 'HECHO'
-    };
+// El color de cada misión sale de su dificultad. Un solo tono por tarjeta:
+// nada de degradados de dos colores.
+const DIFICULTADES = {
+    easy: { label: 'Fácil', color: '#4ade80' },
+    medium: { label: 'Media', color: '#3b82f6' },
+    hard: { label: 'Difícil', color: '#f43f5e' },
+    epic: { label: 'Épica', color: '#a855f7' }
+};
 
-    switch (diff) {
-        case 'easy': return {
-            gradient: 'from-[#14532d] via-[#166534] to-[#22c55e]',
-            shadow: 'rgba(22, 101, 52, 0.4)',
-            textGradient: 'from-[#166534] to-[#22c55e]',
-            badge: 'text-green-400 border-green-500/30 bg-green-900/20',
-            iconColor: 'text-green-400',
-            label
-        };
-        case 'medium': return {
-            gradient: 'from-blue-600 via-cyan-500 to-indigo-600',
-            shadow: 'rgba(37, 99, 235, 0.4)',
-            textGradient: 'from-blue-400 to-cyan-400',
-            badge: 'text-blue-300 border-blue-500/30 bg-blue-500/10',
-            iconColor: 'text-blue-400',
-            label
-        };
-        case 'hard': return {
-            gradient: 'from-red-600 via-orange-500 to-rose-600',
-            shadow: 'rgba(220, 38, 38, 0.4)',
-            textGradient: 'from-red-400 to-orange-400',
-            badge: 'text-red-300 border-red-500/30 bg-red-500/10',
-            iconColor: 'text-red-400',
-            label
-        };
-        case 'epic': return {
-            gradient: 'from-purple-600 via-fuchsia-500 to-violet-600',
-            shadow: 'rgba(147, 51, 234, 0.4)',
-            textGradient: 'from-purple-400 to-fuchsia-400',
-            badge: 'text-purple-300 border-purple-500/30 bg-purple-500/10',
-            iconColor: 'text-purple-400',
-            label
-        };
-        default: return {
-            gradient: 'from-zinc-500 to-zinc-700',
-            shadow: 'rgba(113, 113, 122, 0.2)',
-            textGradient: 'from-zinc-400 to-zinc-600',
-            badge: 'text-zinc-400 border-zinc-600',
-            iconColor: 'text-zinc-400',
-            label
-        };
-    }
+const estiloMision = (diff, completed) => {
+    const base = DIFICULTADES[diff] || { label: diff, color: '#a1a1aa' };
+    if (completed) return { color: '#3f3f46', label: 'Hecho', apagada: true };
+    return { ...base, apagada: false };
 };
 
 function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId, onEdit, viewAllMode }) {
@@ -125,7 +85,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const startX = useRef(0);
     const THRESHOLD = 80;
 
-    const styles = getGradientStyles(mission.difficulty, mission.completed);
+    const styles = estiloMision(mission.difficulty, mission.completed);
     const isPending = mission.isCoop && mission.invitationStatus === 'pending';
     const amIOwner = mission.user === currentUserId;
     const isBinary = mission.target === 1;
@@ -174,11 +134,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const cardStyle = {
         transform: `translate3d(${dragX}px, 0, 0)`,
         transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-        touchAction: 'pan-y',
-        // ⚠️ El halo iba en una clase de Tailwind con una variable interpolada
-        // dentro. Tailwind no interpola: generaba CSS roto (lo avisaba el build)
-        // y el resplandor de color no se veía nunca. Va como estilo en línea.
-        boxShadow: mission.completed ? 'none' : `0 0 25px ${styles.shadow}`
+        touchAction: 'pan-y'
     };
 
     let bgAction = 'bg-transparent';
@@ -190,8 +146,9 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const renderProgressBar = () => {
         if (isBinary && !mission.isCoop) return null;
         return (
-            <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex mt-2 border border-zinc-800/50 relative shadow-inner">
+            <div className="h-[6px] w-full bg-[#18181b] rounded-full overflow-hidden flex mt-3">
                 {mission.isCoop ? (
+                    // En los retos sociales cada participante pinta su tramo
                     mission.participants.map((p) => {
                         const contrib = (mission.contributions && mission.contributions[p._id]) || 0;
                         const w = (contrib / mission.target) * 100;
@@ -199,7 +156,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                         return <div key={p._id} className={`h-full ${colorClass} transition-all duration-500`} style={{ width: `${w}%` }} />;
                     })
                 ) : (
-                    <div className={`h-full transition-all duration-500 relative bg-gradient-to-r ${styles.gradient}`} style={{ width: `${progressPercent}%` }} />
+                    <div className="h-full transition-all duration-500 rounded-full" style={{ width: `${progressPercent}%`, background: styles.color }} />
                 )}
             </div>
         );
@@ -216,7 +173,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
 
             <div
                 style={cardStyle}
-                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
+                className={`relative bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] overflow-hidden z-10 will-change-transform ${isPending ? 'opacity-70' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.985]' : ''} ${mission.completed ? 'opacity-[0.55]' : 'opacity-100'}`}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
@@ -225,76 +182,123 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                 onMouseUp={handleEnd}
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
-                <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-4 relative overflow-hidden h-full flex flex-col justify-between`}>
-                    {!mission.completed && <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>}
-                    <div className="relative z-10">
-                        <div className="flex justify-between items-start gap-3 mb-1">
-                            <div className="flex-1 min-w-0 relative">
-                                <div className="pr-20 mb-1">
-                                    <div className="flex items-center gap-2">
-                                        {mission.isCoop && <Users size={16} className={styles.iconColor} />}
-                                        {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="flex items-baseline gap-1">
-                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>{mission.progress}/{mission.target}</span>
-                                            {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
-                                        </div>
-                                    </div>
+                {/* Línea de acento y halo, del color de la dificultad */}
+                <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${styles.color}, transparent)` }} />
+                {!mission.completed && (
+                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: styles.color }} />
+                )}
 
-                                    {/* Días en los que toca: antes no había forma de saberlo
-                                        sin abrir el modo gestión y editar la misión. */}
-                                    {mission.frequency === 'daily' && mission.specificDays?.length > 0 && (
-                                        <div className="flex items-center gap-1 mt-1.5">
-                                            {[1, 2, 3, 4, 5, 6, 0].map(d => (
-                                                <span
-                                                    key={d}
-                                                    className={`w-[15px] h-[15px] rounded-full flex items-center justify-center text-[8px] font-black ${mission.specificDays.includes(d) ? 'bg-zinc-700 text-white' : 'bg-zinc-900 text-zinc-700'}`}
-                                                >
-                                                    {DAY_LABELS[d]}
-                                                </span>
-                                            ))}
-                                        </div>
+                <div className="p-[18px] relative overflow-hidden h-full flex flex-col justify-between">
+                    <div className="relative z-10">
+                        <div className="flex justify-between items-start gap-3">
+                            <div className="flex-1 min-w-0">
+                                {/* Etiqueta: icono de tipo + nombre */}
+                                <div className="flex items-center gap-2 min-w-0">
+                                    {mission.isCoop
+                                        ? <Users size={13} style={{ color: styles.color }} className="shrink-0" />
+                                        : mission.type === 'habit'
+                                            ? <Repeat size={13} style={{ color: styles.color }} className="shrink-0" />
+                                            : <Flag size={13} style={{ color: styles.color }} className="shrink-0" />}
+                                    {viewAllMode && <Edit size={12} className="text-yellow-500 shrink-0" />}
+                                    <h3 className={`text-[11px] font-black uppercase tracking-[0.16em] leading-none truncate not-italic ${mission.completed ? 'text-zinc-600 line-through' : 'text-zinc-300'}`}>
+                                        {mission.title}
+                                    </h3>
+                                </div>
+
+                                {/* Número principal */}
+                                <div className="mt-2.5 flex items-baseline gap-1.5">
+                                    <span className="text-[30px] font-black text-white tracking-[-0.05em] leading-none not-italic">
+                                        {mission.progress}<span style={{ color: '#3f3f46' }}>/{mission.target}</span>
+                                    </span>
+                                    {mission.unit && (
+                                        <span className="text-[13px] font-black uppercase leading-none not-italic" style={{ color: styles.color }}>
+                                            {mission.unit}
+                                        </span>
                                     )}
                                 </div>
-                                <div className="absolute -top-1 -right-1 flex items-center gap-2">
-                                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                                        {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
+
+                                {/* Días en los que toca: antes no había forma de saberlo
+                                    sin abrir el modo gestión y editar la misión. */}
+                                {mission.frequency === 'daily' && mission.specificDays?.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-2.5">
+                                        {[1, 2, 3, 4, 5, 6, 0].map(d => (
+                                            <span
+                                                key={d}
+                                                className={`w-[15px] h-[15px] rounded-full flex items-center justify-center text-[8px] font-black not-italic ${mission.specificDays.includes(d) ? 'bg-zinc-700 text-white' : 'bg-[#18181b] text-zinc-700'}`}
+                                            >
+                                                {DAY_LABELS[d]}
+                                            </span>
+                                        ))}
                                     </div>
-                                    <div className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>{styles.label}</div>
-                                </div>
+                                )}
                             </div>
-                            <div className="flex flex-col items-center gap-2">
+
+                            {/* Chip de dificultad + botón de incremento */}
+                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                <span
+                                    className="text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-[8px] border not-italic"
+                                    style={{
+                                        color: styles.color,
+                                        background: `${styles.color}1f`,
+                                        borderColor: `${styles.color}4d`
+                                    }}
+                                >
+                                    {styles.label}
+                                </span>
                                 {!isBinary && !mission.completed && !isPending && !viewAllMode && (
-                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto"><Plus size={16} /></button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }}
+                                        aria-label="Añadir progreso"
+                                        className="w-8 h-8 rounded-[11px] flex items-center justify-center active:scale-90 transition-transform"
+                                        style={{ background: `${styles.color}1f`, color: styles.color }}
+                                    >
+                                        <Plus size={16} strokeWidth={2.6} />
+                                    </button>
                                 )}
                             </div>
                         </div>
 
                         {renderProgressBar()}
 
-                        <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
-                            <div className="flex items-center gap-4">
+                        {/* Leyenda de los retos sociales */}
+                        {mission.isCoop && mission.participants?.length > 1 && (
+                            <div className="flex items-center gap-3 mt-2">
+                                {mission.participants.map(p => (
+                                    <div key={p._id} className="flex items-center gap-1.5">
+                                        <span className={`w-[7px] h-[7px] rounded-full ${getUserColor(p._id)}`} />
+                                        <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] truncate max-w-[80px] not-italic">
+                                            {p.username}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Pie: recompensas y castigo */}
+                        <div className="flex gap-4 mt-3 pt-3 border-t border-white/[0.05] relative z-10 items-center">
+                            <div className="flex items-center gap-3">
                                 {mission.xpReward > 0 && (
-                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span><img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" /></div>
+                                    <div className="flex items-center gap-1"><span className={`text-[12px] font-black not-italic ${mission.completed ? 'text-zinc-600' : 'text-zinc-300'}`}>+{mission.xpReward}</span><img src={ICON_XP} className={`w-5 h-5 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" /></div>
                                 )}
                                 {(mission.coinReward > 0) && (
-                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span><img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" /></div>
+                                    <div className="flex items-center gap-1"><span className={`text-[12px] font-black not-italic ${mission.completed ? 'text-zinc-600' : 'text-zinc-300'}`}>+{mission.coinReward}</span><img src={ICON_COIN} className={`w-5 h-5 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Monedas" /></div>
                                 )}
                                 {(mission.gameCoinReward > 0) && (
-                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span><img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" /></div>
+                                    <div className="flex items-center gap-1"><span className={`text-[12px] font-black not-italic ${mission.completed ? 'text-zinc-600' : 'text-zinc-300'}`}>+{mission.gameCoinReward}</span><img src={ICON_CHIP} className={`w-5 h-5 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Fichas" /></div>
                                 )}
                             </div>
                             {!mission.completed && (
-                                <div className="ml-auto flex items-center gap-1.5 opacity-90"><span className="text-sm font-black text-red-400">-{damage}</span><img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" /></div>
+                                <div className="ml-auto flex items-center gap-1">
+                                    <span className="text-[12px] font-black text-red-400 not-italic">−{damage}</span>
+                                    <img src={ICON_HEART} className="w-5 h-5 object-contain" alt="Vida" />
+                                </div>
                             )}
                         </div>
 
                         {showInput && !isBinary && (
                             <form onSubmit={handleNumericSubmit} className="mt-3 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
-                                <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-                                <button type="submit" className={`px-3 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient} shadow-lg`}><Check size={18} /></button>
+                                <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-white/[0.09] rounded-[14px] px-3 py-2.5 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-colors" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
+                                <button type="submit" aria-label="Confirmar" className="px-4 rounded-[14px] font-black text-black" style={{ background: styles.color }}><Check size={18} strokeWidth={3} /></button>
                             </form>
                         )}
                     </div>
@@ -460,48 +464,115 @@ export default function Missions() {
                 />
             )}
 
-            <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
-                <div className="flex justify-between items-center mb-3">
-                    <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
-                        Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
-                    </h1>
-                    <div className="flex gap-2">
-                        <button onClick={() => setViewAllMode(!viewAllMode)} className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}>{viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}</button>
-                        <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
+            <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md pt-[18px] pb-3 px-4">
+                {/* CABECERA DE PÁGINA */}
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">
+                            {viewAllMode ? 'Modo gestión' : `Hasta ${getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}`}
+                        </p>
+                        <h1 className="mt-[9px] text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">
+                            Misiones
+                        </h1>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 mt-1">
+                        <button
+                            onClick={() => setViewAllMode(!viewAllMode)}
+                            aria-label={viewAllMode ? 'Salir del modo gestión' : 'Modo gestión'}
+                            className={`transition-colors ${viewAllMode ? 'text-blue-400' : 'text-zinc-500 hover:text-zinc-200'}`}
+                        >
+                            {viewAllMode ? <Eye size={21} /> : <EyeOff size={21} />}
+                        </button>
+                        <button onClick={handleOpenCreator} aria-label="Nueva misión" className="transition-transform active:scale-90" style={{ color: ACENTO }}>
+                            <Plus size={22} strokeWidth={3} />
+                        </button>
                     </div>
                 </div>
+
                 {!viewAllMode && (
                     <>
-                        <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
-                            {['daily', 'weekly', 'monthly', 'yearly'].map(freq => (
-                                <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>{freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANA' : freq === 'monthly' ? 'MES' : 'AÑO'}</button>
-                            ))}
+                        {/* PESTAÑAS */}
+                        <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-[18px] p-1">
+                            {['daily', 'weekly', 'monthly', 'yearly'].map(freq => {
+                                const activa = activeTab === freq;
+                                return (
+                                    <button
+                                        key={freq}
+                                        onClick={() => setActiveTab(freq)}
+                                        className={`flex-1 py-[9px] rounded-[12px] text-[10px] font-black uppercase tracking-[0.1em] transition-colors not-italic ${activa ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        style={activa ? { background: ACENTO } : undefined}
+                                    >
+                                        {freq === 'daily' ? 'Diaria' : freq === 'weekly' ? 'Semana' : freq === 'monthly' ? 'Mes' : 'Año'}
+                                    </button>
+                                );
+                            })}
                         </div>
-                        <div className="mt-2 flex items-center gap-2">
-                            <div className="h-1.5 flex-1 bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
-                                <div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} />
-                            </div>
-                            {/* Cuántas llevas y cuánta vida te juegas si no las haces */}
-                            <span className="text-[10px] font-black text-zinc-400 tabular-nums shrink-0">{completedCount}/{totalCount}</span>
-                            {pendingDamage > 0 && (
-                                <span className="text-[10px] font-black text-red-400 flex items-center gap-1 shrink-0">
-                                    −{pendingDamage}
-                                    <img src={ICON_HEART} className="w-3.5 h-3.5 object-contain" alt="HP" />
+
+                        {/* TARJETA DE PROGRESO */}
+                        <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-[18px] mt-3 overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO}, transparent)` }} />
+                            <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: ACENTO }} />
+
+                            <div className="relative z-10 flex items-center justify-between gap-3">
+                                <span className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] leading-none not-italic">
+                                    Progreso de hoy
                                 </span>
-                            )}
+                                <div className="flex items-baseline gap-2 shrink-0">
+                                    {pendingDamage > 0 && (
+                                        <span className="text-[10px] font-black text-red-400 flex items-center gap-1 not-italic">
+                                            −{pendingDamage}
+                                            <img src={ICON_HEART} className="w-3.5 h-3.5 object-contain" alt="Vida" />
+                                        </span>
+                                    )}
+                                    <span className="text-[28px] font-black text-white tracking-[-0.05em] leading-none not-italic">
+                                        {completedCount}<span style={{ color: ACENTO }}>/{totalCount}</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Barra segmentada: un tramo por misión */}
+                            <div className="relative z-10 flex gap-1 mt-3">
+                                {totalCount === 0 ? (
+                                    <div className="h-[6px] flex-1 rounded-full bg-[#18181b]" />
+                                ) : (
+                                    filteredMissions.slice(0, 8).map((m, i) => (
+                                        <div
+                                            key={m._id || i}
+                                            className="h-[6px] flex-1 rounded-full transition-colors duration-500"
+                                            style={{ background: m.completed ? ACENTO : '#18181b' }}
+                                        />
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </>
                 )}
-                {viewAllMode && <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2"><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Toca una misión para editarla</p></div>}
+
+                {viewAllMode && (
+                    <div className="bg-blue-950/20 border border-blue-500/30 p-3 rounded-[18px] text-center mt-[18px]">
+                        <p className="text-[10px] text-blue-300 font-black uppercase tracking-[0.1em] not-italic">Toca una misión para editarla</p>
+                    </div>
+                )}
             </div>
 
-            <div className="px-4 mt-4 space-y-4">
+            <div className="px-4 mt-3 space-y-3">
                 {filteredMissions.length === 0 ? (
-                    <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p></div>
+                    <div className="py-20 text-center">
+                        <div className="w-16 h-16 bg-[#0a0a0c] border border-white/[0.07] rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Target className="text-zinc-700" size={30} />
+                        </div>
+                        <p className="text-zinc-500 font-black text-[11px] uppercase tracking-[0.1em] not-italic">Sin misiones activas</p>
+                    </div>
                 ) : (
                     <>
                         {filteredMissions.map(m => <MissionCard key={m._id} mission={m} onUpdateProgress={handleUpdateProgress} onRequestDelete={setMissionToDelete} currentUserId={user._id} onEdit={openEditModal} viewAllMode={viewAllMode} />)}
-                        {!viewAllMode && <div className="text-center mt-8 mb-4"><span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 flex items-center justify-center gap-2 mx-auto w-fit"><Clock size={12} /> HASTA: <span className="text-zinc-300">{getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}</span></span></div>}
+                        {!viewAllMode && (
+                            <div className="text-center mt-6 mb-4">
+                                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] flex items-center justify-center gap-1.5 not-italic">
+                                    <Clock size={11} /> Hasta {getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}
+                                </span>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

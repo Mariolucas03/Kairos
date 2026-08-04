@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, UserPlus, User, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, UserPlus, User, Mail, Lock, ArrowRight, FilePlus, Check } from 'lucide-react';
 import api from '../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
+
+const ACENTO = '#3b82f6'; // azul: diferencia el registro del login (oro)
+const MAX_ALIAS = 8;      // el límite real que valida el backend
 
 export default function Register() {
     const navigate = useNavigate();
@@ -14,6 +17,7 @@ export default function Register() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [campoActivo, setCampoActivo] = useState(null);
 
     // 🔥 AUTO-REDIRECCIÓN
     useEffect(() => {
@@ -48,93 +52,112 @@ export default function Register() {
         }
     };
 
+    const claseCampo = (nombre) =>
+        `w-full bg-black border rounded-[16px] py-[14px] text-white font-semibold text-sm outline-none transition-colors placeholder:text-zinc-700 ${campoActivo === nombre ? 'border-blue-500/45' : 'border-white/[0.09]'}`;
+
+    const colorIcono = (nombre) => (campoActivo === nombre ? ACENTO : '#52525b');
+
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden select-none">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6 py-10 select-none">
+            <div className="w-full max-w-sm animate-in fade-in duration-300">
 
-            {/* Fondo Decorativo (Azul/Cyan para registro) */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-600 via-blue-500 to-cyan-600 z-20"></div>
-            <div className="absolute -top-20 -left-20 w-80 h-80 bg-blue-600/10 rounded-full blur-[80px] pointer-events-none"></div>
-
-            <div className="w-full max-w-sm relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-black italic text-white tracking-tighter mb-1">
-                        NUEVO RECLUTA
+                {/* MARCA */}
+                <div className="flex flex-col items-center mb-9">
+                    <div
+                        className="w-16 h-16 rounded-[20px] flex items-center justify-center border"
+                        style={{ background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.3)' }}
+                    >
+                        <UserPlus size={30} style={{ color: ACENTO }} />
+                    </div>
+                    <h1 className="mt-5 text-[30px] font-black text-white uppercase tracking-[-0.05em] leading-none text-center not-italic">
+                        Nuevo recluta
                     </h1>
-                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">
-                        Crear Expediente
+                    <p className="mt-3 text-[9px] font-black text-zinc-600 uppercase tracking-[0.24em] not-italic">
+                        Empieza tu partida
                     </p>
                 </div>
 
-                <div className="bg-zinc-950 border border-white/10 rounded-[32px] p-6 shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-blue-500 blur-sm"></div>
+                {/* TARJETA DE REGISTRO */}
+                <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-[28px] p-6 overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO}, transparent)` }} />
+                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: ACENTO }} />
 
-                    <h2 className="text-xl font-black text-white uppercase italic mb-6 flex items-center gap-2">
-                        <UserPlus size={20} className="text-blue-500" /> Registro
+                    <h2 className="relative z-10 text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] flex items-center gap-2 mb-6 not-italic">
+                        <FilePlus size={16} style={{ color: ACENTO }} /> Crear expediente
                     </h2>
 
                     {error && (
-                        <div className="mb-6 p-3 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-xs font-bold text-center animate-pulse">
+                        <div className="relative z-10 mb-5 p-3 bg-red-950/40 border border-red-500/30 rounded-2xl text-red-400 text-[11px] font-bold text-center not-italic">
                             {error}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Usuario */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Alias / Usuario</label>
-                            <div className="relative group">
-                                <User className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                    <form onSubmit={handleSubmit} className="relative z-10 space-y-4">
+                        {/* Alias */}
+                        <div>
+                            <div className="flex items-baseline justify-between mb-2">
+                                <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] not-italic">Alias</label>
+                                <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.1em] not-italic">Máx. {MAX_ALIAS}</span>
+                            </div>
+                            <div className="relative">
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors" size={17} style={{ color: colorIcono('username') }} />
                                 <input
                                     type="text"
                                     name="username"
-                                    placeholder="Guerrero01"
-                                    maxLength={8}
+                                    placeholder="Guerrero"
+                                    maxLength={MAX_ALIAS}
                                     value={formData.username}
                                     onChange={handleChange}
+                                    onFocus={() => setCampoActivo('username')}
+                                    onBlur={() => setCampoActivo(null)}
                                     required
-                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                    className={`${claseCampo('username')} pl-12 pr-4`}
                                 />
                             </div>
                         </div>
 
                         {/* Email */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Correo</label>
-                            <div className="relative group">
-                                <Mail className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                        <div>
+                            <label className="block text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] mb-2 not-italic">Correo</label>
+                            <div className="relative">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors" size={17} style={{ color: colorIcono('email') }} />
                                 <input
                                     type="email"
                                     name="email"
                                     placeholder="tu@email.com"
                                     value={formData.email}
                                     onChange={handleChange}
+                                    onFocus={() => setCampoActivo('email')}
+                                    onBlur={() => setCampoActivo(null)}
                                     required
-                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                    className={`${claseCampo('email')} pl-12 pr-4`}
                                 />
                             </div>
                         </div>
 
                         {/* Password */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-wide">Contraseña</label>
-                            <div className="relative group">
-                                <Lock className="absolute left-4 top-3.5 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+                        <div>
+                            <label className="block text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] mb-2 not-italic">Contraseña</label>
+                            <div className="relative">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors" size={17} style={{ color: colorIcono('password') }} />
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     name="password"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={handleChange}
+                                    onFocus={() => setCampoActivo('password')}
+                                    onBlur={() => setCampoActivo(null)}
                                     required
-                                    className="w-full bg-black border border-zinc-800 rounded-2xl py-3 pl-12 pr-12 text-white font-bold text-sm focus:border-blue-500 outline-none transition-all placeholder:text-zinc-700"
+                                    className={`${claseCampo('password')} pl-12 pr-12`}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-3.5 text-zinc-600 hover:text-white transition-colors"
+                                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white transition-colors"
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                                 </button>
                             </div>
                         </div>
@@ -142,19 +165,25 @@ export default function Register() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl mt-6 uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full rounded-[18px] py-4 mt-6 font-black uppercase tracking-[0.16em] text-[12px] text-white active:scale-[0.985] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 not-italic"
+                            style={{ background: ACENTO }}
                         >
-                            {loading ? "Creando..." : "CONFIRMAR"}
+                            {loading ? 'Creando...' : <>Confirmar <Check size={18} strokeWidth={3} /></>}
                         </button>
                     </form>
                 </div>
 
-                <div className="mt-8 text-center">
-                    <p className="text-zinc-500 text-xs font-medium">
-                        ¿Ya tienes cuenta?
+                {/* PIE */}
+                <div className="mt-7 text-center">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">
+                        ¿Ya tienes expediente?
                     </p>
-                    <Link to="/login" className="text-blue-400 text-xs font-black uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1 mt-2 group">
-                        Inicia Sesión <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    <Link
+                        to="/login"
+                        className="mt-2 inline-flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] hover:brightness-125 transition-all group not-italic"
+                        style={{ color: ACENTO }}
+                    >
+                        Iniciar sesión <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
                     </Link>
                 </div>
             </div>

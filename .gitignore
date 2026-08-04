@@ -13,3 +13,6 @@ dist/
 /frontend/.env
 /frontend/.env.*
 !/frontend/.env.example
+
+# Prototipo del handoff de diseno: solo referencia local, no se sube
+/frontend/public/_proto/

@@ -6,8 +6,8 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useSmoothMount } from '../hooks/useSmoothMount';
 import useSWR from 'swr';
 import {
-    Settings, X, Bot, Send, ChevronRight, Flame, Wheat, Droplet, Leaf,
-    Plus, Target, Trash2, ToggleLeft, ToggleRight, Save, Sparkles, BrainCircuit, Camera, Image as ImageIcon, SortAsc, Filter
+    Settings, X, Bot, Send, ChevronRight,
+    Plus, Trash2, ToggleLeft, ToggleRight, Save
 } from 'lucide-react';
 import api from '../services/api';
 import FoodSearchModal from '../components/food/FoodSearchModal';
@@ -16,6 +16,23 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import LoadingScreen from '../components/common/LoadingScreen';
 
 const fetcher = url => api.get(url).then(res => res.data);
+
+const ACENTO = '#a3e635'; // lima: el color de la sección de comidas
+
+// Un color por macro, igual en la tarjeta de resumen y en cada alimento
+const MACRO_COLORS = { protein: '#3b82f6', carbs: '#facc15', fat: '#f87171', fiber: '#22c55e' };
+
+// Un tono por comida, de más oscuro (primera del día) a más claro
+const TONO_COMIDA = {
+    DESAYUNO: '#65a30d',
+    COMIDA: '#84cc16',
+    MERIENDA: '#a3e635',
+    CENA: '#bef264',
+    SNACK: '#d9f99d'
+};
+const tonoDeComida = (nombre) => TONO_COMIDA[(nombre || '').toUpperCase()] || ACENTO;
+
+const f = (n) => Math.round(Number(n) || 0).toLocaleString('es-ES');
 
 export default function Food() {
     // 🔥 CONECTAMOS CON ZUSTAND Y AMORTIGUADOR
@@ -204,15 +221,21 @@ export default function Food() {
     const currentKcal = log?.totalCalories || 0;
     const limitKcal = goals.calories || 2100;
     const percentage = Math.min((currentKcal / limitKcal) * 100, 100);
-    const radius = 36; // Radio del círculo
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
+    const restanKcal = limitKcal - currentKcal;
+    const sePasa = currentKcal > limitKcal;
+    // Si te pasas de calorías, el acento de la tarjeta entera pasa a rojo
+    const acentoComida = sePasa ? '#ef4444' : ACENTO;
+
+    // Anillo de 112px con trazo de 9 (mismo que el widget del home)
+    const R = 48;
+    const C = 2 * Math.PI * R;
+    const offsetAnillo = C - (percentage / 100) * C;
 
     const macros = [
-        { label: 'PROT', current: log?.totalProtein || 0, total: goals.protein, color: 'text-blue-500', barColor: 'bg-blue-500', icon: <Flame size={12} className="text-blue-500" /> },
-        { label: 'CARBS', current: log?.totalCarbs || 0, total: goals.carbs, color: 'text-yellow-400', barColor: 'bg-yellow-400', icon: <Wheat size={12} className="text-yellow-400" /> },
-        { label: 'GRASA', current: log?.totalFat || 0, total: goals.fat, color: 'text-red-400', barColor: 'bg-red-400', icon: <Droplet size={12} className="text-red-400" /> },
-        { label: 'FIBRA', current: log?.totalFiber || 0, total: goals.fiber, color: 'text-green-500', barColor: 'bg-green-500', icon: <Leaf size={12} className="text-green-500" /> },
+        { label: 'PROT', current: log?.totalProtein || 0, total: goals.protein, color: MACRO_COLORS.protein },
+        { label: 'CARBS', current: log?.totalCarbs || 0, total: goals.carbs, color: MACRO_COLORS.carbs },
+        { label: 'GRASA', current: log?.totalFat || 0, total: goals.fat, color: MACRO_COLORS.fat },
+        { label: 'FIBRA', current: log?.totalFiber || 0, total: goals.fiber, color: MACRO_COLORS.fiber },
     ];
 
     const rawMeals = log?.meals || [];
@@ -233,128 +256,170 @@ export default function Food() {
                 />
             )}
 
-            {/* HEADER */}
-            <div className="flex justify-between items-center px-4 pt-4">
-                <div>
-                    <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">COMIDAS</h1>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">
-                        <Target size={12} /> Objetivo: {limitKcal} kcal
+            {/* CABECERA DE PÁGINA */}
+            <div className="flex items-start justify-between gap-3 px-4 pt-[18px]">
+                <div className="min-w-0">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">
+                        Objetivo {f(limitKcal)} kcal
                     </p>
+                    <h1 className="mt-[9px] text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">
+                        Comidas
+                    </h1>
                 </div>
                 <button
                     onClick={() => setConfigModal({ show: true, mode: 'manual' })}
-                    className="bg-zinc-900 p-2.5 rounded-xl text-zinc-400 hover:text-white border border-zinc-800 shadow-md transition-colors active:scale-95"
+                    aria-label="Ajustar objetivos"
+                    className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 mt-1"
                 >
-                    <Settings size={20} />
+                    <Settings size={21} />
                 </button>
             </div>
 
-            {/* TARJETA PRINCIPAL */}
+            {/* TARJETA DE MACROS */}
             <div className="px-4">
-                <div className="bg-zinc-950 border border-green-500 rounded-[32px] p-6 shadow-[0_0_30px_rgba(34,197,94,0.15)] relative overflow-hidden">
-                    <div className="flex items-center justify-between gap-6">
+                <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-[26px] p-[18px] overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${acentoComida}, transparent)` }} />
+                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: acentoComida }} />
 
-                        {/* IZQUIERDA: CÍRCULO CALORÍAS */}
-                        <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
-                            {/* SVG Círculo */}
-                            <svg className="transform -rotate-90 w-full h-full">
-                                <circle cx="50%" cy="50%" r={radius} stroke="#27272a" strokeWidth="8" fill="transparent" />
+                    <div className="relative z-10 flex items-center gap-[18px]">
+
+                        {/* ANILLO DE CALORÍAS */}
+                        <div className="relative w-28 h-28 shrink-0">
+                            <svg viewBox="0 0 112 112" className="w-full h-full -rotate-90">
+                                <circle cx="56" cy="56" r={R} fill="none" stroke="#1b1b1e" strokeWidth="9" />
                                 <circle
-                                    cx="50%" cy="50%" r={radius}
-                                    stroke="#22c55e"
-                                    strokeWidth="8"
-                                    fill="transparent"
-                                    strokeDasharray={circumference}
-                                    strokeDashoffset={strokeDashoffset}
+                                    cx="56" cy="56" r={R}
+                                    fill="none"
+                                    stroke={acentoComida}
+                                    strokeWidth="9"
                                     strokeLinecap="round"
+                                    strokeDasharray={C}
+                                    strokeDashoffset={offsetAnillo}
                                     className="transition-all duration-1000 ease-out"
                                 />
                             </svg>
-                            {/* Texto Central */}
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-4xl font-black text-white tracking-tighter leading-none">{Math.round(currentKcal)}</span>
-                                <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">DE {limitKcal}</span>
+                                <span className="text-[27px] font-black text-white tracking-[-0.05em] leading-none not-italic">
+                                    {f(currentKcal)}
+                                </span>
+                                <span className="mt-1 text-[10px] font-black tracking-[0.16em] leading-none not-italic" style={{ color: acentoComida }}>
+                                    KCAL
+                                </span>
                             </div>
                         </div>
 
-                        {/* DERECHA: BARRAS MACROS */}
-                        <div className="flex-1 space-y-3">
-                            {macros.map((m, i) => (
-                                <div key={i}>
-                                    <div className="flex justify-between items-center text-[10px] font-bold mb-1">
-                                        <div className="flex items-center gap-1.5 uppercase text-zinc-400">
-                                            {m.icon} <span>{m.label}</span>
+                        {/* BARRAS DE MACROS */}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline justify-between gap-2">
+                                <span className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] leading-none not-italic">
+                                    Macros
+                                </span>
+                                <span className="text-[10px] font-black leading-none not-italic" style={{ color: acentoComida }}>
+                                    {sePasa ? `+${f(Math.abs(restanKcal))}` : `RESTAN ${f(restanKcal)}`}
+                                </span>
+                            </div>
+
+                            <div className="mt-3.5 flex flex-col gap-[9px]">
+                                {macros.map((m) => {
+                                    const pct = m.total > 0 ? Math.min((m.current / m.total) * 100, 100) : 0;
+                                    return (
+                                        <div key={m.label} className="flex items-center gap-2">
+                                            <span className="w-[44px] text-[9px] font-black uppercase tracking-[0.1em] leading-none text-zinc-400 not-italic">
+                                                {m.label}
+                                            </span>
+                                            <div className="flex-1 h-[5px] bg-[#18181b] rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: m.color }} />
+                                            </div>
+                                            <span className="text-[9px] font-black leading-none text-zinc-300 whitespace-nowrap not-italic">
+                                                {f(m.current)}<span style={{ color: m.color }}>/{f(m.total)}</span>
+                                            </span>
                                         </div>
-                                        <span className="text-zinc-500">{Math.round(m.current)}/{m.total}</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full rounded-full ${m.barColor} transition-all duration-500`}
-                                            style={{ width: `${Math.min(((m.current / m.total) * 100), 100)}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            ))}
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* LISTA DE COMIDAS */}
-            <div className="space-y-4 px-4">
+            <div className="space-y-3 px-4">
                 {rawMeals.map((meal) => {
                     const mealKcal = meal.foods.reduce((acc, i) => acc + i.calories, 0);
+                    const tono = tonoDeComida(meal.name);
+                    const vacia = meal.foods.length === 0;
+
                     return (
-                        <div key={meal._id} className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-lg group">
-                            {/* Cabecera de la Comida */}
-                            <div className="bg-zinc-900/50 p-4 flex justify-between items-center border-b border-zinc-800/50">
-                                <div>
-                                    <h3 className="text-white font-black text-base uppercase tracking-tighter">{meal.name}</h3>
-                                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                                        {meal.foods.length} ITEMS • <span className="text-zinc-300">{mealKcal} KCAL</span>
-                                    </p>
+                        <div
+                            key={meal._id}
+                            className={`relative bg-[#0a0a0c] rounded-[24px] overflow-hidden ${vacia ? 'border-2 border-dashed border-white/[0.12]' : 'border border-white/[0.07]'}`}
+                        >
+                            {!vacia && (
+                                <>
+                                    <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${tono}, transparent)` }} />
+                                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: tono }} />
+                                </>
+                            )}
+
+                            {/* Cabecera de la comida */}
+                            <div className="relative z-10 p-[18px] flex justify-between items-center gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="text-[11px] font-black uppercase tracking-[0.16em] leading-none not-italic" style={{ color: vacia ? '#71717a' : '#d4d4d8' }}>
+                                        {meal.name}
+                                    </h3>
+                                    {vacia ? (
+                                        <p className="mt-2 text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] leading-none not-italic">
+                                            Sin alimentos{restanKcal > 0 && ` · Te quedan ${f(restanKcal)} kcal`}
+                                        </p>
+                                    ) : (
+                                        <div className="mt-2 flex items-baseline gap-1.5">
+                                            <span className="text-[20px] font-black text-white tracking-[-0.04em] leading-none not-italic">{f(mealKcal)}</span>
+                                            <span className="text-[9px] font-black uppercase tracking-[0.08em] leading-none not-italic" style={{ color: tono }}>
+                                                Kcal · {meal.foods.length} {meal.foods.length === 1 ? 'item' : 'items'}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                                 <button
                                     onClick={() => handleOpenAdd(meal._id, meal.name)}
-                                    className="bg-zinc-800 text-zinc-400 w-10 h-10 rounded-xl hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-700 flex items-center justify-center"
+                                    aria-label={`Añadir a ${meal.name}`}
+                                    className="w-[38px] h-[38px] rounded-[13px] flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+                                    style={{ background: `${tono}1f`, color: tono }}
                                 >
-                                    <Plus size={20} />
+                                    <Plus size={19} strokeWidth={2.6} />
                                 </button>
                             </div>
 
-                            {/* Lista de Alimentos */}
-                            <div className="p-2">
-                                {meal.foods.length === 0 ? (
-                                    <div className="py-8 text-center m-2">
-                                        <p className="text-[10px] text-zinc-700 font-bold uppercase tracking-widest">SIN ALIMENTOS</p>
-                                    </div>
-                                ) : (
-                                    meal.foods.map((item, idx) => (
-                                        <div key={item._id || idx} className="flex justify-between items-center p-3 hover:bg-white/5 rounded-2xl transition-colors border-b border-zinc-900 last:border-0 last:mb-0 mb-1">
-                                            <div className="flex-1 min-w-0 pr-3">
-                                                <p className="text-sm font-bold text-zinc-200 truncate">{item.name}</p>
-                                                <div className="text-[10px] text-zinc-500 font-bold uppercase flex flex-wrap gap-x-3 gap-y-1 mt-0.5">
-                                                    <span className="text-zinc-400">x{item.quantity}</span>
-                                                    <span className="text-blue-400/80">P: {Math.round(item.protein)}</span>
-                                                    <span className="text-yellow-400/80">C: {Math.round(item.carbs)}</span>
-                                                    <span className="text-red-400/80">G: {Math.round(item.fat)}</span>
+                            {/* Lista de alimentos */}
+                            {!vacia && (
+                                <div className="relative z-10 border-t border-white/[0.05]">
+                                    {meal.foods.map((item, idx) => (
+                                        <div key={item._id || idx} className="flex justify-between items-center gap-3 px-[18px] py-3 border-b border-white/[0.04] last:border-0">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[12px] font-bold text-zinc-200 truncate not-italic">{item.name}</p>
+                                                <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-1 text-[9px] font-black uppercase not-italic">
+                                                    <span className="text-zinc-600">x{item.quantity}</span>
+                                                    <span style={{ color: MACRO_COLORS.protein }}>P {f(item.protein)}</span>
+                                                    <span style={{ color: MACRO_COLORS.carbs }}>C {f(item.carbs)}</span>
+                                                    <span style={{ color: MACRO_COLORS.fat }}>G {f(item.fat)}</span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-sm font-black text-white whitespace-nowrap bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800 flex items-center gap-1">
-                                                    {Math.round(item.calories)} <span className="text-[9px] text-zinc-500 font-bold">KCAL</span>
+                                            <div className="flex items-center gap-2.5 shrink-0">
+                                                <span className="text-[13px] font-black text-white whitespace-nowrap not-italic">
+                                                    {f(item.calories)}<span className="text-[9px] font-black ml-1" style={{ color: tono }}>KCAL</span>
                                                 </span>
                                                 <button
                                                     onClick={() => setConfirmDelete({ mealId: meal._id, foodItemId: item._id, name: item.name })}
-                                                    className="p-2 bg-red-900/10 text-red-500 rounded-lg hover:bg-red-900/30 transition-colors"
+                                                    aria-label={`Quitar ${item.name}`}
+                                                    className="p-2 text-zinc-600 hover:text-red-400 transition-colors"
                                                 >
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
