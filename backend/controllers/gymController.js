@@ -198,6 +198,7 @@ const syncExerciseCatalog = async ({ force = false } = {}) => {
                     muscle: ex.muscle,
                     muscleDetail: ex.muscleDetail || '',
                     secondary: ex.secondary || [],
+                    shares: ex.shares || undefined,
                     equipment: ex.equipment || 'Barra',
                     isCardio: !!ex.isCardio,
                     category: ex.isCardio ? 'cardio' : 'strength',

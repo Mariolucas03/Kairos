@@ -25,8 +25,16 @@ function BodyTab({ ranks }) {
     if (!ranks) return null;
 
     // De mayor a menor nivel, para que se vea arriba lo más entrenado
-    const ordenados = Object.entries(ranks).sort((a, b) => b[1].points - a[1].points);
-    const conActividad = ordenados.filter(([, r]) => r.points > 0);
+    // Los 8 grupos siempre; los músculos concretos solo si tienen actividad
+    // (si no, serían casi 40 filas y la mayoría a cero).
+    const entradas = Object.entries(ranks);
+    const ordenados = entradas
+        .filter(([, r]) => r.isGroup !== false)
+        .sort((a, b) => b[1].points - a[1].points);
+    const detallados = entradas
+        .filter(([, r]) => r.isGroup === false && (r.points || 0) > 0)
+        .sort((a, b) => b[1].points - a[1].points);
+    const conActividad = entradas.filter(([, r]) => r.points > 0);
 
     return (
         <div className="pb-4">
@@ -76,6 +84,22 @@ function BodyTab({ ranks }) {
                     </div>
                 ))}
             </div>
+
+            {/* Detalle por músculo concreto */}
+            {detallados.length > 0 && (
+                <div className="mt-5">
+                    <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Por músculo</h4>
+                    <div className="space-y-1.5">
+                        {detallados.map(([musculo, r]) => (
+                            <div key={musculo} className="bg-zinc-950 border border-white/5 rounded-xl px-3 py-2 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.rankColor }} />
+                                <span className="text-[11px] font-bold text-zinc-300 truncate flex-1">{musculo}</span>
+                                <span className="text-[9px] font-black uppercase shrink-0" style={{ color: r.rankColor }}>{r.rankLabel}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

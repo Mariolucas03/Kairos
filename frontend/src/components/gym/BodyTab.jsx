@@ -27,7 +27,16 @@ export default function BodyTab() {
     );
 
     // De más entrenado a menos, para que arriba salga en lo que más trabajas
-    const grupos = Object.entries(ranks).sort((a, b) => (b[1].points || 0) - (a[1].points || 0));
+    // El backend devuelve los 8 grupos Y cada músculo concreto. En la lista se
+    // enseñan los grupos, y de los músculos solo los que ya tienen actividad:
+    // si no, serían 38 filas y la mayoría a cero.
+    const entradas = Object.entries(ranks);
+    const grupos = entradas
+        .filter(([, r]) => r.isGroup !== false)
+        .sort((a, b) => (b[1].points || 0) - (a[1].points || 0));
+    const musculos = entradas
+        .filter(([, r]) => r.isGroup === false && (r.points || 0) > 0)
+        .sort((a, b) => (b[1].points || 0) - (a[1].points || 0));
 
     if (isLoading) {
         return <div className="py-16 text-center text-zinc-600 text-xs font-bold uppercase animate-pulse">Calculando tus rangos...</div>;
@@ -123,6 +132,27 @@ export default function BodyTab() {
                         </div>
                     ))}
                 </div>
+
+                {/* DETALLE POR MÚSCULO: solo los que ya tienen kilos encima */}
+                {musculos.length > 0 && (
+                    <div className="mt-5">
+                        <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">
+                            Por músculo
+                        </h4>
+                        <div className="space-y-1.5">
+                            {musculos.map(([nombre, info]) => (
+                                <div key={nombre} className="bg-zinc-950 border border-white/5 rounded-xl px-3 py-2 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: info.rankColor }} />
+                                    <span className="text-[11px] font-bold text-zinc-300 truncate flex-1">{nombre}</span>
+                                    <span className="text-[9px] font-bold text-zinc-600 shrink-0">{miles(info.volume)} kg</span>
+                                    <span className="text-[9px] font-black uppercase shrink-0 w-16 text-right" style={{ color: info.rankColor }}>
+                                        {info.rankLabel}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* --- PROGRESO POR EJERCICIO --- */}

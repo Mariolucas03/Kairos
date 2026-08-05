@@ -12,6 +12,11 @@ const exerciseSchema = new mongoose.Schema({
     // Otros GRUPOS que participan en el ejercicio. Se usan para colorear el
     // mapa del cuerpo con menos intensidad que el músculo principal.
     secondary: { type: [String], default: [] },
+    // Reparto del esfuerzo por músculo, en porcentaje: { 'Glúteo mayor': 35, ... }.
+    // Es lo que permite que una sentadilla no sume lo mismo al cuádriceps que al
+    // lumbar. Si está vacío se usa el reparto antiguo (principal 100%, cada
+    // secundario 40%), así que los ejercicios viejos siguen funcionando.
+    shares: { type: Map, of: Number, default: undefined },
     // Los de cardio puntúan por duración, no por kg levantados
     isCardio: { type: Boolean, default: false },
     equipment: { type: String, default: "Barra" },

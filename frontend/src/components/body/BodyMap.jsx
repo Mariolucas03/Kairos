@@ -1,6 +1,36 @@
 import { useId, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
-import { BODY_IMAGE, BODY_IMAGE_SIZE, VIEW_BOX, MUSCLE_SHAPES, GROUPS_BY_VIEW } from './bodyPaths';
+import { BODY_IMAGE, BODY_IMAGE_SIZE, VIEW_BOX, MUSCLE_SHAPES, GROUPS_BY_VIEW, GROUP_OF_MUSCLE, MUSCLES_OF_GROUP } from './bodyPaths';
+
+/**
+ * Expande una lista que puede venir con grupos grandes ('Pierna') o con
+ * músculos concretos ('Isquiotibiales') a la lista de zonas que hay que pintar.
+ * Así el mapa entiende los dos idiomas: los entrenos que ya están guardados
+ * hablan de grupos, y los que vengan con detalle encenderán solo su músculo.
+ */
+const expandirZonas = (lista = []) => {
+    const zonas = new Set();
+    for (const nombre of lista) {
+        if (!nombre) continue;
+        if (GROUP_OF_MUSCLE[nombre]) { zonas.add(nombre); continue; }   // ya es un músculo del mapa
+        (MUSCLES_OF_GROUP[nombre] || []).forEach(m => zonas.add(m));     // es un grupo: se encienden todos
+    }
+    return zonas;
+};
+
+/**
+ * Igual para los niveles: si sólo hay dato del grupo, cada músculo suyo hereda
+ * ese nivel; si hay dato del músculo concreto, ese manda.
+ */
+const expandirNiveles = (levels) => {
+    if (!levels) return null;
+    const salida = {};
+    for (const [nombre, info] of Object.entries(levels)) {
+        if (GROUP_OF_MUSCLE[nombre]) { salida[nombre] = info; continue; }
+        (MUSCLES_OF_GROUP[nombre] || []).forEach(m => { if (!salida[m]) salida[m] = info; });
+    }
+    return salida;
+};
 
 /**
  * MAPA DEL CUERPO
@@ -91,20 +121,22 @@ export default function BodyMap({
 }) {
     const [view, setView] = useState('front');
 
-    const highlightSet = new Set(highlight);
-    const secondarySet = new Set(secondary);
+    // Grupos ('Pierna') y músculos concretos ('Gemelos') se entienden por igual
+    const highlightSet = expandirZonas(highlight);
+    const secondarySet = expandirZonas(secondary);
+    const nivelesPorMusculo = expandirNiveles(levels);
 
     // Color y opacidad de cada zona según el modo en el que se use.
     // Sin nada que destacar el relleno es transparente, así se ve la lámina tal cual.
     const getFill = (group) => {
-        if (highlight.length || secondary.length) {
+        if (highlightSet.size || secondarySet.size) {
             if (highlightSet.has(group)) return { fill: accent, opacity: 0.9 };
             if (secondarySet.has(group)) return { fill: accent, opacity: 0.35 };
             return { fill: '#000000', opacity: 0 };
         }
 
-        if (levels && levels[group]) {
-            const info = levels[group];
+        if (nivelesPorMusculo && nivelesPorMusculo[group]) {
+            const info = nivelesPorMusculo[group];
             if (!info.points) return { fill: '#000000', opacity: 0 };
             // La intensidad crece con el progreso dentro del rango, para que se
             // note el avance aunque no hayas cambiado de nivel todavía
@@ -135,7 +167,9 @@ export default function BodyMap({
 
     // ¿Hay algo destacado en la cara que NO se está viendo?
     const otherView = view === 'front' ? 'back' : 'front';
-    const hayEnLaOtraCara = [...highlightSet].some(g => GROUPS_BY_VIEW[otherView].includes(g) && !GROUPS_BY_VIEW[view].includes(g));
+    // ¿Hay algún músculo destacado que solo se vea por la otra cara?
+    const zonasDeLaVista = (v) => Object.keys(MUSCLE_SHAPES[v] || {});
+    const hayEnLaOtraCara = [...highlightSet].some(m => zonasDeLaVista(otherView).includes(m) && !zonasDeLaVista(view).includes(m));
 
     return (
         <div className={`relative w-full flex flex-col items-center ${className}`}>
