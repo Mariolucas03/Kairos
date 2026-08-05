@@ -22,6 +22,7 @@ const pushRoutes = require('./routes/push');
 const eventRoutes = require('./routes/eventRoutes');
 const cronRoutes = require('./routes/cron');
 const gamesRoutes = require('./routes/games');
+const { syncExerciseCatalog } = require('./controllers/gymController');
 
 connectDB();
 
@@ -97,7 +98,23 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 // Escuchar en 0.0.0.0 es correcto para Render y acceso red local
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ Servidor iniciado en puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Servidor iniciado en puerto ${PORT}`);
+
+    // CATÁLOGO DE EJERCICIOS AL ARRANQUE.
+    // La huella es un hash de todo el catálogo, así que esto solo escribe en la
+    // base de datos cuando algo ha cambiado de verdad (un ejercicio nuevo, un
+    // músculo corregido, los porcentajes...). Antes solo se sincronizaba cuando
+    // el primer usuario abría la lista de ejercicios: ese pagaba la espera.
+    // Va en segundo plano y con su propio catch: si falla, el servidor sigue
+    // en pie y el catálogo se pondrá al día en la primera visita a /exercises.
+    syncExerciseCatalog()
+        .then(r => {
+            if (r.synced) console.log(`🏋️ Catálogo de ejercicios sincronizado (${r.total} ejercicios)`);
+            else console.log('🏋️ Catálogo de ejercicios ya al día');
+        })
+        .catch(err => console.error('⚠️ No se pudo sincronizar el catálogo al arrancar:', err.message));
+});
 
 // Endpoint de salud (Health Check)
 app.get('/ping', (req, res) => {

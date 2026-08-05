@@ -17,6 +17,8 @@ export default function BodyTab() {
     const [ejercicio, setEjercicio] = useState(null);
     const [metrica, setMetrica] = useState('bestWeight');
     const [verEscala, setVerEscala] = useState(false);
+    // Qué grupo está desplegado en la lista (solo uno a la vez, para no marear)
+    const [grupoAbierto, setGrupoAbierto] = useState(null);
 
     const ranks = ranksData?.ranks || {};
     const escala = ranksData?.tiers || null;
@@ -26,17 +28,23 @@ export default function BodyTab() {
         fetcher
     );
 
-    // De más entrenado a menos, para que arriba salga en lo que más trabajas
-    // El backend devuelve los 8 grupos Y cada músculo concreto. En la lista se
-    // enseñan los grupos, y de los músculos solo los que ya tienen actividad:
-    // si no, serían 38 filas y la mayoría a cero.
+    // De más entrenado a menos, para que arriba salga en lo que más trabajas.
+    // El backend devuelve los 8 grupos Y cada músculo concreto: los grupos son
+    // las filas de la lista y cada uno despliega los suyos al pulsarlo.
     const entradas = Object.entries(ranks);
     const grupos = entradas
         .filter(([, r]) => r.isGroup !== false)
         .sort((a, b) => (b[1].points || 0) - (a[1].points || 0));
-    const musculos = entradas
-        .filter(([, r]) => r.isGroup === false && (r.points || 0) > 0)
-        .sort((a, b) => (b[1].points || 0) - (a[1].points || 0));
+
+    // Índice grupo -> sus músculos, ordenados de más a menos trabajado
+    const musculosPorGrupo = {};
+    entradas
+        .filter(([, r]) => r.isGroup === false)
+        .sort((a, b) => (b[1].points || 0) - (a[1].points || 0))
+        .forEach(([nombre, r]) => {
+            const g = r.group || 'Otros';
+            (musculosPorGrupo[g] = musculosPorGrupo[g] || []).push([nombre, r]);
+        });
 
     if (isLoading) {
         return <div className="py-16 text-center text-zinc-600 text-xs font-bold uppercase animate-pulse">Calculando tus rangos...</div>;
@@ -102,57 +110,82 @@ export default function BodyTab() {
                 )}
 
                 <div className="space-y-2">
-                    {grupos.map(([nombre, info]) => (
-                        <div key={nombre} className="bg-zinc-950 border border-white/5 rounded-2xl p-3">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: info.rankColor }} />
-                                    <span className="text-xs font-black text-white uppercase truncate">{nombre}</span>
-                                </div>
-                                <span className="text-[10px] font-black uppercase shrink-0" style={{ color: info.rankColor }}>
-                                    {info.rankLabel}
-                                </span>
-                            </div>
+                    {grupos.map(([nombre, info]) => {
+                        const hijos = musculosPorGrupo[nombre] || [];
+                        const abierto = grupoAbierto === nombre;
 
-                            <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/5">
-                                <div
-                                    className="h-full rounded-full transition-all duration-700"
-                                    style={{ width: `${info.progress}%`, backgroundColor: info.rankColor }}
-                                />
-                            </div>
+                        return (
+                            <div key={nombre} className="bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden">
+                                {/* Cabecera: pulsa para desplegar los músculos del grupo */}
+                                <button
+                                    onClick={() => hijos.length > 0 && setGrupoAbierto(abierto ? null : nombre)}
+                                    disabled={hijos.length === 0}
+                                    aria-expanded={abierto}
+                                    className="w-full text-left p-3 disabled:cursor-default"
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: info.rankColor }} />
+                                            <span className="text-xs font-black text-white uppercase truncate">{nombre}</span>
+                                            {hijos.length > 0 && (
+                                                <ChevronDown
+                                                    size={13}
+                                                    className={`text-zinc-600 shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}
+                                                />
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase shrink-0" style={{ color: info.rankColor }}>
+                                            {info.rankLabel}
+                                        </span>
+                                    </div>
 
-                            <div className="flex items-center justify-between mt-1.5">
-                                <span className="text-[9px] font-bold text-zinc-500">{miles(info.volume)} kg movidos</span>
-                                <span className="text-[9px] font-bold text-zinc-600">
-                                    {info.nextRankLabel
-                                        ? `Faltan ${miles(info.pointsToNext)} para ${info.nextRankLabel}`
-                                        : 'Rango máximo'}
-                                </span>
+                                    <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/5">
+                                        <div
+                                            className="h-full rounded-full transition-all duration-700"
+                                            style={{ width: `${info.progress}%`, backgroundColor: info.rankColor }}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-1.5">
+                                        <span className="text-[9px] font-bold text-zinc-500">{miles(info.volume)} kg movidos</span>
+                                        <span className="text-[9px] font-bold text-zinc-600">
+                                            {info.nextRankLabel
+                                                ? `Faltan ${miles(info.pointsToNext)} para ${info.nextRankLabel}`
+                                                : 'Rango máximo'}
+                                        </span>
+                                    </div>
+                                </button>
+
+                                {/* Los músculos de dentro. Se ven TODOS, también los
+                                    que están a cero: así se nota lo que no entrenas. */}
+                                {abierto && (
+                                    <div className="border-t border-white/5 bg-black/40 px-3 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
+                                        {hijos.map(([musculo, r]) => {
+                                            const sinTrabajo = (r.points || 0) === 0;
+                                            return (
+                                                <div key={musculo} className={sinTrabajo ? 'opacity-45' : ''}>
+                                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                                        <span className="text-[11px] font-bold text-zinc-300 truncate">{musculo}</span>
+                                                        <span className="text-[9px] font-black uppercase shrink-0" style={{ color: sinTrabajo ? '#52525b' : r.rankColor }}>
+                                                            {sinTrabajo ? 'Sin entrenar' : r.rankLabel}
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-1 bg-black rounded-full overflow-hidden border border-white/5">
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-700"
+                                                            style={{ width: `${r.progress || 0}%`, backgroundColor: r.rankColor }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[9px] font-bold text-zinc-600 mt-0.5 block">{miles(r.volume)} kg</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
-
-                {/* DETALLE POR MÚSCULO: solo los que ya tienen kilos encima */}
-                {musculos.length > 0 && (
-                    <div className="mt-5">
-                        <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">
-                            Por músculo
-                        </h4>
-                        <div className="space-y-1.5">
-                            {musculos.map(([nombre, info]) => (
-                                <div key={nombre} className="bg-zinc-950 border border-white/5 rounded-xl px-3 py-2 flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: info.rankColor }} />
-                                    <span className="text-[11px] font-bold text-zinc-300 truncate flex-1">{nombre}</span>
-                                    <span className="text-[9px] font-bold text-zinc-600 shrink-0">{miles(info.volume)} kg</span>
-                                    <span className="text-[9px] font-black uppercase shrink-0 w-16 text-right" style={{ color: info.rankColor }}>
-                                        {info.rankLabel}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* --- PROGRESO POR EJERCICIO --- */}

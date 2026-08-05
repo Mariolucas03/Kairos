@@ -22,18 +22,27 @@ const TABS = [
 
 // --- PESTAÑA CUERPO: mapa + nivel de cada grupo muscular ---
 function BodyTab({ ranks }) {
+    // Qué grupo está desplegado (solo uno a la vez)
+    const [grupoAbierto, setGrupoAbierto] = useState(null);
+
     if (!ranks) return null;
 
     // De mayor a menor nivel, para que se vea arriba lo más entrenado
-    // Los 8 grupos siempre; los músculos concretos solo si tienen actividad
-    // (si no, serían casi 40 filas y la mayoría a cero).
+    // Los 8 grupos son las filas; cada uno despliega sus músculos al pulsarlo.
     const entradas = Object.entries(ranks);
     const ordenados = entradas
         .filter(([, r]) => r.isGroup !== false)
         .sort((a, b) => b[1].points - a[1].points);
-    const detallados = entradas
-        .filter(([, r]) => r.isGroup === false && (r.points || 0) > 0)
-        .sort((a, b) => b[1].points - a[1].points);
+
+    const musculosPorGrupo = {};
+    entradas
+        .filter(([, r]) => r.isGroup === false)
+        .sort((a, b) => (b[1].points || 0) - (a[1].points || 0))
+        .forEach(([nombre, r]) => {
+            const g = r.group || 'Otros';
+            (musculosPorGrupo[g] = musculosPorGrupo[g] || []).push([nombre, r]);
+        });
+
     const conActividad = entradas.filter(([, r]) => r.points > 0);
 
     return (
@@ -51,55 +60,78 @@ function BodyTab({ ranks }) {
             )}
 
             <div className="space-y-2">
-                {ordenados.map(([grupo, r]) => (
-                    <div key={grupo} className="bg-zinc-950 border border-white/5 rounded-2xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.points ? r.rankColor : '#3f3f46' }} />
-                                <span className="text-xs font-black text-white uppercase truncate">{grupo}</span>
-                            </div>
-                            <span
-                                className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0"
-                                style={{ color: r.rankColor, borderColor: `${r.rankColor}55`, backgroundColor: `${r.rankColor}15` }}
+                {ordenados.map(([grupo, r]) => {
+                    const hijos = musculosPorGrupo[grupo] || [];
+                    const abierto = grupoAbierto === grupo;
+
+                    return (
+                        <div key={grupo} className="bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden">
+                            <button
+                                onClick={() => hijos.length > 0 && setGrupoAbierto(abierto ? null : grupo)}
+                                disabled={hijos.length === 0}
+                                aria-expanded={abierto}
+                                className="w-full text-left p-3 disabled:cursor-default"
                             >
-                                {r.rankLabel}
-                            </span>
-                        </div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.points ? r.rankColor : '#3f3f46' }} />
+                                        <span className="text-xs font-black text-white uppercase truncate">{grupo}</span>
+                                        {hijos.length > 0 && (
+                                            <ChevronDown size={13} className={`text-zinc-600 shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`} />
+                                        )}
+                                    </div>
+                                    <span
+                                        className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0"
+                                        style={{ color: r.rankColor, borderColor: `${r.rankColor}55`, backgroundColor: `${r.rankColor}15` }}
+                                    >
+                                        {r.rankLabel}
+                                    </span>
+                                </div>
 
-                        <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/10">
-                            <div
-                                className="h-full rounded-full transition-all duration-700"
-                                style={{ width: `${r.progress}%`, backgroundColor: r.rankColor }}
-                            />
-                        </div>
+                                <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/10">
+                                    <div
+                                        className="h-full rounded-full transition-all duration-700"
+                                        style={{ width: `${r.progress}%`, backgroundColor: r.rankColor }}
+                                    />
+                                </div>
 
-                        <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[9px] text-zinc-600 font-bold">
-                                {r.volume >= 1000 ? `${Math.round(r.volume / 1000)}k` : r.volume} kg·rep · {r.weeks} {r.weeks === 1 ? 'semana' : 'semanas'}
-                            </span>
-                            <span className="text-[9px] text-zinc-600 font-bold">
-                                {r.nextRankLabel ? `${r.progress}% → ${r.nextRankLabel}` : 'Máximo'}
-                            </span>
+                                <div className="flex items-center justify-between mt-1.5">
+                                    <span className="text-[9px] text-zinc-600 font-bold">
+                                        {r.volume >= 1000 ? `${Math.round(r.volume / 1000)}k` : r.volume} kg·rep · {r.weeks} {r.weeks === 1 ? 'semana' : 'semanas'}
+                                    </span>
+                                    <span className="text-[9px] text-zinc-600 font-bold">
+                                        {r.nextRankLabel ? `${r.progress}% → ${r.nextRankLabel}` : 'Máximo'}
+                                    </span>
+                                </div>
+                            </button>
+
+                            {abierto && (
+                                <div className="border-t border-white/5 bg-black/40 px-3 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
+                                    {hijos.map(([musculo, m]) => {
+                                        const sinTrabajo = (m.points || 0) === 0;
+                                        return (
+                                            <div key={musculo} className={sinTrabajo ? 'opacity-45' : ''}>
+                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <span className="text-[11px] font-bold text-zinc-300 truncate">{musculo}</span>
+                                                    <span className="text-[9px] font-black uppercase shrink-0" style={{ color: sinTrabajo ? '#52525b' : m.rankColor }}>
+                                                        {sinTrabajo ? 'Sin entrenar' : m.rankLabel}
+                                                    </span>
+                                                </div>
+                                                <div className="h-1 bg-black rounded-full overflow-hidden border border-white/5">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-700"
+                                                        style={{ width: `${m.progress || 0}%`, backgroundColor: m.rankColor }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
-
-            {/* Detalle por músculo concreto */}
-            {detallados.length > 0 && (
-                <div className="mt-5">
-                    <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Por músculo</h4>
-                    <div className="space-y-1.5">
-                        {detallados.map(([musculo, r]) => (
-                            <div key={musculo} className="bg-zinc-950 border border-white/5 rounded-xl px-3 py-2 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.rankColor }} />
-                                <span className="text-[11px] font-bold text-zinc-300 truncate flex-1">{musculo}</span>
-                                <span className="text-[9px] font-black uppercase shrink-0" style={{ color: r.rankColor }}>{r.rankLabel}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

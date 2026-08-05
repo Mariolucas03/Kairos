@@ -733,6 +733,9 @@ const chatRoutineGenerator = async (req, res) => {
 };
 
 module.exports = {
+    // Se exporta para poder sincronizar el catálogo en el arranque del servidor
+    // (server.js), y no solo cuando el primer usuario abre la lista.
+    syncExerciseCatalog,
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
     getAllExercises, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,
