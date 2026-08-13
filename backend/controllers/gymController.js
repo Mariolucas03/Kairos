@@ -30,13 +30,15 @@ const getRoutines = async (req, res) => {
 
 const createRoutine = async (req, res) => {
     try {
-        const { name, exercises, difficulty, color, defaultRest } = req.body;
+        // `difficulty` se escribía aquí pero NO existe en el esquema de Routine,
+        // así que Mongoose lo descartaba en silencio... y además nadie lo leía
+        // en ninguna pantalla. Se elimina en vez de añadirlo: era campo muerto.
+        const { name, exercises, color, defaultRest } = req.body;
         const routine = await Routine.create({
             user: req.user._id,
             name,
             color: color || 'blue',
             exercises,
-            difficulty: difficulty || 'Guerrero',
             // El descanso lo enviaba el frontend pero aquí se ignoraba
             defaultRest: parseInt(defaultRest) || 60
         });
@@ -48,14 +50,13 @@ const createRoutine = async (req, res) => {
 
 const updateRoutine = async (req, res) => {
     try {
-        const { name, exercises, difficulty, color } = req.body;
+        const { name, exercises, color } = req.body;
         let routine = await Routine.findById(req.params.id);
         if (!routine) return res.status(404).json({ message: 'Rutina no encontrada' });
         if (routine.user.toString() !== req.user.id) return res.status(401).json({ message: 'No autorizado' });
 
         routine.name = name || routine.name;
         routine.exercises = exercises || routine.exercises;
-        if (difficulty) routine.difficulty = difficulty;
         if (color) routine.color = color;
 
         const updatedRoutine = await routine.save();

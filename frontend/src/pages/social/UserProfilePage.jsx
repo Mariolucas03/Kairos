@@ -278,7 +278,7 @@ export default function UserProfilePage() {
     if (profileError) {
         const denied = profileError.response?.status === 403;
         return (
-            <div className="min-h-screen bg-black pt-6 px-4 pb-24">
+            <div className="min-h-screen bg-black safe-top px-4 pb-24">
                 <div className="mb-8"><BackButton /></div>
                 <div className="text-center py-20 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Lock className="mx-auto mb-3 opacity-50" size={32} />
@@ -331,7 +331,10 @@ export default function UserProfilePage() {
     ];
 
     return (
-        <div className="min-h-screen bg-black pb-24 pt-6 px-4 animate-in fade-in select-none">
+        // ⚠️ safe-top y no pt-6: esta pantalla NO lleva la cabecera global, así
+        // que sin la zona segura el contenido se metía debajo del reloj y la
+        // batería del móvil.
+        <div className="min-h-screen bg-black pb-24 safe-top px-4 animate-in fade-in select-none">
             <style>{customAnimationsStyle}</style>
 
             {/* --- BARRA SUPERIOR --- */}

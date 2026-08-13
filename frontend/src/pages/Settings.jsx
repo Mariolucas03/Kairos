@@ -72,7 +72,9 @@ export default function Settings() {
     };
 
     return (
-        <div className="min-h-screen bg-black pb-28 pt-6 px-4 animate-in fade-in select-none">
+        // safe-top: Ajustes tampoco lleva la cabecera global, así que el título
+        // se metía bajo el reloj del móvil.
+        <div className="min-h-screen bg-black pb-28 safe-top px-4 animate-in fade-in select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             <div className="flex items-center gap-3 mb-8">

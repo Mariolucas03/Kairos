@@ -122,15 +122,35 @@ const runNightlyMaintenance = async () => {
     try {
         const frequenciesToPunish = ['daily'];
         if (yesterday.getDay() === 0) frequenciesToPunish.push('weekly');
-
-        const tomorrow = new Date(now);
-        if (tomorrow.getDate() === 1) frequenciesToPunish.push('monthly');
+        // El día 1 castigamos el mes que acaba de cerrarse
+        if (now.getDate() === 1) frequenciesToPunish.push('monthly');
 
         console.log(`⚔️ Evaluando ciclos: ${frequenciesToPunish.join(', ')}`);
 
+        // Inicio de ayer, para no castigar misiones creadas después
+        const inicioDeAyer = new Date(yesterday);
+        inicioDeAyer.setHours(0, 0, 0, 0);
+        const diaDeAyer = yesterday.getDay();
+
         const failedMissions = await Mission.find({
             frequency: { $in: frequenciesToPunish },
-            completed: false
+            completed: false,
+
+            // ⚠️ ESTO FALTABA: se castigaban TODAS las misiones sin completar,
+            // sin mirar si tocaban ayer. Una misión puesta solo para lunes y
+            // miércoles te quitaba vida los siete días de la semana. El reinicio
+            // sí filtraba por `specificDays`; el castigo no.
+            $or: [
+                { specificDays: { $size: 0 } },
+                { specificDays: { $exists: false } },
+                { specificDays: diaDeAyer }
+            ],
+
+            // Una misión creada hoy no puede haberse fallado ayer
+            createdAt: { $lte: inicioDeAyer },
+
+            // Una invitación coop sin aceptar no es tuya todavía
+            invitationStatus: { $ne: 'pending' }
         });
 
         if (failedMissions.length > 0) {
@@ -233,7 +253,8 @@ async function processCycle(frequency) {
 
 // Inicializador del CRON
 const initScheduledJobs = () => {
-    cron.schedule('0 4 * * *', async () => {
+    // 03:00 de Madrid: el castigo por misiones no marcadas del día anterior
+    cron.schedule('0 3 * * *', async () => {
         await runNightlyMaintenance();
     }, { scheduled: true, timezone: "Europe/Madrid" });
 

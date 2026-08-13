@@ -4,6 +4,7 @@ import {
     SortAsc, Filter, ArrowRight, BrainCircuit, Save, Flame, Wheat, Droplet, Leaf, Folder
 } from 'lucide-react';
 import api from '../../services/api';
+import ScanAnimation from './ScanAnimation';
 
 // --- COMPONENTE INTERNO: ÍTEM DESLIZABLE ---
 const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
@@ -78,7 +79,9 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
 
 // --- COMPONENTE PRINCIPAL ---
 export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic, onBackgroundSync, onShowToast }) {
-    const [mode, setMode] = useState('search');
+    // Se entra directamente al escáner: es lo que más se usa y antes había que
+    // buscar la pestaña a mano cada vez.
+    const [mode, setMode] = useState('ai');
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -89,6 +92,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
     const [aiImage, setAiImage] = useState(null);
     const [aiImagePreview, setAiImagePreview] = useState(null);
     const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState(null);
     const fileInputRef = useRef(null);
 
     const [showAiHelper, setShowAiHelper] = useState(false);
@@ -172,6 +176,7 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
         if (!aiImage) return;
 
         setAiLoading(true);
+        setAiError(null);
         try {
             const formData = new FormData();
             formData.append('text', aiInput || "Analizar comida");
@@ -197,8 +202,29 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
             setMode('review');
 
         } catch (error) {
-            console.error(error);
-            onShowToast("Error al procesar la imagen. Intenta de nuevo.", "error");
+            // Se explica QUÉ ha pasado en vez de un "error" genérico: no es lo
+            // mismo que la foto no sea de comida que que la IA esté caída, y
+            // cada caso tiene una salida distinta.
+            const datos = error.response?.data;
+            if (datos?.notFound || datos?.notFood) {
+                setAiError({
+                    titulo: 'Eso no parece comida',
+                    detalle: datos.sees ? `He visto ${datos.sees}.` : '',
+                    consejo: 'Haz la foto al plato, de cerca y con buena luz. O descríbelo por texto en la pestaña Manual.'
+                });
+            } else if (datos?.aiDown) {
+                setAiError({
+                    titulo: 'La IA no responde ahora mismo',
+                    detalle: 'No es culpa de tu foto.',
+                    consejo: 'Ve a Manual y escribe lo que has comido: ahí sí puedo calcularlo.'
+                });
+            } else {
+                setAiError({
+                    titulo: 'No he podido leer la foto',
+                    detalle: datos?.message || 'La imagen puede estar muy oscura o borrosa.',
+                    consejo: 'Prueba otra vez con más luz, o descríbelo por texto.'
+                });
+            }
         } finally {
             setAiLoading(false);
         }
@@ -242,15 +268,39 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
         setAiHelperLoading(true);
         try {
             const res = await api.post('/food/analyze-text', { text: aiDescription });
-            if (res.data.type === 'success') {
-                const d = res.data.data;
-                setManualForm(p => ({ ...p, name: d.name || p.name, calories: d.calories || p.calories, protein: d.protein || p.protein, carbs: d.carbs || p.carbs, fat: d.fat || p.fat, fiber: d.fiber || p.fiber }));
-                setShowAiHelper(false); onShowToast("¡Macros calculados!", "success");
+            const d = res.data.data;
+
+            // ⚠️ Antes esto solo rellenaba el formulario si el tipo era 'success'.
+            // Cuando la IA fallaba el servidor devolvía type:'estimate' CON datos
+            // buenos, y el frontend los tiraba a la basura sin decir nada: pulsabas
+            // el botón y no pasaba absolutamente nada. De ahí la sensación de que
+            // "no funciona y se queda ahí".
+            if (d) {
+                setManualForm(p => ({
+                    ...p,
+                    name: d.name || p.name,
+                    calories: d.calories ?? p.calories,
+                    protein: d.protein ?? p.protein,
+                    carbs: d.carbs ?? p.carbs,
+                    fat: d.fat ?? p.fat,
+                    fiber: d.fiber ?? p.fiber
+                }));
+                setShowAiHelper(false);
+                onShowToast(
+                    res.data.type === 'estimate'
+                        ? 'Estimación aproximada: revísala antes de guardar'
+                        : '¡Macros calculados!',
+                    res.data.type === 'estimate' ? 'info' : 'success'
+                );
+            } else {
+                onShowToast(res.data.message || 'No he podido calcularlo', 'error');
             }
-        } catch (e) { onShowToast("Error IA", "error"); } finally { setAiHelperLoading(false); }
+        } catch (e) {
+            onShowToast(e.response?.data?.message || 'No he podido calcularlo. Rellénalo a mano.', 'error');
+        } finally { setAiHelperLoading(false); }
     };
 
-    const handleImageUpload = (e) => { const f = e.target.files[0]; if (f) { setAiImage(f); setAiImagePreview(URL.createObjectURL(f)); } };
+    const handleImageUpload = (e) => { const f = e.target.files[0]; if (f) { setAiImage(f); setAiImagePreview(URL.createObjectURL(f)); setAiError(null); } };
     const clearImage = () => { setAiImage(null); setAiImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; };
 
     return (
@@ -311,8 +361,31 @@ export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic
                     </div>
                 )}
 
-                {mode === 'ai' && (
+                {/* Mientras analiza NO se enseña el formulario: se enseña la
+                    animación, que es lo que faltaba para no sentirte perdido */}
+                {mode === 'ai' && aiLoading && (
+                    <ScanAnimation preview={aiImagePreview} />
+                )}
+
+                {mode === 'ai' && !aiLoading && (
                     <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
+                        {/* Error explicado: qué ha pasado y qué hacer ahora */}
+                        {aiError && (
+                            <div className="bg-red-950/30 border border-red-900/50 rounded-3xl p-4 animate-in fade-in">
+                                <p className="text-sm font-black text-red-400 uppercase tracking-wide">{aiError.titulo}</p>
+                                {aiError.detalle && <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{aiError.detalle}</p>}
+                                <p className="text-[11px] text-zinc-500 mt-2 leading-snug">{aiError.consejo}</p>
+                                <div className="flex gap-2 mt-3">
+                                    <button onClick={() => { setAiError(null); clearImage(); fileInputRef.current?.click(); }} className="flex-1 bg-zinc-900 border border-zinc-700 text-zinc-200 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide active:scale-95 transition-transform">
+                                        Otra foto
+                                    </button>
+                                    <button onClick={() => { setAiError(null); setMode('manual'); setShowAiHelper(true); }} className="flex-1 bg-purple-600 text-white py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide active:scale-95 transition-transform">
+                                        Escribirlo
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="relative mt-2">
                             <textarea
                                 placeholder={aiImage ? "Añade detalles extra (opcional)..." : "Sube una foto primero para escribir..."}

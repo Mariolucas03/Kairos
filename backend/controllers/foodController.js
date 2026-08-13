@@ -94,15 +94,18 @@ const analyzeFoodText = async (req, res) => {
 
     const SYSTEM_PROMPT = `
     Eres un experto nutricionista y analista de alimentos.
-    Tu tarea es analizar el texto del usuario: "${text}".
+    Analiza lo que ha comido el usuario: "${text}".
 
-    Calcula o estima las calorías y macronutrientes (Proteína, Carbohidratos, Grasa, Fibra).
-    Si el usuario no especifica cantidad, asume una ración estándar lógica.
+    Calcula las calorías y macronutrientes (proteína, carbohidratos, grasa, fibra)
+    del TOTAL de lo descrito. Si menciona cantidades ("200g de pollo", "2 huevos",
+    "un plato de pasta"), respétalas y súmalas todas. Si no dice cantidad, asume
+    una ración estándar de esa comida.
 
     ⚠️ REGLAS CRÍTICAS:
     1. Responde SOLO con un objeto JSON válido. Nada de texto extra.
-    2. Usa números enteros (sin decimales).
-    3. Formato exacto:
+    2. Números enteros, sin decimales ni unidades.
+    3. Las calorías deben cuadrar con los macros: proteína×4 + carbohidratos×4 + grasa×9.
+    4. Formato exacto:
     {
         "calories": 0,
         "protein": 0,
@@ -116,7 +119,16 @@ const analyzeFoodText = async (req, res) => {
     const result = await askAI({
         system: SYSTEM_PROMPT,
         temperature: 0.1,
-        validate: (d) => typeof d.calories === 'number'
+        // Se rechaza lo que no tenga sentido: cero calorías, cifras de delirio,
+        // o macros que no cuadran ni de lejos con las calorías declaradas.
+        // Antes valía cualquier número y por eso salían resultados absurdos.
+        validate: (d) => {
+            if (typeof d.calories !== 'number' || d.calories <= 0 || d.calories > 15000) return false;
+            const porMacros = (Number(d.protein) || 0) * 4 + (Number(d.carbs) || 0) * 4 + (Number(d.fat) || 0) * 9;
+            if (porMacros === 0) return true;   // sin macros, nos fiamos de las kcal
+            const desvio = Math.abs(porMacros - d.calories) / d.calories;
+            return desvio < 0.45;
+        }
     });
 
     if (result.ok) {
@@ -146,12 +158,18 @@ const analyzeImage = async (req, res) => {
         const imageDataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
         const prompt = `
-        Analiza esta imagen de comida o etiqueta nutricional.
-        Contexto del usuario: "${userContext}".
-        Identifica el alimento y calcula sus macros totales aproximados.
+        Mira esta imagen. Contexto del usuario: "${userContext}".
 
-        Responde SOLO con un JSON válido:
-        {
+        PRIMERO decide si en la imagen hay comida, bebida o una etiqueta nutricional.
+
+        - Si NO la hay (una persona, un paisaje, una pantalla, un animal, un objeto...),
+          responde SOLO:
+          { "isFood": false, "sees": "qué se ve exactamente, en 3-6 palabras y en español" }
+
+        - Si SÍ la hay, identifica el alimento y calcula sus macros totales
+          aproximados, y responde SOLO:
+          {
+            "isFood": true,
             "name": "Nombre corto del plato",
             "calories": int,
             "protein": int,
@@ -159,21 +177,37 @@ const analyzeImage = async (req, res) => {
             "fat": int,
             "fiber": int,
             "servingSize": "string"
-        }
+          }
+
+        Nada de texto fuera del JSON.
         `;
 
         const result = await askVisionAI({
             prompt,
             imageDataUrl,
-            validate: (d) => d.name && typeof d.calories === 'number'
+            // Vale tanto un "no es comida" bien formado como un análisis completo
+            validate: (d) => d.isFood === false
+                ? typeof d.sees === 'string'
+                : (d.name && typeof d.calories === 'number')
         });
+
+        if (result.ok && result.data.isFood === false) {
+            // 422: la petición está bien, lo que no vale es la foto. El frontend
+            // lo distingue del "la IA está caída" para poder explicar el porqué.
+            return res.status(422).json({
+                notFood: true,
+                sees: result.data.sees,
+                message: `Eso no parece comida: veo ${result.data.sees}. Prueba con una foto del plato, o descríbelo por texto.`
+            });
+        }
 
         if (result.ok) return res.json(normalizeMacros(result.data));
 
         // Con una foto no hay forma razonable de estimar sin IA, así que aquí sí
         // devolvemos error, pero indicando la alternativa que sí funciona.
         return res.status(503).json({
-            message: 'No he podido leer la foto. Prueba a describir la comida por texto.'
+            aiDown: true,
+            message: 'La IA no responde ahora mismo. Descríbelo por texto y lo calculo igual.'
         });
     } catch (error) {
         console.error('Error en analyzeImage:', error);

@@ -140,10 +140,17 @@ export default function Roulette() {
             const { winNum, totalWin, user: updatedUser } = res.data;
 
             // 2. Calcular animación exacta para que caiga en winNum
+            //
+            // ⚠️ Los números se dibujan en el CENTRO de su casilla
+            // (i * SEGMENT_ANGLE + SEGMENT_ANGLE/2), pero aquí se giraba solo
+            // hasta el BORDE de la casilla. Faltaba medio segmento, así que la
+            // bola caía siempre en la raya entre el número premiado y el de al
+            // lado, y parecía que la ruleta pagaba un número distinto del que
+            // salía.
             const winIndex = WHEEL_NUMBERS.indexOf(winNum);
             const wheelSpins = 5;
             const currentRotationNormalized = wheelRotation % 360;
-            const targetAngle = winIndex * SEGMENT_ANGLE;
+            const targetAngle = winIndex * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2);
             const newWheelRotation = wheelRotation + (360 * wheelSpins) + (targetAngle - currentRotationNormalized);
 
             setWheelRotation(newWheelRotation);

@@ -150,6 +150,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const resumen = useMemo(() => {
         let totalSets = 0, volumen = 0;
         const musculos = new Set();
+        const secundarios = new Set();
 
         exercises.forEach(ex => {
             const hechas = ex.setsData.filter(s => s.completed);
@@ -161,9 +162,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 volumen += kg * reps;
             });
             if (ex.muscle) musculos.add(ex.muscle);
+            // Los secundarios también se marcan, en tono apagado, igual que en el post
+            (ex.secondary || []).forEach(s => secundarios.add(s));
         });
 
-        return { totalSets, volumen: Math.round(volumen), musculos: [...musculos] };
+        // Un músculo principal no debe salir además como secundario
+        musculos.forEach(m => secundarios.delete(m));
+
+        return { totalSets, volumen: Math.round(volumen), musculos: [...musculos], secundarios: [...secundarios] };
     }, [exercises]);
     const [swapIndex, setSwapIndex] = useState(null);
     const [showSelector, setShowSelector] = useState(false);
@@ -577,12 +583,26 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         {resumen.musculos.length > 0 && (
                             <div className="bg-black border border-white/5 rounded-2xl p-3 mb-4">
                                 <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center mb-1">Músculos trabajados</p>
-                                <div className="h-52 flex items-center justify-center">
-                                    <BodyMap highlight={resumen.musculos} showToggle={false} />
+                                {/* ⚠️ Antes se pintaba SOLO el frente y con el botón de girar
+                                    desactivado: si acababas de entrenar espalda, glúteo o
+                                    tríceps, el resumen salía con el cuerpo entero apagado.
+                                    Frente y espalda a la vez, igual que en el post del feed. */}
+                                <div className="h-60 flex items-center justify-center">
+                                    <BodyMap
+                                        highlight={resumen.musculos}
+                                        secondary={resumen.secundarios}
+                                        showToggle={false}
+                                        dual
+                                        labels={false}
+                                        className="h-full"
+                                    />
                                 </div>
                                 <div className="flex flex-wrap gap-1.5 justify-center mt-1">
                                     {resumen.musculos.map(m => (
                                         <span key={m} className="text-[9px] font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 px-2 py-0.5 rounded-lg uppercase">{m}</span>
+                                    ))}
+                                    {resumen.secundarios.map(m => (
+                                        <span key={m} className="text-[9px] font-bold bg-white/5 text-zinc-500 border border-white/10 px-2 py-0.5 rounded-lg uppercase">{m}</span>
                                     ))}
                                 </div>
                             </div>

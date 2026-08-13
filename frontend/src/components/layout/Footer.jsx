@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Users, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home } from 'lucide-react';
+import { Rss, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home } from 'lucide-react';
 import useSocialBadge from '../../hooks/useSocialBadge';
 
 export default function Footer() {
@@ -30,8 +30,11 @@ export default function Footer() {
     const { total: avisos } = useSocialBadge();
     const hasNotifications = avisos > 0;
 
+    // Cada icono del footer es el mismo que usa esa sección en su propia
+    // cabecera. El de IG era `Users`, que se leía como "amigos" cuando en
+    // realidad lleva al feed —y los amigos son solo una pestaña de dentro.
     const navItemsLeft = [
-        { name: 'IG', path: '/social', icon: Users, hasBadge: hasNotifications },
+        { name: 'IG', path: '/social', icon: Rss, hasBadge: hasNotifications },
         { name: 'Comida', path: '/food', icon: Utensils },
     ];
 

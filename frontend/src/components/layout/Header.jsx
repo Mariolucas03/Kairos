@@ -110,37 +110,34 @@ export default function Header() {
                         <HealthWidget user={user} setUser={setUser} />
                     </div>
 
-                    <div className="flex flex-col gap-1.5 w-auto items-end">
-                        {/* Botón Monedas */}
-                        <Link
-                            to="/shop"
-                            state={{ openCategory: 'reward' }}
-                            className="relative flex items-center bg-zinc-900/90 border border-gold-500/30 hover:border-gold-500/80 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden transition-all active:scale-95 group"
-                        >
+                    {/* Monedas y fichas: son CONTADORES, no botones.
+                        - Ya no navegan (tocar tu saldo te metía de golpe en la
+                          tienda o en los juegos sin haberlo pedido).
+                        - Ancho FIJO e idéntico en ambas: antes era `w-auto`, así
+                          que con 790 monedas y 49.690 fichas las dos cajas medían
+                          distinto y quedaban desalineadas una encima de otra. */}
+                    <div className="flex flex-col gap-1.5 items-end">
+                        <div className="relative flex items-center bg-zinc-900/90 border border-gold-500/30 rounded-lg h-6 w-[78px] px-2 shadow-md overflow-hidden">
                             <span className={`relative z-10 text-gold-400 font-black w-full text-right pr-5 ${getFontSize(coins)}`}>
                                 {coins > 99999 ? (coins / 1000).toFixed(0) + 'k' : coins.toLocaleString()}
                             </span>
                             <img
                                 src={ICON_COINS}
-                                alt="C"
-                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100 group-hover:scale-110 transition-all"
+                                alt="Monedas"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain"
                             />
-                        </Link>
+                        </div>
 
-                        {/* Botón Fichas */}
-                        <Link
-                            to="/games"
-                            className="relative flex items-center bg-zinc-900/90 border border-purple-500/30 hover:border-purple-500/80 rounded-lg h-6 min-w-[64px] w-auto px-2 shadow-md overflow-hidden transition-all active:scale-95 group"
-                        >
+                        <div className="relative flex items-center bg-zinc-900/90 border border-purple-500/30 rounded-lg h-6 w-[78px] px-2 shadow-md overflow-hidden">
                             <span className={`relative z-10 text-purple-300 font-black w-full text-right pr-5 ${getFontSize(gameCoins)}`}>
                                 {gameCoins > 99999 ? (gameCoins / 1000).toFixed(0) + 'k' : gameCoins.toLocaleString()}
                             </span>
                             <img
                                 src={ICON_CHIPS}
-                                alt="F"
-                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain opacity-100 group-hover:scale-110 transition-all"
+                                alt="Fichas"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain"
                             />
-                        </Link>
+                        </div>
                     </div>
                 </div>
 

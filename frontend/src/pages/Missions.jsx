@@ -169,7 +169,12 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const cardStyle = {
         transform: `translate3d(${dragX}px, 0, 0)`,
         transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-        touchAction: 'pan-y'
+        touchAction: 'pan-y',
+        // ⚠️ El resplandor iba como una clase de sombra con el color interpolado
+        // dentro. Tailwind lee las clases del código fuente ANTES de ejecutarlo,
+        // así que una interpolación nunca llega a generar CSS: el color de la
+        // dificultad no se ha visto jamás. En estilo en línea sí funciona.
+        boxShadow: `0 0 25px ${styles.shadow}`
     };
 
     let bgAction = 'bg-transparent';
@@ -207,7 +212,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
 
             <div
                 style={cardStyle}
-                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} shadow-[0_0_25px_${styles.shadow}] ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
+                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
@@ -270,7 +275,8 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                         {showInput && !isBinary && (
                             <form onSubmit={handleNumericSubmit} className="mt-3 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
                                 <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-                                <button type="submit" className={`px-3 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient} shadow-lg shadow-${styles.shadow.split(' ')[0]}`}><Check size={18} /></button>
+                                {/* Mismo caso: `shadow-${...}` no existe como clase. Va en línea. */}
+                                <button type="submit" style={{ boxShadow: `0 4px 14px ${styles.shadow}` }} className={`px-3 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient}`}><Check size={18} /></button>
                             </form>
                         )}
                     </div>

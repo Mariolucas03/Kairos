@@ -84,7 +84,6 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                 name: routineName,
                 color: routineColor,
                 exercises: addedExercises,
-                difficulty: 'Guerrero',
                 defaultRest: parseInt(restTime) || 60 // 🔥 ENVIAMOS EL DESCANSO AL BACKEND
             };
 
