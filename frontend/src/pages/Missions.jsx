@@ -55,61 +55,26 @@ const getPotentialDamage = (diff) => {
     return rules[diff] !== undefined ? rules[diff] : 5;
 };
 
+/**
+ * Estilo por dificultad, con el mismo sistema visual que el Home.
+ *
+ * Antes cada tarjeta era un degradado saturado de tres colores con un borde de
+ * 2px encendido y un halo fuerte: cuatro dificultades gritando a la vez y
+ * ninguna destacando sobre las demás. Ahora el color es UN tono por dificultad,
+ * reducido a una línea de acento de 2px arriba, y la jerarquía la marca el
+ * contenido, no el ruido.
+ */
+const DIFFICULTY = {
+    easy: { accent: '#4ade80', label: 'Fácil' },
+    medium: { accent: '#22d3ee', label: 'Media' },
+    hard: { accent: '#fb923c', label: 'Difícil' },
+    epic: { accent: '#a855f7', label: 'Épica' }
+};
+
 const getGradientStyles = (diff, completed) => {
-    const labels = { easy: 'Fácil', medium: 'Media', hard: 'Difícil', epic: 'Épica' };
-    const label = labels[diff] || diff;
-
-    if (completed) return {
-        gradient: 'from-[#18181b] to-[#09090b]',
-        shadow: 'rgba(0,0,0,0)',
-        textGradient: 'from-zinc-600 to-zinc-500',
-        badge: 'text-zinc-700 border-zinc-800 bg-zinc-900',
-        iconColor: 'text-zinc-700',
-        label: 'HECHO'
-    };
-
-    switch (diff) {
-        case 'easy': return {
-            gradient: 'from-[#14532d] via-[#166534] to-[#22c55e]',
-            shadow: 'rgba(22, 101, 52, 0.4)',
-            textGradient: 'from-[#166534] to-[#22c55e]',
-            badge: 'text-green-400 border-green-500/30 bg-green-900/20',
-            iconColor: 'text-green-400',
-            label
-        };
-        case 'medium': return {
-            gradient: 'from-blue-600 via-cyan-500 to-indigo-600',
-            shadow: 'rgba(37, 99, 235, 0.4)',
-            textGradient: 'from-blue-400 to-cyan-400',
-            badge: 'text-blue-300 border-blue-500/30 bg-blue-500/10',
-            iconColor: 'text-blue-400',
-            label
-        };
-        case 'hard': return {
-            gradient: 'from-red-600 via-orange-500 to-rose-600',
-            shadow: 'rgba(220, 38, 38, 0.4)',
-            textGradient: 'from-red-400 to-orange-400',
-            badge: 'text-red-300 border-red-500/30 bg-red-500/10',
-            iconColor: 'text-red-400',
-            label
-        };
-        case 'epic': return {
-            gradient: 'from-purple-600 via-fuchsia-500 to-violet-600',
-            shadow: 'rgba(147, 51, 234, 0.4)',
-            textGradient: 'from-purple-400 to-fuchsia-400',
-            badge: 'text-purple-300 border-purple-500/30 bg-purple-500/10',
-            iconColor: 'text-purple-400',
-            label
-        };
-        default: return {
-            gradient: 'from-zinc-500 to-zinc-700',
-            shadow: 'rgba(113, 113, 122, 0.2)',
-            textGradient: 'from-zinc-400 to-zinc-600',
-            badge: 'text-zinc-400 border-zinc-600',
-            iconColor: 'text-zinc-400',
-            label
-        };
-    }
+    const base = DIFFICULTY[diff] || { accent: '#71717a', label: diff };
+    if (completed) return { accent: '#3f3f46', label: 'Hecho', completed: true };
+    return { ...base, completed: false };
 };
 
 function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId, onEdit, viewAllMode }) {
@@ -169,12 +134,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const cardStyle = {
         transform: `translate3d(${dragX}px, 0, 0)`,
         transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-        touchAction: 'pan-y',
-        // ⚠️ El resplandor iba como una clase de sombra con el color interpolado
-        // dentro. Tailwind lee las clases del código fuente ANTES de ejecutarlo,
-        // así que una interpolación nunca llega a generar CSS: el color de la
-        // dificultad no se ha visto jamás. En estilo en línea sí funciona.
-        boxShadow: `0 0 25px ${styles.shadow}`
+        touchAction: 'pan-y'
     };
 
     let bgAction = 'bg-transparent';
@@ -195,7 +155,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                         return <div key={p._id} className={`h-full ${colorClass} transition-all duration-500`} style={{ width: `${w}%` }} />;
                     })
                 ) : (
-                    <div className={`h-full transition-all duration-500 relative bg-gradient-to-r ${styles.gradient}`} style={{ width: `${progressPercent}%` }} />
+                    <div className="h-full transition-all duration-500 relative" style={{ width: `${progressPercent}%`, backgroundColor: styles.accent }} />
                 )}
             </div>
         );
@@ -212,7 +172,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
 
             <div
                 style={cardStyle}
-                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform p-[2px] bg-gradient-to-br ${styles.gradient} ${isPending ? 'opacity-70 grayscale-[0.5]' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.98] hover:brightness-110' : ''} ${mission.completed ? 'opacity-80 grayscale-[0.3]' : 'opacity-100'}`}
+                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform bg-[#0a0a0c] border border-white/[0.07] ${isPending ? 'opacity-70' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.985]' : ''} ${mission.completed ? 'opacity-60' : 'opacity-100'}`}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
@@ -221,20 +181,28 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                 onMouseUp={handleEnd}
                 onMouseLeave={() => { if (isDragging) handleEnd() }}
             >
-                <div className={`${mission.isCoop ? 'bg-[#2E2E2E]' : 'bg-zinc-950'} rounded-[22px] p-4 relative overflow-hidden h-full flex flex-col justify-between`}>
-                    {!mission.completed && <div className={`absolute -right-12 -top-12 w-40 h-40 rounded-full blur-[30px] pointer-events-none bg-gradient-to-tr ${styles.gradient} opacity-15`}></div>}
+                {/* Línea de acento de 2px arriba: el color de la dificultad se
+                    reduce a esto, igual que las tarjetas del Home */}
+                <div className="absolute inset-x-0 top-0 h-0.5 z-20 pointer-events-none" style={{ background: `linear-gradient(90deg, ${styles.accent}, transparent)` }} />
+
+                <div className="p-4 relative overflow-hidden h-full flex flex-col justify-between">
+                    {/* Halo suave del color, muy tenue */}
+                    {!mission.completed && <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none opacity-[0.11]" style={{ backgroundColor: styles.accent }} />}
                     <div className="relative z-10">
                         <div className="flex justify-between items-start gap-3 mb-1">
                             <div className="flex-1 min-w-0 relative">
                                 <div className="pr-20 mb-1">
                                     <div className="flex items-center gap-2">
-                                        {mission.isCoop && <Users size={16} className={styles.iconColor} />}
+                                        {mission.isCoop && <Users size={16} style={{ color: styles.accent }} />}
                                         {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
                                         <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
                                         <div className="flex items-baseline gap-1">
-                                            <span className={`text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r ${styles.textGradient} filter brightness-110`}>{mission.progress}/{mission.target}</span>
+                                            {/* Número principal en blanco y la unidad con el color
+                                                del widget, la regla del sistema visual */}
+                                            <span className="text-[30px] leading-none font-black tracking-[-0.05em] text-white not-italic">{mission.progress}</span>
+                                            <span className="text-[13px] font-black not-italic" style={{ color: styles.accent }}>/{mission.target}</span>
                                             {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
                                         </div>
                                     </div>
@@ -243,7 +211,10 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
                                         {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
                                     </div>
-                                    <div className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${styles.badge}`}>{styles.label}</div>
+                                    <div
+                                        className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider border"
+                                        style={{ color: styles.accent, borderColor: styles.accent + '55', backgroundColor: styles.accent + '15' }}
+                                    >{styles.label}</div>
                                 </div>
                             </div>
                             <div className="flex flex-col items-center gap-2">
@@ -275,8 +246,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                         {showInput && !isBinary && (
                             <form onSubmit={handleNumericSubmit} className="mt-3 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
                                 <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-                                {/* Mismo caso: `shadow-${...}` no existe como clase. Va en línea. */}
-                                <button type="submit" style={{ boxShadow: `0 4px 14px ${styles.shadow}` }} className={`px-3 rounded-xl font-black text-black bg-gradient-to-r ${styles.gradient}`}><Check size={18} /></button>
+                                <button type="submit" style={{ backgroundColor: styles.accent }} className="px-4 rounded-xl font-black text-black active:scale-95 transition-transform"><Check size={18} /></button>
                             </form>
                         )}
                     </div>
@@ -449,8 +419,10 @@ export default function Missions() {
                 {!viewAllMode && (
                     <>
                         <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
+                            {/* py-2.5: antes eran 27px de alto, por debajo de lo que se
+                                acierta con el pulgar sin fallar */}
                             {['daily', 'weekly', 'monthly', 'yearly'].map(freq => (
-                                <button key={freq} onClick={() => setActiveTab(freq)} className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>{freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANA' : freq === 'monthly' ? 'MES' : 'AÑO'}</button>
+                                <button key={freq} onClick={() => setActiveTab(freq)} className={`py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>{freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANA' : freq === 'monthly' ? 'MES' : 'AÑO'}</button>
                             ))}
                         </div>
                         <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800"><div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} /></div>
