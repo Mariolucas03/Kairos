@@ -50,8 +50,11 @@ const getDeadlineText = (frequency) => {
     return end.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
+// ⚠️ Estos valores tienen que ser EXACTAMENTE los del servidor
+// (backend/utils/scheduler.js → DAMAGE_RULES). Estaban al revés: la tarjeta de
+// una misión épica decía "-0 HP" cuando en realidad te quita 50.
 const getPotentialDamage = (diff) => {
-    const rules = { easy: 10, medium: 5, hard: 2, epic: 0 };
+    const rules = { easy: 5, medium: 10, hard: 20, epic: 50 };
     return rules[diff] !== undefined ? rules[diff] : 5;
 };
 
@@ -85,7 +88,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const startX = useRef(0);
     const THRESHOLD = 80;
 
-    const styles = getGradientStyles(mission.difficulty, mission.completed);
+    const styles = estiloMision(mission.difficulty, mission.completed);
     const isPending = mission.isCoop && mission.invitationStatus === 'pending';
     const amIOwner = mission.user === currentUserId;
     const isBinary = mission.target === 1;
@@ -146,8 +149,9 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const renderProgressBar = () => {
         if (isBinary && !mission.isCoop) return null;
         return (
-            <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex mt-2 border border-zinc-800/50 relative shadow-inner">
+            <div className="h-[6px] w-full bg-[#18181b] rounded-full overflow-hidden flex mt-3">
                 {mission.isCoop ? (
+                    // En los retos sociales cada participante pinta su tramo
                     mission.participants.map((p) => {
                         const contrib = (mission.contributions && mission.contributions[p._id]) || 0;
                         const w = (contrib / mission.target) * 100;
@@ -216,26 +220,75 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                                         style={{ color: styles.accent, borderColor: styles.accent + '55', backgroundColor: styles.accent + '15' }}
                                     >{styles.label}</div>
                                 </div>
+
+                                {/* Días en los que toca: antes no había forma de saberlo
+                                    sin abrir el modo gestión y editar la misión. */}
+                                {mission.frequency === 'daily' && mission.specificDays?.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-2.5">
+                                        {[1, 2, 3, 4, 5, 6, 0].map(d => (
+                                            <span
+                                                key={d}
+                                                className={`w-[15px] h-[15px] rounded-full flex items-center justify-center text-[8px] font-black not-italic ${mission.specificDays.includes(d) ? 'bg-zinc-700 text-white' : 'bg-[#18181b] text-zinc-700'}`}
+                                            >
+                                                {DAY_LABELS[d]}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex flex-col items-center gap-2">
+
+                            {/* Chip de dificultad + botón de incremento */}
+                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                <span
+                                    className="text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-[8px] border not-italic"
+                                    style={{
+                                        color: styles.color,
+                                        background: `${styles.color}1f`,
+                                        borderColor: `${styles.color}4d`
+                                    }}
+                                >
+                                    {styles.label}
+                                </span>
                                 {!isBinary && !mission.completed && !isPending && !viewAllMode && (
-                                    <button onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }} className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 active:scale-95 ml-auto"><Plus size={16} /></button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }}
+                                        aria-label="Añadir progreso"
+                                        className="w-8 h-8 rounded-[11px] flex items-center justify-center active:scale-90 transition-transform"
+                                        style={{ background: `${styles.color}1f`, color: styles.color }}
+                                    >
+                                        <Plus size={16} strokeWidth={2.6} />
+                                    </button>
                                 )}
                             </div>
                         </div>
 
                         {renderProgressBar()}
 
-                        <div className={`flex gap-4 mt-3 pt-2 border-t relative z-10 border-zinc-800/30 items-center`}>
-                            <div className="flex items-center gap-4">
+                        {/* Leyenda de los retos sociales */}
+                        {mission.isCoop && mission.participants?.length > 1 && (
+                            <div className="flex items-center gap-3 mt-2">
+                                {mission.participants.map(p => (
+                                    <div key={p._id} className="flex items-center gap-1.5">
+                                        <span className={`w-[7px] h-[7px] rounded-full ${getUserColor(p._id)}`} />
+                                        <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] truncate max-w-[80px] not-italic">
+                                            {p.username}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Pie: recompensas y castigo */}
+                        <div className="flex gap-4 mt-3 pt-3 border-t border-white/[0.05] relative z-10 items-center">
+                            <div className="flex items-center gap-3">
                                 {mission.xpReward > 0 && (
-                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-blue-200'}`}>+{mission.xpReward}</span><img src={ICON_XP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" /></div>
+                                    <div className="flex items-center gap-1"><span className={`text-[12px] font-black not-italic ${mission.completed ? 'text-zinc-600' : 'text-zinc-300'}`}>+{mission.xpReward}</span><img src={ICON_XP} className={`w-5 h-5 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" /></div>
                                 )}
                                 {(mission.coinReward > 0) && (
-                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-yellow-200'}`}>+{mission.coinReward}</span><img src={ICON_COIN} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Coins" /></div>
+                                    <div className="flex items-center gap-1"><span className={`text-[12px] font-black not-italic ${mission.completed ? 'text-zinc-600' : 'text-zinc-300'}`}>+{mission.coinReward}</span><img src={ICON_COIN} className={`w-5 h-5 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Monedas" /></div>
                                 )}
                                 {(mission.gameCoinReward > 0) && (
-                                    <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span><img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" /></div>
+                                    <div className="flex items-center gap-1"><span className={`text-[12px] font-black not-italic ${mission.completed ? 'text-zinc-600' : 'text-zinc-300'}`}>+{mission.gameCoinReward}</span><img src={ICON_CHIP} className={`w-5 h-5 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Fichas" /></div>
                                 )}
                             </div>
                             {/* Las épicas no quitan vida (daño 0). Pintarlo igual
@@ -321,6 +374,10 @@ export default function Missions() {
     const completedCount = filteredMissions.filter(m => m.completed).length;
     const totalCount = filteredMissions.length;
     const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+    // Vida que perderías esta noche si dejas así las misiones pendientes
+    const pendingDamage = filteredMissions
+        .filter(m => !m.completed && !(m.isCoop && m.invitationStatus === 'pending'))
+        .reduce((acc, m) => acc + getPotentialDamage(m.difficulty), 0);
 
     const handleOpenCreator = () => { setNewMission({ ...DEFAULTS, frequency: activeTab === 'all' ? 'daily' : activeTab }); setSelectedDays([]); setShowCreator(true); };
     const handleCloseCreator = () => setShowCreator(false);
@@ -412,16 +469,31 @@ export default function Missions() {
                 />
             )}
 
-            <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md border-b border-zinc-800 pt-6 pb-2 px-4 shadow-xl">
-                <div className="flex justify-between items-center mb-3">
-                    <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
-                        Misiones <span className="text-yellow-500 capitalize">{viewAllMode ? 'GESTIÓN' : (activeTab === 'all' ? 'Todas' : activeTab === 'daily' ? 'DIARIAS' : activeTab === 'weekly' ? 'SEMANALES' : activeTab === 'monthly' ? 'MENSUALES' : 'ANUALES')}</span>
-                    </h1>
-                    <div className="flex gap-2">
-                        <button onClick={() => setViewAllMode(!viewAllMode)} className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform border ${viewAllMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'}`}>{viewAllMode ? <Eye size={20} strokeWidth={3} /> : <EyeOff size={20} strokeWidth={3} />}</button>
-                        <button onClick={handleOpenCreator} className="bg-yellow-500 text-black p-2 rounded-xl shadow-lg active:scale-95 transition-transform"><Plus size={20} strokeWidth={3} /></button>
+            <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md pt-[18px] pb-3 px-4">
+                {/* CABECERA DE PÁGINA */}
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">
+                            {viewAllMode ? 'Modo gestión' : `Hasta ${getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}`}
+                        </p>
+                        <h1 className="mt-[9px] text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">
+                            Misiones
+                        </h1>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 mt-1">
+                        <button
+                            onClick={() => setViewAllMode(!viewAllMode)}
+                            aria-label={viewAllMode ? 'Salir del modo gestión' : 'Modo gestión'}
+                            className={`transition-colors ${viewAllMode ? 'text-blue-400' : 'text-zinc-500 hover:text-zinc-200'}`}
+                        >
+                            {viewAllMode ? <Eye size={21} /> : <EyeOff size={21} />}
+                        </button>
+                        <button onClick={handleOpenCreator} aria-label="Nueva misión" className="transition-transform active:scale-90" style={{ color: ACENTO }}>
+                            <Plus size={22} strokeWidth={3} />
+                        </button>
                     </div>
                 </div>
+
                 {!viewAllMode && (
                     <>
                         <div className="grid grid-cols-4 gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
@@ -431,19 +503,34 @@ export default function Missions() {
                                 <button key={freq} onClick={() => setActiveTab(freq)} className={`py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === freq ? 'bg-white text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>{freq === 'daily' ? 'DIARIA' : freq === 'weekly' ? 'SEMANA' : freq === 'monthly' ? 'MES' : 'AÑO'}</button>
                             ))}
                         </div>
-                        <div className="mt-2 h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800"><div className="h-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-500" style={{ width: `${completionRate}%` }} /></div>
                     </>
                 )}
-                {viewAllMode && <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded-xl text-center mb-2"><p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Modo Gestión: Toca una misión para editarla</p></div>}
+
+                {viewAllMode && (
+                    <div className="bg-blue-950/20 border border-blue-500/30 p-3 rounded-[18px] text-center mt-[18px]">
+                        <p className="text-[10px] text-blue-300 font-black uppercase tracking-[0.1em] not-italic">Toca una misión para editarla</p>
+                    </div>
+                )}
             </div>
 
-            <div className="px-4 mt-4 space-y-4">
+            <div className="px-4 mt-3 space-y-3">
                 {filteredMissions.length === 0 ? (
-                    <div className="py-20 text-center opacity-60"><div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-zinc-800"><Target className="text-zinc-600" size={32} /></div><p className="text-zinc-500 font-bold text-sm uppercase tracking-wide">Sin misiones activas</p></div>
+                    <div className="py-20 text-center">
+                        <div className="w-16 h-16 bg-[#0a0a0c] border border-white/[0.07] rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Target className="text-zinc-700" size={30} />
+                        </div>
+                        <p className="text-zinc-500 font-black text-[11px] uppercase tracking-[0.1em] not-italic">Sin misiones activas</p>
+                    </div>
                 ) : (
                     <>
                         {filteredMissions.map(m => <MissionCard key={m._id} mission={m} onUpdateProgress={handleUpdateProgress} onRequestDelete={setMissionToDelete} currentUserId={user._id} onEdit={openEditModal} viewAllMode={viewAllMode} />)}
-                        {!viewAllMode && <div className="text-center mt-8 mb-4"><span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800 flex items-center justify-center gap-2 mx-auto w-fit"><Clock size={12} /> HASTA: <span className="text-zinc-300">{getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}</span></span></div>}
+                        {!viewAllMode && (
+                            <div className="text-center mt-6 mb-4">
+                                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] flex items-center justify-center gap-1.5 not-italic">
+                                    <Clock size={11} /> Hasta {getDeadlineText(activeTab === 'all' ? 'daily' : activeTab)}
+                                </span>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

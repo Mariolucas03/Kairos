@@ -4,12 +4,13 @@ import { useState, useRef } from 'react';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
 import {
-    Plus, Play, Trash2, Dumbbell, Activity, Timer, Edit, PersonStanding, Lock
+    Plus, Play, Trash2, Dumbbell, Activity, Edit, PersonStanding, Lock
 } from 'lucide-react';
 
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import LoadingScreen from '../components/common/LoadingScreen';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
 import BodyTab from '../components/gym/BodyTab';
 import SportsTab from '../components/gym/SportsTab';
@@ -22,6 +23,8 @@ import useSWR from 'swr';
 // Fetcher global para SWR
 const fetcher = (url) => api.get(url).then(res => res.data);
 
+const ACENTO = '#eab308'; // oro: el color de la sección de entreno
+
 // Las tres pestañas de la sección
 const PESTANAS = [
     { id: 'gym', label: 'Gym', icon: Dumbbell },
@@ -29,17 +32,23 @@ const PESTANAS = [
     { id: 'otros', label: 'Otros', icon: Activity }
 ];
 
-const COLOR_THEMES = {
-    blue: { border: 'border-blue-500', shadow: 'rgba(59,130,246,0.4)', bgIcon: 'bg-blue-600', textIcon: 'text-white', play: 'bg-blue-500 text-white' },
-    red: { border: 'border-red-500', shadow: 'rgba(239,68,68,0.4)', bgIcon: 'bg-red-600', textIcon: 'text-white', play: 'bg-red-500 text-white' },
-    green: { border: 'border-green-500', shadow: 'rgba(34,197,94,0.4)', bgIcon: 'bg-green-600', textIcon: 'text-white', play: 'bg-green-500 text-white' },
-    yellow: { border: 'border-yellow-500', shadow: 'rgba(234,179,8,0.4)', bgIcon: 'bg-yellow-500', textIcon: 'text-black', play: 'bg-yellow-500 text-black' },
-    purple: { border: 'border-purple-500', shadow: 'rgba(168,85,247,0.4)', bgIcon: 'bg-purple-600', textIcon: 'text-white', play: 'bg-purple-500 text-white' },
-    orange: { border: 'border-orange-500', shadow: 'rgba(249,115,22,0.4)', bgIcon: 'bg-orange-600', textIcon: 'text-white', play: 'bg-orange-500 text-white' },
-    pink: { border: 'border-pink-500', shadow: 'rgba(236,72,153,0.4)', bgIcon: 'bg-pink-600', textIcon: 'text-white', play: 'bg-pink-500 text-white' },
+// Un tono por rutina. Se respeta el color que el usuario eligió al crearla y,
+// si no tiene ninguno, se reparte por orden para que la lista tenga ritmo.
+const TONOS_RUTINA = {
+    yellow: '#eab308',
+    blue: '#3b82f6',
+    green: '#4ade80',
+    purple: '#a855f7',
+    orange: '#f97316',
+    red: '#f87171',
+    pink: '#FE90AF'
 };
+const ORDEN_TONOS = ['#eab308', '#3b82f6', '#4ade80', '#a855f7', '#f97316', '#22d3ee', '#FE90AF'];
 
-const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) => {
+const tonoDeRutina = (routine, index) =>
+    TONOS_RUTINA[routine.color] || ORDEN_TONOS[index % ORDEN_TONOS.length];
+
+const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLocked }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
@@ -63,18 +72,18 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
         setOffsetX(0);
     };
 
-    const colorKey = routine.color || 'blue';
-    const theme = COLOR_THEMES[colorKey] || COLOR_THEMES.blue;
+    const acento = tonoDeRutina(routine, index);
     const initial = routine.name.charAt(0).toUpperCase();
 
     return (
-        <div className="relative w-full mb-4 select-none touch-pan-y overflow-hidden rounded-3xl">
-            <div className="absolute inset-0 flex justify-between items-center px-6 bg-zinc-900 border border-zinc-800">
-                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-blue-400'} font-bold uppercase text-xs transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
-                    {isLocked ? <><Lock size={20} /> Bloqueado</> : <><Edit size={20} /> Editar</>}
+        <div className="relative w-full mb-3 select-none touch-pan-y overflow-hidden rounded-[24px]">
+            {/* Acciones que asoman al deslizar */}
+            <div className="absolute inset-0 flex justify-between items-center px-6 bg-[#0a0a0c] border border-white/[0.07] rounded-[24px]">
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-600' : 'text-blue-400'} font-black uppercase text-[10px] tracking-[0.1em] transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
+                    {isLocked ? <><Lock size={18} /> Bloqueado</> : <><Edit size={18} /> Editar</>}
                 </div>
-                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-red-500'} font-bold uppercase text-xs transition-opacity ${offsetX < -50 ? 'opacity-100' : 'opacity-30'}`}>
-                    {isLocked ? <>Bloqueado <Lock size={20} /></> : <>Borrar <Trash2 size={20} /></>}
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-600' : 'text-red-400'} font-black uppercase text-[10px] tracking-[0.1em] transition-opacity ${offsetX < -50 ? 'opacity-100' : 'opacity-30'}`}>
+                    {isLocked ? <>Bloqueado <Lock size={18} /></> : <>Borrar <Trash2 size={18} /></>}
                 </div>
             </div>
 
@@ -85,32 +94,43 @@ const SwipeableRoutineCard = ({ routine, onPlay, onDelete, onEdit, isLocked }) =
                 style={{
                     transform: `translateX(${offsetX}px)`,
                     transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                    boxShadow: `0 0 20px -5px ${theme.shadow}`
+                    // La rutina en curso se distingue por el borde, no por un glow
+                    borderColor: isLocked ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.07)'
                 }}
-                className={`relative bg-zinc-950 border ${theme.border} rounded-3xl p-5 flex justify-between items-center z-10 h-24 will-change-transform`}
+                className="relative bg-[#0a0a0c] border rounded-[24px] p-[18px] flex justify-between items-center z-10 will-change-transform overflow-hidden"
             >
-                <div className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${theme.bgIcon} pointer-events-none`}></div>
+                {/* Línea de acento arriba */}
+                <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${acento}, transparent)` }} />
+                {/* Halo difuso */}
+                <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: acento }} />
 
-                <div className="flex items-center gap-5 pointer-events-none relative z-10">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${theme.bgIcon} ${theme.textIcon} font-black text-2xl shadow-lg`}>
+                <div className="flex items-center gap-4 pointer-events-none relative z-10 min-w-0">
+                    <div
+                        className="w-12 h-12 rounded-[16px] flex items-center justify-center font-black text-xl shrink-0 not-italic"
+                        style={{ background: `${acento}24`, color: acento }}
+                    >
                         {initial}
                     </div>
-                    <div>
-                        <h4 className="font-black text-white text-lg italic uppercase tracking-tighter leading-none mb-1">{routine.name}</h4>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{routine.exercises.length} Ejercicios</p>
+                    <div className="min-w-0">
+                        <h4 className="font-black text-white text-[17px] uppercase tracking-[-0.03em] leading-none truncate not-italic">{routine.name}</h4>
+                        <p className="mt-2 text-[9px] font-black uppercase tracking-[0.08em] not-italic" style={{ color: isLocked ? acento : '#71717a' }}>
+                            {routine.exercises.length} Ejercicios{isLocked && ' · En curso'}
+                        </p>
                     </div>
                 </div>
 
                 {isLocked ? (
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-zinc-800 text-zinc-500 border border-zinc-700 z-20">
-                        <Activity size={20} className="animate-pulse" />
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center bg-[#18181b] text-zinc-500 border border-white/[0.06] z-20 shrink-0">
+                        <Activity size={19} className="animate-pulse" />
                     </div>
                 ) : (
                     <button
                         onClick={(e) => { e.stopPropagation(); onPlay(); }}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all z-20 hover:brightness-110 ${theme.play}`}
+                        aria-label={`Empezar ${routine.name}`}
+                        className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform z-20 shrink-0"
+                        style={{ background: acento, color: '#000' }}
                     >
-                        <Play size={20} fill="currentColor" className="ml-1" />
+                        <Play size={19} fill="currentColor" className="ml-0.5" />
                     </button>
                 )}
             </div>
@@ -143,6 +163,8 @@ export default function Gym() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
     const [tab, setTab] = useState('gym');
+    // Confirmación de borrado con el modal de la app (antes era un window.confirm nativo)
+    const [routineToDelete, setRoutineToDelete] = useState(null);
 
     const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
@@ -160,10 +182,12 @@ export default function Gym() {
         openCreateRoutine(r);
     };
 
-    const handleDeleteRoutine = async (id) => {
-        if (activeRoutine && activeRoutine._id === id) return showToast("⚠️ En curso: No se puede borrar.", "error");
-        if (!window.confirm("¿Borrar rutina?")) return;
+    const pedirBorrado = (routine) => {
+        if (activeRoutine && activeRoutine._id === routine._id) return showToast("⚠️ En curso: No se puede borrar.", "error");
+        setRoutineToDelete(routine);
+    };
 
+    const handleDeleteRoutine = async (id) => {
         // Optimistic UI para borrado de rutina
         mutateRoutines(routines.filter(r => r._id !== id), false);
 
@@ -182,61 +206,78 @@ export default function Gym() {
     if (!isSmoothMounted || isFirstLoad) return <LoadingScreen message="Preparando zona de entreno..." />;
 
     return (
-        <div className="animate-in fade-in pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen">
+        <div className="animate-in fade-in pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* CABECERA */}
-            <div className="px-1 pt-2 mb-4">
-                <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">Zona de Entreno</h1>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Supera tus límites</p>
+            {routineToDelete && (
+                <ConfirmDialog
+                    message={`¿Borrar la rutina "${routineToDelete.name}"? No se puede deshacer.`}
+                    confirmLabel="Borrar"
+                    onCancel={() => setRoutineToDelete(null)}
+                    onConfirm={() => { handleDeleteRoutine(routineToDelete._id); setRoutineToDelete(null); }}
+                />
+            )}
+
+            {/* CABECERA DE PÁGINA */}
+            <div className="pt-[18px]">
+                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">
+                    Supera tus límites
+                </p>
+                <h1 className="mt-[9px] text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">
+                    Zona de entreno
+                </h1>
             </div>
 
             {/* PESTAÑAS: Gym · Cuerpo · Otros */}
-            <div className="flex bg-zinc-950 border border-white/5 p-1 rounded-2xl mb-6 sticky top-0 z-30">
-                {PESTANAS.map(({ id, label, icon: Icon }) => (
-                    <button
-                        key={id}
-                        onClick={() => setTab(id)}
-                        className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-wide transition-all ${
-                            tab === id ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/10' : 'text-zinc-500 hover:text-zinc-300'
-                        }`}
-                    >
-                        <Icon size={14} strokeWidth={tab === id ? 2.6 : 2} /> {label}
-                    </button>
-                ))}
+            <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-[18px] p-1 sticky top-0 z-30">
+                {PESTANAS.map(({ id, label, icon: Icon }) => {
+                    const activa = tab === id;
+                    return (
+                        <button
+                            key={id}
+                            onClick={() => setTab(id)}
+                            className={`flex-1 py-2.5 rounded-[14px] flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-[0.1em] transition-colors not-italic ${activa ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}
+                            style={activa ? { background: ACENTO } : undefined}
+                        >
+                            <Icon size={14} strokeWidth={activa ? 2.6 : 2} /> {label}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* --- GYM: TUS RUTINAS --- */}
             {tab === 'gym' && (
-                <div className="animate-in fade-in duration-200">
+                <div className="animate-in fade-in duration-200 mt-[18px]">
                     <button
                         onClick={() => openCreateRoutine(null)}
-                        className="w-full bg-yellow-500 text-black rounded-2xl py-4 flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs active:scale-[0.98] transition-transform border-b-4 border-yellow-600 mb-5"
+                        className="w-full rounded-[20px] py-4 flex items-center justify-center gap-2 font-black uppercase tracking-[0.14em] text-[11px] active:scale-[0.985] transition-transform mb-5 not-italic"
+                        style={{ background: ACENTO, color: '#000' }}
                     >
                         <Plus size={18} strokeWidth={3} /> Nueva rutina
                     </button>
 
-                    <div className="flex items-center justify-between mb-3 px-1">
-                        <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest">Mis rutinas</h3>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-zinc-300 not-italic">Mis rutinas</h3>
                         {routines.length > 0 && (
-                            <span className="text-[9px] font-bold text-zinc-600 uppercase">Desliza para editar o borrar</span>
+                            <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">Desliza para editar o borrar</span>
                         )}
                     </div>
 
                     <div className="pb-24">
                         {routines.length === 0 ? (
-                            <div onClick={() => openCreateRoutine(null)} className="text-center py-14 border-2 border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20 cursor-pointer hover:border-yellow-500/30 transition-colors group">
+                            <div onClick={() => openCreateRoutine(null)} className="text-center py-14 border-2 border-dashed border-white/[0.12] rounded-[24px] cursor-pointer hover:border-yellow-500/30 transition-colors group">
                                 <Dumbbell className="mx-auto text-zinc-700 mb-3 group-hover:text-yellow-500 transition-colors" size={32} />
-                                <p className="text-zinc-500 text-xs font-black uppercase">Todavía no tienes rutinas</p>
-                                <p className="text-zinc-600 text-[10px] mt-1">Toca aquí para crear la primera</p>
+                                <p className="text-zinc-500 text-[11px] font-black uppercase tracking-[0.1em] not-italic">Todavía no tienes rutinas</p>
+                                <p className="text-zinc-600 text-[9px] font-black uppercase tracking-[0.08em] mt-2 not-italic">Toca aquí para crear la primera</p>
                             </div>
                         ) : (
-                            routines.map((routine) => (
+                            routines.map((routine, index) => (
                                 <SwipeableRoutineCard
                                     key={routine._id}
                                     routine={routine}
+                                    index={index}
                                     onPlay={() => openActiveWorkout(routine)}
-                                    onDelete={() => handleDeleteRoutine(routine._id)}
+                                    onDelete={() => pedirBorrado(routine)}
                                     onEdit={() => handleEditRoutine(routine)}
                                     isLocked={activeRoutine && activeRoutine._id === routine._id}
                                 />
@@ -248,14 +289,14 @@ export default function Gym() {
 
             {/* --- CUERPO: RANGOS Y PROGRESO --- */}
             {tab === 'body' && (
-                <div className="animate-in fade-in duration-200">
+                <div className="animate-in fade-in duration-200 mt-[18px]">
                     <BodyTab />
                 </div>
             )}
 
             {/* --- OTROS: CUALQUIER DEPORTE --- */}
             {tab === 'otros' && (
-                <div className="animate-in fade-in duration-200">
+                <div className="animate-in fade-in duration-200 mt-[18px]">
                     <SportsTab
                         hoy={todaySports}
                         showToast={showToast}

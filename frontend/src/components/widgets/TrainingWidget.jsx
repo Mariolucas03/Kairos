@@ -2,17 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Activity, Clock, Flame, Dumbbell } from 'lucide-react';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
-import { WeeklyHistoryModal } from './WeeklyWidget';
 
 /**
  * RUTINA GYM + VOLUMEN SEMANAL fusionados.
  *  - Tocar la tarjeta abre el detalle del entreno de hoy (igual que antes).
- *  - Tocar el bloque de volumen (derecha) abre el histórico de volumen,
- *    que antes vivía en el widget "Progreso Semanal".
+ *  - El bloque de volumen (derecha) es solo informativo: el histórico completo
+ *    vive ahora en Gym > Cuerpo, así que aquí no abre nada.
  */
 export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weeklyPercentage = 0 }) {
     const [isOpen, setIsOpen] = useState(false);
-    const [showWeekly, setShowWeekly] = useState(false);
     const [activeTabIndex, setActiveTabIndex] = useState(0);
     const accent = WIDGET_ACCENTS.training;
 
@@ -64,10 +62,10 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
                         )}
                     </div>
 
-                    {/* VOLUMEN SEMANAL (fusionado) */}
+                    {/* VOLUMEN SEMANAL (solo lectura: el histórico vive en Gym > Cuerpo) */}
                     <div
-                        onClick={(e) => { e.stopPropagation(); setShowWeekly(true); }}
-                        className="text-right shrink-0 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-right shrink-0"
                     >
                         <div className="text-lg font-black text-white tracking-[-0.03em] leading-none not-italic">
                             {f(weeklyVolume)}<span className="text-[11px] not-italic" style={{ color: accent }}> KG</span>
@@ -78,8 +76,6 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
                     </div>
                 </div>
             </WidgetCard>
-
-            {showWeekly && <WeeklyHistoryModal onClose={() => setShowWeekly(false)} />}
 
             {isOpen && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>

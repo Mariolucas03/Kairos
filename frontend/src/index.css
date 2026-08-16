@@ -37,6 +37,13 @@ body {
     padding-top: max(50px, var(--sat)) !important;
 }
 
+/* PÁGINAS SIN HEADER GLOBAL (ajustes, perfil propio y de otros):
+   como no tienen la barra fija encima, su contenido empezaba pegado a la hora
+   y la batería. Este padding las baja igual que baja el header. */
+.pt-safe-page {
+    padding-top: max(58px, calc(var(--sat) + 12px)) !important;
+}
+
 /* FOOTER: Forzamos 15px (muy poco). Esto PEGA los iconos abajo, eliminando el hueco negro grande. */
 .safe-bottom {
     padding-bottom: 0px !important;

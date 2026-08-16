@@ -49,12 +49,6 @@ export default function ScratchGame() {
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
-    // SALDO
-    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
-    const [visualBalance, setVisualBalance] = useState(currentFichas);
-
-    useEffect(() => { setVisualBalance(currentFichas); }, [currentFichas]);
-
     // Ocultar UI global
     useEffect(() => {
         setIsUiHidden(true);
@@ -71,27 +65,21 @@ export default function ScratchGame() {
     const [showInfo, setShowInfo] = useState(false);
     const [showRain, setShowRain] = useState(false);
     const [isRainFading, setIsRainFading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState(null);
 
     const COST = 10;
 
-    // --- ACTUALIZACIÓN DE SALDO ---
-    const updateBalanceInstant = (amountToAdd) => {
-        setVisualBalance(prev => Math.max(0, prev + amountToAdd));
-        setUser(prevUser => {
-            const current = prevUser.stats?.gameCoins ?? prevUser.gameCoins ?? 0;
-            const newBalance = Math.max(0, current + amountToAdd);
-            const updatedUser = { ...prevUser, gameCoins: newBalance, stats: { ...prevUser.stats, gameCoins: newBalance } };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            return updatedUser;
-        });
-    };
+    // SALDO DERIVADO: mientras rascas se descuenta el cartón y, al terminar,
+    // manda el saldo real que devolvió el servidor. Antes era un estado aparte
+    // que había que ir sincronizando a mano en cuatro sitios distintos.
+    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
+    const visualBalance = isPlaying ? Math.max(0, currentFichas - COST) : currentFichas;
 
     // --- JUGAR (CONEXIÓN AL BACKEND) ---
     const play = async () => {
-        if (visualBalance < COST) { alert("No tienes suficientes fichas"); return; }
+        if (visualBalance < COST) { setErrorMsg("No te llegan las fichas"); return; }
 
-        // 1. Cobrar visualmente al instante
-        setVisualBalance(prev => prev - COST);
+        setErrorMsg(null);
         setIsPlaying(true);
         setRevealed(Array(9).fill(false));
         setResult(null);
@@ -115,9 +103,9 @@ export default function ScratchGame() {
 
         } catch (error) {
             console.error("Error comprando cartón:", error);
-            alert(error.response?.data?.message || "Error al comprar el cartón");
+            // Sin rollback manual: al salir de isPlaying el saldo vuelve solo al real
+            setErrorMsg(error.response?.data?.message || "No se pudo comprar el cartón");
             setIsPlaying(false);
-            setVisualBalance(currentFichas); // Rollback
         }
     };
 
@@ -140,7 +128,6 @@ export default function ScratchGame() {
             if (result.user) {
                 setUser(result.user);
                 localStorage.setItem('user', JSON.stringify(result.user));
-                setVisualBalance(result.user.gameCoins ?? result.user.stats?.gameCoins ?? 0);
             }
         }
     };
@@ -163,10 +150,15 @@ export default function ScratchGame() {
             </div>
 
             {/* TÍTULO */}
-            <div className="absolute top-28 w-full text-center z-10 pointer-events-none">
-                <h1 className="text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)] tracking-wide uppercase">
+            <div className="absolute top-28 w-full text-center z-10">
+                <h1 className="text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)] tracking-wide uppercase pointer-events-none">
                     RASCA Y GANA
                 </h1>
+                {errorMsg && (
+                    <div onClick={() => setErrorMsg(null)} className="mx-6 mt-3 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl cursor-pointer">
+                        {errorMsg}
+                    </div>
+                )}
             </div>
 
             {/* ZONA DE JUEGO */}

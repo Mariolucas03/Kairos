@@ -37,6 +37,7 @@ const DiceGame = lazy(() => import('./pages/games/DiceGame'));
 const Roulette = lazy(() => import('./pages/games/Roulette'));
 const BlackJack = lazy(() => import('./pages/games/BlackJack'));
 const Slots = lazy(() => import('./pages/games/Slots'));
+const TowerGame = lazy(() => import('./pages/games/TowerGame'));
 
 // Fetcher único para toda la app
 const fetcher = (url) => api.get(url).then(res => res.data);
@@ -50,10 +51,14 @@ const swrOptions = {
     // Evita repetir la misma petición si dos componentes la piden a la vez
     dedupingInterval: 5000,
     revalidateOnFocus: true,
-    // Con el backend en Render (plan gratuito) una petición puede fallar por
-    // arranque en frío: reintentamos un par de veces con margen.
-    errorRetryCount: 2,
-    errorRetryInterval: 3000
+    // Con el backend en Render (plan gratuito) el servidor se duerme y tarda
+    // entre 30 y 50 segundos en despertar.
+    // ⚠️ Antes eran 2 reintentos cada 3 s: a los ~6 segundos SWR tiraba la toalla,
+    // mucho antes de que el servidor estuviera listo, y las pantallas se quedaban
+    // con los datos vacíos (el feed decía "no hay entrenos" con el servidor aún
+    // arrancando). Con 6 reintentos y 5 s de base se cubre el arranque en frío.
+    errorRetryCount: 6,
+    errorRetryInterval: 5000
 };
 
 function App() {
@@ -90,6 +95,7 @@ function App() {
                             <Route path="/games/roulette" element={<Roulette />} />
                             <Route path="/games/blackjack" element={<BlackJack />} />
                             <Route path="/games/slots" element={<Slots />} />
+                            <Route path="/games/tower" element={<TowerGame />} />
                         </Route>
                     </Routes>
                 </Suspense>

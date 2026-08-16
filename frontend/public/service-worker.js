@@ -47,6 +47,24 @@ self.addEventListener('activate', (event) => {
     );
 });
 
+// Solo se guarda en caché lo que se puede guardar sin romper nada:
+// respuestas correctas, del mismo origen y por http(s). Antes se hacía
+// cache.put() de CUALQUIER respuesta —incluidos errores 4xx/5xx, redirecciones
+// y respuestas opacas de otros dominios—, así que un fallo puntual del servidor
+// se quedaba guardado y se seguía sirviendo después.
+const sePuedeCachear = (request, response) => {
+    if (!response || !response.ok || response.type === 'opaque') return false;
+    const url = new URL(request.url);
+    if (!url.protocol.startsWith('http')) return false;
+    return url.origin === self.location.origin;
+};
+
+const guardarEnCache = (request, response) => {
+    if (!sePuedeCachear(request, response)) return;
+    const copia = response.clone();
+    caches.open(DYNAMIC_CACHE).then((cache) => cache.put(request, copia)).catch(() => { });
+};
+
 // --- INTERCEPTOR DE PETICIONES (ESTRATEGIA DE CACHÉ) ---
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
@@ -70,36 +88,23 @@ self.addEventListener('fetch', (event) => {
     if (url.pathname.startsWith('/assets/') || url.pathname.match(/\.(png|jpg|jpeg|svg|gif|woff2)$/)) {
         event.respondWith(
             caches.match(event.request).then((cachedResponse) => {
-                if (cachedResponse) {
-                    return cachedResponse; // Devuelve al instante desde el disco duro
-                }
+                if (cachedResponse) return cachedResponse;
 
-                // Si no está en caché, lo baja de internet y lo guarda
-                return fetch(event.request).then((networkResponse) => {
-                    return caches.open(DYNAMIC_CACHE).then((cache) => {
-                        // Guardamos un clon de la respuesta para el futuro
-                        cache.put(event.request, networkResponse.clone());
-                        return networkResponse;
-                    });
-                });
+                // Si falla la red, antes se rompía la respuesta entera y la imagen
+                // (o el trozo de código) quedaba sin cargar sin ningún aviso.
+                return fetch(event.request)
+                    .then((networkResponse) => { guardarEnCache(event.request, networkResponse); return networkResponse; })
+                    .catch(() => caches.match(event.request));
             })
         );
         return;
     }
 
-    // 3. ESTRATEGIA PARA EL RESTO (HTML, JS de Vite): Network First, fallback a Cache
+    // 4. EL RESTO: Network First, con la caché como red de seguridad
     event.respondWith(
         fetch(event.request)
-            .then((response) => {
-                return caches.open(DYNAMIC_CACHE).then((cache) => {
-                    cache.put(event.request, response.clone());
-                    return response;
-                });
-            })
-            .catch(() => {
-                // Si el usuario no tiene internet, le mostramos lo último que guardó
-                return caches.match(event.request);
-            })
+            .then((response) => { guardarEnCache(event.request, response); return response; })
+            .catch(() => caches.match(event.request))
     );
 });
 
@@ -133,20 +138,21 @@ self.addEventListener('push', function (event) {
 self.addEventListener('notificationclick', function (event) {
     event.notification.close(); // Cierra el popup
 
-    // Abre la app en la ruta enviada por el servidor
+    const destino = event.notification.data?.url || '/';
+
+    // Abre la app en la ruta enviada por el servidor.
+    // ⚠️ Antes comparaba client.url === '/', y client.url es la URL COMPLETA
+    // ("https://tuapp.com/home"), así que nunca coincidía: la rama de "traer al
+    // frente" no se ejecutaba jamás y siempre se abría una ventana nueva.
     event.waitUntil(
-        clients.matchAll({ type: 'window' }).then((windowClients) => {
-            // Si la app ya está abierta en segundo plano, la trae al frente
-            for (let i = 0; i < windowClients.length; i++) {
-                let client = windowClients[i];
-                if (client.url === '/' && 'focus' in client) {
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            for (const client of windowClients) {
+                if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+                    if ('navigate' in client) client.navigate(destino).catch(() => { });
                     return client.focus();
                 }
             }
-            // Si estaba cerrada del todo, la abre
-            if (clients.openWindow) {
-                return clients.openWindow(event.notification.data.url);
-            }
+            if (clients.openWindow) return clients.openWindow(destino);
         })
     );
 });

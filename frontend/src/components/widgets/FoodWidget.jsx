@@ -32,6 +32,10 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
         return 0;
     };
 
+    // Solo se listan las comidas que ya tienen algo registrado: la tarjeta se
+    // va rellenando sola según añades desayuno, comida, merienda...
+    const loggedMeals = MEAL_SECTIONS.filter((meal) => Math.round(kcalOf(meal.key)) > 0);
+
     // Anillo
     const R = 48;
     const C = 2 * Math.PI * R;
@@ -84,24 +88,29 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                         </div>
 
                         <div className="mt-3.5 flex flex-col gap-[9px]">
-                            {MEAL_SECTIONS.slice(0, 4).map((meal) => {
-                                const kcal = Math.round(kcalOf(meal.key));
-                                const pct = safeLimit > 0 ? Math.min((kcal / safeLimit) * 100, 100) : 0;
-                                const empty = kcal === 0;
-                                return (
-                                    <div key={meal.key} className="flex items-center gap-2">
-                                        <span className={`w-[58px] text-[9px] font-black uppercase tracking-[0.1em] leading-none not-italic ${empty ? 'text-zinc-600' : 'text-zinc-400'}`}>
-                                            {meal.label}
-                                        </span>
-                                        <div className="flex-1 h-[5px] bg-[#18181b] rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: meal.bar }} />
+                            {loggedMeals.length === 0 ? (
+                                <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.1em] leading-relaxed not-italic">
+                                    SIN COMIDAS<br />REGISTRADAS HOY
+                                </span>
+                            ) : (
+                                loggedMeals.slice(0, 4).map((meal) => {
+                                    const kcal = Math.round(kcalOf(meal.key));
+                                    const pct = safeLimit > 0 ? Math.min((kcal / safeLimit) * 100, 100) : 0;
+                                    return (
+                                        <div key={meal.key} className="flex items-center gap-2">
+                                            <span className="w-[58px] text-[9px] font-black uppercase tracking-[0.1em] leading-none not-italic text-zinc-400">
+                                                {meal.label}
+                                            </span>
+                                            <div className="flex-1 h-[5px] bg-[#18181b] rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: meal.bar }} />
+                                            </div>
+                                            <span className="w-[34px] text-right text-[9px] font-black leading-none not-italic text-zinc-400">
+                                                {f(kcal)}
+                                            </span>
                                         </div>
-                                        <span className={`w-[34px] text-right text-[9px] font-black leading-none not-italic ${empty ? 'text-zinc-600' : 'text-zinc-400'}`}>
-                                            {empty ? '—' : f(kcal)}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
                 </div>
@@ -134,7 +143,13 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                         </div>
 
                         <div className="flex flex-col gap-3 relative z-10 overflow-y-auto custom-scrollbar pr-1 flex-1 pb-2">
-                            {MEAL_SECTIONS.map((meal) => {
+                            {loggedMeals.length === 0 && (
+                                <div className="py-8 text-center">
+                                    <p className="text-zinc-500 text-sm font-bold uppercase">Nada registrado todavía</p>
+                                    <p className="text-zinc-600 text-xs mt-1">Añade alimentos y aparecerán aquí.</p>
+                                </div>
+                            )}
+                            {loggedMeals.map((meal) => {
                                 const mealKcal = kcalOf(meal.key);
                                 const mealPercent = safeCurrent > 0 ? Math.min((mealKcal / safeCurrent) * 100, 100) : 0;
 

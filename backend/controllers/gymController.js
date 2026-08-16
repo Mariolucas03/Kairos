@@ -263,6 +263,7 @@ const syncExerciseCatalog = async ({ force = false } = {}) => {
                     muscle: ex.muscle,
                     muscleDetail: ex.muscleDetail || '',
                     secondary: ex.secondary || [],
+                    shares: ex.shares || undefined,
                     equipment: ex.equipment || 'Barra',
                     equipmentGroup: ex.equipmentGroup || familiaDe(ex.equipment),
                     isCardio: !!ex.isCardio,
@@ -804,6 +805,9 @@ const chatRoutineGenerator = async (req, res) => {
 };
 
 module.exports = {
+    // Se exporta para poder sincronizar el catálogo en el arranque del servidor
+    // (server.js), y no solo cuando el primer usuario abre la lista.
+    syncExerciseCatalog,
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
     getAllExercises, getExerciseById, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,

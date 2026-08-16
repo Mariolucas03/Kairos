@@ -14,14 +14,30 @@ const OpenAI = require('openai');
  * OpenRouter retire alguno.
  */
 
-const openrouter = new OpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: process.env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-        'HTTP-Referer': 'https://kairos.app',
-        'X-Title': 'Kairos'
+/**
+ * ⚠️ El cliente se crea a la PRIMERA petición, no al importar el módulo.
+ *
+ * Antes se instanciaba aquí arriba, y el constructor de OpenAI LANZA si falta la
+ * clave. Como este servicio lo importa gymController y ese a su vez lo importa
+ * server.js, quedarse sin OPENROUTER_API_KEY no dejaba la app "sin IA": impedía
+ * que arrancara el servidor ENTERO. Ahora, sin clave, solo fallan las funciones
+ * de IA y cada una ya tiene su plan B determinista.
+ */
+let clienteIA = null;
+const getClienteIA = () => {
+    if (!process.env.OPENROUTER_API_KEY) return null;
+    if (!clienteIA) {
+        clienteIA = new OpenAI({
+            baseURL: 'https://openrouter.ai/api/v1',
+            apiKey: process.env.OPENROUTER_API_KEY,
+            defaultHeaders: {
+                'HTTP-Referer': 'https://kairos.app',
+                'X-Title': 'Kairos'
+            }
+        });
     }
-});
+    return clienteIA;
+};
 
 /**
  * ⚠️ MODELOS VERIFICADOS EN VIVO CONTRA OPENROUTER.
@@ -54,10 +70,14 @@ const DEFAULT_VISION_TIMEOUT = 15000;
 // Aborta la petición si el modelo tarda demasiado, para pasar al siguiente
 // en vez de dejar al usuario esperando indefinidamente.
 const callWithTimeout = async (config, timeoutMs) => {
+    const cliente = getClienteIA();
+    // Sin clave configurada no hay IA: se avisa y cada función usa su plan B
+    if (!cliente) throw new Error('IA no configurada (falta OPENROUTER_API_KEY)');
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        return await openrouter.chat.completions.create(config, { signal: controller.signal });
+        return await cliente.chat.completions.create(config, { signal: controller.signal });
     } finally {
         clearTimeout(timeoutId);
     }

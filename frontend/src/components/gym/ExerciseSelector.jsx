@@ -38,6 +38,8 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     const [showCreate, setShowCreate] = useState(false);
     const [nuevoNombre, setNuevoNombre] = useState('');
     const [nuevoGrupo, setNuevoGrupo] = useState('Pecho');
+    // Músculo concreto dentro del grupo ('' = todo el grupo)
+    const [nuevoDetalle, setNuevoDetalle] = useState('');
     const [nuevoSecundarios, setNuevoSecundarios] = useState([]);
     const [guardando, setGuardando] = useState(false);
     const [errorCrear, setErrorCrear] = useState('');
@@ -77,6 +79,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     const abrirCrear = () => {
         setNuevoNombre(searchTerm.trim());
         setNuevoGrupo(selectedMuscle === 'Todos' ? groups[0] : selectedMuscle);
+        setNuevoDetalle('');
         setNuevoSecundarios([]);
         setErrorCrear('');
         setShowCreate(true);
@@ -99,6 +102,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
             const res = await api.post('/gym/exercises', {
                 name: nombre,
                 muscle: nuevoGrupo,
+                muscleDetail: nuevoDetalle,
                 secondary: nuevoSecundarios.filter(g => g !== nuevoGrupo)
             });
             const nuevo = res.data;
@@ -329,7 +333,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                 {groups.map(g => (
                                     <button
                                         key={g}
-                                        onClick={() => { setNuevoGrupo(g); setNuevoSecundarios(s => s.filter(x => x !== g)); }}
+                                        onClick={() => { setNuevoGrupo(g); setNuevoDetalle(''); setNuevoSecundarios(s => s.filter(x => x !== g)); }}
                                         className={`py-3 rounded-2xl text-xs font-black uppercase border transition-all ${nuevoGrupo === g
                                             ? 'bg-yellow-500 text-black border-yellow-500'
                                             : 'bg-black text-zinc-400 border-zinc-800 hover:border-zinc-700'}`}
@@ -339,6 +343,43 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                 ))}
                             </div>
                         </div>
+
+                        {/* MÚSCULO CONCRETO: lo que decide qué zona del mapa se
+                            colorea y qué rango sube. Sin esto, todo el volumen
+                            se reparte al grupo entero y la pierna sube de rango
+                            de golpe en vez de solo el músculo trabajado. */}
+                        {(especificosDelGrupo.length > 0) && (
+                            <div>
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">
+                                    ¿Qué músculo en concreto?
+                                </label>
+                                <p className="text-[10px] text-zinc-600 mb-2 leading-tight">
+                                    Opcional, pero es lo que hace que suba de rango <span className="text-zinc-400">ese</span> músculo
+                                    y se pinte solo su zona del cuerpo.
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <button
+                                        onClick={() => setNuevoDetalle('')}
+                                        className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase border transition-colors ${!nuevoDetalle
+                                            ? 'bg-zinc-700 text-white border-zinc-600'
+                                            : 'bg-black text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
+                                    >
+                                        Todo el grupo
+                                    </button>
+                                    {especificosDelGrupo.map(m => (
+                                        <button
+                                            key={m}
+                                            onClick={() => setNuevoDetalle(m)}
+                                            className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase border transition-colors ${nuevoDetalle === m
+                                                ? 'bg-yellow-500 text-black border-yellow-500'
+                                                : 'bg-black text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
+                                        >
+                                            {m}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div>
                             <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">

@@ -457,4 +457,108 @@ const playBlackjack = asyncHandler(async (req, res) => {
     });
 });
 
-module.exports = { playDice, playScratch, playSlots, playRoulette, playFortuneWheel, playBlackjack };
+// ==========================================
+// 7. LA TORRE (subir plantas sin pisar la trampa)
+// ==========================================
+// Cada planta tiene 3 losas y una es trampa. Subes eligiendo losa y el premio
+// se multiplica; puedes retirarte cuando quieras. Si pisas la trampa, se pierde
+// todo lo acumulado. El estado (dónde están las trampas) va CIFRADO igual que en
+// el blackjack: el cliente no puede leerlo ni fabricarlo.
+const TOWER_FLOORS = 8;
+const TOWER_TILES = 3;
+const TOWER_MULTIPLIERS = [1.4, 2.0, 2.8, 3.9, 5.5, 7.7, 10.8, 15.0];
+
+const playTower = asyncHandler(async (req, res) => {
+    const { action, bet, token, choice } = req.body;
+
+    // --- EMPEZAR PARTIDA ---
+    if (action === 'start') {
+        const amount = Number(bet);
+        if (!Number.isFinite(amount) || amount < 10) { res.status(400); throw new Error('Apuesta mínima 10'); }
+
+        await chargeAndValidate(req.user._id, amount);
+
+        const gameId = crypto.randomBytes(16).toString('hex');
+        await User.findByIdAndUpdate(req.user._id, { activeGameToken: gameId });
+
+        // Una trampa por planta, elegida con aleatoriedad criptográfica
+        const traps = Array.from({ length: TOWER_FLOORS }, () => crypto.randomInt(TOWER_TILES));
+        const state = { gameId, bet: amount, traps, floor: 0 };
+
+        return res.json({
+            token: encryptState(state),
+            floor: 0,
+            multipliers: TOWER_MULTIPLIERS,
+            status: 'playing'
+        });
+    }
+
+    if (!token) { res.status(400); throw new Error('Partida no encontrada'); }
+
+    let state;
+    try {
+        state = decryptState(token);
+    } catch (e) {
+        res.status(400); throw new Error('Partida inválida o manipulada. Empieza de nuevo.');
+    }
+
+    const currentUser = await User.findById(req.user._id).select('activeGameToken');
+    if (!currentUser.activeGameToken || currentUser.activeGameToken !== state.gameId) {
+        res.status(400); throw new Error('Partida expirada. Empieza de nuevo.');
+    }
+
+    const cerrarPartida = async (payout) => {
+        if (payout > 0) {
+            return await User.findByIdAndUpdate(
+                req.user._id,
+                { $inc: { gameCoins: payout }, $set: { activeGameToken: null } },
+                { new: true }
+            );
+        }
+        return await User.findByIdAndUpdate(req.user._id, { $set: { activeGameToken: null } }, { new: true });
+    };
+
+    // --- RETIRARSE ---
+    if (action === 'cashout') {
+        if (state.floor === 0) { res.status(400); throw new Error('Sube al menos una planta'); }
+        const payout = Math.round(state.bet * TOWER_MULTIPLIERS[state.floor - 1]);
+        const finalUser = await cerrarPartida(payout);
+        return res.json({ status: 'cashed', payout, floor: state.floor, traps: state.traps, user: finalUser, token: null });
+    }
+
+    // --- ELEGIR LOSA ---
+    if (action === 'pick') {
+        const tile = Number(choice);
+        if (!Number.isInteger(tile) || tile < 0 || tile >= TOWER_TILES) { res.status(400); throw new Error('Losa inválida'); }
+
+        const trapTile = state.traps[state.floor];
+        const floorJugada = state.floor;
+
+        if (tile === trapTile) {
+            const finalUser = await cerrarPartida(0);
+            return res.json({ status: 'lost', trapTile, floor: floorJugada, traps: state.traps, payout: 0, user: finalUser, token: null });
+        }
+
+        state.floor += 1;
+
+        // Torre completada: se paga sola
+        if (state.floor >= TOWER_FLOORS) {
+            const payout = Math.round(state.bet * TOWER_MULTIPLIERS[TOWER_FLOORS - 1]);
+            const finalUser = await cerrarPartida(payout);
+            return res.json({ status: 'won', trapTile, floor: state.floor, traps: state.traps, payout, user: finalUser, token: null });
+        }
+
+        return res.json({
+            status: 'playing',
+            trapTile,
+            floor: state.floor,
+            potential: Math.round(state.bet * TOWER_MULTIPLIERS[state.floor - 1]),
+            token: encryptState(state)
+        });
+    }
+
+    res.status(400);
+    throw new Error('Acción inválida');
+});
+
+module.exports = { playDice, playScratch, playSlots, playRoulette, playFortuneWheel, playBlackjack, playTower };

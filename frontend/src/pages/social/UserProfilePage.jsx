@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
     Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
-    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X
+    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X, WifiOff, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
 import BackButton from '../../components/common/BackButton';
@@ -22,11 +22,28 @@ const TABS = [
 
 // --- PESTAÑA CUERPO: mapa + nivel de cada grupo muscular ---
 function BodyTab({ ranks }) {
+    // Qué grupo está desplegado (solo uno a la vez)
+    const [grupoAbierto, setGrupoAbierto] = useState(null);
+
     if (!ranks) return null;
 
     // De mayor a menor nivel, para que se vea arriba lo más entrenado
-    const ordenados = Object.entries(ranks).sort((a, b) => b[1].points - a[1].points);
-    const conActividad = ordenados.filter(([, r]) => r.points > 0);
+    // Los 8 grupos son las filas; cada uno despliega sus músculos al pulsarlo.
+    const entradas = Object.entries(ranks);
+    const ordenados = entradas
+        .filter(([, r]) => r.isGroup !== false)
+        .sort((a, b) => b[1].points - a[1].points);
+
+    const musculosPorGrupo = {};
+    entradas
+        .filter(([, r]) => r.isGroup === false)
+        .sort((a, b) => (b[1].points || 0) - (a[1].points || 0))
+        .forEach(([nombre, r]) => {
+            const g = r.group || 'Otros';
+            (musculosPorGrupo[g] = musculosPorGrupo[g] || []).push([nombre, r]);
+        });
+
+    const conActividad = entradas.filter(([, r]) => r.points > 0);
 
     return (
         <div className="pb-4">
@@ -43,38 +60,77 @@ function BodyTab({ ranks }) {
             )}
 
             <div className="space-y-2">
-                {ordenados.map(([grupo, r]) => (
-                    <div key={grupo} className="bg-zinc-950 border border-white/5 rounded-2xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.points ? r.rankColor : '#3f3f46' }} />
-                                <span className="text-xs font-black text-white uppercase truncate">{grupo}</span>
-                            </div>
-                            <span
-                                className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0"
-                                style={{ color: r.rankColor, borderColor: `${r.rankColor}55`, backgroundColor: `${r.rankColor}15` }}
+                {ordenados.map(([grupo, r]) => {
+                    const hijos = musculosPorGrupo[grupo] || [];
+                    const abierto = grupoAbierto === grupo;
+
+                    return (
+                        <div key={grupo} className="bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden">
+                            <button
+                                onClick={() => hijos.length > 0 && setGrupoAbierto(abierto ? null : grupo)}
+                                disabled={hijos.length === 0}
+                                aria-expanded={abierto}
+                                className="w-full text-left p-3 disabled:cursor-default"
                             >
-                                {r.rankLabel}
-                            </span>
-                        </div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.points ? r.rankColor : '#3f3f46' }} />
+                                        <span className="text-xs font-black text-white uppercase truncate">{grupo}</span>
+                                        {hijos.length > 0 && (
+                                            <ChevronDown size={13} className={`text-zinc-600 shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`} />
+                                        )}
+                                    </div>
+                                    <span
+                                        className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shrink-0"
+                                        style={{ color: r.rankColor, borderColor: `${r.rankColor}55`, backgroundColor: `${r.rankColor}15` }}
+                                    >
+                                        {r.rankLabel}
+                                    </span>
+                                </div>
 
-                        <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/10">
-                            <div
-                                className="h-full rounded-full transition-all duration-700"
-                                style={{ width: `${r.progress}%`, backgroundColor: r.rankColor }}
-                            />
-                        </div>
+                                <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/10">
+                                    <div
+                                        className="h-full rounded-full transition-all duration-700"
+                                        style={{ width: `${r.progress}%`, backgroundColor: r.rankColor }}
+                                    />
+                                </div>
 
-                        <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[9px] text-zinc-600 font-bold">
-                                {r.volume >= 1000 ? `${Math.round(r.volume / 1000)}k` : r.volume} kg·rep · {r.weeks} {r.weeks === 1 ? 'semana' : 'semanas'}
-                            </span>
-                            <span className="text-[9px] text-zinc-600 font-bold">
-                                {r.nextRankLabel ? `${r.progress}% → ${r.nextRankLabel}` : 'Máximo'}
-                            </span>
+                                <div className="flex items-center justify-between mt-1.5">
+                                    <span className="text-[9px] text-zinc-600 font-bold">
+                                        {r.volume >= 1000 ? `${Math.round(r.volume / 1000)}k` : r.volume} kg·rep · {r.weeks} {r.weeks === 1 ? 'semana' : 'semanas'}
+                                    </span>
+                                    <span className="text-[9px] text-zinc-600 font-bold">
+                                        {r.nextRankLabel ? `${r.progress}% → ${r.nextRankLabel}` : 'Máximo'}
+                                    </span>
+                                </div>
+                            </button>
+
+                            {abierto && (
+                                <div className="border-t border-white/5 bg-black/40 px-3 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
+                                    {hijos.map(([musculo, m]) => {
+                                        const sinTrabajo = (m.points || 0) === 0;
+                                        return (
+                                            <div key={musculo} className={sinTrabajo ? 'opacity-45' : ''}>
+                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <span className="text-[11px] font-bold text-zinc-300 truncate">{musculo}</span>
+                                                    <span className="text-[9px] font-black uppercase shrink-0" style={{ color: sinTrabajo ? '#52525b' : m.rankColor }}>
+                                                        {sinTrabajo ? 'Sin entrenar' : m.rankLabel}
+                                                    </span>
+                                                </div>
+                                                <div className="h-1 bg-black rounded-full overflow-hidden border border-white/5">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-700"
+                                                        style={{ width: `${m.progress || 0}%`, backgroundColor: m.rankColor }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );
@@ -153,15 +209,13 @@ function CuadroEntreno({ item, onOpen }) {
     const musculos = item.musclesWorked || [];
     return (
         <button onClick={onOpen} className="relative aspect-square bg-black border border-white/5 overflow-hidden active:opacity-70 transition-opacity">
+            {/* Sin foto siempre se enseña el cuerpo: aunque el entreno no tenga
+                músculos guardados, la silueta es mejor pista que un cuadro vacío. */}
             {item.photo ? (
                 <img src={item.photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            ) : musculos.length > 0 ? (
+            ) : (
                 <div className="absolute inset-0 p-1 pb-4">
                     <BodyMap highlight={musculos} secondary={item.secondaryMuscles} showToggle={false} dual labels={false} className="h-full" />
-                </div>
-            ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <Dumbbell size={26} className="text-zinc-800" />
                 </div>
             )}
 
@@ -240,7 +294,7 @@ export default function UserProfilePage() {
     // Solo pedimos el contenido si tenemos permiso: en una cuenta privada ajena
     // esta petición daría 403 y llenaría la consola de errores.
     const puedeVer = profileData ? profileData.canViewContent !== false : false;
-    const { data: itemsData, isLoading: loadingItems } =
+    const { data: itemsData, error: itemsError, isLoading: loadingItems, mutate: mutateItems } =
         useSWR(userId && puedeVer ? `/social/profile/${userId}/items?tab=${tab}&page=1` : null, fetcher);
 
     // Paginación local por pestaña
@@ -367,16 +421,21 @@ export default function UserProfilePage() {
 
             {/* --- INFO / NIVEL / XP --- */}
             <div className="mb-6">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-sm font-black text-white uppercase">{profile.username}</span>
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getLevelStyle(level)}`}>Lvl {level}</span>
-                    {profile.clan && (
-                        <span className="text-[9px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                            <Shield size={9} /> {profile.clan.icon} {profile.clan.name}
-                        </span>
-                    )}
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-black text-white uppercase truncate">{profile.username}</span>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase shrink-0 ${getLevelStyle(level)}`}>Lvl {level}</span>
                 </div>
                 <p className="text-[10px] text-yellow-500/80 italic font-bold tracking-wider uppercase mb-1">{profile.title || 'Novato'}</p>
+
+                {/* El clan va en su propia línea, no apretado junto al nombre */}
+                {profile.clan && (
+                    <div className="mb-2">
+                        <span className="text-[9px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 px-2 py-1 rounded-lg inline-flex items-center gap-1.5 max-w-full">
+                            <Shield size={9} className="shrink-0" />
+                            <span className="truncate">{profile.clan.icon} {profile.clan.name}</span>
+                        </span>
+                    </div>
+                )}
 
                 {/* Descripción del perfil */}
                 {profile.bio && (
@@ -461,6 +520,17 @@ export default function UserProfilePage() {
                 </div>
             ) : loadingItems && !itemsData ? (
                 <div className="text-center py-16 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando...</div>
+            ) : itemsError && !itemsData ? (
+                /* Si la petición falla no se puede decir "no hay nada": no se sabe.
+                   Antes se caía en el estado vacío y parecía que no tenías entrenos. */
+                <div className="text-center py-16 px-6 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
+                    <WifiOff className="mx-auto mb-3 opacity-50" size={30} />
+                    <p className="text-xs text-zinc-400 font-bold mb-1">No se ha podido cargar</p>
+                    <p className="text-[11px] mb-4">El servidor puede estar despertando.</p>
+                    <button onClick={() => mutateItems()} className="bg-yellow-500 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider inline-flex items-center gap-2">
+                        <RefreshCw size={14} /> Reintentar
+                    </button>
+                </div>
             ) : tab === 'body' ? (
                 <BodyTab ranks={itemsData?.ranks} />
             ) : items.length === 0 ? (

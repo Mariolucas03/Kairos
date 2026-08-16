@@ -4,6 +4,7 @@ const User = require('../models/User');
 const WorkoutLog = require('../models/WorkoutLog');
 const DailyLog = require('../models/DailyLog');
 const levelService = require('../services/levelService');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 // --- CONFIGURACIÓN DE ROTACIÓN ---
 const EVENT_ROTATION = ['volume', 'missions', 'calories', 'xp'];
@@ -110,14 +111,20 @@ const getClanMetrics = async (clanMemberIds, weekStart, eventType) => {
         ]);
     }
     else if (eventType === 'missions') {
-        const dateStr = weekStart.toISOString().split('T')[0];
+        // Fecha en hora de Madrid, igual que la que guardan los DailyLog. Con
+        // toISOString() (UTC) el inicio de semana podía caer en el día anterior
+        // y el evento del clan contaba un día de más.
+        const dateStr = getMadridDateString(weekStart);
         stats = await DailyLog.aggregate([
             { $match: { user: { $in: clanMemberIds }, date: { $gte: dateStr } } },
             { $group: { _id: "$user", total: { $sum: "$missionStats.completed" } } }
         ]);
     }
     else if (eventType === 'xp') {
-        const dateStr = weekStart.toISOString().split('T')[0];
+        // Fecha en hora de Madrid, igual que la que guardan los DailyLog. Con
+        // toISOString() (UTC) el inicio de semana podía caer en el día anterior
+        // y el evento del clan contaba un día de más.
+        const dateStr = getMadridDateString(weekStart);
         stats = await DailyLog.aggregate([
             { $match: { user: { $in: clanMemberIds }, date: { $gte: dateStr } } },
             { $group: { _id: "$user", total: { $sum: "$gains.xp" } } }

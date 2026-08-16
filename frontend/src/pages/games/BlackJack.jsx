@@ -41,11 +41,6 @@ export default function BlackJack() {
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     const navigate = useNavigate();
 
-    // SALDO VISUAL INSTANTÁNEO
-    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
-    const [visualBalance, setVisualBalance] = useState(currentFichas);
-
-    useEffect(() => { setVisualBalance(currentFichas); }, [currentFichas]);
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
     // Estados JWT y Backend
@@ -56,22 +51,29 @@ export default function BlackJack() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [resultModal, setResultModal] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
+    const [errorMsg, setErrorMsg] = useState(null);
 
-    // --- SINCRONIZACIÓN ---
-    const updateBalanceInstant = (amountToAdd) => {
-        setVisualBalance(prev => Math.max(0, prev + amountToAdd));
-    };
+    // SALDO DERIVADO: al saldo real se le resta lo que hay puesto sobre la mesa
+    // (incluye el doblar, porque la apuesta de la mano ya viene doblada del
+    // servidor). Antes era un estado paralelo con sumas y restas manuales, y
+    // cualquier rollback fallido lo dejaba descuadrado hasta recargar.
+    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
+    const apostadoEnMesa = gameState && gameState.status !== 'ended'
+        ? gameState.pHands.reduce((acc, h) => acc + h.bet, 0)
+        : (isProcessing && !gameState ? bet : 0);
+    const visualBalance = Math.max(0, currentFichas - apostadoEnMesa);
 
     // --- ACCIÓN CENTRALIZADA HACIA EL BACKEND ---
     const handleAction = async (action) => {
         if (isProcessing) return;
 
         // Validaciones pre-vuelo
-        if (action === 'deal' && visualBalance < bet) return alert("Fichas insuficientes");
-        if (action === 'double' && visualBalance < gameState.pHands[gameState.activeHand].bet) return alert("Fichas insuficientes para doblar");
+        if (action === 'deal' && visualBalance < bet) return setErrorMsg("No te llegan las fichas");
+        if (action === 'double' && visualBalance < gameState.pHands[gameState.activeHand].bet) return setErrorMsg("No te llegan las fichas para doblar");
 
+        setErrorMsg(null);
         setIsProcessing(true);
-        if (action === 'deal') { setResultModal(null); updateBalanceInstant(-bet); }
+        if (action === 'deal') setResultModal(null);
 
         try {
             const res = await api.post('/games/blackjack', { action, bet, token: sessionToken });
@@ -89,7 +91,6 @@ export default function BlackJack() {
                     if (updatedUser) {
                         setUser(updatedUser);
                         localStorage.setItem('user', JSON.stringify(updatedUser));
-                        setVisualBalance(updatedUser.gameCoins ?? updatedUser.stats?.gameCoins ?? 0);
                     }
 
                     setResultModal({
@@ -101,8 +102,9 @@ export default function BlackJack() {
 
         } catch (error) {
             console.error("BJ Error:", error);
-            alert(error.response?.data?.message || "Error conectando al casino.");
-            if (action === 'deal') updateBalanceInstant(bet); // Rollback
+            // Sin rollback manual: el saldo se recalcula desde el estado de la mesa
+            setErrorMsg(error.response?.data?.message || "No se pudo conectar con el casino");
+            if (action === 'deal') { setGameState(null); setSessionToken(null); }
         } finally {
             setIsProcessing(false);
         }
@@ -126,6 +128,12 @@ export default function BlackJack() {
                 </div>
                 <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
             </div>
+
+            {errorMsg && (
+                <div onClick={() => setErrorMsg(null)} className="absolute top-28 left-6 right-6 z-50 bg-red-950/80 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl text-center cursor-pointer">
+                    {errorMsg}
+                </div>
+            )}
 
             {/* ZONA DE JUEGO */}
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-6">

@@ -70,6 +70,7 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
     const [spinning, setSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
     const [winData, setWinData] = useState(null);
+    const [errorMsg, setErrorMsg] = useState(null);
 
     const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
     const prizes = config.prizes;
@@ -81,24 +82,23 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
         const cost = config.cost || 0;
 
         if (cost > 0 && currentFichas < cost) {
-            alert(`Necesitas ${cost} fichas.`); return;
+            setErrorMsg(`Necesitas ${cost} fichas`); return;
         }
 
-        // Cobro visual
-        if (cost > 0) {
-            setUser(prev => {
-                const c = prev.stats?.gameCoins || prev.gameCoins || 0;
-                const u = { ...prev, gameCoins: c - cost, stats: { ...prev.stats, gameCoins: c - cost } };
-                localStorage.setItem('user', JSON.stringify(u)); return u;
-            });
-        }
-
-        setSpinning(true); setWinData(null); onSpinComplete(); // Bloquea tiro diario visualmente
+        // ⚠️ Aquí se restaba el coste al usuario a mano ANTES de llamar al servidor
+        // y no se deshacía nunca si la petición fallaba: te quedabas viendo menos
+        // fichas de las que tenías hasta recargar la app. El saldo bueno lo manda
+        // el servidor al terminar el giro, así que no hace falta tocarlo.
+        setErrorMsg(null);
+        setSpinning(true); setWinData(null);
 
         try {
             // Llamada al Backend Inhackeable
             const res = await api.post('/games/fortune', { type: config.id });
             const { winIndex, prize: serverPrize, user: updatedUser } = res.data;
+
+            // El tiro diario solo se marca como gastado si el servidor lo aceptó
+            onSpinComplete();
 
             // Animación
             const offset = segmentAngle / 2;
@@ -113,7 +113,9 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
             setTimeout(() => {
                 setSpinning(false);
                 setWinData(serverPrize);
-                if (serverPrize.v > 0) {
+                // Se sincroniza SIEMPRE, gane o no: si el premio era 0 antes no se
+                // actualizaba y el saldo se quedaba sin reflejar el coste del tiro.
+                if (updatedUser) {
                     setUser(updatedUser);
                     localStorage.setItem('user', JSON.stringify(updatedUser));
                 }
@@ -121,13 +123,19 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
 
         } catch (error) {
             console.error("Error ruleta:", error);
-            alert("Error al tirar."); setSpinning(false);
+            setErrorMsg(error.response?.data?.message || "No se pudo tirar");
+            setSpinning(false);
         }
     };
 
     return (
         <div className="flex flex-col items-center w-full max-w-sm mx-auto">
             {winData && winData.v > 0 && winData.t !== 'xp' && <CoinsRain />}
+            {errorMsg && (
+                <div onClick={() => setErrorMsg(null)} className="w-full mb-4 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl text-center cursor-pointer">
+                    {errorMsg}
+                </div>
+            )}
             <div className="relative w-[320px] h-[320px] mb-10">
                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 w-8 h-10 bg-white" style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)', filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.5))' }}></div>
                 <div className="w-full h-full rounded-full border-8 border-zinc-900 shadow-2xl overflow-hidden relative bg-zinc-950 transition-transform cubic-bezier(0.15, 0, 0.15, 1)"

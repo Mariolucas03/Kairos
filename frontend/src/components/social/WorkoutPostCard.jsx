@@ -85,10 +85,12 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
     const durationMin = Math.round((post.duration || 0) / 60);
     const isGym = post.type === 'gym';
 
-    // Diapositivas del carrusel: solo las que tienen contenido
+    // Diapositivas del carrusel: solo las que tienen contenido.
+    // Si no hay foto, el cuerpo se enseña igual aunque no haya músculos guardados:
+    // así la publicación nunca se queda sin nada que mirar.
     const slides = [
         post.photo ? 'photo' : null,
-        (post.musclesWorked || []).length > 0 ? 'body' : null,
+        ((post.musclesWorked || []).length > 0 || !post.photo) ? 'body' : null,
         (post.exercises || []).length > 0 ? 'exercises' : null
     ].filter(Boolean);
 
@@ -190,9 +192,16 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                                             {(post.exercises || []).map((ex, idx) => {
                                                 const record = records.find(r => r.name === ex.name);
                                                 return (
-                                                    <div key={idx} className={`rounded-xl px-3 py-2 border ${record ? 'bg-yellow-500/[0.07] border-yellow-500/30' : 'bg-zinc-900/60 border-white/5'}`}>
+                                                    // El ejercicio con récord va en ORO y se nota: borde dorado,
+                                                    // fondo cálido y halo alrededor del recuadro.
+                                                    <div
+                                                        key={idx}
+                                                        className={`rounded-xl px-3 py-2 ${record
+                                                            ? 'border-2 border-yellow-500 bg-gradient-to-br from-yellow-500/20 to-yellow-500/[0.04] shadow-[0_0_18px_-4px_rgba(234,179,8,0.65)]'
+                                                            : 'border border-white/5 bg-zinc-900/60'}`}
+                                                    >
                                                         <div className="flex items-center justify-between mb-1 gap-2">
-                                                            <span className="text-[11px] font-black text-white uppercase truncate">{ex.name}</span>
+                                                            <span className={`text-[11px] font-black uppercase truncate ${record ? 'text-yellow-400' : 'text-white'}`}>{ex.name}</span>
                                                             <div className="flex items-center gap-1.5 shrink-0">
                                                                 {record && (
                                                                     <span className="flex items-center gap-0.5 text-[8px] font-black text-black bg-yellow-500 px-1.5 py-0.5 rounded uppercase">

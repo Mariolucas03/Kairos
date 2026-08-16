@@ -100,11 +100,30 @@ const syncSystemCatalog = async () => {
         }
     })));
 
-    // Retiramos items de sistema que ya no estén en el catálogo
-    await ShopItem.deleteMany({
+    // Retiramos items de sistema que ya no estén en el catálogo.
+    // ⚠️ Y LOS QUITAMOS TAMBIÉN DE LOS INVENTARIOS: si no, el usuario se queda
+    // con una entrada apuntando a un item borrado. Al popular llega como null y
+    // la tienda del móvil se quedaba en NEGRO nada más comprar algo.
+    const obsoletos = await ShopItem.find({
         category: { $ne: 'reward' },
         name: { $nin: SEED_ITEMS.map(i => i.name) }
-    });
+    }).select('_id').lean();
+
+    if (obsoletos.length > 0) {
+        const ids = obsoletos.map(i => i._id);
+        await ShopItem.deleteMany({ _id: { $in: ids } });
+        await User.updateMany({}, { $pull: { inventory: { item: { $in: ids } } } });
+        console.log(`🧹 ${ids.length} items retirados del catálogo y de los inventarios.`);
+    }
+};
+
+// Devuelve el usuario sin entradas de inventario rotas (item borrado → null).
+// El frontend confía en que cada slot tenga su item.
+const limpiarInventario = (userDoc) => {
+    const obj = userDoc.toObject ? userDoc.toObject() : userDoc;
+    obj.inventory = (obj.inventory || []).filter(slot => slot && slot.item);
+    delete obj.password;
+    return obj;
 };
 
 // 1. OBTENER TIENDA
@@ -163,7 +182,7 @@ const buyItem = async (req, res) => {
         // B. Verificamos si ya lo tiene (para categorías únicas)
         const userCheck = await User.findById(userId).select('inventory');
         const isUniqueCategory = ['avatar', 'frame', 'theme', 'title', 'pet'].includes(item.category);
-        const alreadyOwns = userCheck.inventory.some(entry => entry.item.toString() === itemId);
+        const alreadyOwns = userCheck.inventory.some(entry => entry?.item && entry.item.toString() === itemId);
 
         if (isUniqueCategory && alreadyOwns) {
             return res.status(400).json({ message: '¡Ya tienes este objeto!' });
@@ -209,7 +228,7 @@ const buyItem = async (req, res) => {
 
         res.json({
             message: `¡Compraste ${item.name}!`,
-            user: updatedUser
+            user: limpiarInventario(updatedUser)
         });
 
     } catch (error) {
@@ -227,10 +246,11 @@ const useItem = async (req, res) => {
 
         if (!item) return res.status(404).json({ message: 'Objeto no encontrado' });
 
-        const inventoryIndex = user.inventory.findIndex(i =>
-            (i.item._id && i.item._id.toString() === itemId) ||
-            (i.item.toString() === itemId)
-        );
+        const inventoryIndex = user.inventory.findIndex(i => {
+            if (!i?.item) return false; // entrada rota: item retirado del catálogo
+            const id = i.item._id ? i.item._id.toString() : i.item.toString();
+            return id === itemId;
+        });
 
         if (inventoryIndex === -1) {
             return res.status(400).json({ message: 'No tienes este objeto' });
@@ -267,7 +287,7 @@ const useItem = async (req, res) => {
 
         await user.save();
         const updatedUser = await User.findById(user._id).populate('inventory.item');
-        res.json({ message: msg, user: updatedUser, reward: rewardData });
+        res.json({ message: msg, user: limpiarInventario(updatedUser), reward: rewardData });
 
     } catch (error) {
         console.error(error);

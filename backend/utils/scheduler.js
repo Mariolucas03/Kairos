@@ -19,12 +19,12 @@ const runEveningReminder = async () => {
     const notifyPromises = usersToWarn.map(async (user) => {
         const todayDay = new Date().getDay();
         const pendingCount = await Mission.countDocuments({
-            user: user._id,
             frequency: 'daily',
             completed: false,
-            $or: [
-                { specificDays: { $size: 0 } },
-                { specificDays: todayDay }
+            invitationStatus: { $ne: 'pending' },
+            $and: [
+                { $or: [{ user: user._id }, { participants: user._id }] },
+                { $or: [{ specificDays: { $size: 0 } }, { specificDays: todayDay }] }
             ]
         });
 
@@ -157,23 +157,29 @@ const runNightlyMaintenance = async () => {
             const DAMAGE_RULES = { easy: 5, medium: 10, hard: 20, epic: 50 };
             const userUpdates = {};
 
-            // Agrupar fallos
+            // Agrupar fallos. En las misiones coop aceptadas el daño lo reciben
+            // TODOS los participantes, no solo quien la creó.
             for (const mission of failedMissions) {
-                const uid = mission.user.toString();
-                if (!userUpdates[uid]) userUpdates[uid] = { damage: 0, failedItems: [] };
-
                 const dmg = DAMAGE_RULES[mission.difficulty] || 5;
-                userUpdates[uid].damage += dmg;
 
-                userUpdates[uid].failedItems.push({
-                    title: mission.title,
-                    coinReward: 0, xpReward: 0, gameCoinReward: 0,
-                    frequency: mission.frequency,
-                    difficulty: mission.difficulty,
-                    type: mission.type,
-                    failed: true,
-                    hpLoss: dmg
-                });
+                const affected = (mission.isCoop && mission.invitationStatus === 'active' && mission.participants?.length)
+                    ? mission.participants.map(p => p.toString())
+                    : [mission.user.toString()];
+
+                for (const uid of new Set(affected)) {
+                    if (!userUpdates[uid]) userUpdates[uid] = { damage: 0, failedItems: [] };
+                    userUpdates[uid].damage += dmg;
+
+                    userUpdates[uid].failedItems.push({
+                        title: mission.title,
+                        coinReward: 0, xpReward: 0, gameCoinReward: 0,
+                        frequency: mission.frequency,
+                        difficulty: mission.difficulty,
+                        type: mission.type,
+                        failed: true,
+                        hpLoss: dmg
+                    });
+                }
             }
 
             // 🔥 MAGIA DE ARQUITECTO: APLICAR DAÑO EN PARALELO MASIVO

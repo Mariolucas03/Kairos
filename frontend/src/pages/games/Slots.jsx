@@ -63,12 +63,6 @@ export default function Slots() {
 
     const navigate = useNavigate();
 
-    // Saldo
-    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
-    const [visualBalance, setVisualBalance] = useState(currentFichas);
-
-    useEffect(() => { setVisualBalance(currentFichas); }, [currentFichas]);
-
     // Estados Juego
     const [gameStarted, setGameStarted] = useState(false);
     const [bet, setBet] = useState(20);
@@ -82,6 +76,12 @@ export default function Slots() {
     const animationRef = useRef(null);
 
     const [isGameActive, setIsGameActive] = useState(false);
+
+    // SALDO DERIVADO, no un estado paralelo que haya que ir resincronizando a mano:
+    // mientras giran los rodillos se descuenta la apuesta y, en cuanto responde el
+    // servidor, el saldo real del usuario manda. Así no puede descuadrarse nunca.
+    const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
+    const visualBalance = isGameActive ? Math.max(0, currentFichas - bet) : currentFichas;
 
     // RESULTADO
     const [result, setResult] = useState({ won: false, payout: 0, winningCells: [] });
@@ -107,10 +107,8 @@ export default function Slots() {
     const handleSpin = async () => {
         if (!gameStarted) { setGameStarted(true); return; }
         if (isGameActive) return;
-        if (visualBalance < bet) { alert("Faltan fichas"); return; }
+        if (visualBalance < bet) { setMsg("No te llegan las fichas"); return; }
 
-        // 1. Cobrar visualmente al instante
-        setVisualBalance(prev => prev - bet);
         setIsGameActive(true);
         setSpinningCols([true, true, true, true]);
         spinningRef.current = [true, true, true, true];
@@ -161,7 +159,6 @@ export default function Slots() {
                 if (res.data.user) {
                     setUser(res.data.user);
                     localStorage.setItem('user', JSON.stringify(res.data.user));
-                    setVisualBalance(res.data.user.gameCoins ?? res.data.user.stats?.gameCoins ?? 0);
                 }
 
                 setIsGameActive(false);
@@ -169,11 +166,11 @@ export default function Slots() {
 
         } catch (error) {
             console.error("Error en Slots:", error);
-            alert(error.response?.data?.message || "Error al tirar");
+            // El saldo se recalcula solo: no hace falta deshacer nada a mano
+            setMsg(error.response?.data?.message || "No se pudo tirar");
             clearInterval(animationRef.current);
             setIsGameActive(false);
             setSpinningCols([false, false, false, false]);
-            setVisualBalance(currentFichas); // Rollback
         }
     };
 

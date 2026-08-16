@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
+import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
@@ -64,6 +64,14 @@ export default function Games() {
             icon: <Ticket size={32} className="text-purple-400" />,
             color: 'from-purple-900/40 to-black border-purple-500/30',
             glow: 'shadow-purple-500/20'
+        },
+        {
+            id: 'tower',
+            name: 'La Torre',
+            desc: 'Sube o piérdelo',
+            icon: <Building2 size={32} className="text-emerald-400" />,
+            color: 'from-emerald-900/40 to-black border-emerald-500/30',
+            glow: 'shadow-emerald-500/20'
         },
         {
             id: 'fortune-wheel',

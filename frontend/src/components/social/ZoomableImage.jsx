@@ -86,6 +86,11 @@ export default function ZoomableImage({ src, alt = '' }) {
 
     const conZoom = escala > 1.05;
 
+    // ⚠️ 'pan-y' a secas impedía el gesto HORIZONTAL: el navegador se comía el
+    // deslizamiento y no se podía pasar de la foto al cuerpo ni al entreno.
+    // Con 'pan-x pan-y' el carrusel desliza y el pellizco sigue siendo nuestro.
+    const touchAction = conZoom ? 'none' : 'pan-x pan-y';
+
     return (
         <div
             ref={marcoRef}
@@ -94,7 +99,7 @@ export default function ZoomableImage({ src, alt = '' }) {
             onTouchEnd={onTouchEnd}
             onDoubleClick={onDoubleClick}
             className="w-full h-full overflow-hidden bg-black relative select-none"
-            style={{ touchAction: conZoom ? 'none' : 'pan-y' }}
+            style={{ touchAction }}
         >
             <img
                 src={src}

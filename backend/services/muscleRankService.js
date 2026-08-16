@@ -1,6 +1,6 @@
 const WorkoutLog = require('../models/WorkoutLog');
 const Exercise = require('../models/Exercise');
-const { MUSCLE_GROUPS, resolveMuscleGroup } = require('../utils/muscles');
+const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 
 /**
  * RANGOS POR MÚSCULO
@@ -90,7 +90,10 @@ const getMuscleRanks = async (userId) => {
     const [logs, exercises] = await Promise.all([
         WorkoutLog.find({ user: userId }).select('type date duration exercises').lean(),
         Exercise.find({ $or: [{ user: userId }, { isCustom: false }, { user: null }] })
-            .select('name muscle secondary isCardio').lean()
+            // ⚠️ Faltaba muscleDetail: sin él todo el volumen se acumulaba en el
+            // grupo grande y la pierna entera subía de rango a la vez, aunque el
+            // ejercicio dijera exactamente qué músculo trabaja.
+            .select('name muscle muscleDetail secondary shares isCardio').lean()
     ]);
 
     // Índice nombre de ejercicio -> músculos, para no consultar por cada serie
@@ -98,19 +101,24 @@ const getMuscleRanks = async (userId) => {
     exercises.forEach(ex => {
         byName[ex.name.toLowerCase()] = {
             muscle: resolveMuscleGroup(ex.muscle),
+            detail: ex.muscleDetail && isSpecificMuscle(ex.muscleDetail) ? ex.muscleDetail.trim() : '',
             secondary: (ex.secondary || []).map(s => resolveMuscleGroup(s)),
+            // El reparto llega como Map de Mongoose o como objeto plano (.lean())
+            shares: ex.shares ? Object.fromEntries(ex.shares instanceof Map ? ex.shares : Object.entries(ex.shares)) : null,
             isCardio: !!ex.isCardio
         };
     });
 
-    // Acumuladores por grupo
+    // Acumuladores: los 8 grupos de siempre MÁS cada músculo concreto.
+    // Se devuelven los dos: el grupo lo siguen usando el ranking y los eventos
+    // de clan, y el músculo concreto es lo que pinta el mapa corporal.
     const stats = {};
-    MUSCLE_GROUPS.forEach(g => {
-        stats[g] = { volume: 0, sets: 0, reps: 0, bestWeight: 0, weeks: new Set() };
-    });
+    const nuevoAcumulador = () => ({ volume: 0, sets: 0, reps: 0, bestWeight: 0, weeks: new Set() });
+    MUSCLE_GROUPS.forEach(g => { stats[g] = nuevoAcumulador(); });
+    Object.values(SPECIFIC_MUSCLES).flat().forEach(m => { stats[m] = nuevoAcumulador(); });
 
-    const addVolume = (group, volume, weekKey, setCount = 0, reps = 0, weight = 0) => {
-        const s = stats[group];
+    const addVolume = (clave, volume, weekKey, setCount = 0, reps = 0, weight = 0) => {
+        const s = stats[clave];
         if (!s) return;
         s.volume += volume;
         s.sets += setCount;
@@ -151,27 +159,57 @@ const getMuscleRanks = async (userId) => {
                 if (kg > mejorPeso) mejorPeso = kg;
             });
 
-            addVolume(info.muscle, volumen, weekKey, (ex.sets || []).length, repeticiones, mejorPeso);
-            // Los secundarios reciben una fracción
-            info.secondary.forEach(sec => {
-                if (sec !== info.muscle) addVolume(sec, volumen * SECONDARY_FACTOR, weekKey);
-            });
+            const nSeries = (ex.sets || []).length;
+
+            if (info.shares) {
+                // REPARTO POR PORCENTAJE (catálogo nuevo).
+                // Cada músculo se lleva su parte del volumen, y su grupo padre
+                // acumula lo mismo para que el ranking de siempre siga cuadrando.
+                const porGrupo = {};
+                Object.entries(info.shares).forEach(([musculo, pct]) => {
+                    const parte = volumen * (Number(pct) || 0) / 100;
+                    if (parte <= 0) return;
+
+                    const esPrincipal = musculo === info.detail || musculo === info.muscle;
+                    addVolume(musculo, parte, weekKey, esPrincipal ? nSeries : 0, esPrincipal ? repeticiones : 0, esPrincipal ? mejorPeso : 0);
+
+                    const grupo = resolveMuscleGroup(musculo, null);
+                    if (grupo && grupo !== musculo) porGrupo[grupo] = (porGrupo[grupo] || 0) + parte;
+                });
+
+                Object.entries(porGrupo).forEach(([grupo, parte]) => {
+                    const esPrincipal = grupo === info.muscle;
+                    addVolume(grupo, parte, weekKey, esPrincipal ? nSeries : 0, esPrincipal ? repeticiones : 0, esPrincipal ? mejorPeso : 0);
+                });
+            } else {
+                // REPARTO ANTIGUO, para los ejercicios que aún no tienen porcentajes
+                addVolume(info.muscle, volumen, weekKey, nSeries, repeticiones, mejorPeso);
+                if (info.detail) {
+                    addVolume(info.detail, volumen, weekKey, nSeries, repeticiones, mejorPeso);
+                }
+                info.secondary.forEach(sec => {
+                    if (sec !== info.muscle) addVolume(sec, volumen * SECONDARY_FACTOR, weekKey);
+                });
+            }
         });
     });
 
     // La puntuación ES el volumen acumulado: kilos movidos, sin más vueltas
     const result = {};
-    MUSCLE_GROUPS.forEach(g => {
-        const s = stats[g];
+    Object.entries(stats).forEach(([clave, s]) => {
         const points = Math.round(s.volume);
+        const esGrupo = MUSCLE_GROUPS.includes(clave);
 
-        result[g] = {
+        result[clave] = {
             points,
             volume: points,
             weeks: s.weeks.size,
             sets: s.sets,
             reps: s.reps,
             bestWeight: s.bestWeight,
+            // Para poder separar en la interfaz los 8 grupos de los músculos concretos
+            isGroup: esGrupo,
+            group: esGrupo ? clave : resolveMuscleGroup(clave),
             ...getRankForPoints(points)
         };
     });
