@@ -238,7 +238,9 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                                     <div className="flex items-center gap-1.5"><span className={`text-sm font-black ${mission.completed ? 'text-zinc-600' : 'text-purple-200'}`}>+{mission.gameCoinReward}</span><img src={ICON_CHIP} className={`w-6 h-6 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="Chips" /></div>
                                 )}
                             </div>
-                            {!mission.completed && (
+                            {/* Las épicas no quitan vida (daño 0). Pintarlo igual
+                                dejaba un "-0 ❤" que no informa de nada. */}
+                            {!mission.completed && damage > 0 && (
                                 <div className="ml-auto flex items-center gap-1.5 opacity-90"><span className="text-sm font-black text-red-400">-{damage}</span><img src={ICON_HEART} className="w-5 h-5 object-contain opacity-80" alt="HP" /></div>
                             )}
                         </div>
@@ -254,7 +256,11 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                     {isPending && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-[22px] z-30">
                             <Loader2 className="animate-spin text-zinc-500 mb-2" /><span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
-                            {amIOwner && <button onClick={(e) => { e.stopPropagation(); onDelete(mission._id); }} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
+                            {/* Llamaba a `onDelete`, que NO es una prop de este
+                                componente: pulsarlo reventaba con ReferenceError.
+                                Va por el mismo camino que el resto de borrados,
+                                con su diálogo de confirmación. */}
+                            {amIOwner && <button onClick={(e) => { e.stopPropagation(); onRequestDelete(mission); }} className="text-[10px] text-red-500 mt-2 hover:underline">Cancelar Invitación</button>}
                         </div>
                     )}
                 </div>

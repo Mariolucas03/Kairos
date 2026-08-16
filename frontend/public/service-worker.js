@@ -1,4 +1,6 @@
-const CACHE_VERSION = 'kairos-v1.0';
+// v1.1: se sube la versión para que la activación borre las cachés viejas, que
+// pueden traer GIFs del CDN guardados por la regla de imágenes de antes.
+const CACHE_VERSION = 'kairos-v1.1';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 
@@ -53,6 +55,16 @@ self.addEventListener('fetch', (event) => {
     if (url.pathname.startsWith('/api/') || event.request.method !== 'GET') {
         return; // Deja que el navegador haga la petición normal a internet
     }
+
+    // 1.b RECURSOS DE OTROS DOMINIOS: que los lleve la caché HTTP del navegador
+    // Los GIFs y miniaturas del catálogo de ejercicios vienen del CDN de
+    // jsDelivr, y sus rutas acaban en .gif, así que caían en la regla de
+    // imágenes de abajo. Eso guardaba respuestas OPACAS (una petición de <img>
+    // a otro dominio no se puede leer) en una caché sin límite: 1.291 GIFs de
+    // ~300 KB, y en varios navegadores cada respuesta opaca ocupa varios MB de
+    // cuota aunque pese menos. Se llenaba el almacenamiento del móvil.
+    // El CDN ya manda cabeceras de caché largas: con dejarlo pasar basta.
+    if (url.origin !== self.location.origin) return;
 
     // 2. ESTRATEGIA PARA IMÁGENES Y ASSETS: Cache First, fallback a Network
     if (url.pathname.startsWith('/assets/') || url.pathname.match(/\.(png|jpg|jpeg|svg|gif|woff2)$/)) {

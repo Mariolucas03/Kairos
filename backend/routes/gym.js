@@ -7,6 +7,7 @@ const {
     deleteRoutine,
     updateRoutine,
     getAllExercises,
+    getExerciseById,
     createCustomExercise,
     saveWorkoutLog,
     saveSportLog,
@@ -44,6 +45,9 @@ router.get('/muscles', protect, getMuscleCatalog);
 // Nivel/rango de cada grupo muscular
 router.get('/muscle-ranks', protect, getMuscleRanksController);
 router.post('/exercises', protect, createCustomExercise);
+// Ficha de un ejercicio (GIF + instrucciones). Va DESPUÉS de las rutas fijas
+// como /exercises/muscles para que ":id" no se las trague.
+router.get('/exercises/:id', protect, getExerciseById);
 
 // Logs / Registros
 // 🛡️ AQUÍ APLICAMOS LA VALIDACIÓN JOI ANTES DEL CONTROLADOR

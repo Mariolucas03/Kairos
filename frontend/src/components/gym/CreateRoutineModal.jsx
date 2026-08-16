@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash } from 'lucide-react';
+import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play } from 'lucide-react';
 import api from '../../services/api';
 import ExerciseSelector from './ExerciseSelector';
+import ExerciseSheet from './ExerciseSheet';
 
 // Colores disponibles para la tarjeta de rutina
 const ROUTINE_COLORS = [
@@ -25,6 +26,8 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     // Estados UI
     const [showExerciseSelector, setShowExerciseSelector] = useState(false);
     const [loading, setLoading] = useState(false);
+    // Nombre del ejercicio cuya ficha (GIF + ejecución) está abierta
+    const [fichaAbierta, setFichaAbierta] = useState(null);
 
     // Cargar datos si editamos
     useEffect(() => {
@@ -110,6 +113,10 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     return createPortal(
         <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col h-[100dvh] w-full animate-in slide-in-from-bottom-5 duration-300">
 
+            {fichaAbierta && (
+                <ExerciseSheet exerciseName={fichaAbierta} onClose={() => setFichaAbierta(null)} />
+            )}
+
             {/* HEADER */}
             <div className="pt-4 pb-4 px-6 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between shrink-0 safe-top">
                 <h2 className="font-black text-white text-xl uppercase italic tracking-wide flex items-center gap-2">
@@ -194,9 +201,23 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                         </div>
                                         <div className="min-w-0 pr-2">
                                             <h4 className="text-white font-bold text-sm uppercase truncate">{ex.name}</h4>
-                                            <span className="text-[10px] text-zinc-500 font-bold uppercase bg-black px-2 py-0.5 rounded border border-zinc-800 mt-1 inline-block">
-                                                {ex.muscle}
-                                            </span>
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <span className="text-[10px] text-zinc-500 font-bold uppercase bg-black px-2 py-0.5 rounded border border-zinc-800 inline-block">
+                                                    {ex.muscle}
+                                                </span>
+                                                {/* Ver la ejecución también aquí: al montar la rutina
+                                                    ya sólo tienes el nombre, y con 1.291 ejercicios
+                                                    en el catálogo muchos no se distinguen por él.
+                                                    Va por nombre porque la rutina guarda
+                                                    subdocumentos sin referencia al catálogo. */}
+                                                <button
+                                                    onClick={() => setFichaAbierta(ex.name)}
+                                                    className="w-6 h-6 rounded-md bg-black border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:border-zinc-600 active:scale-95 transition-all shrink-0"
+                                                    aria-label={`Ver ejecución de ${ex.name}`}
+                                                >
+                                                    <Play size={10} fill="currentColor" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 

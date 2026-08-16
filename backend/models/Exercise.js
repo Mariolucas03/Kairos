@@ -15,6 +15,28 @@ const exerciseSchema = new mongoose.Schema({
     // Los de cardio puntúan por duración, no por kg levantados
     isCardio: { type: Boolean, default: false },
     equipment: { type: String, default: "Barra" },
+    // Familia de equipamiento ('Pesas', 'Máquina', 'Polea'...). Es el segundo
+    // nivel del selector: dentro de un grupo muscular hay hasta 245 ejercicios.
+    equipmentGroup: { type: String, default: 'Otros' },
+
+    // --- DEMOSTRACIÓN VISUAL (catálogo de GIFs) ---
+    // ⚠️ Sin declarar aquí, mongoose en modo strict los descarta EN SILENCIO al
+    // guardar, que es justo lo que pasó antes con `photo` y `type` en las series.
+
+    // Identificador estable del ejercicio en el catálogo externo. Es la clave de
+    // sincronización: el nombre puede cambiar de redacción, el slug no.
+    slug: { type: String, default: null },
+    // GIF de ejecución y miniatura estática. Se sirven desde el CDN de jsDelivr,
+    // no se guardan en el repositorio ni en la base de datos.
+    gif: { type: String, default: '' },
+    thumb: { type: String, default: '' },
+    // Pasos de ejecución, tal cual vienen del catálogo
+    instructions: { type: [String], default: [] },
+    // Zona del cuerpo ('arms', 'legs'...). Informativo, para agrupar y filtrar.
+    bodyPart: { type: String, default: '' },
+    // Los 82 ejercicios de siempre. El selector los muestra por defecto, porque
+    // una lista plana de 1291 no hay quien la use.
+    isCore: { type: Boolean, default: false },
 
     // --- NUEVOS CAMPOS NECESARIOS PARA EL FIX ---
 
@@ -39,5 +61,7 @@ const exerciseSchema = new mongoose.Schema({
 
 // Índice compuesto: Permite buscar rápido ejercicios por nombre para un usuario específico
 exerciseSchema.index({ name: 1, user: 1 });
+// El selector pide por grupo y prioriza los del catálogo base
+exerciseSchema.index({ muscle: 1, isCore: -1, name: 1 });
 
 module.exports = mongoose.model('Exercise', exerciseSchema);

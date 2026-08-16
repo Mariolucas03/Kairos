@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Search, X, Dumbbell, Plus, CheckCircle2, Save } from 'lucide-react';
+import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Play } from 'lucide-react';
 import api from '../../services/api';
+import ExerciseSheet from './ExerciseSheet';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
 const GRUPOS_POR_DEFECTO = ['Pecho', 'Espalda', 'Hombro', 'Bíceps', 'Tríceps', 'Pierna', 'Glúteo', 'Abdomen'];
+const FAMILIAS_POR_DEFECTO = ['Pesas', 'Máquina', 'Polea', 'Peso corporal', 'Otros'];
 
 export default function ExerciseSelector({ onSelect, onClose }) {
     const [exercises, setExercises] = useState([]);
@@ -13,6 +15,20 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMuscle, setSelectedMuscle] = useState('Todos');
     const [loading, setLoading] = useState(true);
+
+    // Ficha abierta (GIF + ejecución)
+    const [fichaAbierta, setFichaAbierta] = useState(null);
+
+    // El catálogo tiene 1291 ejercicios: la lista ya no se trae entera y se
+    // filtra en el móvil. Sin filtros el servidor manda sólo los básicos (los
+    // 82 de siempre) y los tuyos; al buscar o elegir grupo, busca en todo.
+    const [busquedaAplicada, setBusquedaAplicada] = useState('');
+    useEffect(() => {
+        const t = setTimeout(() => setBusquedaAplicada(searchTerm.trim()), 300);
+        return () => clearTimeout(t);
+    }, [searchTerm]);
+
+    const modoBasicos = !busquedaAplicada && selectedMuscle === 'Todos';
 
     // --- CREAR EJERCICIO ---
     // Es una pantalla propia con su botón siempre a la vista. Antes la única
@@ -29,17 +45,27 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     const { data: catalog } = useSWR('/gym/muscles', fetcher);
     const groups = catalog?.groups || GRUPOS_POR_DEFECTO;
     const muscles = ['Todos', ...groups];
+    // El orden lo manda el backend (utils/equipment.js) para no tener dos listas
+    const familias = catalog?.equipmentGroups || FAMILIAS_POR_DEFECTO;
 
     useEffect(() => {
+        let vivo = true;
         const fetchExercises = async () => {
+            setLoading(true);
             try {
-                const res = await api.get('/gym/exercises');
-                setExercises(res.data);
+                const res = await api.get('/gym/exercises', {
+                    params: {
+                        ...(selectedMuscle !== 'Todos' && { muscle: selectedMuscle }),
+                        ...(busquedaAplicada && { q: busquedaAplicada })
+                    }
+                });
+                if (vivo) setExercises(res.data);
             } catch (error) { console.error(error); }
-            finally { setLoading(false); }
+            finally { if (vivo) setLoading(false); }
         };
         fetchExercises();
-    }, []);
+        return () => { vivo = false; };
+    }, [selectedMuscle, busquedaAplicada]);
 
     // LÓGICA DE SELECCIÓN POR ORDEN (1, 2, 3...)
     const toggleSelection = (exercise) => {
@@ -87,17 +113,22 @@ export default function ExerciseSelector({ onSelect, onClose }) {
         }
     };
 
-    // Filtrado
-    const filtered = exercises.filter(ex => {
-        const matchName = ex.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchMuscle = selectedMuscle === 'Todos' || ex.muscle === selectedMuscle;
-        return matchName && matchMuscle;
-    });
+    // El filtrado lo hace el servidor (ver el useEffect de arriba): con 1291
+    // ejercicios, traérselos todos para descartarlos en el móvil eran cientos
+    // de KB por apertura.
+    const filtered = exercises;
 
-    // Agrupados por músculo y en el orden oficial de grupos, en vez de una
-    // lista plana de 82 ejercicios donde no se encontraba nada.
+    // Dos niveles: grupo muscular y, dentro, la familia de equipamiento.
+    // Con 245 ejercicios en Pierna una sola lista no se recorre; separados por
+    // Pesas / Máquina / Polea / Peso corporal se busca por lo que tienes libre.
     const agrupados = groups
-        .map(g => [g, filtered.filter(ex => ex.muscle === g)])
+        .map(g => {
+            const delGrupo = filtered.filter(ex => ex.muscle === g);
+            const secciones = familias
+                .map(f => [f, delGrupo.filter(ex => (ex.equipmentGroup || 'Otros') === f)])
+                .filter(([, lista]) => lista.length > 0);
+            return [g, delGrupo, secciones];
+        })
         .filter(([, lista]) => lista.length > 0);
 
     return (
@@ -149,19 +180,47 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                         </button>
                     ))}
                 </div>
+
+                {/* Sin esto la lista parece incompleta: por defecto sólo salen
+                    los básicos, y no hay forma de adivinar que hay 1.200 más. */}
+                {modoBasicos && !loading && (
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide leading-tight">
+                        Básicos ({filtered.length}). Busca o elige un grupo para ver el catálogo completo.
+                    </p>
+                )}
+                {!modoBasicos && !loading && filtered.length >= 300 && (
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide leading-tight">
+                        Primeros 300 resultados. Afina la búsqueda si no lo encuentras.
+                    </p>
+                )}
             </div>
 
             {/* LISTA DE EJERCICIOS, AGRUPADA POR MÚSCULO */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-black p-4 space-y-2 pb-24">
+            {/* Sin padding ARRIBA a propósito: `sticky top-0` se ancla al borde
+                del área de scroll, así que con `p-4` la cabecera se quedaba 16px
+                más abajo y por esa franja se veían pasar las filas. El hueco lo
+                pone ahora la propia cabecera con su `pt-4`. */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-black px-4 pt-0 pb-24 space-y-2">
                 {loading ? <div className="text-center py-10 text-zinc-600 animate-pulse font-bold text-xs uppercase">Cargando...</div> :
-                    agrupados.map(([grupo, lista]) => (
+                    agrupados.map(([grupo, lista, secciones]) => (
                         <div key={grupo} className="mb-4">
-                            <div className="flex items-center justify-between px-1 mb-2 sticky top-0 bg-black py-1 z-10">
+                            {/* Cabecera del grupo muscular: se queda pegada
+                                mientras recorres sus ejercicios */}
+                            <div className="flex items-center justify-between px-1 mb-2 sticky top-0 bg-black pt-4 pb-1.5 z-10">
                                 <h3 className="text-[10px] font-black text-yellow-500 uppercase tracking-widest">{grupo}</h3>
                                 <span className="text-[9px] font-bold text-zinc-600">{lista.length}</span>
                             </div>
+                            {secciones.map(([familia, ejercicios]) => (
+                            <div key={familia} className="mb-3">
+                                {/* Subgrupo de equipamiento. No es sticky a
+                                    propósito: dos cabeceras pegadas se pisan. */}
+                                <div className="flex items-center gap-2 px-1 mb-1.5">
+                                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{familia}</span>
+                                    <div className="h-px flex-1 bg-zinc-900" />
+                                    <span className="text-[9px] font-bold text-zinc-700">{ejercicios.length}</span>
+                                </div>
                             <div className="space-y-2">
-                                {lista.map(ex => {
+                                {ejercicios.map(ex => {
                                     const selectionIndex = selectedExercises.findIndex(s => s._id === ex._id);
                                     const isSelected = selectionIndex !== -1;
                                     const secundarios = (ex.secondary || []).filter(s => s !== ex.muscle);
@@ -173,25 +232,51 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                             className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-98 ${isSelected ? 'bg-yellow-900/20 border-yellow-500/50' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}
                                         >
                                             <div className="flex items-center gap-4 min-w-0">
-                                                <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-black transition-all ${isSelected ? 'bg-yellow-500 text-black text-xl shadow-lg shadow-yellow-500/20' : 'bg-black text-zinc-600'}`}>
-                                                    {isSelected ? (selectionIndex + 1) : <Dumbbell size={20} />}
+                                                {/* Miniatura del ejercicio. `loading="lazy"` es lo que
+                                                    evita que abrir un grupo dispare 200 descargas de
+                                                    golpe: sólo baja lo que entra en pantalla. */}
+                                                <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-black transition-all overflow-hidden ${isSelected ? 'bg-yellow-500 text-black text-xl shadow-lg shadow-yellow-500/20' : ex.thumb ? 'bg-white' : 'bg-black text-zinc-600'}`}>
+                                                    {isSelected ? (selectionIndex + 1) : ex.thumb ? (
+                                                        <img
+                                                            src={ex.thumb}
+                                                            alt=""
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                        />
+                                                    ) : <Dumbbell size={20} />}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className={`font-bold text-sm uppercase truncate ${isSelected ? 'text-yellow-500' : 'text-zinc-300'}`}>{ex.name}</p>
-                                                    {/* Los músculos que trabaja: principal y, si los tiene, secundarios */}
+                                                    {/* El grupo y la familia ya los dicen las cabeceras:
+                                                        aquí va el equipamiento concreto (Multipower,
+                                                        Barra Z...) y los músculos secundarios. */}
                                                     <p className="text-[10px] text-zinc-600 font-bold uppercase truncate">
-                                                        {ex.muscle}
+                                                        {ex.equipment || ex.muscle}
                                                         {secundarios.length > 0 && (
                                                             <span className="text-zinc-700 normal-case"> · también {secundarios.join(', ')}</span>
                                                         )}
                                                     </p>
                                                 </div>
                                             </div>
-                                            {isSelected ? <CheckCircle2 className="text-yellow-500 shrink-0" size={24} /> : <div className="w-6 h-6 rounded-full border-2 border-zinc-800 shrink-0"></div>}
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {/* Ver la ejecución sin seleccionar el ejercicio */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setFichaAbierta(ex); }}
+                                                    className="w-8 h-8 rounded-lg bg-black border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:border-zinc-600 active:scale-95 transition-all"
+                                                    aria-label={`Ver ejecución de ${ex.name}`}
+                                                >
+                                                    <Play size={13} fill="currentColor" />
+                                                </button>
+                                                {isSelected ? <CheckCircle2 className="text-yellow-500" size={24} /> : <div className="w-6 h-6 rounded-full border-2 border-zinc-800"></div>}
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
+                            </div>
+                            ))}
                         </div>
                     ))
                 }
@@ -208,6 +293,10 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                     </div>
                 )}
             </div>
+
+            {fichaAbierta && (
+                <ExerciseSheet exercise={fichaAbierta} onClose={() => setFichaAbierta(null)} />
+            )}
 
             {/* --- PANTALLA DE CREAR EJERCICIO --- */}
             {showCreate && (

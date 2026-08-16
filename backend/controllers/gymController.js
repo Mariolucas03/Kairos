@@ -12,7 +12,11 @@ const { askAI } = require('../services/aiService');
 // entre las 00:00 y las 02:00 se guardaba en el día ANTERIOR.
 const { getTodayDateString } = require('../utils/dateHelpers');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
-const { EXERCISE_CATALOG } = require('../utils/exerciseCatalog');
+const { FAMILIAS, familiaDe } = require('../utils/equipment');
+// Catálogo completo (1291): los 82 curados de exerciseCatalog.js con su GIF
+// enganchado, más la ampliación de ExerciseGymGifsDB. Lo genera a mano
+// scripts/generateExerciseCatalog.js; aquí sólo se lee.
+const EXERCISE_CATALOG = require('../data/exercises.json');
 const { SPORTS, getSport, estimateCalories } = require('../utils/sportCatalog');
 const { getMuscleRanks, getExerciseProgress, RANKS } = require('../services/muscleRankService');
 
@@ -75,20 +79,50 @@ const deleteRoutine = async (req, res) => {
     }
 };
 
+// Sin esto, un usuario que busque "press (" hace que `new RegExp` reviente
+const escaparRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Tope de resultados de una búsqueda. Con 1291 ejercicios, devolverlos todos
+// son cientos de KB por petición y una lista que nadie va a recorrer entera.
+const LIMITE_BUSQUEDA = 300;
+
+/**
+ * Lista de ejercicios para el selector.
+ *
+ * El catálogo pasó de 82 a 1291 al integrar los GIFs, así que ya no se puede
+ * devolver entero en cada apertura:
+ *  - Sin filtros manda los 82 de siempre (isCore) más los del usuario.
+ *  - Con búsqueda o grupo concreto busca en todo el catálogo, con tope.
+ *  - `instructions` nunca viaja aquí: son 5 frases por ejercicio y sólo hacen
+ *    falta en la ficha, que se pide de una en una.
+ */
 const getAllExercises = async (req, res) => {
     try {
         // Nos aseguramos de que el catálogo base esté al día sin que el usuario
         // tenga que llamar a /seed a mano (solo hace trabajo si falta algo).
         await syncExerciseCatalog();
 
-        const { muscle } = req.query;
-        let query = {};
-        if (muscle && muscle !== 'Todos') query.muscle = muscle;
+        const { muscle, q, all } = req.query;
+        const busqueda = (q || '').trim();
+        const grupo = muscle && muscle !== 'Todos' ? muscle : null;
 
-        const exercises = await Exercise.find({
-            ...query,
+        // ¿Hay que salir del catálogo base? Sólo si el usuario ha pedido algo.
+        const ampliar = !!busqueda || !!grupo || all === '1';
+
+        const query = {
             $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
-        }).sort({ name: 1 }).lean(); // .lean() para que sea ultrarrápido
+        };
+        if (grupo) query.muscle = grupo;
+        if (busqueda) query.name = new RegExp(escaparRegex(busqueda), 'i');
+        // Los propios del usuario se ven siempre, estén o no en el catálogo base
+        if (!ampliar) query.$and = [{ $or: [{ isCore: true }, { isCustom: true }] }];
+
+        const exercises = await Exercise.find(query)
+            .select('-instructions')
+            // Primero los de siempre, y dentro de cada bloque por nombre
+            .sort({ isCore: -1, name: 1 })
+            .limit(ampliar ? LIMITE_BUSQUEDA : 0)
+            .lean();
 
         res.json(exercises);
     } catch (error) {
@@ -96,9 +130,26 @@ const getAllExercises = async (req, res) => {
     }
 };
 
+/**
+ * Ficha completa de un ejercicio: es la única que trae las instrucciones.
+ */
+const getExerciseById = async (req, res) => {
+    try {
+        const ejercicio = await Exercise.findOne({
+            _id: req.params.id,
+            $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
+        }).lean();
+
+        if (!ejercicio) return res.status(404).json({ message: 'Ejercicio no encontrado' });
+        res.json(ejercicio);
+    } catch (error) {
+        res.status(500).json({ message: 'Error cargando el ejercicio' });
+    }
+};
+
 const createCustomExercise = async (req, res) => {
     try {
-        const { name, muscle, muscleDetail, secondary } = req.body;
+        const { name, muscle, muscleDetail, secondary, equipment } = req.body;
         if (!name) return res.status(400).json({ message: 'Falta el nombre del ejercicio' });
         if (!muscle && !muscleDetail) return res.status(400).json({ message: 'Falta el músculo' });
 
@@ -125,11 +176,18 @@ const createCustomExercise = async (req, res) => {
         }).lean();
         if (yaExiste) return res.status(409).json({ message: 'Ya existe un ejercicio con ese nombre' });
 
+        // Sin esto el ejercicio se guardaba con equipment 'Barra' (el defecto del
+        // esquema) pero equipmentGroup 'Otros', y aparecía en la sección
+        // equivocada del selector.
+        const equipo = equipment || 'Barra';
+
         const exercise = await Exercise.create({
             name: nombreLimpio,
             muscle: grupo,
             muscleDetail: detalle,
             secondary: secundarios,
+            equipment: equipo,
+            equipmentGroup: familiaDe(equipo),
             category: 'strength',
             user: req.user._id,
             isCustom: true
@@ -161,7 +219,10 @@ const getMuscleCatalog = async (req, res) => {
     // ejercicio, los músculos secundarios que quieras añadirle.
     res.json({
         groups: MUSCLE_GROUPS,
-        specific: SPECIFIC_MUSCLES
+        specific: SPECIFIC_MUSCLES,
+        // El orden de las secciones de equipamiento lo manda el servidor, para
+        // que no haya dos listas que mantener en sitios distintos.
+        equipmentGroups: FAMILIAS
     });
 };
 
@@ -190,6 +251,9 @@ const syncExerciseCatalog = async ({ force = false } = {}) => {
         return { synced: false, total: EXERCISE_CATALOG.length };
     }
 
+    // El filtro sigue siendo el NOMBRE, no el slug: las rutinas y el historial
+    // de entrenos referencian los ejercicios por nombre, así que los 82 de
+    // siempre tienen que seguir siendo el mismo documento y conservar su _id.
     await Exercise.bulkWrite(EXERCISE_CATALOG.map(ex => ({
         updateOne: {
             filter: { name: ex.name, isCustom: { $ne: true } },
@@ -200,15 +264,22 @@ const syncExerciseCatalog = async ({ force = false } = {}) => {
                     muscleDetail: ex.muscleDetail || '',
                     secondary: ex.secondary || [],
                     equipment: ex.equipment || 'Barra',
+                    equipmentGroup: ex.equipmentGroup || familiaDe(ex.equipment),
                     isCardio: !!ex.isCardio,
                     category: ex.isCardio ? 'cardio' : 'strength',
+                    slug: ex.slug || null,
+                    gif: ex.gif || '',
+                    thumb: ex.thumb || '',
+                    instructions: ex.instructions || [],
+                    bodyPart: ex.bodyPart || '',
+                    isCore: !!ex.isCore,
                     isCustom: false,
                     user: null
                 }
             },
             upsert: true
         }
-    })));
+    })), { ordered: false });
 
     ultimaHuellaSincronizada = CATALOG_FINGERPRINT;
     return { synced: true, total: EXERCISE_CATALOG.length };
@@ -734,7 +805,7 @@ const chatRoutineGenerator = async (req, res) => {
 
 module.exports = {
     getRoutines, createRoutine, deleteRoutine, updateRoutine,
-    getAllExercises, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
+    getAllExercises, getExerciseById, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,
     getExerciseProgressController, getTrainedExercises,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,

@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 import ExerciseSelector from './ExerciseSelector';
+import ExerciseSheet from './ExerciseSheet';
 import BodyMap from '../body/BodyMap';
 import { compressImage } from '../../utils/imageCompressor';
 
@@ -114,6 +115,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
     });
 
     const [intensity, setIntensity] = useState('Media');
+
+    // Nombre del ejercicio cuya ficha (GIF + ejecución) está abierta
+    const [fichaAbierta, setFichaAbierta] = useState(null);
 
     const [restTargetTime, setRestTargetTime] = useState(() => {
         const saved = localStorage.getItem(REST_KEY);
@@ -462,6 +466,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 </div>
             </div>
 
+            {fichaAbierta && (
+                <ExerciseSheet exerciseName={fichaAbierta} onClose={() => setFichaAbierta(null)} />
+            )}
+
             {/* LISTA */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar bg-black pb-40">
                 {exercises.map((ex, exIdx) => (
@@ -484,6 +492,8 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                         </span>
                                     </div>
                                 )}
+                                {/* Ver cómo se hace sin salir del entreno */}
+                                <button onClick={() => setFichaAbierta(ex.name)} className="p-1.5 bg-zinc-900 rounded-lg text-zinc-400 border border-zinc-800 hover:bg-zinc-800 hover:text-white active:scale-95" aria-label={`Ver ejecución de ${ex.name}`}><Play size={16} fill="currentColor" /></button>
                                 <button onClick={() => handleOpenSwap(exIdx)} className="p-1.5 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 active:scale-95"><RefreshCw size={16} /></button>
                             </div>
                         </div>
