@@ -26,6 +26,11 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     // Estados UI
     const [showExerciseSelector, setShowExerciseSelector] = useState(false);
     const [loading, setLoading] = useState(false);
+    // Mensaje de error del formulario (nombre vacío, sin ejercicios, fallo al
+    // guardar). Se usaba en cinco sitios pero faltaba declararlo: el componente
+    // lanzaba "errorMsg is not defined" nada más renderizarse, así que abrir
+    // "Nueva rutina" tiraba la pantalla entera.
+    const [errorMsg, setErrorMsg] = useState(null);
     // Nombre del ejercicio cuya ficha (GIF + ejecución) está abierta
     const [fichaAbierta, setFichaAbierta] = useState(null);
 

@@ -254,33 +254,40 @@ const syncExerciseCatalog = async ({ force = false } = {}) => {
     // El filtro sigue siendo el NOMBRE, no el slug: las rutinas y el historial
     // de entrenos referencian los ejercicios por nombre, así que los 82 de
     // siempre tienen que seguir siendo el mismo documento y conservar su _id.
-    await Exercise.bulkWrite(EXERCISE_CATALOG.map(ex => ({
-        updateOne: {
-            filter: { name: ex.name, isCustom: { $ne: true } },
-            update: {
-                $set: {
-                    name: ex.name,
-                    muscle: ex.muscle,
-                    muscleDetail: ex.muscleDetail || '',
-                    secondary: ex.secondary || [],
-                    shares: ex.shares || undefined,
-                    equipment: ex.equipment || 'Barra',
-                    equipmentGroup: ex.equipmentGroup || familiaDe(ex.equipment),
-                    isCardio: !!ex.isCardio,
-                    category: ex.isCardio ? 'cardio' : 'strength',
-                    slug: ex.slug || null,
-                    gif: ex.gif || '',
-                    thumb: ex.thumb || '',
-                    instructions: ex.instructions || [],
-                    bodyPart: ex.bodyPart || '',
-                    isCore: !!ex.isCore,
-                    isCustom: false,
-                    user: null
-                }
-            },
-            upsert: true
-        }
-    })), { ordered: false });
+    await Exercise.bulkWrite(EXERCISE_CATALOG.map(ex => {
+        const campos = {
+            name: ex.name,
+            muscle: ex.muscle,
+            muscleDetail: ex.muscleDetail || '',
+            secondary: ex.secondary || [],
+            equipment: ex.equipment || 'Barra',
+            equipmentGroup: ex.equipmentGroup || familiaDe(ex.equipment),
+            isCardio: !!ex.isCardio,
+            category: ex.isCardio ? 'cardio' : 'strength',
+            slug: ex.slug || null,
+            gif: ex.gif || '',
+            thumb: ex.thumb || '',
+            instructions: ex.instructions || [],
+            bodyPart: ex.bodyPart || '',
+            isCore: !!ex.isCore,
+            isCustom: false,
+            user: null
+        };
+
+        // `shares` (reparto del esfuerzo por músculo concreto) sólo lo traen los
+        // ejercicios curados, y es lo que usan los rangos musculares. La clave
+        // se añade SÓLO si existe: ponerla a `undefined` para los demás la
+        // guardaba como null y dejaba sin reparto a ejercicios que sí lo tenían.
+        if (ex.shares) campos.shares = ex.shares;
+
+        return {
+            updateOne: {
+                filter: { name: ex.name, isCustom: { $ne: true } },
+                update: { $set: campos },
+                upsert: true
+            }
+        };
+    }), { ordered: false });
 
     ultimaHuellaSincronizada = CATALOG_FINGERPRINT;
     return { synced: true, total: EXERCISE_CATALOG.length };
