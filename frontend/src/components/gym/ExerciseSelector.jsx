@@ -192,20 +192,23 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                     ))}
                 </div>
 
-                {/* Filtro por equipamiento. Segunda fila, más discreta que la de
-                    músculos: el músculo es lo que buscas, el equipo es con qué
-                    lo haces. Sólo se ofrecen las familias que tienen algo. */}
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {/* Subfiltro de equipamiento: MISMA pastilla que la fila de
+                    músculos —mismo tamaño, mismo radio, mismo borde— para que se
+                    lean como el mismo control. Lo único que cambia es el color
+                    del activo: amarillo el músculo (lo que buscas), blanco el
+                    equipo (con qué lo haces). Así se ve que es un nivel por
+                    debajo sin inventarse otra forma de botón.
+                    Sólo se ofrecen las familias que tienen algo. */}
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                     {['Todos', ...familias.filter(f => cuentaEquipo[f] > 0)].map(f => (
                         <button
                             key={f}
                             onClick={() => setEquipoActivo(f)}
-                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap border transition-colors ${equipoActivo === f
+                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap border transition-colors ${equipoActivo === f
                                 ? 'bg-zinc-100 text-black border-zinc-100'
-                                : 'bg-transparent text-zinc-600 border-zinc-800 hover:text-zinc-400'}`}
+                                : 'bg-black text-zinc-500 border-zinc-800'}`}
                         >
                             {f}
-                            {f !== 'Todos' && <span className="ml-1.5 opacity-50">{cuentaEquipo[f]}</span>}
                         </button>
                     ))}
                 </div>
