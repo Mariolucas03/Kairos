@@ -16,12 +16,23 @@ import BackButton from '../components/common/BackButton';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
-// Estilo visual por rareza: borde, brillo y etiqueta
+/**
+ * Rareza: UN tono por tier, igual que el resto de la app.
+ *
+ * Antes cada rareza traía borde de color, sombra exterior encendida y un halo
+ * al 20%: cuatro niveles compitiendo y la cuadrícula entera vibrando. Ahora el
+ * color va donde va en todo Kairos —la línea de acento de 2px y la etiqueta— y
+ * la tarjeta es la misma superficie que las del Home, el Arcade y Misiones.
+ *
+ * `shadow-[0_0_15px_...]` además nunca llegó a existir: son clases con valor
+ * arbitrario que Tailwind sí genera, pero el brillo quedaba tapado por el
+ * `overflow-hidden` de la propia tarjeta.
+ */
 const RARITIES = {
-    comun: { label: 'Común', border: 'border-zinc-800', glow: '', text: 'text-zinc-500', blob: 'bg-zinc-500' },
-    raro: { label: 'Raro', border: 'border-blue-500/40', glow: 'shadow-[0_0_15px_rgba(59,130,246,0.15)]', text: 'text-blue-400', blob: 'bg-blue-500' },
-    epico: { label: 'Épico', border: 'border-purple-500/50', glow: 'shadow-[0_0_18px_rgba(168,85,247,0.2)]', text: 'text-purple-400', blob: 'bg-purple-500' },
-    legendario: { label: 'Legendario', border: 'border-yellow-500/60', glow: 'shadow-[0_0_22px_rgba(234,179,8,0.25)]', text: 'text-yellow-400', blob: 'bg-yellow-500' }
+    comun: { label: 'Común', accent: '#71717a', text: 'text-zinc-500' },
+    raro: { label: 'Raro', accent: '#3b82f6', text: 'text-blue-400' },
+    epico: { label: 'Épico', accent: '#a855f7', text: 'text-purple-400' },
+    legendario: { label: 'Legendario', accent: '#eab308', text: 'text-yellow-400' }
 };
 
 const CATEGORIES = [
@@ -183,7 +194,7 @@ export default function Shop() {
             {/* HEADER PRO (SIN BOTÓN RESET) */}
             <div className="flex justify-between items-end px-4 pt-6 pb-2 bg-black border-b border-zinc-900">
                 <div>
-                    <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">MERCADO</h1>
+                    <h1 className="text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Mercado</h1>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Gasta tu fortuna</p>
                 </div>
             </div>
@@ -278,14 +289,22 @@ export default function Shop() {
                                             key={item._id}
                                             onClick={() => { if (!purchased) setSelectedItem(item); }}
                                             className={`
-                                                relative bg-zinc-950 border rounded-3xl p-4 flex flex-col items-center justify-between transition-all min-h-[160px] overflow-hidden
-                                                ${rarity.border} ${rarity.glow}
-                                                ${purchased ? 'opacity-40 grayscale cursor-default' : 'cursor-pointer active:scale-95 hover:brightness-125'}
+                                                relative bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex flex-col items-center justify-between transition-all min-h-[160px] overflow-hidden
+                                                ${purchased ? 'opacity-40 grayscale cursor-default' : 'cursor-pointer active:scale-[0.985]'}
                                             `}
                                         >
-                                            {/* Halo de color según rareza */}
+                                            {/* Línea de acento de 2px con el color de la rareza */}
+                                            <div
+                                                className="absolute inset-x-0 top-0 h-[2px] z-20 pointer-events-none"
+                                                style={{ background: `linear-gradient(90deg, ${rarity.accent}, transparent)` }}
+                                            />
+
+                                            {/* Halo suave del mismo color, al 11% como el resto */}
                                             {item.rarity && item.rarity !== 'comun' && (
-                                                <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-20 pointer-events-none ${rarity.blob}`} />
+                                                <div
+                                                    className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none"
+                                                    style={{ background: rarity.accent, opacity: 0.11 }}
+                                                />
                                             )}
 
                                             <div className="h-14 w-14 mb-2 flex items-center justify-center relative z-10">
