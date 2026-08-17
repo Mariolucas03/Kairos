@@ -281,14 +281,19 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
-                                                {/* Ver la ejecución sin seleccionar el ejercicio */}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setFichaAbierta(ex); }}
-                                                    className="w-8 h-8 rounded-lg bg-black border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:border-zinc-600 active:scale-95 transition-all"
-                                                    aria-label={`Ver ejecución de ${ex.name}`}
-                                                >
-                                                    <Play size={13} fill="currentColor" />
-                                                </button>
+                                                {/* Ver la ejecución sin seleccionar el ejercicio. Sólo
+                                                    si hay GIF: los que creas tú no tienen ninguno, y
+                                                    el botón invitaba a pulsar para encontrarte un
+                                                    "no hay demostración". */}
+                                                {ex.gif && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setFichaAbierta(ex); }}
+                                                        className="w-8 h-8 rounded-lg bg-black border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:border-zinc-600 active:scale-95 transition-all"
+                                                        aria-label={`Ver ejecución de ${ex.name}`}
+                                                    >
+                                                        <Play size={13} fill="currentColor" />
+                                                    </button>
+                                                )}
                                                 {isSelected ? <CheckCircle2 className="text-yellow-500" size={24} /> : <div className="w-6 h-6 rounded-full border-2 border-zinc-800"></div>}
                                             </div>
                                         </div>

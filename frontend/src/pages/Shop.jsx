@@ -28,6 +28,11 @@ const fetcher = (url) => api.get(url).then(res => res.data);
  * arbitrario que Tailwind sí genera, pero el brillo quedaba tapado por el
  * `overflow-hidden` de la propia tarjeta.
  */
+// Las dos monedas del juego, cada una con su tono: monedas amarillas, fichas
+// moradas. Es el mismo par que usa la cabecera de la app.
+const ACENTO_TIENDA = '#eab308';
+const ACENTO_FICHAS = '#a855f7';
+
 const RARITIES = {
     comun: { label: 'Común', accent: '#71717a', text: 'text-zinc-500' },
     raro: { label: 'Raro', accent: '#3b82f6', text: 'text-blue-400' },
@@ -216,14 +221,16 @@ export default function Shop() {
 
                 {/* WIDGET CASA DE CAMBIO (Solo en tienda principal) */}
                 {activeTab === 'shop' && !selectedCategory && (
-                    <div onClick={() => setShowExchange(true)} className="mb-6 bg-zinc-950 border border-purple-500/20 rounded-[32px] p-5 flex items-center justify-between cursor-pointer active:scale-95 transition-all hover:bg-zinc-900 group shadow-[0_0_20px_rgba(168,85,247,0.15)]">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors border border-purple-500/10">
-                                <ArrowRightLeft size={24} />
+                    <div onClick={() => setShowExchange(true)} className="mb-5 relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 flex items-center justify-between cursor-pointer active:scale-[0.985] transition-all">
+                        <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
+                        <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
+                        <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-12 h-12 rounded-[16px] bg-[#18181b] border border-white/[0.07] flex items-center justify-center" style={{ color: ACENTO_FICHAS }}>
+                                <ArrowRightLeft size={22} />
                             </div>
                             <div>
-                                <h3 className="text-white font-black text-lg italic uppercase tracking-tight">Casa de Cambio</h3>
-                                <p className="text-xs text-zinc-500 font-bold uppercase">100 Fichas ➔ 1 Moneda</p>
+                                <h3 className="text-white font-black text-[15px] uppercase tracking-[0.02em] leading-none not-italic">Casa de cambio</h3>
+                                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide mt-1.5">100 fichas · 1 moneda</p>
                             </div>
                         </div>
                     </div>
@@ -233,9 +240,10 @@ export default function Shop() {
                 {!selectedCategory ? (
                     <div className="grid grid-cols-2 gap-3 pb-8 animate-in fade-in slide-in-from-bottom-4">
                         {CATEGORIES.map(cat => (
-                            <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="aspect-[4/3] bg-zinc-950 border border-zinc-800 rounded-[28px] flex flex-col items-center justify-center gap-2 hover:border-yellow-500/30 transition-all active:scale-95 cursor-pointer group relative overflow-hidden shadow-lg">
-                                <div className="text-zinc-600 group-hover:text-yellow-500 group-hover:scale-110 transition-all duration-300 relative z-10">{cat.icon}</div>
-                                <span className="font-black text-[10px] text-zinc-500 group-hover:text-white tracking-widest relative z-10 uppercase">{cat.label}</span>
+                            <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="aspect-[4/3] bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] flex flex-col items-center justify-center gap-2.5 transition-all active:scale-[0.985] cursor-pointer group relative overflow-hidden">
+                                <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_TIENDA}, transparent)` }} />
+                                <div className="text-zinc-600 group-hover:text-zinc-300 transition-colors relative z-10">{cat.icon}</div>
+                                <span className="font-black text-[10px] text-zinc-500 group-hover:text-white tracking-[0.16em] relative z-10 uppercase not-italic">{cat.label}</span>
                             </div>
                         ))}
                     </div>
@@ -350,26 +358,47 @@ export default function Shop() {
             {/* MODALES FULL SCREEN */}
 
             {/* 1. Detalle / Compra */}
-            {selectedItem && (
-                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
-                    <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 relative flex flex-col items-center text-center shadow-2xl">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
+            {selectedItem && (() => {
+                // El acento del modal es el de la rareza del objeto que acabas de
+                // tocar: ata la ficha con la tarjeta de la que vienes. Antes era un
+                // borrón amarillo fijo, igual para un común que para un legendario.
+                const rarezaSel = RARITIES[selectedItem.rarity] || RARITIES.comun;
+                return (
+                <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
+                    <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-[32px] p-8 relative flex flex-col items-center text-center shadow-2xl overflow-hidden">
+                        {/* Acento de 2px + halo al 11%, como las tarjetas */}
+                        <div
+                            className="absolute inset-x-0 top-0 h-[2px] pointer-events-none"
+                            style={{ background: `linear-gradient(90deg, ${rarezaSel.accent}, transparent)` }}
+                        />
+                        <div
+                            className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none"
+                            style={{ background: rarezaSel.accent, opacity: 0.11 }}
+                        />
 
-                        <button onClick={() => setSelectedItem(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full transition-colors border border-zinc-800"><X size={20} /></button>
+                        <button onClick={() => setSelectedItem(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full transition-colors border border-zinc-800 z-20"><X size={20} /></button>
 
-                        <div className="w-28 h-28 bg-zinc-900 rounded-3xl flex items-center justify-center mb-6 shadow-inner border border-zinc-800 overflow-hidden relative">
-                            {(selectedItem.icon?.startsWith('/') || selectedItem.icon?.startsWith('http')) ? <img src={selectedItem.icon} className="w-full h-full object-cover" /> : <div className="text-6xl animate-bounce-slow">{selectedItem.icon}</div>}
+                        <div className="w-28 h-28 bg-[#18181b] rounded-[24px] flex items-center justify-center mb-5 border border-white/[0.07] overflow-hidden relative z-10">
+                            {(selectedItem.icon?.startsWith('/') || selectedItem.icon?.startsWith('http')) ? <img src={selectedItem.icon} className="w-full h-full object-cover" /> : <div className="text-6xl">{selectedItem.icon}</div>}
                         </div>
 
-                        <h2 className="text-xl font-black uppercase text-white mb-2 leading-tight italic tracking-wide">{selectedItem.name}</h2>
-                        <p className="text-xs font-bold text-zinc-500 mb-8 uppercase tracking-widest px-4">
+                        {/* La rareza no se veía en ningún sitio de la ficha */}
+                        <span
+                            className="relative z-10 text-[9px] font-black uppercase tracking-[0.16em] px-2.5 py-1 rounded-lg border not-italic mb-3"
+                            style={{ color: rarezaSel.accent, borderColor: rarezaSel.accent + '55', backgroundColor: rarezaSel.accent + '15' }}
+                        >
+                            {rarezaSel.label}
+                        </span>
+
+                        <h2 className="relative z-10 text-[22px] font-black uppercase text-white leading-none tracking-[-0.045em] not-italic">{selectedItem.name}</h2>
+                        <p className="relative z-10 text-[12px] text-zinc-500 mb-7 mt-2.5 leading-snug px-2">
                             {selectedItem.description || "Sin descripción disponible"}
                         </p>
 
                         <button
                             onClick={activeTab === 'shop' ? handleBuy : handleUse}
                             disabled={isProcessing}
-                            className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95 border-b-4 flex items-center justify-center gap-2
+                            className={`relative z-10 w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-xs transition-all active:scale-95 border-b-4 flex items-center justify-center gap-2
                                 ${activeTab === 'shop'
                                     ? (selectedItem.category === 'reward' ? 'bg-yellow-500 text-black hover:bg-yellow-400 border-yellow-700' : 'bg-purple-600 text-white hover:bg-purple-500 border-purple-800')
                                     : 'bg-green-600 text-white hover:bg-green-500 border-green-800'
@@ -378,22 +407,24 @@ export default function Shop() {
                             {isProcessing ? <Loader2 className="animate-spin" /> : (
                                 activeTab === 'shop' ? (
                                     <>
-                                        COMPRAR • {selectedItem.price}
-                                        <img src={selectedItem.category === 'reward' ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png"} className="w-5 h-5 object-contain mt-0.5" />
+                                        Comprar · {selectedItem.price}
+                                        <img src={selectedItem.category === 'reward' ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png"} className="w-5 h-5 object-contain" />
                                     </>
-                                ) : (selectedItem.category === 'chest' ? 'ABRIR COFRE' : 'USAR ITEM')
+                                ) : (selectedItem.category === 'chest' ? 'Abrir cofre' : 'Usar objeto')
                             )}
                         </button>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* 2. Crear Premio */}
             {showCreator && (
-                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
-                    <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-[32px] p-6 relative shadow-2xl">
+                <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
+                    <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-[32px] p-6 relative shadow-2xl overflow-hidden">
+                        <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_TIENDA}, transparent)` }} />
                         <div className="flex justify-between items-center mb-6 relative z-10">
-                            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Nuevo <span className="text-yellow-500">Premio</span></h3>
+                            <h3 className="text-[20px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Nuevo premio</h3>
                             <button onClick={() => setShowCreator(false)} className="text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full border border-zinc-800"><X size={20} /></button>
                         </div>
 
@@ -406,8 +437,8 @@ export default function Shop() {
                                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 block mb-2 tracking-widest">Precio</label>
                                 <input type="number" placeholder="Ej: 100" value={newReward.price} onChange={e => setNewReward({ ...newReward, price: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-sm outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors placeholder:text-zinc-700" />
                             </div>
-                            <button onClick={handleCreate} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mt-4 transition-all active:scale-95 flex items-center justify-center gap-2 border-b-4 border-yellow-700 uppercase tracking-widest text-xs">
-                                <Save size={16} /> CREAR PREMIO
+                            <button onClick={handleCreate} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mt-4 transition-all active:scale-95 flex items-center justify-center gap-2 border-b-4 border-yellow-700 uppercase tracking-[0.12em] text-xs">
+                                <Save size={16} /> Crear premio
                             </button>
                         </div>
                     </div>
@@ -416,16 +447,19 @@ export default function Shop() {
 
             {/* 3. Modal Canje */}
             {showExchange && (
-                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in h-screen w-screen">
-                    <div className="bg-zinc-950 w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl relative">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
+                <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in h-screen w-screen">
+                    <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-white/[0.07] p-6 shadow-2xl relative overflow-hidden">
+                        {/* Acento y halo de la casa de cambio: morado, el color de
+                            las fichas, que es lo que entregas aquí. */}
+                        <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
+                        <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
 
-                        <div className="flex justify-between items-center mb-8 relative z-10">
-                            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Casa de <span className="text-yellow-500">Cambio</span></h3>
+                        <div className="flex justify-between items-center mb-7 relative z-10">
+                            <h3 className="text-[20px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Casa de cambio</h3>
                             <button onClick={() => setShowExchange(false)} className="text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full border border-zinc-800"><X size={20} /></button>
                         </div>
 
-                        <div className="flex items-center justify-between mb-8 bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800 relative z-10">
+                        <div className="flex items-center justify-between mb-7 bg-[#18181b] p-4 rounded-[24px] border border-white/[0.07] relative z-10">
                             <div className="text-center flex flex-col items-center">
                                 <span className="block text-2xl font-black text-purple-400 leading-none mb-2">{exchangeAmount}</span>
                                 <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest flex items-center gap-1">
@@ -457,8 +491,8 @@ export default function Shop() {
                             </div>
                         </div>
 
-                        <button onClick={handleExchange} disabled={isExchanging} className="w-full py-4 bg-yellow-500 text-black rounded-2xl font-black shadow-lg hover:bg-yellow-400 active:scale-95 transition-all flex justify-center items-center gap-2 border-b-4 border-yellow-700 uppercase tracking-widest text-xs relative z-10">
-                            {isExchanging ? <Loader2 className="animate-spin" /> : 'CONFIRMAR CANJE'}
+                        <button onClick={handleExchange} disabled={isExchanging} className="w-full py-4 bg-yellow-500 text-black rounded-2xl font-black hover:bg-yellow-400 active:scale-95 transition-all flex justify-center items-center gap-2 border-b-4 border-yellow-700 uppercase tracking-[0.12em] text-xs relative z-10">
+                            {isExchanging ? <Loader2 className="animate-spin" /> : 'Confirmar canje'}
                         </button>
                     </div>
                 </div>
