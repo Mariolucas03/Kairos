@@ -18,6 +18,17 @@ const ICON_COIN = "/assets/icons/moneda.png";
 const ICON_CHIP = "/assets/icons/ficha.png";
 const ICON_HEART = "/assets/icons/corazon.png";
 
+// Acento de la pantalla (el amarillo de `yellow-500` que ya usan el icono de
+// editar, los bordes de foco y el modal). Se usaba en el botón de nueva misión
+// pero no estaba declarado: la pantalla entera reventaba con
+// "ACENTO is not defined" nada más entrar en Misiones.
+const ACENTO = '#eab308';
+
+// Inicial de cada día, indexada por el número que devuelve getDay() (0 = domingo).
+// La usa la fila de días de las misiones diarias, y tampoco estaba declarada:
+// era el segundo "is not defined" esperando detrás del anterior.
+const DAY_LABELS = { 0: 'D', 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S' };
+
 const COOP_COLORS = [
     'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-indigo-500'
 ];
@@ -74,10 +85,22 @@ const DIFFICULTY = {
     epic: { accent: '#a855f7', label: 'Épica' }
 };
 
-const getGradientStyles = (diff, completed) => {
+/**
+ * Se llamaba `getGradientStyles` pero MissionCard la invoca como `estiloMision`:
+ * un renombrado a medias que dejaba la pantalla entera con
+ * "estiloMision is not defined".
+ *
+ * Devuelve el color con DOS nombres, `accent` y `color`, porque la tarjeta usa
+ * los dos: la línea de acento y el halo leen `accent`, y el chip de dificultad
+ * y el botón de incremento leen `color`. Sin el alias, esos tres pintaban
+ * "undefined1f" como color y se quedaban transparentes.
+ */
+const estiloMision = (diff, completed) => {
     const base = DIFFICULTY[diff] || { accent: '#71717a', label: diff };
-    if (completed) return { accent: '#3f3f46', label: 'Hecho', completed: true };
-    return { ...base, completed: false };
+    const salida = completed
+        ? { accent: '#3f3f46', label: 'Hecho', completed: true }
+        : { ...base, completed: false };
+    return { ...salida, color: salida.accent };
 };
 
 function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId, onEdit, viewAllMode }) {

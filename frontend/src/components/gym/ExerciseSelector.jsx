@@ -18,6 +18,8 @@ export default function ExerciseSelector({ onSelect, onClose }) {
 
     // Ficha abierta (GIF + ejecución)
     const [fichaAbierta, setFichaAbierta] = useState(null);
+    // Filtro por familia de equipamiento: 'Todos', 'Pesas', 'Máquina'...
+    const [equipoActivo, setEquipoActivo] = useState('Todos');
 
     // El catálogo tiene 1291 ejercicios: la lista ya no se trae entera y se
     // filtra en el móvil. Sin filtros el servidor manda sólo los básicos (los
@@ -122,18 +124,23 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     // de KB por apertura.
     const filtered = exercises;
 
-    // Dos niveles: grupo muscular y, dentro, la familia de equipamiento.
-    // Con 245 ejercicios en Pierna una sola lista no se recorre; separados por
-    // Pesas / Máquina / Polea / Peso corporal se busca por lo que tienes libre.
+    // El equipamiento es un FILTRO, no una división de la lista: partir cada
+    // grupo muscular en cinco secciones dejaba cabeceras por todas partes y
+    // obligaba a bajar entre bloques que no te interesan. Ahora eliges "Polea"
+    // y ves sólo poleas.
+    const porEquipo = equipoActivo === 'Todos'
+        ? filtered
+        : filtered.filter(ex => (ex.equipmentGroup || 'Otros') === equipoActivo);
+
     const agrupados = groups
-        .map(g => {
-            const delGrupo = filtered.filter(ex => ex.muscle === g);
-            const secciones = familias
-                .map(f => [f, delGrupo.filter(ex => (ex.equipmentGroup || 'Otros') === f)])
-                .filter(([, lista]) => lista.length > 0);
-            return [g, delGrupo, secciones];
-        })
+        .map(g => [g, porEquipo.filter(ex => ex.muscle === g)])
         .filter(([, lista]) => lista.length > 0);
+
+    // Cuántos hay de cada familia, para no ofrecer filtros que dan lista vacía
+    const cuentaEquipo = familias.reduce((acc, f) => {
+        acc[f] = filtered.filter(ex => (ex.equipmentGroup || 'Otros') === f).length;
+        return acc;
+    }, {});
 
     return (
         <div className="fixed inset-0 z-[110] bg-zinc-950 flex flex-col h-[100dvh] w-full animate-in slide-in-from-right duration-300">
@@ -185,6 +192,24 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                     ))}
                 </div>
 
+                {/* Filtro por equipamiento. Segunda fila, más discreta que la de
+                    músculos: el músculo es lo que buscas, el equipo es con qué
+                    lo haces. Sólo se ofrecen las familias que tienen algo. */}
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    {['Todos', ...familias.filter(f => cuentaEquipo[f] > 0)].map(f => (
+                        <button
+                            key={f}
+                            onClick={() => setEquipoActivo(f)}
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap border transition-colors ${equipoActivo === f
+                                ? 'bg-zinc-100 text-black border-zinc-100'
+                                : 'bg-transparent text-zinc-600 border-zinc-800 hover:text-zinc-400'}`}
+                        >
+                            {f}
+                            {f !== 'Todos' && <span className="ml-1.5 opacity-50">{cuentaEquipo[f]}</span>}
+                        </button>
+                    ))}
+                </div>
+
                 {/* Sin esto la lista parece incompleta: por defecto sólo salen
                     los básicos, y no hay forma de adivinar que hay 1.200 más. */}
                 {modoBasicos && !loading && (
@@ -206,7 +231,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                 pone ahora la propia cabecera con su `pt-4`. */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-black px-4 pt-0 pb-24 space-y-2">
                 {loading ? <div className="text-center py-10 text-zinc-600 animate-pulse font-bold text-xs uppercase">Cargando...</div> :
-                    agrupados.map(([grupo, lista, secciones]) => (
+                    agrupados.map(([grupo, lista]) => (
                         <div key={grupo} className="mb-4">
                             {/* Cabecera del grupo muscular: se queda pegada
                                 mientras recorres sus ejercicios */}
@@ -214,17 +239,8 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                 <h3 className="text-[10px] font-black text-yellow-500 uppercase tracking-widest">{grupo}</h3>
                                 <span className="text-[9px] font-bold text-zinc-600">{lista.length}</span>
                             </div>
-                            {secciones.map(([familia, ejercicios]) => (
-                            <div key={familia} className="mb-3">
-                                {/* Subgrupo de equipamiento. No es sticky a
-                                    propósito: dos cabeceras pegadas se pisan. */}
-                                <div className="flex items-center gap-2 px-1 mb-1.5">
-                                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{familia}</span>
-                                    <div className="h-px flex-1 bg-zinc-900" />
-                                    <span className="text-[9px] font-bold text-zinc-700">{ejercicios.length}</span>
-                                </div>
                             <div className="space-y-2">
-                                {ejercicios.map(ex => {
+                                {lista.map(ex => {
                                     const selectionIndex = selectedExercises.findIndex(s => s._id === ex._id);
                                     const isSelected = selectionIndex !== -1;
                                     const secundarios = (ex.secondary || []).filter(s => s !== ex.muscle);
@@ -279,13 +295,11 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                     );
                                 })}
                             </div>
-                            </div>
-                            ))}
                         </div>
                     ))
                 }
 
-                {!loading && filtered.length === 0 && (
+                {!loading && porEquipo.length === 0 && (
                     <div className="text-center py-12">
                         <Dumbbell className="mx-auto text-zinc-800 mb-3" size={32} />
                         <p className="text-zinc-600 text-xs font-bold uppercase mb-4">

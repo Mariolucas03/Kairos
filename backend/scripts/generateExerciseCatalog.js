@@ -188,6 +188,57 @@ const ALIAS = {
     'Elevación de Piernas': 'lying-leg-raise-flat-bench',
     'Elevación de Rodillas en Paralelas': 'vertical-leg-raise-on-parallel-bars',
     'Plancha Lateral': 'bodyweight-incline-side-plank',
+    // --- Segunda tanda: los que se añadieron al catálogo curado después de la
+    // primera importación. Todos comprobados contra el repo uno a uno.
+    // Pecho
+    'Aperturas Inclinadas': 'dumbbell-incline-fly',
+    'Flexiones Declinadas': 'decline-push-up',
+    'Flexiones Diamante': 'diamond-push-up',
+    'Press de Banca en Multipower': 'smith-bench-press',
+    'Press Inclinado en Multipower': 'smith-incline-bench-press',
+    'Fondos Asistidos': 'assisted-chest-dip-kneeling',
+    // Espalda
+    'Dominadas Supinas': 'chin-up',
+    'Dominadas Neutras': 'chin-ups-narrow-parallel-grip',
+    'Dominadas Lastradas': 'weighted-pull-up',
+    'Dominadas Asistidas': 'assisted-pull-up',
+    'Jalón Tras Nuca': 'cable-wide-grip-rear-pulldown-behind-neck',
+    'Buenos Días': 'barbell-good-morning',
+    'Encogimientos con Barra': 'barbell-shrug',
+    'Encogimientos en Polea': 'cable-shrug',
+    'Pull-over en Polea': 'cable-lying-extension-pullover-with-rope-attachment',
+    // Hombro
+    'Press de Hombro en Máquina': 'lever-shoulder-press',
+    'Press Militar en Multipower': 'smith-standing-military-press',
+    'Pájaros en Máquina': 'lever-seated-reverse-fly',
+    'Pájaros en Polea': 'cable-standing-cross-over-high-reverse-fly',
+    'Rotación Interna en Polea': 'cable-seated-shoulder-internal-rotation',
+    // Bíceps
+    'Curl Araña': 'ez-barbell-spider-curl',
+    // Tríceps
+    'Extensión con Cuerda': 'cable-pushdown-with-rope-attachment',
+    'Extensión sobre la Cabeza en Polea': 'cable-rope-high-pulley-overhead-tricep-extension',
+    'Press Francés con Mancuernas': 'dumbbell-lying-triceps-extension',
+    'Extensión a una Mano': 'cable-one-arm-tricep-pushdown',
+    // Pierna
+    'Sentadilla Sissy': 'sissy-squat',
+    'Sentadilla en Multipower': 'smith-squat',
+    'Sentadilla Sumo': 'smith-sumo-squat',
+    'Zancadas Caminando': 'walking-lunge',
+    'Curl Nórdico': 'self-assisted-inverse-leg-curl',
+    'Aductores en Polea': 'cable-hip-adduction',
+    'Elevación de Gemelos a una Pierna': 'single-leg-calf-raise-on-a-dumbbell',
+    'Elevación de Gemelos en Prensa': 'sled-calf-press-on-leg-press',
+    'Elevación de Gemelos en Multipower': 'smith-standing-leg-calf-raise',
+    // Glúteo
+    'Hip Thrust': 'resistance-band-hip-thrusts-on-knees-female',
+    'Abducción con Banda': 'resistance-band-seated-hip-abduction',
+    'Puente de Glúteo con Banda': 'low-glute-bridge-on-floor',
+    // Abdomen
+    'Elevación de Piernas Colgado': 'hanging-leg-raise',
+    'Mountain Climbers': 'mountain-climber',
+    'Encogimientos en Banco': 'reverse-crunch',
+
     // Cardio
     'Cinta de Correr': 'walking-on-incline-treadmill',
     'Bicicleta Estática': 'stationary-bike-run-v-3',
