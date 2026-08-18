@@ -197,7 +197,7 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                                                     <div
                                                         key={idx}
                                                         className={`rounded-xl px-3 py-2 ${record
-                                                            ? 'border-2 border-yellow-500 bg-gradient-to-br from-yellow-500/20 to-yellow-500/[0.04] shadow-[0_0_18px_-4px_rgba(234,179,8,0.65)]'
+                                                            ? 'border-2 border-yellow-500 bg-yellow-500/[0.08]'
                                                             : 'border border-white/5 bg-zinc-900/60'}`}
                                                     >
                                                         <div className="flex items-center justify-between mb-1 gap-2">

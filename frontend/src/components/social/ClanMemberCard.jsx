@@ -36,11 +36,11 @@ export default function ClanMemberCard({
 
     // Los tres primeros del clan se destacan, igual que en el ranking
     const podio = position === 1
-        ? { color: 'text-yellow-400', ring: 'border-yellow-500/40 bg-gradient-to-r from-yellow-900/15 to-transparent' }
+        ? { color: 'text-yellow-400', ring: 'border-yellow-500/40 bg-[#0a0a0c]' }
         : position === 2
-            ? { color: 'text-zinc-300', ring: 'border-zinc-500/30 bg-gradient-to-r from-zinc-800/30 to-transparent' }
+            ? { color: 'text-zinc-300', ring: 'border-zinc-500/30 bg-[#0a0a0c]' }
             : position === 3
-                ? { color: 'text-orange-400', ring: 'border-orange-600/30 bg-gradient-to-r from-orange-900/15 to-transparent' }
+                ? { color: 'text-orange-400', ring: 'border-orange-600/30 bg-[#0a0a0c]' }
                 : { color: 'text-zinc-600', ring: 'border-white/5 bg-zinc-950' };
 
     return (

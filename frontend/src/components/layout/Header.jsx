@@ -15,8 +15,8 @@ const customAnimationsStyle = `
 `;
 
 const getLevelStyle = (level) => {
-    if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-smooth-gradient";
-    if (level >= 90) return "bg-cyan-900/40 text-cyan-400 border-cyan-500/40 shadow-[0_0_8px_rgba(34,211,238,0.2)]";
+    if (level >= 100) return "bg-gradient-to-r from-red-500 via-purple-500 via-blue-500 via-green-500 to-red-500 text-white border-white/50 animate-smooth-gradient";
+    if (level >= 90) return "bg-cyan-900/40 text-cyan-400 border-cyan-500/40";
     if (level >= 80) return "bg-pink-900/40 text-pink-400 border-pink-500/40";
     if (level >= 70) return "bg-purple-900/40 text-purple-400 border-purple-500/40";
     if (level >= 60) return "bg-red-900/40 text-red-400 border-red-500/40";
@@ -82,7 +82,7 @@ export default function Header() {
                     </Link>
 
                     <div className="flex flex-col justify-center w-full max-w-[140px] sm:max-w-[220px]">
-                        <span className="text-[9px] sm:text-[10px] text-gold-500/80 italic font-bold tracking-wider mb-0.5 truncate uppercase">
+                        <span className="text-[9px] sm:text-[10px] text-gold-500/80 font-bold tracking-[0.16em] mb-0.5 truncate uppercase not-italic">
                             {userTitle}
                         </span>
                         <div className="flex items-center gap-2 mb-1 overflow-hidden">
@@ -94,7 +94,8 @@ export default function Header() {
                             </span>
                         </div>
                         <div className="relative w-full h-2.5 sm:h-3.5 bg-zinc-900 rounded-full border border-zinc-700 overflow-hidden shadow-inner">
-                            <div className="h-full bg-gradient-to-r from-blue-600 to-purple-500 transition-all duration-500 ease-out" style={{ width: `${xpPercent}%` }} />
+                            {/* Un tono, no degradado: el sistema pide color plano por métrica */}
+                            <div className="h-full transition-all duration-500 ease-out" style={{ width: `${xpPercent}%`, background: '#3b82f6' }} />
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <span className="text-[8px] sm:text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                                     {currentXP}/{nextLevelXP} XP

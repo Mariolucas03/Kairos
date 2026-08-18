@@ -64,7 +64,8 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
         let textColors = "";
 
         if (isToday) {
-            containerStyle = "bg-gradient-to-b from-purple-600 to-indigo-700 border-2 border-purple-300 shadow-[0_0_30px_rgba(168,85,247,0.6)] scale-110 z-20 ring-4 ring-purple-500/20 translate-y-[-8px]";
+            // El día de hoy destaca por tamaño y borde, no por un degradado con halo
+            containerStyle = "bg-[#18181b] border-2 border-purple-500 scale-110 z-20 translate-y-[-8px]";
             textColors = "text-white";
         } else if (isPast) {
             if (isClaimed || (isViewOnly && day <= currentDay)) {
@@ -134,7 +135,7 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}></div>
             <div className="relative z-10 w-full max-w-lg flex flex-col items-center animate-in zoom-in-95 duration-300">
                 <div className="text-center mb-8">
-                    <h2 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-purple-300 to-indigo-500 uppercase tracking-tighter drop-shadow-lg">{message}</h2>
+                    <h2 className="text-3xl md:text-4xl font-black text-purple-300 uppercase tracking-[-0.045em] not-italic">{message}</h2>
                     <p className="text-purple-300/80 font-bold text-sm tracking-widest mt-2 uppercase">{subMessage}</p>
                 </div>
                 <div className="flex items-center justify-center gap-2 md:gap-3 mb-10 w-full px-2 py-8">
@@ -143,7 +144,7 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
                 <button
                     onClick={isViewOnly ? onClose : onClaim}
                     disabled={claiming}
-                    className={`w-full max-w-xs py-4 rounded-2xl font-black text-xl uppercase tracking-widest shadow-[0_0_40px_rgba(147,51,234,0.4)] transition-all transform active:scale-95 hover:scale-105 border-b-4 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-wait ${isViewOnly ? 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700 hover:text-white' : 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-indigo-800 hover:brightness-110'}`}
+                    className={`w-full max-w-xs py-4 rounded-2xl font-black text-xl uppercase tracking-widest transition-all transform active:scale-95 hover:scale-105 border-b-4 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-wait ${isViewOnly ? 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700 hover:text-white' : 'bg-purple-600 text-white border-purple-800 hover:brightness-110'}`}
                 >
                     {claiming && <Loader2 size={20} className="animate-spin" />}
                     {claiming ? 'RECLAMANDO...' : buttonText}

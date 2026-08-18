@@ -26,7 +26,7 @@ export default function ClanPreviewModal({ clanId, currentUserId, userClanId, on
                 ) : clanData ? (
                     <>
                         <div className="relative bg-zinc-900 p-6 pb-8 border-b border-white/10 shrink-0">
-                            <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent pointer-events-none"></div>
+                            
                             <div className="flex flex-col items-center relative z-10">
                                 <div className="text-5xl mb-3 filter drop-shadow-lg">{clanData.icon}</div>
                                 <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter text-center leading-none mb-2">{clanData.name}</h2>
@@ -37,7 +37,7 @@ export default function ClanPreviewModal({ clanId, currentUserId, userClanId, on
                                         <Users size={10} /> {clanData.members.length} Miembros
                                     </span>
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 border border-purple-500/50 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.3)]">
+                                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#18181b] border border-white/[0.07] text-purple-400">
                                             <Zap size={14} fill="currentColor" />
                                         </div>
                                         <div className="flex flex-col">

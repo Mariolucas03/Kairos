@@ -8,15 +8,17 @@ export default function RankingItem({ player, index, isMe, isViewable, onViewPro
 
     if (index === 0) {
         rankIcon = <Crown size={24} className="text-yellow-400 fill-yellow-400 animate-pulse" />;
-        rankStyles = "border-yellow-500/50 bg-gradient-to-r from-yellow-900/20 to-black shadow-[0_0_15px_rgba(234,179,8,0.2)]";
+        // Un tono por puesto, sin degradado ni halo: el podio se distingue por el
+        // borde y el color del número, igual que la rareza en la Tienda.
+        rankStyles = "border-yellow-500/40 bg-[#0a0a0c]";
         textStyle = "text-yellow-400";
     } else if (index === 1) {
         rankIcon = <Medal size={24} className="text-zinc-300 fill-zinc-300" />;
-        rankStyles = "border-zinc-400/30 bg-gradient-to-r from-zinc-800/40 to-black";
+        rankStyles = "border-zinc-400/30 bg-[#0a0a0c]";
         textStyle = "text-zinc-200";
     } else if (index === 2) {
         rankIcon = <Medal size={24} className="text-orange-600 fill-orange-600" />;
-        rankStyles = "border-orange-600/30 bg-gradient-to-r from-orange-900/20 to-black";
+        rankStyles = "border-orange-600/30 bg-[#0a0a0c]";
         textStyle = "text-orange-200";
     }
 

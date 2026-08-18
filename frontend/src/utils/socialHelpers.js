@@ -27,11 +27,14 @@ export const RANK_CONFIG = {
     esclavo: { label: 'ESCLAVO', color: 'text-zinc-500 border-zinc-700 bg-zinc-800/50', value: 0 }
 };
 
+// `bg` es un color PLANO, no paradas de degradado. Antes era "from-x to-y",
+// que sólo pinta acompañado de `bg-gradient-to-r`: usado suelto no pinta NADA
+// y la barra de progreso se quedaba invisible. Un tono por evento.
 export const EVENT_CONFIG = {
-    volume: { title: "Titanes del Hierro", unit: "KG", icon: Dumbbell, color: "text-blue-400", bg: "from-blue-600 to-cyan-500", border: "border-blue-500/30" },
-    missions: { title: "Cruzada Disciplina", unit: "MISIONES", icon: Target, color: "text-green-400", bg: "from-green-600 to-emerald-500", border: "border-green-500/30" },
-    calories: { title: "Horno Humano", unit: "KCAL", icon: Flame, color: "text-orange-400", bg: "from-orange-600 to-red-500", border: "border-orange-500/30" },
-    xp: { title: "Era de Sabiduría", unit: "XP", icon: Zap, color: "text-purple-400", bg: "from-purple-600 to-indigo-500", border: "border-purple-500/30" }
+    volume: { title: "Titanes del Hierro", unit: "KG", icon: Dumbbell, color: "text-blue-400", bg: "bg-blue-500", border: "border-blue-500/30" },
+    missions: { title: "Cruzada Disciplina", unit: "MISIONES", icon: Target, color: "text-green-400", bg: "bg-green-500", border: "border-green-500/30" },
+    calories: { title: "Horno Humano", unit: "KCAL", icon: Flame, color: "text-orange-400", bg: "bg-orange-500", border: "border-orange-500/30" },
+    xp: { title: "Era de Sabiduría", unit: "XP", icon: Zap, color: "text-purple-400", bg: "bg-purple-500", border: "border-purple-500/30" }
 };
 
 export const customAnimationsStyle = `

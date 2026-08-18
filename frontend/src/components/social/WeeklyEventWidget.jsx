@@ -35,7 +35,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                 <span className="text-lg font-black text-white">{percent.toFixed(1)}%</span>
             </div>
             <div className="relative h-2.5 bg-black rounded-full overflow-hidden border border-white/10">
-                <div className={`h-full bg-gradient-to-r ${config.bg} transition-all duration-1000`} style={{ width: `${percent}%` }}></div>
+                <div className={`h-full ${config.bg} transition-all duration-1000`} style={{ width: `${percent}%` }}></div>
             </div>
             <p className="text-center text-[9px] text-zinc-500 font-bold mt-3 uppercase tracking-widest">
                 {total.toLocaleString()} / {goal.toLocaleString()} {config.unit}
@@ -67,7 +67,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                             <span>{total.toLocaleString()} / {goal.toLocaleString()} {config.unit}</span>
                         </div>
                         <div className="h-3 bg-black rounded-full overflow-hidden border border-white/10 relative">
-                            <div className={`h-full bg-gradient-to-r ${config.bg} transition-all duration-1000`} style={{ width: `${percent}%` }}></div>
+                            <div className={`h-full ${config.bg} transition-all duration-1000`} style={{ width: `${percent}%` }}></div>
                         </div>
                     </div>
                 </div>
@@ -104,7 +104,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                 <div onClick={() => setShowRewards(!showRewards)} className="absolute bottom-0 left-0 right-0 bg-zinc-900 border-t border-white/10 p-4 cursor-pointer hover:bg-zinc-800 transition-colors z-40">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full bg-gradient-to-r ${config.bg} text-white shadow-lg`}><Gift size={20} /></div>
+                            <div className={`p-2 rounded-full ${config.bg} text-white`}><Gift size={20} /></div>
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-white uppercase">Premios</span>
                                 <span className="text-[10px] text-zinc-500">Toca para abrir</span>
