@@ -10,8 +10,7 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
     const [loading, setLoading] = useState(false);
     const [bestPR, setBestPR] = useState(0);
 
-    // --- ESTILO VISUAL "TITANIUM GOLD" ---
-    const gradientClasses = "from-yellow-500 via-amber-400 to-yellow-600";
+
 
     useEffect(() => {
         const fetchExercises = async () => {
@@ -51,13 +50,12 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
                     w-full relative rounded-[32px] overflow-hidden
                     group cursor-pointer active:scale-[0.99] transition-all duration-200
                     p-[2px] h-[160px]
-                    bg-gradient-to-br from-zinc-100 via-zinc-400 to-zinc-600
-                    shadow-[0_0_25px_rgba(255,255,255,0.15)]
+                    bg-zinc-300
                 `}
             >
                 <div className="h-full w-full bg-zinc-950 rounded-[30px] flex flex-col justify-between relative overflow-hidden z-10">
                     <div className="px-5 pt-5 flex justify-between items-start z-10 shrink-0">
-                        <h2 className="text-xl font-black text-white italic uppercase tracking-tighter leading-none drop-shadow-md flex items-center gap-2">
+                        <h2 className="text-xl font-black text-white not-italic uppercase tracking-tighter leading-none drop-shadow-md flex items-center gap-2">
                             FUERZA 1RM
                         </h2>
                         <div className="bg-yellow-500/20 p-2 rounded-full border border-yellow-500/50 text-yellow-400">
@@ -66,7 +64,7 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
                     </div>
                     <div className="flex-1 flex flex-col items-center justify-center z-10 -mt-2">
                         <div className="flex items-baseline gap-1 animate-in zoom-in duration-300">
-                            <span className="text-6xl font-black tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400 drop-shadow-lg not-italic">
+                            <span className="text-6xl font-black tracking-[-0.05em] leading-none text-white not-italic">
                                 {bestPR || '--'}
                             </span>
                             <span className="text-2xl font-black uppercase text-yellow-500 tracking-tighter not-italic">KG</span>
@@ -76,7 +74,7 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
                         </span>
                     </div>
                     <div className="absolute bottom-0 left-0 w-full h-3 z-0">
-                        <div className="h-full w-full bg-gradient-to-r from-yellow-600 via-yellow-400 to-white shadow-[0_-2px_20px_rgba(234,179,8,0.5)]"></div>
+                        <div className="h-full w-full bg-yellow-500"></div>
                     </div>
                 </div>
             </div>
@@ -88,15 +86,15 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
         <div className="bg-[#09090b] border border-white/10 w-full rounded-[40px] p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden h-[500px]">
 
             {/* Decoración Fondo */}
-            <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${gradientClasses}`}></div>
-            <div className={`absolute -top-20 -right-20 w-60 h-60 rounded-full blur-3xl pointer-events-none bg-gradient-to-bl ${gradientClasses} opacity-10`}></div>
+            <div className="absolute top-0 left-0 w-full h-[2px]" style={{ background: 'linear-gradient(90deg, #eab308, transparent)' }}></div>
+            <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: '#eab308', opacity: 0.11 }}></div>
 
             {/* HEADER CON BOTÓN X DENTRO */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-20 shrink-0">
                 <div className="flex justify-between w-full items-start">
                     <div>
                         <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2 not-italic">
-                            PROGRESO <span className={`text-transparent bg-clip-text bg-gradient-to-r ${gradientClasses} filter brightness-125`}>FUERZA</span>
+                            PROGRESO <span className="text-yellow-500">FUERZA</span>
                         </h2>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Tu evolución histórica</p>
                     </div>

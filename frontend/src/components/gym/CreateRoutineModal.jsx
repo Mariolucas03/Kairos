@@ -125,7 +125,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
 
             {/* HEADER */}
             <div className="pt-4 pb-4 px-6 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between shrink-0 safe-top">
-                <h2 className="font-black text-white text-xl uppercase italic tracking-wide flex items-center gap-2">
+                <h2 className="font-black text-white text-xl uppercase not-italic tracking-wide flex items-center gap-2">
                     <Dumbbell className="text-yellow-500" size={24} />
                     <span>{routineToEdit ? 'Editar' : 'Crear'} Rutina</span>
                 </h2>

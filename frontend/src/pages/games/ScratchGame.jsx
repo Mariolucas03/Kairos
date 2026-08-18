@@ -151,7 +151,7 @@ export default function ScratchGame() {
 
             {/* TÍTULO */}
             <div className="absolute top-28 w-full text-center z-10">
-                <h1 className="text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)] tracking-wide uppercase pointer-events-none">
+                <h1 className="text-4xl font-black text-yellow-400 tracking-[-0.045em] uppercase not-italic pointer-events-none">
                     RASCA Y GANA
                 </h1>
                 {errorMsg && (
@@ -164,7 +164,7 @@ export default function ScratchGame() {
             {/* ZONA DE JUEGO */}
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 relative z-10">
 
-                <div className="bg-gradient-to-br from-zinc-800 to-black p-1 rounded-[2rem] shadow-2xl w-full transform transition-all ring-2 ring-yellow-600/30">
+                <div className="bg-[#18181b] border border-white/[0.07] p-1 rounded-[24px] w-full transform transition-all">
                     <div className="bg-black/90 rounded-[1.8rem] p-6 border border-white/5 relative overflow-hidden flex flex-col gap-6">
 
                         {/* CUADRÍCULA */}
@@ -202,7 +202,7 @@ export default function ScratchGame() {
                                         {result.won ? (
                                             <div className="flex flex-col items-center gap-1">
                                                 <span className="font-black text-2xl uppercase tracking-widest text-green-400 animate-pulse">¡PREMIO!</span>
-                                                <div className="flex items-center gap-2 bg-green-900/40 px-4 py-1 rounded-full border border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.3)]">
+                                                <div className="flex items-center gap-2 bg-green-900/40 px-4 py-1 rounded-full border border-green-500/50">
                                                     <span className="font-black text-white text-xl">+{result.prize}</span>
                                                     {result.type === 'xp' ? <Zap size={20} className="text-blue-400" /> : <img src="/assets/icons/ficha.png" alt="f" className="w-5 h-5 object-contain" />}
                                                 </div>
@@ -215,7 +215,7 @@ export default function ScratchGame() {
                                     <button
                                         onClick={play}
                                         disabled={visualBalance < COST}
-                                        className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-black py-4 rounded-xl uppercase transition-all shadow-lg shadow-yellow-900/20 active:scale-95 text-lg border-b-4 border-yellow-700 flex items-center justify-center gap-2 disabled:grayscale disabled:opacity-50"
+                                        className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl uppercase transition-all shadow-lg shadow-yellow-900/20 active:scale-95 text-lg border-b-4 border-yellow-700 flex items-center justify-center gap-2 disabled:grayscale disabled:opacity-50"
                                     >
                                         <span>Jugar de nuevo</span>
                                         <div className="flex items-center bg-black/20 px-2 py-0.5 rounded text-sm">
@@ -233,7 +233,7 @@ export default function ScratchGame() {
                                             ? 'bg-zinc-800 text-zinc-500 border-zinc-900 cursor-default'
                                             : visualBalance < COST
                                                 ? 'bg-zinc-800 text-zinc-500 border-zinc-900 cursor-not-allowed'
-                                                : 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black shadow-yellow-900/20 border-yellow-700'
+                                                : 'bg-yellow-500 hover:bg-yellow-400 text-black border-yellow-700'
                                         }
                                     `}
                                 >
@@ -260,7 +260,7 @@ export default function ScratchGame() {
                     <div className="bg-zinc-900 border border-white/10 rounded-[2rem] p-6 w-full max-w-xs relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={24} /></button>
                         <div className="text-center mb-6">
-                            <h3 className="text-xl font-black text-white uppercase tracking-tighter italic">Tabla de Premios</h3>
+                            <h3 className="text-xl font-black text-white uppercase tracking-tighter not-italic">Tabla de Premios</h3>
                             <p className="text-[10px] text-zinc-500 font-bold uppercase mt-1">Encuentra 3 iguales para ganar</p>
                         </div>
                         <div className="space-y-2 mb-4">

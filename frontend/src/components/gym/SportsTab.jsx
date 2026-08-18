@@ -138,7 +138,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                         <div className="flex items-center justify-between mb-5">
                             <div className="flex items-center gap-3 min-w-0">
                                 <span className="text-3xl leading-none">{elegido.icon}</span>
-                                <h2 className="text-xl font-black text-white italic uppercase tracking-tighter truncate">{elegido.name}</h2>
+                                <h2 className="text-xl font-black text-white not-italic uppercase tracking-tighter truncate">{elegido.name}</h2>
                             </div>
                             <button onClick={() => setElegido(null)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 border border-zinc-800 shrink-0">
                                 <X size={18} />

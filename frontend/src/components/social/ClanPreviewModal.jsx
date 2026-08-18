@@ -29,8 +29,8 @@ export default function ClanPreviewModal({ clanId, currentUserId, userClanId, on
                             
                             <div className="flex flex-col items-center relative z-10">
                                 <div className="text-5xl mb-3 filter drop-shadow-lg">{clanData.icon}</div>
-                                <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter text-center leading-none mb-2">{clanData.name}</h2>
-                                <p className="text-xs text-zinc-400 font-medium text-center max-w-[80%] italic">"{clanData.description}"</p>
+                                <h2 className="text-3xl font-black text-white uppercase not-italic tracking-tighter text-center leading-none mb-2">{clanData.name}</h2>
+                                <p className="text-xs text-zinc-400 font-medium text-center max-w-[80%] not-italic">"{clanData.description}"</p>
 
                                 <div className="flex items-center gap-4 mt-4">
                                     <span className="text-[10px] font-bold bg-zinc-950 border border-zinc-800 text-zinc-400 px-3 py-1 rounded-full flex items-center gap-1">

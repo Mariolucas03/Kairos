@@ -120,7 +120,7 @@ export default function TowerGame() {
             </div>
 
             <div className="w-full max-w-sm px-5 flex-1 flex flex-col min-h-0">
-                <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter text-center">LA TORRE</h1>
+                <h1 className="text-3xl font-black text-white not-italic uppercase tracking-tighter text-center">LA TORRE</h1>
                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest text-center mt-1 mb-3">
                     Sube sin pisar la trampa · retírate cuando quieras
                 </p>
@@ -230,7 +230,7 @@ export default function TowerGame() {
                         <button
                             onClick={empezar}
                             disabled={busy || bet > fichas}
-                            className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-700 text-black font-black uppercase tracking-widest text-sm border-b-4 border-emerald-900 active:scale-95 transition-transform disabled:opacity-40 disabled:grayscale flex items-center justify-center gap-2"
+                            className="w-full py-4 rounded-2xl bg-emerald-500 text-black font-black uppercase tracking-widest text-sm border-b-4 border-emerald-900 active:scale-95 transition-transform disabled:opacity-40 disabled:grayscale flex items-center justify-center gap-2"
                         >
                             {busy ? <Loader2 className="animate-spin" size={18} /> : 'Empezar a subir'}
                         </button>

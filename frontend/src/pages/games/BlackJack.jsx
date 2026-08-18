@@ -204,7 +204,7 @@ export default function BlackJack() {
                             <button
                                 onClick={() => handleAction('deal')}
                                 disabled={visualBalance < bet || isProcessing}
-                                className="flex-1 h-14 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black text-xl rounded-2xl shadow-[0_4px_0_#b45309] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+                                className="flex-1 h-14 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl rounded-2xl shadow-[0_4px_0_#b45309] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
                             >
                                 REPARTIR
                             </button>
@@ -225,7 +225,7 @@ export default function BlackJack() {
                             </div>
                         </div>
 
-                        <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter mb-2">
+                        <h2 className="text-3xl font-black text-white uppercase not-italic tracking-tighter mb-2">
                             {resultModal.type === 'win' ? '¡GANASTE!' : resultModal.type === 'lose' ? 'LA BANCA GANA' : 'EMPATE'}
                         </h2>
 
@@ -248,7 +248,7 @@ export default function BlackJack() {
                 <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
                     <div className="bg-zinc-900 w-full max-w-xs rounded-3xl border border-white/10 p-6 relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
-                        <h3 className="text-xl font-black text-white text-center mb-4 uppercase italic">Reglas Blackjack</h3>
+                        <h3 className="text-xl font-black text-white text-center mb-4 uppercase not-italic">Reglas Blackjack</h3>
                         <div className="space-y-2 text-xs text-zinc-300">
                             <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Blackjack (A+10/J/Q/K)</span><span className="font-bold text-yellow-400">x2.5</span></div>
                             <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Victoria Normal</span><span className="font-bold text-green-400">x2</span></div>

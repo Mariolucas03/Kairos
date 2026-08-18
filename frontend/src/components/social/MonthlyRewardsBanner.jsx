@@ -6,7 +6,7 @@ export default function MonthlyRewardsBanner() {
             <div className="absolute top-0 right-0 p-12 bg-purple-600/10 blur-3xl rounded-full -mr-6 -mt-6 pointer-events-none"></div>
             <div className="flex items-center justify-between relative z-10">
                 <div className="self-start pt-2">
-                    <h3 className="text-white font-black uppercase italic text-sm flex items-center gap-2 mb-1">
+                    <h3 className="text-white font-black uppercase not-italic text-sm flex items-center gap-2 mb-1">
                         <Calendar size={14} className="text-purple-400" /> Premios Mensuales
                     </h3>
                     <p className="text-[10px] text-zinc-500 font-medium max-w-[130px] leading-tight">

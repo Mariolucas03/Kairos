@@ -53,7 +53,7 @@ export default function InboxModal({
                                             {n.workoutName ? <span className="text-zinc-500"> "{n.workoutName}"</span> : null}
                                         </p>
                                         {n.type === 'comment' && n.text && (
-                                            <p className="text-[10px] text-zinc-500 italic truncate mt-0.5">"{n.text}"</p>
+                                            <p className="text-[10px] text-zinc-500 not-italic truncate mt-0.5">"{n.text}"</p>
                                         )}
                                     </div>
                                     <div className="flex flex-col items-end gap-1 shrink-0">
@@ -87,7 +87,7 @@ export default function InboxModal({
 
                     <div>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Solicitudes Amistad</h3>
-                        {requests.length === 0 && <p className="text-[10px] text-zinc-600 italic">Nada por aquí.</p>}
+                        {requests.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Nada por aquí.</p>}
                         {requests.map(req => (
                             <div key={req._id} className="bg-black p-3 rounded-2xl border border-zinc-800 flex justify-between items-center mb-2">
                                 <div className="flex items-center gap-2 min-w-0">

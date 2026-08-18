@@ -135,7 +135,7 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                 foto, es de qué va la publicación; así se sabe qué estás mirando
                 antes de mirarlo. */}
             <div className="px-4 pb-3">
-                <h4 className="text-white font-black text-lg italic uppercase tracking-tighter leading-tight">{post.routineName}</h4>
+                <h4 className="text-white font-black text-lg not-italic uppercase tracking-tighter leading-tight">{post.routineName}</h4>
                 <div className="flex items-center gap-4 text-zinc-400 mt-1">
                     <span className="flex items-center gap-1 text-xs font-bold"><Timer size={12} className="text-blue-400" /> {durationMin} min</span>
                     <span className="flex items-center gap-1 text-xs font-bold"><Flame size={12} className="text-orange-500" /> {Math.round(post.caloriesBurned || 0)} kcal</span>
@@ -270,7 +270,7 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
             {/* COMENTARIOS (DESPLEGABLE) */}
             {showComments && (
                 <div className="px-4 pt-3 space-y-3 animate-in slide-in-from-top-2 fade-in duration-200">
-                    {comments.length === 0 && <p className="text-[10px] text-zinc-600 italic">Sé el primero en comentar.</p>}
+                    {comments.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Sé el primero en comentar.</p>}
                     {comments.map((c, i) => (
                         <div key={c._id || i} className="flex items-start gap-2">
                             <div className="w-7 h-7 rounded-full bg-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500 border border-white/10 shrink-0 overflow-hidden">

@@ -50,7 +50,7 @@ export default function RedemptionScreen({ user, setUser }) {
                         <span className="font-bold text-xs uppercase">Misión de Desbloqueo</span>
                     </div>
 
-                    <p className="text-2xl font-black text-white italic leading-tight">
+                    <p className="text-2xl font-black text-white not-italic leading-tight">
                         "{user.redemptionMission || "Misión de emergencia: Haz 50 burpees"}"
                     </p>
                 </div>
@@ -62,7 +62,7 @@ export default function RedemptionScreen({ user, setUser }) {
                 <button
                     onClick={handleRevive}
                     disabled={loading}
-                    className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-xl text-lg shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all active:scale-95 flex items-center justify-center gap-3"
+                    className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-xl text-lg transition-all active:scale-95 flex items-center justify-center gap-3"
                 >
                     {loading ? (
                         <>

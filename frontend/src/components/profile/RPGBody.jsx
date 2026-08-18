@@ -132,9 +132,9 @@ export default function RPGBody({ mini = false, onClick }) {
             )}
 
             <div className="absolute bottom-6 flex gap-4 bg-gray-900/90 backdrop-blur border border-gray-700 py-2 px-4 rounded-full shadow-2xl z-50">
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-green-500/60 shadow-[0_0_10px_#22c55e]"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Bien</span></div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-500/60 shadow-[0_0_10px_#eab308]"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Recup</span></div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500/60 shadow-[0_0_10px_#ef4444]"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Agujetas</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-green-500"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Bien</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-500"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Recup</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Agujetas</span></div>
             </div>
         </div>
     );

@@ -79,7 +79,7 @@ export default function Settings() {
 
             <div className="flex items-center gap-3 mb-8">
                 <BackButton />
-                <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2">
+                <h1 className="text-2xl font-black text-white uppercase not-italic tracking-tighter flex items-center gap-2">
                     <SettingsIcon size={20} className="text-yellow-500" /> Ajustes
                 </h1>
             </div>

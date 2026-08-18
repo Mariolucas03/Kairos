@@ -17,7 +17,7 @@ const DigitalDie = ({ value, rolling }) => {
         let int; if (rolling) int = setInterval(() => setDisplayNum(Math.floor(Math.random() * 6) + 1), 80); else setDisplayNum(value);
         return () => clearInterval(int);
     }, [rolling, value]);
-    return <div className={`w-32 h-32 md:w-40 md:h-40 bg-black/80 backdrop-blur-xl border-4 rounded-[2rem] flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.15)] relative overflow-hidden transition-all duration-300 ${rolling ? 'scale-95 border-cyan-500/20' : 'scale-100 border-cyan-400'}`}><span className={`text-8xl md:text-9xl font-black text-white transition-all ${rolling ? 'blur-sm opacity-50' : 'blur-0 opacity-100'}`}>{displayNum}</span></div>;
+    return <div className={`w-32 h-32 md:w-40 md:h-40 bg-black/80 backdrop-blur-xl border-4 rounded-[2rem] flex items-center justify-center relative overflow-hidden transition-all duration-300 ${rolling ? 'scale-95 border-cyan-500/20' : 'scale-100 border-cyan-400'}`}><span className={`text-8xl md:text-9xl font-black text-white transition-all ${rolling ? 'blur-sm opacity-50' : 'blur-0 opacity-100'}`}>{displayNum}</span></div>;
 };
 
 export default function Dice() {
@@ -68,7 +68,7 @@ export default function Dice() {
             {showRain && <ChipRain isFading={false} />}
             <div className="absolute top-12 left-4 right-4 flex justify-between z-50"><BackButton to="/games" /><div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-blue-500/50"><span className="text-blue-400 font-black text-xl">{visualBalance}</span><img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" /></div><div></div></div>
             <div className="absolute top-28 w-full text-center z-10">
-                <h1 className="text-4xl font-black italic text-cyan-400">NEON DICE</h1>
+                <h1 className="text-4xl font-black not-italic text-cyan-400">NEON DICE</h1>
                 {errorMsg && (
                     <div onClick={() => setErrorMsg(null)} className="mx-6 mt-3 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl cursor-pointer">
                         {errorMsg}

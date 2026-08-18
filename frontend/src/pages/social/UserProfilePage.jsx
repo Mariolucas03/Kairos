@@ -187,7 +187,7 @@ function MissionDayCard({ item }) {
                 </span>
             </div>
             <div className="space-y-1.5">
-                {item.list.length === 0 && <p className="text-[10px] text-zinc-600 italic">Sin detalle guardado.</p>}
+                {item.list.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Sin detalle guardado.</p>}
                 {item.list.map((m, i) => (
                     <div key={i} className="flex items-center justify-between bg-black/50 rounded-xl px-3 py-2 border border-white/5">
                         <span className="text-[11px] font-bold text-zinc-300 truncate pr-2">{m.title}</span>
@@ -425,7 +425,7 @@ export default function UserProfilePage() {
                     <span className="text-sm font-black text-white uppercase truncate">{profile.username}</span>
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase shrink-0 ${getLevelStyle(level)}`}>Lvl {level}</span>
                 </div>
-                <p className="text-[10px] text-yellow-500/80 italic font-bold tracking-wider uppercase mb-1">{profile.title || 'Novato'}</p>
+                <p className="text-[10px] text-yellow-500/80 not-italic font-bold tracking-wider uppercase mb-1">{profile.title || 'Novato'}</p>
 
                 {/* El clan va en su propia línea, no apretado junto al nombre */}
                 {profile.clan && (
@@ -448,7 +448,7 @@ export default function UserProfilePage() {
                 )}
 
                 <div className="relative w-full h-2 bg-zinc-900 rounded-full border border-zinc-800 overflow-hidden mt-2">
-                    <div className="h-full bg-gradient-to-r from-blue-600 to-purple-500 transition-all duration-500" style={{ width: `${xpPercent}%` }} />
+                    <div className="h-full transition-all duration-500" style={{ width: `${xpPercent}%`, background: '#3b82f6' }} />
                 </div>
                 <p className="text-[9px] text-zinc-600 font-bold mt-1 text-right">{profile.currentXP || 0}/{profile.nextLevelXP || 100} XP</p>
 

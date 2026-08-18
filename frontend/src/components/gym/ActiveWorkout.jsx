@@ -432,7 +432,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     if (isMinimized) {
         return createPortal(
-            <div onClick={maximizeWorkout} className="fixed bottom-[70px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10">
+            <div onClick={maximizeWorkout} className="fixed bottom-[70px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10">
                 <div className="flex items-center gap-3">
                     <div className="relative w-10 h-10 flex items-center justify-center bg-black rounded-xl border border-yellow-500/20">
                         {restTargetTime ? <span className="text-xs font-black text-blue-400 animate-pulse"><Timer size={16} /></span> : <div className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>}
@@ -546,7 +546,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             {/* FOOTER */}
             <div className="absolute bottom-0 left-0 right-0 p-6 bg-black border-t border-zinc-900 safe-bottom z-30">
-                <button onClick={() => setShowFinishAlert(true)} disabled={finishing} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(234,179,8,0.3)] flex items-center justify-center gap-3 active:scale-95 transition-all text-lg uppercase tracking-widest border-b-4 border-yellow-600">
+                <button onClick={() => setShowFinishAlert(true)} disabled={finishing} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all text-lg uppercase tracking-widest border-b-4 border-yellow-600">
                     {finishing ? <Loader2 className="animate-spin" /> : <Save size={24} />}
                     {finishing ? 'GUARDANDO...' : 'TERMINAR SESIÓN'}
                 </button>
@@ -572,7 +572,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     <div className="bg-zinc-950 border border-yellow-500/30 p-5 rounded-3xl w-full max-w-sm shadow-2xl my-6">
                         <div className="text-center mb-4">
                             <div className="bg-yellow-500/10 p-3 rounded-full text-yellow-500 inline-block mb-2"><Trophy size={28} /></div>
-                            <h3 className="text-white font-black text-lg uppercase italic">Resumen del entreno</h3>
+                            <h3 className="text-white font-black text-lg uppercase not-italic">Resumen del entreno</h3>
                         </div>
 
                         {/* Cifras de la sesión */}

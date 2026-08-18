@@ -164,7 +164,7 @@ export default function ClansPage() {
                             </div>
 
                             <div className="flex-1 min-w-0">
-                                <h2 className="text-lg font-black text-white uppercase italic leading-tight break-words">
+                                <h2 className="text-lg font-black text-white uppercase not-italic leading-tight break-words">
                                     {myClan.name}
                                 </h2>
                                 <span className="inline-block mt-1 text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-black border border-white/10 px-2 py-0.5 rounded">
@@ -189,7 +189,7 @@ export default function ClansPage() {
                         </div>
 
                         {myClan.description && (
-                            <p className="text-[11px] text-zinc-400 italic mt-2.5 leading-snug">"{myClan.description}"</p>
+                            <p className="text-[11px] text-zinc-400 not-italic mt-2.5 leading-snug">"{myClan.description}"</p>
                         )}
 
                         {/* Cifras en celdas iguales, para que no se descuadren
@@ -326,7 +326,7 @@ export default function ClansPage() {
                             ))}
 
                             {filteredClans.length === 0 && (
-                                <div className="text-center py-4 text-zinc-700 text-[10px] italic">No se encontraron clanes.</div>
+                                <div className="text-center py-4 text-zinc-700 text-[10px] not-italic">No se encontraron clanes.</div>
                             )}
                         </div>
                     </div>
@@ -339,7 +339,7 @@ export default function ClansPage() {
                     <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => { setShowCreateClan(false); setShowEditClan(false); }} />
                     <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl relative z-10 animate-in zoom-in-95">
                         <div className="p-5 border-b border-white/10 flex justify-between items-center bg-zinc-950">
-                            <h3 className="text-xl font-black text-white flex items-center gap-2 uppercase italic">
+                            <h3 className="text-xl font-black text-white flex items-center gap-2 uppercase not-italic">
                                 {showEditClan ? <><Edit className="text-blue-500" /> Editar Clan</> : <><Crown className="text-yellow-500" /> Fundar Clan</>}
                             </h3>
                             <button onClick={() => { setShowCreateClan(false); setShowEditClan(false); }} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white transition-colors border border-white/5"><X size={20} /></button>

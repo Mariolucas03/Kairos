@@ -166,7 +166,7 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                                 <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20"><X className="w-10 h-10 text-red-500" /></div>
                             )}
                         </div>
-                        <h2 className={`text-3xl font-black uppercase italic mb-2 ${winData.v > 0 ? 'text-yellow-400' : 'text-white'}`}>{winData.v > 0 ? '¡GANASTE!' : 'MALA SUERTE'}</h2>
+                        <h2 className={`text-3xl font-black uppercase not-italic mb-2 ${winData.v > 0 ? 'text-yellow-400' : 'text-white'}`}>{winData.v > 0 ? '¡GANASTE!' : 'MALA SUERTE'}</h2>
                         <p className="text-sm text-zinc-400 mb-8 font-medium">{winData.v > 0 ? `Has conseguido ${winData.v} fichas.` : 'No has ganado nada esta vez.'}</p>
                         <button onClick={() => { setWinData(null); onBack(); }} className="w-full bg-white text-black font-black py-4 rounded-xl uppercase tracking-widest hover:bg-zinc-200 shadow-lg">
                             {winData.v > 0 ? 'RECOGER Y SALIR' : 'CONTINUAR'}
@@ -199,7 +199,7 @@ export default function FortuneWheel() {
         <div className={`flex flex-col h-full animate-in fade-in select-none px-4 pb-20 ${selectedMode ? 'pt-24' : 'pt-4'}`}>
             <div className="flex items-center mb-6">
                 <BackButton onClick={() => selectedMode ? setSelectedMode(null) : navigate('/games')} />
-                <h1 className="ml-4 text-xl font-black italic uppercase text-white tracking-tight">{selectedMode ? WHEEL_CONFIG[selectedMode].title : 'Ruleta de la Fortuna'}</h1>
+                <h1 className="ml-4 text-xl font-black not-italic uppercase text-white tracking-tight">{selectedMode ? WHEEL_CONFIG[selectedMode].title : 'Ruleta de la Fortuna'}</h1>
             </div>
 
             {selectedMode ? (

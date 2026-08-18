@@ -155,7 +155,7 @@ export default function HealthWidget({ user, setUser }) {
                             <Lock size={16} className="text-zinc-500" />
                             <div>
                                 <p className="text-[9px] text-zinc-500 font-bold uppercase">Pacto Activo:</p>
-                                <p className="text-zinc-300 text-xs italic">"{user.redemptionMission}"</p>
+                                <p className="text-zinc-300 text-xs not-italic">"{user.redemptionMission}"</p>
                             </div>
                         </div>
                     )}

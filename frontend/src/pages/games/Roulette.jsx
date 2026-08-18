@@ -334,7 +334,7 @@ export default function Roulette() {
                         {/* Repetir la apuesta anterior: lo normal en cualquier ruleta */}
                         <button onClick={repeatBets} disabled={spinning || bets.length > 0 || lastBets.length === 0} title="Repetir apuesta" className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-yellow-400 disabled:opacity-30"><RotateCw size={20} /></button>
                     </div>
-                    <button onClick={() => { if (bets.length === 0 && !isTableOpen) setIsTableOpen(true); else spin(); }} disabled={spinning} className={`flex-1 font-black py-4 rounded-xl text-xl uppercase tracking-widest shadow-xl border-b-4 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center gap-2 ${bets.length === 0 && !isTableOpen ? 'bg-zinc-700 text-white border-zinc-900' : 'bg-gradient-to-r from-yellow-500 to-yellow-700 text-black border-yellow-900'}`}>
+                    <button onClick={() => { if (bets.length === 0 && !isTableOpen) setIsTableOpen(true); else spin(); }} disabled={spinning} className={`flex-1 font-black py-4 rounded-xl text-xl uppercase tracking-widest shadow-xl border-b-4 active:scale-95 disabled:grayscale disabled:opacity-50 transition-all flex items-center justify-center gap-2 ${bets.length === 0 && !isTableOpen ? 'bg-zinc-700 text-white border-zinc-900' : 'bg-yellow-500 text-black border-yellow-700'}`}>
                         {spinning ? 'GIRANDO...' : (bets.length === 0 && !isTableOpen) ? 'APOSTAR' : 'GIRAR'}
                         {bets.length > 0 && <span className="text-sm font-bold bg-black/20 px-2 py-0.5 rounded text-yellow-900">{currentBetTotal}</span>}
                     </button>
@@ -350,7 +350,7 @@ export default function Roulette() {
                                 {resultModal.num}
                             </div>
                         </div>
-                        <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2">{resultModal.won ? '¡VICTORIA!' : 'SUERTE LA PRÓXIMA'}</h2>
+                        <h2 className="text-2xl font-black text-white uppercase not-italic tracking-tighter mb-2">{resultModal.won ? '¡VICTORIA!' : 'SUERTE LA PRÓXIMA'}</h2>
                         {resultModal.won && (
                             <div className="flex items-center justify-center gap-2 mb-6 bg-black/40 py-2 rounded-xl">
                                 <span className="text-3xl font-black text-green-400">+{resultModal.payout}</span>
@@ -367,7 +367,7 @@ export default function Roulette() {
                 <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
                     <div className="bg-zinc-900 w-full max-w-xs rounded-3xl border border-white/10 p-6 relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
-                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">Pagos</h3>
+                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase not-italic">Pagos</h3>
                         <div className="space-y-2 text-xs text-zinc-300">
                             <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Pleno (1 Núm)</span><span className="text-yellow-400 font-bold">x36</span></div>
                             <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Columna / Docena</span><span className="text-yellow-400 font-bold">x3</span></div>

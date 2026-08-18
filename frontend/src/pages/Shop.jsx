@@ -252,7 +252,7 @@ export default function Shop() {
                         {/* Header Categoría */}
                         <div className="flex items-center gap-4 mb-6">
                             <BackButton onClick={() => setSelectedCategory(null)} />
-                            <h2 className="text-xl font-black uppercase tracking-tighter italic text-white">{CATEGORIES.find(c => c.id === selectedCategory)?.label}</h2>
+                            <h2 className="text-xl font-black uppercase tracking-tighter not-italic text-white">{CATEGORIES.find(c => c.id === selectedCategory)?.label}</h2>
                         </div>
 
                         {loading ? <div className="text-center py-20 text-zinc-500 animate-pulse font-bold text-xs uppercase">Cargando mercancía...</div> : (

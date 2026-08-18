@@ -205,7 +205,7 @@ export default function Slots() {
 
             {/* TÍTULO */}
             <div className="absolute top-28 w-full text-center z-10 pointer-events-none">
-                <h1 className="text-4xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-fuchsia-400 to-purple-600 drop-shadow-[0_0_15px_rgba(192,38,211,0.5)] tracking-wide leading-normal pb-1 pr-2">
+                <h1 className="text-4xl font-black text-fuchsia-400 tracking-[-0.045em] leading-normal pb-1 pr-2 not-italic">
                     NEON SLOTS
                 </h1>
             </div>
@@ -221,7 +221,7 @@ export default function Slots() {
                     </div>
 
                     {/* GRID */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-black via-zinc-900 to-black grid grid-cols-4 gap-1 p-2">
+                    <div className="absolute inset-0 bg-[#0a0a0c] grid grid-cols-4 gap-1 p-2">
                         {cols.map((column, colIdx) => (
                             <div key={colIdx} className={`relative flex flex-col justify-around bg-white/5 rounded-lg overflow-hidden ${spinningCols[colIdx] ? 'slot-spin' : ''}`}>
                                 <div className="absolute inset-0 shadow-[inset_0_0_10px_black] pointer-events-none z-10" />
@@ -266,7 +266,7 @@ export default function Slots() {
                             className={`flex-1 h-14 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg active:scale-95 transition-all border-b-4 
                                 ${isGameActive
                                     ? 'bg-zinc-800 border-zinc-900 text-zinc-600'
-                                    : 'bg-gradient-to-r from-fuchsia-600 to-purple-600 border-purple-800 text-white hover:brightness-110'
+                                    : 'bg-fuchsia-600 border-fuchsia-800 text-white hover:brightness-110'
                                 }`}
                         >
                             {isGameActive ? '...' : (gameStarted ? 'GIRAR' : 'JUGAR')}
@@ -280,7 +280,7 @@ export default function Slots() {
                 <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 animate-in fade-in">
                     <div className="bg-zinc-900 w-full max-w-xs rounded-3xl border border-white/10 p-6 relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
-                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase italic">Tabla de Pagos</h3>
+                        <h3 className="text-xl font-black text-white text-center mb-6 uppercase not-italic">Tabla de Pagos</h3>
                         <div className="space-y-2 text-xs text-zinc-300">
                             {PAYTABLE.map(s => (
                                 <div key={s.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-white/5">

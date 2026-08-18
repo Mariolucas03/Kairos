@@ -173,7 +173,7 @@ export default function Social() {
             <div className="mb-5">
                 {!searchOpen && (
                     <div className="flex items-baseline gap-2 mb-3">
-                        <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2 shrink-0">
+                        <h1 className="text-3xl font-black text-white uppercase not-italic tracking-tighter flex items-center gap-2 shrink-0">
                             <Rss size={22} className="text-yellow-500" /> FEED
                         </h1>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest truncate">Entrenos de tus amigos</p>
@@ -223,7 +223,7 @@ export default function Social() {
                 <div className="space-y-2 mb-6 animate-in fade-in">
                     <h3 className="text-[10px] font-black text-yellow-500 uppercase ml-2 tracking-widest">Resultados</h3>
                     {searchResults.length === 0 && !isSearching && (
-                        <p className="text-center py-6 text-zinc-600 text-xs italic">Nadie con ese nombre.</p>
+                        <p className="text-center py-6 text-zinc-600 text-xs not-italic">Nadie con ese nombre.</p>
                     )}
                     {searchResults.map(u => (
                         <div key={u._id} className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl flex justify-between items-center">

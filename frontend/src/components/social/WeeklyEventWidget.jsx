@@ -28,7 +28,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                 <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-xl border border-white/10 ${config.color} bg-white/5`}><EventIcon size={24} /></div>
                     <div>
-                        <h3 className={`font-black text-sm uppercase italic tracking-wide ${config.color}`}>{config.title}</h3>
+                        <h3 className={`font-black text-sm uppercase not-italic tracking-wide ${config.color}`}>{config.title}</h3>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase">Evento Activo</p>
                     </div>
                 </div>
@@ -58,7 +58,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                 <div className="bg-zinc-950 p-5 border-b border-white/10 relative shrink-0 z-30">
                     <button onClick={() => setIsOpen(false)} className="absolute top-4 right-4 bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white"><X size={20} /></button>
                     <div className="text-center mt-1">
-                        <h2 className={`text-2xl font-black uppercase italic tracking-tighter flex items-center justify-center gap-2 ${config.color}`}><EventIcon size={24} /> {config.title}</h2>
+                        <h2 className={`text-2xl font-black uppercase not-italic tracking-tighter flex items-center justify-center gap-2 ${config.color}`}><EventIcon size={24} /> {config.title}</h2>
                         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Ranking Semanal</p>
                     </div>
                     <div className="mt-4">
@@ -117,7 +117,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                 {showRewards && (
                     <div className="absolute inset-0 bg-zinc-950 z-50 animate-in slide-in-from-bottom flex flex-col">
                         <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900">
-                            <h3 className="text-white font-black uppercase italic">Recompensas</h3>
+                            <h3 className="text-white font-black uppercase not-italic">Recompensas</h3>
                             <button onClick={() => setShowRewards(false)} className="bg-black p-2 rounded-full"><ChevronDown size={20} className="text-white" /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">

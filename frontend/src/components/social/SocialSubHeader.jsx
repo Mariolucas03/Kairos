@@ -6,7 +6,7 @@ export default function SocialSubHeader({ title, subtitle, icon: Icon, accent = 
         <div className="flex items-center gap-3 mb-6">
             <BackButton to="/social" />
             <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-2 truncate">
+                <h1 className="text-2xl font-black text-white uppercase not-italic tracking-tighter flex items-center gap-2 truncate">
                     {Icon && <Icon size={20} className={accent} />} {title}
                 </h1>
                 {subtitle && <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest truncate">{subtitle}</p>}

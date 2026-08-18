@@ -151,7 +151,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                     <button onClick={onClose} className="p-2 -ml-2 rounded-full text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800">
                         <X size={20} />
                     </button>
-                    <h2 className="font-black text-white text-lg uppercase italic">Ejercicios</h2>
+                    <h2 className="font-black text-white text-lg uppercase not-italic">Ejercicios</h2>
                 </div>
                 <button
                     onClick={() => onSelect(selectedExercises)}
@@ -331,7 +331,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                         <button onClick={() => setShowCreate(false)} className="p-2 -ml-2 rounded-full text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800">
                             <X size={20} />
                         </button>
-                        <h2 className="font-black text-white text-lg uppercase italic">Nuevo ejercicio</h2>
+                        <h2 className="font-black text-white text-lg uppercase not-italic">Nuevo ejercicio</h2>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">

@@ -450,7 +450,7 @@ export default function Food() {
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
 
                         <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-                            <h3 className="text-lg font-black text-white uppercase italic tracking-wide">
+                            <h3 className="text-lg font-black text-white uppercase not-italic tracking-wide">
                                 {configModal.mode === 'ai' ? 'Nutricionista IA' : 'Ajustes Macro'}
                             </h3>
                             <button onClick={() => setConfigModal({ ...configModal, show: false })} className="text-zinc-500 hover:text-white bg-black p-2 rounded-full border border-zinc-800 transition-colors">
