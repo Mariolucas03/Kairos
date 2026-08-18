@@ -13,7 +13,7 @@ const { askAI } = require('../services/aiService');
 const { getTodayDateString } = require('../utils/dateHelpers');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 const { FAMILIAS, familiaDe } = require('../utils/equipment');
-// Catálogo completo (1291): los 82 curados de exerciseCatalog.js con su GIF
+// Catálogo completo (1292): los 141 curados de exerciseCatalog.js con su GIF
 // enganchado, más la ampliación de ExerciseGymGifsDB. Lo genera a mano
 // scripts/generateExerciseCatalog.js; aquí sólo se lee.
 const EXERCISE_CATALOG = require('../data/exercises.json');
@@ -82,16 +82,16 @@ const deleteRoutine = async (req, res) => {
 // Sin esto, un usuario que busque "press (" hace que `new RegExp` reviente
 const escaparRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// Tope de resultados de una búsqueda. Con 1291 ejercicios, devolverlos todos
+// Tope de resultados de una búsqueda. Con 1292 ejercicios, devolverlos todos
 // son cientos de KB por petición y una lista que nadie va a recorrer entera.
 const LIMITE_BUSQUEDA = 300;
 
 /**
  * Lista de ejercicios para el selector.
  *
- * El catálogo pasó de 82 a 1291 al integrar los GIFs, así que ya no se puede
+ * El catálogo pasó de 82 a 1292 al integrar los GIFs, así que ya no se puede
  * devolver entero en cada apertura:
- *  - Sin filtros manda los 82 de siempre (isCore) más los del usuario.
+ *  - Sin filtros manda los 141 curados (isCore) más los del usuario.
  *  - Con búsqueda o grupo concreto busca en todo el catálogo, con tope.
  *  - `instructions` nunca viaja aquí: son 5 frases por ejercicio y sólo hacen
  *    falta en la ficha, que se pide de una en una.
@@ -289,8 +289,22 @@ const syncExerciseCatalog = async ({ force = false } = {}) => {
         };
     }), { ordered: false });
 
+    // 🧹 LIMPIEZA: fuera los del catálogo BASE que ya no están en la lista.
+    //
+    // El sync sólo hacía upsert, nunca borraba: un ejercicio retirado del
+    // catálogo se quedaba en la base para siempre y seguía saliendo en el
+    // selector. Así se acumularon los restos de versiones anteriores.
+    //
+    // ⚠️ Sólo toca los del sistema (isCustom !== true). Los que crea el usuario
+    // NO se borran jamás, aunque no estén en el catálogo: son suyos.
+    const nombresDelCatalogo = EXERCISE_CATALOG.map(ex => ex.name);
+    const borrados = await Exercise.deleteMany({
+        isCustom: { $ne: true },
+        name: { $nin: nombresDelCatalogo }
+    });
+
     ultimaHuellaSincronizada = CATALOG_FINGERPRINT;
-    return { synced: true, total: EXERCISE_CATALOG.length };
+    return { synced: true, total: EXERCISE_CATALOG.length, borrados: borrados.deletedCount };
 };
 
 const seedExercises = async (req, res) => {
@@ -299,9 +313,10 @@ const seedExercises = async (req, res) => {
         const result = await syncExerciseCatalog({ force: true });
         res.json({
             message: result.synced
-                ? `Catálogo sincronizado (${result.total} ejercicios)`
+                ? `Catálogo sincronizado (${result.total} ejercicios${result.borrados ? `, ${result.borrados} retirados` : ''})`
                 : 'El catálogo ya está al día',
-            total: result.total
+            total: result.total,
+            borrados: result.borrados || 0
         });
     } catch (error) {
         console.error('Error en seed de ejercicios:', error);

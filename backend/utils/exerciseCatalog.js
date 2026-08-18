@@ -39,20 +39,16 @@ const EXERCISE_CATALOG = [
     { name: 'Press de Banca con Mancuernas', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Tríceps', 'Hombro'], equipment: 'Mancuernas', shares: { 'Pectoral medio': 55, 'Pectoral inferior': 10, 'Deltoides anterior': 15, 'Tríceps (cabeza lateral)': 20 } },
     { name: 'Press Inclinado con Mancuernas', muscle: 'Pecho', muscleDetail: 'Pectoral superior', secondary: ['Hombro'], equipment: 'Mancuernas', shares: { 'Pectoral superior': 60, 'Pectoral medio': 10, 'Deltoides anterior': 20, 'Tríceps (cabeza lateral)': 10 } },
     { name: 'Aperturas con Mancuernas', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: [], equipment: 'Mancuernas', shares: { 'Pectoral medio': 75, 'Pectoral superior': 15, 'Deltoides anterior': 10 } },
-    { name: 'Contractor de Pecho', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: [], equipment: 'Máquina', shares: { 'Pectoral medio': 80, 'Pectoral superior': 10, 'Deltoides anterior': 10 } },
     { name: 'Cruce de Poleas', muscle: 'Pecho', muscleDetail: 'Pectoral inferior', secondary: [], equipment: 'Polea', shares: { 'Pectoral inferior': 55, 'Pectoral medio': 35, 'Deltoides anterior': 10 } },
     { name: 'Flexiones', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Tríceps', 'Abdomen'], equipment: 'Peso Corporal', shares: { 'Pectoral medio': 50, 'Tríceps (cabeza lateral)': 20, 'Deltoides anterior': 15, 'Recto abdominal (superior)': 15 } },
     { name: 'Fondos en Paralelas', muscle: 'Pecho', muscleDetail: 'Pectoral inferior', secondary: ['Tríceps', 'Hombro'], equipment: 'Peso Corporal', shares: { 'Pectoral inferior': 45, 'Tríceps (cabeza larga)': 30, 'Tríceps (cabeza lateral)': 15, 'Deltoides anterior': 10 } },
     { name: 'Pullover', muscle: 'Pecho', muscleDetail: 'Serrato anterior', secondary: ['Espalda'], equipment: 'Mancuernas', shares: { 'Serrato anterior': 35, 'Pectoral superior': 20, 'Dorsal ancho': 30, 'Tríceps (cabeza larga)': 15 } },
     // Nuevos
     { name: 'Aperturas Inclinadas', muscle: 'Pecho', muscleDetail: 'Pectoral superior', secondary: [], equipment: 'Mancuernas', shares: { 'Pectoral superior': 70, 'Pectoral medio': 20, 'Deltoides anterior': 10 } },
-    { name: 'Cruce de Poleas Alto', muscle: 'Pecho', muscleDetail: 'Pectoral inferior', secondary: [], equipment: 'Polea', shares: { 'Pectoral inferior': 65, 'Pectoral medio': 25, 'Serrato anterior': 10 } },
-    { name: 'Cruce de Poleas Bajo', muscle: 'Pecho', muscleDetail: 'Pectoral superior', secondary: [], equipment: 'Polea', shares: { 'Pectoral superior': 65, 'Pectoral medio': 25, 'Deltoides anterior': 10 } },
     { name: 'Press de Pecho en Máquina', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Tríceps'], equipment: 'Máquina', shares: { 'Pectoral medio': 65, 'Pectoral inferior': 10, 'Tríceps (cabeza lateral)': 25 } },
     { name: 'Press Inclinado en Máquina', muscle: 'Pecho', muscleDetail: 'Pectoral superior', secondary: ['Tríceps'], equipment: 'Máquina', shares: { 'Pectoral superior': 65, 'Deltoides anterior': 15, 'Tríceps (cabeza lateral)': 20 } },
     { name: 'Flexiones Diamante', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Tríceps'], equipment: 'Peso Corporal', shares: { 'Tríceps (cabeza lateral)': 45, 'Tríceps (cabeza larga)': 15, 'Pectoral medio': 40 } },
     { name: 'Flexiones Declinadas', muscle: 'Pecho', muscleDetail: 'Pectoral superior', secondary: ['Tríceps', 'Hombro'], equipment: 'Peso Corporal', shares: { 'Pectoral superior': 50, 'Deltoides anterior': 20, 'Tríceps (cabeza lateral)': 20, 'Recto abdominal (superior)': 10 } },
-    { name: 'Flexiones con Lastre', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Tríceps'], equipment: 'Peso Corporal', shares: { 'Pectoral medio': 50, 'Tríceps (cabeza lateral)': 25, 'Deltoides anterior': 15, 'Recto abdominal (superior)': 10 } },
     { name: 'Press con Banda Elástica', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Tríceps'], equipment: 'Accesorio', shares: { 'Pectoral medio': 60, 'Tríceps (cabeza lateral)': 25, 'Deltoides anterior': 15 } },
     { name: 'Pullover en Máquina', muscle: 'Pecho', muscleDetail: 'Serrato anterior', secondary: ['Espalda'], equipment: 'Máquina', shares: { 'Serrato anterior': 30, 'Dorsal ancho': 40, 'Pectoral superior': 20, 'Tríceps (cabeza larga)': 10 } },
 
@@ -66,7 +62,6 @@ const EXERCISE_CATALOG = [
     { name: 'Peso Muerto', muscle: 'Espalda', muscleDetail: 'Lumbar', secondary: ['Pierna', 'Glúteo'], equipment: 'Barra', shares: { 'Lumbar': 25, 'Glúteo mayor': 25, 'Isquiotibiales': 25, 'Trapecio superior': 10, 'Dorsal ancho': 10, 'Cuádriceps (recto femoral)': 5 } },
     { name: 'Peso Muerto Rumano', muscle: 'Espalda', muscleDetail: 'Lumbar', secondary: ['Pierna', 'Glúteo'], equipment: 'Barra', shares: { 'Isquiotibiales': 45, 'Glúteo mayor': 25, 'Lumbar': 25, 'Trapecio superior': 5 } },
     { name: 'Encogimientos de Hombros', muscle: 'Espalda', muscleDetail: 'Trapecio superior', secondary: [], equipment: 'Mancuernas', shares: { 'Trapecio superior': 85, 'Trapecio medio': 15 } },
-    { name: 'Face Pull', muscle: 'Espalda', muscleDetail: 'Trapecio medio', secondary: ['Hombro'], equipment: 'Polea', shares: { 'Trapecio medio': 30, 'Romboides': 25, 'Deltoides posterior': 35, 'Manguito rotador': 10 } },
     { name: 'Hiperextensiones', muscle: 'Espalda', muscleDetail: 'Lumbar', secondary: ['Glúteo'], equipment: 'Peso Corporal', shares: { 'Lumbar': 55, 'Glúteo mayor': 25, 'Isquiotibiales': 20 } },
     { name: 'Pull-over en Polea', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: [], equipment: 'Polea', shares: { 'Dorsal ancho': 65, 'Redondo mayor': 20, 'Tríceps (cabeza larga)': 15 } },
     // Nuevos
@@ -81,7 +76,6 @@ const EXERCISE_CATALOG = [
     { name: 'Remo a una Mano en Polea', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps'], equipment: 'Polea', shares: { 'Dorsal ancho': 50, 'Redondo mayor': 20, 'Romboides': 15, 'Bíceps braquial (cabeza larga)': 15 } },
     { name: 'Buenos Días', muscle: 'Espalda', muscleDetail: 'Lumbar', secondary: ['Pierna'], equipment: 'Barra', shares: { 'Lumbar': 40, 'Isquiotibiales': 40, 'Glúteo mayor': 20 } },
     { name: 'Encogimientos con Barra', muscle: 'Espalda', muscleDetail: 'Trapecio superior', secondary: [], equipment: 'Barra', shares: { 'Trapecio superior': 85, 'Trapecio medio': 15 } },
-    { name: 'Superman', muscle: 'Espalda', muscleDetail: 'Lumbar', secondary: ['Glúteo'], equipment: 'Peso Corporal', shares: { 'Lumbar': 60, 'Glúteo mayor': 25, 'Trapecio inferior': 15 } },
 
     // ================= HOMBRO =================
     { name: 'Press Militar', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps', 'Pecho'], equipment: 'Barra', shares: { 'Deltoides anterior': 45, 'Deltoides lateral': 20, 'Tríceps (cabeza lateral)': 20, 'Pectoral superior': 10, 'Trapecio superior': 5 } },
@@ -95,11 +89,8 @@ const EXERCISE_CATALOG = [
     { name: 'Rotación Externa', muscle: 'Hombro', muscleDetail: 'Manguito rotador', secondary: [], equipment: 'Polea', shares: { 'Manguito rotador': 80, 'Deltoides posterior': 20 } },
     // Nuevos
     { name: 'Press de Hombro en Máquina', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps'], equipment: 'Máquina', shares: { 'Deltoides anterior': 50, 'Deltoides lateral': 25, 'Tríceps (cabeza lateral)': 25 } },
-    { name: 'Press Militar Sentado', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps'], equipment: 'Barra', shares: { 'Deltoides anterior': 50, 'Deltoides lateral': 20, 'Tríceps (cabeza lateral)': 25, 'Trapecio superior': 5 } },
     { name: 'Pájaros en Máquina', muscle: 'Hombro', muscleDetail: 'Deltoides posterior', secondary: ['Espalda'], equipment: 'Máquina', shares: { 'Deltoides posterior': 70, 'Trapecio medio': 20, 'Romboides': 10 } },
     { name: 'Pájaros en Polea', muscle: 'Hombro', muscleDetail: 'Deltoides posterior', secondary: ['Espalda'], equipment: 'Polea', shares: { 'Deltoides posterior': 70, 'Trapecio medio': 20, 'Romboides': 10 } },
-    { name: 'Elevación Lateral Inclinada', muscle: 'Hombro', muscleDetail: 'Deltoides lateral', secondary: [], equipment: 'Mancuernas', shares: { 'Deltoides lateral': 75, 'Deltoides posterior': 25 } },
-    { name: 'Press Landmine', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Pecho', 'Tríceps'], equipment: 'Barra', shares: { 'Deltoides anterior': 45, 'Pectoral superior': 25, 'Tríceps (cabeza lateral)': 20, 'Recto abdominal (superior)': 10 } },
     { name: 'Rotación Interna en Polea', muscle: 'Hombro', muscleDetail: 'Manguito rotador', secondary: [], equipment: 'Polea', shares: { 'Manguito rotador': 85, 'Deltoides anterior': 15 } },
     { name: 'Elevación Lateral en Máquina', muscle: 'Hombro', muscleDetail: 'Deltoides lateral', secondary: [], equipment: 'Máquina', shares: { 'Deltoides lateral': 85, 'Trapecio superior': 15 } },
 
@@ -115,7 +106,6 @@ const EXERCISE_CATALOG = [
     { name: 'Curl Araña', muscle: 'Bíceps', muscleDetail: 'Bíceps braquial (cabeza corta)', secondary: [], equipment: 'Mancuernas', shares: { 'Bíceps braquial (cabeza corta)': 60, 'Braquial anterior': 25, 'Bíceps braquial (cabeza larga)': 15 } },
     { name: 'Curl con Barra Z', muscle: 'Bíceps', muscleDetail: 'Bíceps braquial (cabeza corta)', secondary: [], equipment: 'Barra', shares: { 'Bíceps braquial (cabeza corta)': 45, 'Bíceps braquial (cabeza larga)': 30, 'Braquiorradial': 25 } },
     { name: 'Curl Martillo en Polea', muscle: 'Bíceps', muscleDetail: 'Braquiorradial', secondary: [], equipment: 'Polea', shares: { 'Braquiorradial': 45, 'Braquial anterior': 30, 'Bíceps braquial (cabeza larga)': 25 } },
-    { name: 'Curl 21s', muscle: 'Bíceps', muscleDetail: 'Bíceps braquial (cabeza corta)', secondary: [], equipment: 'Barra', shares: { 'Bíceps braquial (cabeza corta)': 45, 'Bíceps braquial (cabeza larga)': 35, 'Braquial anterior': 20 } },
     { name: 'Curl Invertido', muscle: 'Bíceps', muscleDetail: 'Braquiorradial', secondary: [], equipment: 'Barra', shares: { 'Braquiorradial': 55, 'Braquial anterior': 30, 'Bíceps braquial (cabeza corta)': 15 } },
     { name: 'Curl en Máquina', muscle: 'Bíceps', muscleDetail: 'Bíceps braquial (cabeza corta)', secondary: [], equipment: 'Máquina', shares: { 'Bíceps braquial (cabeza corta)': 50, 'Braquial anterior': 30, 'Bíceps braquial (cabeza larga)': 20 } },
 
@@ -130,7 +120,6 @@ const EXERCISE_CATALOG = [
     { name: 'Extensión con Cuerda', muscle: 'Tríceps', muscleDetail: 'Tríceps (cabeza lateral)', secondary: [], equipment: 'Polea', shares: { 'Tríceps (cabeza lateral)': 45, 'Tríceps (cabeza medial)': 35, 'Tríceps (cabeza larga)': 20 } },
     { name: 'Extensión sobre la Cabeza en Polea', muscle: 'Tríceps', muscleDetail: 'Tríceps (cabeza larga)', secondary: [], equipment: 'Polea', shares: { 'Tríceps (cabeza larga)': 65, 'Tríceps (cabeza lateral)': 20, 'Tríceps (cabeza medial)': 15 } },
     { name: 'Press Francés con Mancuernas', muscle: 'Tríceps', muscleDetail: 'Tríceps (cabeza larga)', secondary: [], equipment: 'Mancuernas', shares: { 'Tríceps (cabeza larga)': 60, 'Tríceps (cabeza lateral)': 25, 'Tríceps (cabeza medial)': 15 } },
-    { name: 'Fondos en Máquina', muscle: 'Tríceps', muscleDetail: 'Tríceps (cabeza medial)', secondary: ['Pecho'], equipment: 'Máquina', shares: { 'Tríceps (cabeza medial)': 35, 'Tríceps (cabeza lateral)': 35, 'Tríceps (cabeza larga)': 20, 'Pectoral inferior': 10 } },
     { name: 'Extensión a una Mano', muscle: 'Tríceps', muscleDetail: 'Tríceps (cabeza lateral)', secondary: [], equipment: 'Polea', shares: { 'Tríceps (cabeza lateral)': 55, 'Tríceps (cabeza medial)': 30, 'Tríceps (cabeza larga)': 15 } },
 
     // ================= PIERNA =================
@@ -152,17 +141,13 @@ const EXERCISE_CATALOG = [
     { name: 'Sentadilla Goblet', muscle: 'Pierna', muscleDetail: 'Cuádriceps (recto femoral)', secondary: ['Glúteo'], equipment: 'Mancuernas', shares: { 'Cuádriceps (recto femoral)': 30, 'Cuádriceps (vasto medial)': 20, 'Glúteo mayor': 25, 'Aductores': 15, 'Recto abdominal (superior)': 10 } },
     { name: 'Sentadilla Sissy', muscle: 'Pierna', muscleDetail: 'Cuádriceps (recto femoral)', secondary: [], equipment: 'Peso Corporal', shares: { 'Cuádriceps (recto femoral)': 45, 'Cuádriceps (vasto medial)': 30, 'Cuádriceps (vasto lateral)': 25 } },
     { name: 'Sentadilla en Multipower', muscle: 'Pierna', muscleDetail: 'Cuádriceps (vasto lateral)', secondary: ['Glúteo'], equipment: 'Máquina', shares: { 'Cuádriceps (vasto lateral)': 30, 'Cuádriceps (recto femoral)': 25, 'Cuádriceps (vasto medial)': 20, 'Glúteo mayor': 25 } },
-    { name: 'Prensa Horizontal', muscle: 'Pierna', muscleDetail: 'Cuádriceps (recto femoral)', secondary: ['Glúteo'], equipment: 'Máquina', shares: { 'Cuádriceps (recto femoral)': 30, 'Cuádriceps (vasto lateral)': 25, 'Cuádriceps (vasto medial)': 20, 'Glúteo mayor': 25 } },
     { name: 'Zancadas Caminando', muscle: 'Pierna', muscleDetail: 'Glúteo mayor', secondary: ['Glúteo'], equipment: 'Mancuernas', shares: { 'Glúteo mayor': 35, 'Cuádriceps (recto femoral)': 25, 'Cuádriceps (vasto medial)': 20, 'Isquiotibiales': 10, 'Glúteo medio': 10 } },
-    { name: 'Zancada Inversa', muscle: 'Pierna', muscleDetail: 'Glúteo mayor', secondary: ['Glúteo'], equipment: 'Mancuernas', shares: { 'Glúteo mayor': 35, 'Cuádriceps (vasto medial)': 25, 'Cuádriceps (recto femoral)': 20, 'Isquiotibiales': 20 } },
     { name: 'Curl Nórdico', muscle: 'Pierna', muscleDetail: 'Isquiotibiales', secondary: ['Glúteo'], equipment: 'Peso Corporal', shares: { 'Isquiotibiales': 75, 'Glúteo mayor': 15, 'Lumbar': 10 } },
     { name: 'Peso Muerto a una Pierna', muscle: 'Pierna', muscleDetail: 'Isquiotibiales', secondary: ['Glúteo', 'Espalda'], equipment: 'Mancuernas', shares: { 'Isquiotibiales': 40, 'Glúteo mayor': 30, 'Glúteo medio': 15, 'Lumbar': 15 } },
     { name: 'Elevación de Gemelos en Prensa', muscle: 'Pierna', muscleDetail: 'Gemelos', secondary: [], equipment: 'Máquina', shares: { 'Gemelos': 70, 'Sóleo': 30 } },
     { name: 'Elevación de Gemelos a una Pierna', muscle: 'Pierna', muscleDetail: 'Gemelos', secondary: [], equipment: 'Peso Corporal', shares: { 'Gemelos': 80, 'Sóleo': 20 } },
-    { name: 'Flexión de Tobillo', muscle: 'Pierna', muscleDetail: 'Tibial anterior', secondary: [], equipment: 'Máquina', shares: { 'Tibial anterior': 100 } },
     { name: 'Sentadilla Sumo', muscle: 'Pierna', muscleDetail: 'Aductores', secondary: ['Glúteo'], equipment: 'Mancuernas', shares: { 'Aductores': 30, 'Glúteo mayor': 30, 'Cuádriceps (vasto medial)': 20, 'Cuádriceps (recto femoral)': 20 } },
     { name: 'Aductores en Polea', muscle: 'Pierna', muscleDetail: 'Aductores', secondary: [], equipment: 'Polea', shares: { 'Aductores': 90, 'Cuádriceps (vasto medial)': 10 } },
-    { name: 'Abductores en Polea', muscle: 'Pierna', muscleDetail: 'Abductores', secondary: ['Glúteo'], equipment: 'Polea', shares: { 'Abductores': 55, 'Glúteo medio': 35, 'Glúteo menor': 10 } },
 
     // ================= GLÚTEO =================
     { name: 'Hip Thrust', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: ['Pierna'], equipment: 'Barra', shares: { 'Glúteo mayor': 65, 'Isquiotibiales': 20, 'Cuádriceps (recto femoral)': 10, 'Lumbar': 5 } },
@@ -172,10 +157,7 @@ const EXERCISE_CATALOG = [
     { name: 'Peso Muerto Sumo', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: ['Pierna', 'Espalda'], equipment: 'Barra', shares: { 'Glúteo mayor': 30, 'Aductores': 20, 'Cuádriceps (recto femoral)': 20, 'Lumbar': 20, 'Trapecio superior': 10 } },
     { name: 'Step Up', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: ['Pierna'], equipment: 'Mancuernas', shares: { 'Glúteo mayor': 35, 'Cuádriceps (recto femoral)': 30, 'Cuádriceps (vasto lateral)': 20, 'Glúteo medio': 15 } },
     // Nuevos
-    { name: 'Hip Thrust a una Pierna', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: ['Pierna'], equipment: 'Peso Corporal', shares: { 'Glúteo mayor': 60, 'Isquiotibiales': 20, 'Glúteo medio': 20 } },
-    { name: 'Patada de Glúteo en Máquina', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: [], equipment: 'Máquina', shares: { 'Glúteo mayor': 80, 'Isquiotibiales': 20 } },
     { name: 'Abducción con Banda', muscle: 'Glúteo', muscleDetail: 'Glúteo medio', secondary: [], equipment: 'Accesorio', shares: { 'Glúteo medio': 65, 'Glúteo menor': 20, 'Abductores': 15 } },
-    { name: 'Almeja con Banda', muscle: 'Glúteo', muscleDetail: 'Glúteo medio', secondary: [], equipment: 'Accesorio', shares: { 'Glúteo medio': 70, 'Glúteo menor': 30 } },
     { name: 'Puente de Glúteo con Banda', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: [], equipment: 'Accesorio', shares: { 'Glúteo mayor': 55, 'Glúteo medio': 25, 'Isquiotibiales': 20 } },
 
     // ================= ABDOMEN =================
@@ -192,8 +174,6 @@ const EXERCISE_CATALOG = [
     { name: 'Crunch Invertido', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (inferior)', secondary: [], equipment: 'Peso Corporal', shares: { 'Recto abdominal (inferior)': 75, 'Recto abdominal (superior)': 15, 'Transverso abdominal': 10 } },
     { name: 'Crunch en Máquina', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (superior)', secondary: [], equipment: 'Máquina', shares: { 'Recto abdominal (superior)': 70, 'Recto abdominal (inferior)': 20, 'Oblicuos': 10 } },
     { name: 'Mountain Climbers', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (inferior)', secondary: [], equipment: 'Peso Corporal', shares: { 'Recto abdominal (inferior)': 45, 'Oblicuos': 25, 'Transverso abdominal': 20, 'Deltoides anterior': 10 } },
-    { name: 'Leñador en Polea', muscle: 'Abdomen', muscleDetail: 'Oblicuos', secondary: [], equipment: 'Polea', shares: { 'Oblicuos': 70, 'Transverso abdominal': 20, 'Recto abdominal (superior)': 10 } },
-    { name: 'Hollow Body', muscle: 'Abdomen', muscleDetail: 'Transverso abdominal', secondary: [], equipment: 'Peso Corporal', shares: { 'Transverso abdominal': 40, 'Recto abdominal (inferior)': 35, 'Recto abdominal (superior)': 25 } },
     { name: 'Dead Bug', muscle: 'Abdomen', muscleDetail: 'Transverso abdominal', secondary: [], equipment: 'Peso Corporal', shares: { 'Transverso abdominal': 55, 'Recto abdominal (inferior)': 30, 'Oblicuos': 15 } },
     { name: 'Encogimientos en Banco', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (superior)', secondary: [], equipment: 'Peso Corporal', shares: { 'Recto abdominal (superior)': 80, 'Recto abdominal (inferior)': 20 } },
 
@@ -202,17 +182,10 @@ const EXERCISE_CATALOG = [
     { name: 'Cinta de Correr', muscle: 'Pierna', muscleDetail: 'Gemelos', secondary: [], equipment: 'Máquina', isCardio: true, shares: { 'Gemelos': 30, 'Cuádriceps (recto femoral)': 25, 'Isquiotibiales': 20, 'Glúteo mayor': 15, 'Sóleo': 10 } },
     { name: 'Bicicleta Estática', muscle: 'Pierna', muscleDetail: 'Cuádriceps (recto femoral)', secondary: ['Glúteo'], equipment: 'Máquina', isCardio: true, shares: { 'Cuádriceps (recto femoral)': 40, 'Cuádriceps (vasto lateral)': 25, 'Glúteo mayor': 20, 'Gemelos': 15 } },
     { name: 'Elíptica', muscle: 'Pierna', muscleDetail: 'Cuádriceps (recto femoral)', secondary: ['Espalda'], equipment: 'Máquina', isCardio: true, shares: { 'Cuádriceps (recto femoral)': 30, 'Glúteo mayor': 25, 'Isquiotibiales': 25, 'Gemelos': 20 } },
-    { name: 'Remo (Máquina)', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Pierna', 'Bíceps'], equipment: 'Máquina', isCardio: true, shares: { 'Dorsal ancho': 30, 'Trapecio medio': 20, 'Cuádriceps (recto femoral)': 25, 'Isquiotibiales': 15, 'Lumbar': 10 } },
     { name: 'Comba', muscle: 'Pierna', muscleDetail: 'Gemelos', secondary: [], equipment: 'Accesorio', isCardio: true, shares: { 'Gemelos': 50, 'Sóleo': 30, 'Tibial anterior': 20 } },
-    { name: 'Escaladora', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: ['Pierna'], equipment: 'Máquina', isCardio: true, shares: { 'Glúteo mayor': 35, 'Cuádriceps (recto femoral)': 30, 'Isquiotibiales': 20, 'Gemelos': 15 } },
     { name: 'Burpees', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Pierna', 'Abdomen'], equipment: 'Peso Corporal', isCardio: true, shares: { 'Pectoral medio': 25, 'Cuádriceps (recto femoral)': 25, 'Glúteo mayor': 20, 'Recto abdominal (superior)': 15, 'Deltoides anterior': 15 } },
-    { name: 'Battle Ropes', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Abdomen'], equipment: 'Accesorio', isCardio: true, shares: { 'Deltoides anterior': 35, 'Deltoides lateral': 20, 'Recto abdominal (superior)': 20, 'Braquiorradial': 15, 'Trapecio superior': 10 } },
     { name: 'Sprint', muscle: 'Pierna', muscleDetail: 'Isquiotibiales', secondary: ['Glúteo'], equipment: 'Peso Corporal', isCardio: true, shares: { 'Isquiotibiales': 30, 'Glúteo mayor': 25, 'Cuádriceps (recto femoral)': 25, 'Gemelos': 20 } },
     // Nuevos
-    { name: 'Air Bike', muscle: 'Pierna', muscleDetail: 'Cuádriceps (recto femoral)', secondary: ['Hombro'], equipment: 'Máquina', isCardio: true, shares: { 'Cuádriceps (recto femoral)': 30, 'Isquiotibiales': 20, 'Deltoides anterior': 20, 'Dorsal ancho': 15, 'Gemelos': 15 } },
-    { name: 'Caminata Inclinada', muscle: 'Pierna', muscleDetail: 'Glúteo mayor', secondary: ['Glúteo'], equipment: 'Máquina', isCardio: true, shares: { 'Glúteo mayor': 35, 'Isquiotibiales': 25, 'Gemelos': 20, 'Sóleo': 20 } },
-    { name: 'Sled Push', muscle: 'Pierna', muscleDetail: 'Cuádriceps (vasto lateral)', secondary: ['Glúteo'], equipment: 'Accesorio', isCardio: true, shares: { 'Cuádriceps (vasto lateral)': 30, 'Glúteo mayor': 30, 'Gemelos': 20, 'Sóleo': 20 } },
-    { name: 'Paseo del Granjero', muscle: 'Espalda', muscleDetail: 'Trapecio superior', secondary: ['Abdomen'], equipment: 'Mancuernas', isCardio: true, shares: { 'Trapecio superior': 35, 'Braquiorradial': 25, 'Oblicuos': 20, 'Transverso abdominal': 20 } },
     { name: 'Sentadilla con Salto', muscle: 'Pierna', muscleDetail: 'Cuádriceps (recto femoral)', secondary: ['Glúteo'], equipment: 'Peso Corporal', isCardio: true, shares: { 'Cuádriceps (recto femoral)': 35, 'Glúteo mayor': 30, 'Gemelos': 20, 'Isquiotibiales': 15 } },
 
     // ================= MÁQUINAS DE GIMNASIO =================
@@ -222,29 +195,17 @@ const EXERCISE_CATALOG = [
     { name: 'Dominadas Asistidas', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps'], equipment: 'Máquina', shares: { 'Dorsal ancho': 50, 'Redondo mayor': 15, 'Bíceps braquial (cabeza larga)': 20, 'Trapecio medio': 15 } },
     { name: 'Fondos Asistidos', muscle: 'Pecho', muscleDetail: 'Pectoral inferior', secondary: ['Tríceps'], equipment: 'Máquina', shares: { 'Pectoral inferior': 45, 'Tríceps (cabeza larga)': 30, 'Tríceps (cabeza lateral)': 15, 'Deltoides anterior': 10 } },
     { name: 'Remo Alto en Máquina', muscle: 'Espalda', muscleDetail: 'Trapecio medio', secondary: ['Bíceps'], equipment: 'Máquina', shares: { 'Trapecio medio': 30, 'Dorsal ancho': 30, 'Romboides': 25, 'Bíceps braquial (cabeza larga)': 15 } },
-    { name: 'Jalón en Máquina', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps'], equipment: 'Máquina', shares: { 'Dorsal ancho': 55, 'Redondo mayor': 15, 'Bíceps braquial (cabeza larga)': 20, 'Trapecio medio': 10 } },
     { name: 'Press Declinado en Máquina', muscle: 'Pecho', muscleDetail: 'Pectoral inferior', secondary: ['Tríceps'], equipment: 'Máquina', shares: { 'Pectoral inferior': 60, 'Pectoral medio': 15, 'Tríceps (cabeza lateral)': 25 } },
     { name: 'Extensión de Tríceps en Máquina', muscle: 'Tríceps', muscleDetail: 'Tríceps (cabeza lateral)', secondary: [], equipment: 'Máquina', shares: { 'Tríceps (cabeza lateral)': 45, 'Tríceps (cabeza medial)': 35, 'Tríceps (cabeza larga)': 20 } },
     { name: 'Curl Predicador en Máquina', muscle: 'Bíceps', muscleDetail: 'Bíceps braquial (cabeza corta)', secondary: [], equipment: 'Máquina', shares: { 'Bíceps braquial (cabeza corta)': 55, 'Braquial anterior': 30, 'Bíceps braquial (cabeza larga)': 15 } },
-    { name: 'Encogimientos en Máquina', muscle: 'Espalda', muscleDetail: 'Trapecio superior', secondary: [], equipment: 'Máquina', shares: { 'Trapecio superior': 85, 'Trapecio medio': 15 } },
     { name: 'Curl Femoral de Pie', muscle: 'Pierna', muscleDetail: 'Isquiotibiales', secondary: [], equipment: 'Máquina', shares: { 'Isquiotibiales': 85, 'Gemelos': 15 } },
-    { name: 'Prensa Vertical', muscle: 'Pierna', muscleDetail: 'Glúteo mayor', secondary: ['Glúteo'], equipment: 'Máquina', shares: { 'Glúteo mayor': 30, 'Cuádriceps (recto femoral)': 30, 'Cuádriceps (vasto lateral)': 25, 'Isquiotibiales': 15 } },
-    { name: 'Hip Thrust en Máquina', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: ['Pierna'], equipment: 'Máquina', shares: { 'Glúteo mayor': 70, 'Isquiotibiales': 20, 'Cuádriceps (recto femoral)': 10 } },
-    { name: 'Silla Romana', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (inferior)', secondary: [], equipment: 'Máquina', shares: { 'Recto abdominal (inferior)': 60, 'Oblicuos': 25, 'Recto abdominal (superior)': 15 } },
-    { name: 'Banco Lumbar', muscle: 'Espalda', muscleDetail: 'Lumbar', secondary: ['Glúteo'], equipment: 'Máquina', shares: { 'Lumbar': 55, 'Glúteo mayor': 25, 'Isquiotibiales': 20 } },
-    { name: 'Rotación de Torso en Máquina', muscle: 'Abdomen', muscleDetail: 'Oblicuos', secondary: [], equipment: 'Máquina', shares: { 'Oblicuos': 75, 'Transverso abdominal': 25 } },
     // --- MULTIPOWER (barra guiada) ---
     { name: 'Press de Banca en Multipower', muscle: 'Pecho', muscleDetail: 'Pectoral medio', secondary: ['Tríceps', 'Hombro'], equipment: 'Máquina', shares: { 'Pectoral medio': 55, 'Pectoral inferior': 10, 'Tríceps (cabeza lateral)': 20, 'Deltoides anterior': 15 } },
     { name: 'Press Inclinado en Multipower', muscle: 'Pecho', muscleDetail: 'Pectoral superior', secondary: ['Tríceps', 'Hombro'], equipment: 'Máquina', shares: { 'Pectoral superior': 55, 'Pectoral medio': 10, 'Deltoides anterior': 20, 'Tríceps (cabeza lateral)': 15 } },
     { name: 'Press Militar en Multipower', muscle: 'Hombro', muscleDetail: 'Deltoides anterior', secondary: ['Tríceps'], equipment: 'Máquina', shares: { 'Deltoides anterior': 50, 'Deltoides lateral': 20, 'Tríceps (cabeza lateral)': 25, 'Trapecio superior': 5 } },
-    { name: 'Remo en Multipower', muscle: 'Espalda', muscleDetail: 'Dorsal ancho', secondary: ['Bíceps'], equipment: 'Máquina', shares: { 'Dorsal ancho': 35, 'Trapecio medio': 25, 'Romboides': 20, 'Bíceps braquial (cabeza larga)': 20 } },
-    { name: 'Zancadas en Multipower', muscle: 'Pierna', muscleDetail: 'Glúteo mayor', secondary: ['Glúteo'], equipment: 'Máquina', shares: { 'Glúteo mayor': 35, 'Cuádriceps (vasto medial)': 25, 'Cuádriceps (recto femoral)': 20, 'Isquiotibiales': 20 } },
-    { name: 'Hip Thrust en Multipower', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: ['Pierna'], equipment: 'Máquina', shares: { 'Glúteo mayor': 65, 'Isquiotibiales': 20, 'Cuádriceps (recto femoral)': 10, 'Lumbar': 5 } },
     { name: 'Elevación de Gemelos en Multipower', muscle: 'Pierna', muscleDetail: 'Gemelos', secondary: [], equipment: 'Máquina', shares: { 'Gemelos': 80, 'Sóleo': 20 } },
     // --- POLEA / CROSSOVER ---
-    { name: 'Jalón con Cuerda al Rostro', muscle: 'Hombro', muscleDetail: 'Deltoides posterior', secondary: ['Espalda'], equipment: 'Polea', shares: { 'Deltoides posterior': 40, 'Trapecio medio': 30, 'Romboides': 20, 'Manguito rotador': 10 } },
     { name: 'Encogimientos en Polea', muscle: 'Espalda', muscleDetail: 'Trapecio superior', secondary: [], equipment: 'Polea', shares: { 'Trapecio superior': 85, 'Trapecio medio': 15 } },
-    { name: 'Patada de Glúteo con Tobillera', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: [], equipment: 'Polea', shares: { 'Glúteo mayor': 75, 'Isquiotibiales': 15, 'Glúteo medio': 10 } },
     { name: 'Crunch de Rodillas en Polea', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (superior)', secondary: [], equipment: 'Polea', shares: { 'Recto abdominal (superior)': 65, 'Recto abdominal (inferior)': 20, 'Oblicuos': 15 } }
 ];
 
