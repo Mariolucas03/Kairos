@@ -104,10 +104,11 @@ const updateDailyLog = asyncHandler(async (req, res) => {
         case 'steps': log.steps = value; break;
         case 'streakCurrent': log.streakCurrent = value; break;
         case 'nutrition': log.nutrition = { ...log.nutrition, ...value }; break;
-        case 'sport': log.sportWorkouts = value; break;
-        case 'training': log.gymWorkouts = value; break;
-        case 'missions': log.missionStats = value; break;
-        case 'gains': log.gains = value; break;
+        // 🔒 'sport', 'training', 'missions' y 'gains' NO son editables por el cliente:
+        // los gestiona el servidor (gymController con $push, levelService/missionController
+        // con $inc) porque alimentan premios reales (ranking mensual, ranking de clanes).
+        // Dejarlos aquí permitía a cualquiera mandar PUT /api/daily {type:'gains', value:{xp:9e9}}
+        // y ganar el premio mensual/de clan de forma fraudulenta.
         default: res.status(400); throw new Error('Campo no editable'); // 🔥 solo se permiten los campos listados arriba
     }
     await log.save();

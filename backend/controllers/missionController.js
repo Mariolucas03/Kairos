@@ -67,7 +67,9 @@ const getMissions = asyncHandler(async (req, res) => {
                     updated = true;
                 }
             }
-        } catch (err) { }
+        } catch (err) {
+            console.error(`Error reseteando misión de hábito ${mission._id}:`, err);
+        }
     }
 
     if (updated) return getMissions(req, res);

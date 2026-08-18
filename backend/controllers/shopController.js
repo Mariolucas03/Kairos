@@ -259,31 +259,49 @@ const useItem = async (req, res) => {
         let msg = 'Objeto usado';
         let rewardData = null;
 
-        // LÓGICA
-        if (item.category === 'avatar') { user.avatar = item.icon; msg = `Avatar equipado`; }
-        else if (item.category === 'frame') { user.frame = item.icon; msg = `Marco equipado`; }
-        else if (item.category === 'pet') { user.pet = item.icon; msg = `Mascota equipada`; }
-        else if (item.category === 'title') { user.title = item.name; msg = `Título equipado`; }
-        else if (item.category === 'theme') { user.theme = item.effectType || 'dark'; msg = `Tema aplicado`; }
-
-        // CONSUMIBLES Y COFRES (Se gastan)
-        else if (item.category === 'consumable' || item.category === 'chest') {
+        // CONSUMIBLES Y COFRES (Se gastan): descuento atómico (🔥 BLINDADO, igual que buyItem)
+        // para que dos peticiones simultáneas con el mismo objeto no dupliquen el premio del
+        // cofre ni pisen el descuento de cantidad (lost update).
+        if (item.category === 'consumable' || item.category === 'chest') {
+            let prize = 0;
             if (item.category === 'chest') {
                 const roll = Math.random();
-                let prize = 10;
-                if (roll > 0.8) prize = 100;
-                user.coins += prize;
+                prize = roll > 0.8 ? 100 : 10;
                 rewardData = { type: 'coins', value: prize };
                 msg = "Cofre abierto";
             } else {
                 msg = "Poción usada";
             }
 
-            user.inventory[inventoryIndex].quantity -= 1;
-            if (user.inventory[inventoryIndex].quantity <= 0) {
-                user.inventory.splice(inventoryIndex, 1);
+            const inc = { 'inventory.$[elem].quantity': -1 };
+            if (prize) inc.coins = prize;
+
+            const updatedForItem = await User.findOneAndUpdate(
+                { _id: user._id, inventory: { $elemMatch: { item: itemId, quantity: { $gte: 1 } } } },
+                { $inc: inc },
+                { new: true, arrayFilters: [{ 'elem.item': itemId, 'elem.quantity': { $gte: 1 } }] }
+            );
+
+            if (!updatedForItem) {
+                return res.status(400).json({ message: 'No tienes este objeto' });
             }
+
+            // Limpieza: quita del inventario las entradas que se quedaron a 0
+            await User.updateOne(
+                { _id: user._id },
+                { $pull: { inventory: { item: itemId, quantity: { $lte: 0 } } } }
+            );
+
+            const updatedUser = await User.findById(user._id).populate('inventory.item');
+            return res.json({ message: msg, user: limpiarInventario(updatedUser), reward: rewardData });
         }
+
+        // EQUIPAR (sin problema de concurrencia real: no se gasta nada, solo se asigna)
+        if (item.category === 'avatar') { user.avatar = item.icon; msg = `Avatar equipado`; }
+        else if (item.category === 'frame') { user.frame = item.icon; msg = `Marco equipado`; }
+        else if (item.category === 'pet') { user.pet = item.icon; msg = `Mascota equipada`; }
+        else if (item.category === 'title') { user.title = item.name; msg = `Título equipado`; }
+        else if (item.category === 'theme') { user.theme = item.effectType || 'dark'; msg = `Tema aplicado`; }
 
         await user.save();
         const updatedUser = await User.findById(user._id).populate('inventory.item');

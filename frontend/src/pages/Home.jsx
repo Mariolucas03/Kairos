@@ -33,13 +33,13 @@ import { useAuthStore } from '../store/useAuthStore';
 // WRAPPER INTELIGENTE V4 (FIX CLICS) — SIN CAMBIOS
 // ==========================================
 const SmartWidgetWrapper = ({ children, onClick, className, isDragEnabled }) => {
-    if (isDragEnabled) {
-        return <div className={className}>{children}</div>;
-    }
-
     const startX = useRef(0);
     const startY = useRef(0);
     const isScrolling = useRef(false);
+
+    if (isDragEnabled) {
+        return <div className={className}>{children}</div>;
+    }
 
     const handleTouchStart = (e) => {
         startX.current = e.touches[0].clientX;
