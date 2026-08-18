@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
-import { preload, mutate } from 'swr';
+import useSWR, { preload } from 'swr';
 import Header from './Header';
 import Footer from './Footer';
 import api from '../../services/api';
@@ -13,6 +13,20 @@ const fetcher = (url) => api.get(url).then(res => res.data);
 // entrar, así que cuando el usuario pulsa "Gym" o "Comida" los datos ya están
 // en caché. Antes solo se precargaban los de Home, y por eso era la única
 // sección que se sentía instantánea.
+// Lo que CADA pantalla pide por su cuenta nada más montarse. Se excluye de la
+// precarga: su useSWR dispara en la fase de render, o sea ANTES de que corra el
+// efecto que precarga, así que preload() no lo deduplica y acaba siendo un
+// segundo viaje al servidor por la misma URL. Medido: entrar en Gym pedía
+// /gym/routines dos veces, y Social pedía /social/feed y /social/friends dos
+// veces cada una.
+const YA_LO_PIDE_LA_PANTALLA = {
+    '/gym': ['/gym/routines'],
+    '/food': ['/food/log'],
+    '/missions': ['/missions', '/social/friends'],
+    '/social': ['/social/feed?page=1', '/social/friends'],
+    '/social/friends': ['/social/friends']
+};
+
 const SECTION_ENDPOINTS = [
     '/gym/routines',
     '/food/log',
@@ -48,6 +62,25 @@ function LayoutContent() {
     // de amigos mientras la app está abierta en primer plano.
     useHeartbeat(!!user);
 
+    // ⚠️ /daily se pide con el MISMO hook que usan las páginas, no con api.get()
+    // dentro de un efecto. Antes eran DOS viajes al servidor en cada carga:
+    // la página monta y su useSWR('/daily') dispara en la fase de render, o sea
+    // ANTES de que corra el efecto de aquí, así que ni sembrar la caché después
+    // con mutate() ni llamar a preload() llegaban a tiempo de evitar el segundo.
+    // Compartiendo hook, dedupingInterval los colapsa en UNO. Contra un Render
+    // dormido cada viaje ahorrado se nota.
+    const { data: dailyData } = useSWR(
+        typeof localStorage !== 'undefined' && localStorage.getItem('token') ? '/daily' : null,
+        fetcher
+    );
+
+    // El log del día viaja dentro del usuario global, como antes
+    useEffect(() => {
+        if (!dailyData) return;
+        setUser(prev => ({ ...prev, ...(dailyData.user || {}), dailyLog: dailyData }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dailyData]);
+
     // Sincronización con Backend
     // 🔥 Solo al montar el shell autenticado (login / recarga de página), NO en cada
     // cambio de sección. `navigate` de react-router cambia de identidad en cada
@@ -56,26 +89,20 @@ function LayoutContent() {
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                const [dailyRes, userRes] = await Promise.all([
-                    api.get('/daily'),
-                    api.get('/users/')
-                ]);
-
-                // Sembramos la caché de SWR con lo que acabamos de traer: así las
-                // páginas que hacen useSWR('/daily') lo tienen ya listo en vez de
-                // volver a pedirlo (antes /daily se pedía dos veces al entrar).
-                mutate('/daily', dailyRes.data, false);
+                const userRes = await api.get('/users/');
 
                 // Actualizamos el estado global (Zustand lo guarda en localStorage en 2º plano)
                 setUser({
                     ...user,
-                    ...(dailyRes.data.user || {}),
-                    ...userRes.data,
-                    dailyLog: dailyRes.data
+                    ...userRes.data
                 });
 
-                // Precarga en segundo plano del resto de secciones (sin bloquear nada)
-                SECTION_ENDPOINTS.forEach(url => { preload(url, fetcher); });
+                // Precarga en segundo plano del RESTO de secciones (sin bloquear nada).
+                // La de la pantalla en la que ya estás se salta: ya la está pidiendo ella.
+                const yaPedidos = YA_LO_PIDE_LA_PANTALLA[location.pathname] || [];
+                SECTION_ENDPOINTS
+                    .filter(url => !yaPedidos.includes(url))
+                    .forEach(url => { preload(url, fetcher); });
             } catch (error) {
                 if (error.response?.status === 401) {
                     logout();

@@ -3,8 +3,32 @@ const User = require('../models/User');
 const crypto = require('crypto'); // 🔥 IMPORTACIÓN NATIVA DE NODE PARA SEGURIDAD
 
 // --- UTILIDADES GLOBALES ---
+
+/**
+ * Normaliza una apuesta recibida del cliente. Devuelve el número, o null si no
+ * sirve. TODOS los juegos deben pasar por aquí.
+ *
+ * Cada juego tenía su propia guarda y no coincidían:
+ *   - blackjack:    `bet < 10`         -> `undefined < 10` y `NaN < 10` son
+ *                                         FALSE, así que ambos la atravesaban.
+ *   - dados/slots:  `!bet || bet < 10` -> deja pasar 'abc' e Infinity.
+ *   - ruleta/torre: Number.isFinite    -> esta era la única correcta.
+ *
+ * Lo que se colaba acababa en `$inc: { gameCoins: NaN }`. Eso no da error:
+ * deja el saldo del usuario en NaN y a partir de ahí ninguna partida cuadra.
+ */
+const normalizarApuesta = (valor, minimo = 10) => {
+    const n = Number(valor);
+    if (!Number.isFinite(n) || n < minimo) return null;
+    return n;
+};
+
 const chargeAndValidate = async (userId, amount) => {
-    if (amount <= 0) return await User.findById(userId);
+    // Red de seguridad: aunque un juego olvide validar, aquí no pasa un NaN
+    const importe = Number(amount);
+    if (!Number.isFinite(importe)) throw new Error('Importe de apuesta inválido');
+    if (importe <= 0) return await User.findById(userId);
+    amount = importe;
     const user = await User.findOneAndUpdate(
         { _id: userId, gameCoins: { $gte: amount } },
         { $inc: { gameCoins: -amount } },
@@ -15,7 +39,10 @@ const chargeAndValidate = async (userId, amount) => {
 };
 
 const payPrize = async (userId, amount) => {
-    if (amount <= 0) return await User.findById(userId);
+    // Un premio no finito NO se escribe: meter NaN aquí deja el saldo inservible
+    const importe = Number(amount);
+    if (!Number.isFinite(importe) || importe <= 0) return await User.findById(userId);
+    amount = importe;
     return await User.findByIdAndUpdate(userId, { $inc: { gameCoins: amount } }, { new: true });
 };
 
@@ -24,10 +51,11 @@ const payPrize = async (userId, amount) => {
 // ==========================================
 const playDice = asyncHandler(async (req, res) => {
     const { bet, prediction } = req.body;
-    if (!bet || bet < 10) { res.status(400); throw new Error('Apuesta mínima 10'); }
+    const apuesta = normalizarApuesta(bet);
+    if (apuesta === null) { res.status(400); throw new Error('Apuesta mínima 10'); }
     if (!['under', 'seven', 'over'].includes(prediction)) { res.status(400); throw new Error('Predicción inválida'); }
 
-    await chargeAndValidate(req.user._id, bet);
+    await chargeAndValidate(req.user._id, apuesta);
 
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
@@ -38,7 +66,7 @@ const playDice = asyncHandler(async (req, res) => {
     else if (prediction === 'seven' && sum === 7) { won = true; multiplier = 5; }
     else if (prediction === 'over' && sum > 7) { won = true; multiplier = 2; }
 
-    const payout = won ? bet * multiplier : 0;
+    const payout = won ? apuesta * multiplier : 0;
     const finalUser = await payPrize(req.user._id, payout);
 
     res.json({ won, payout, sum, dices: [d1, d2], user: finalUser });
@@ -148,8 +176,9 @@ const getSlotSymbol = () => {
 
 const playSlots = asyncHandler(async (req, res) => {
     const { bet } = req.body;
-    if (!bet || bet < 10) { res.status(400); throw new Error('Apuesta mínima 10'); }
-    await chargeAndValidate(req.user._id, bet);
+    const apuesta = normalizarApuesta(bet);
+    if (apuesta === null) { res.status(400); throw new Error('Apuesta mínima 10'); }
+    await chargeAndValidate(req.user._id, apuesta);
 
     const grid = Array(4).fill(null).map(() => Array(4).fill(null).map(() => getSlotSymbol()));
     const rows = [0, 1, 2, 3].map(r => [grid[0][r], grid[1][r], grid[2][r], grid[3][r]]);
@@ -180,7 +209,7 @@ const playSlots = asyncHandler(async (req, res) => {
 
         if (matchIds.length >= 3) {
             const multi = matchIds.length === 4 ? 2 : 1;
-            totalPayout += bet * s[matchIds[0]].val * multi;
+            totalPayout += apuesta * s[matchIds[0]].val * multi;
             matchIds.forEach(i => winningCells.push(`${line.coords[i][0]}-${line.coords[i][1]}`));
         }
     });
@@ -348,8 +377,9 @@ const playBlackjack = asyncHandler(async (req, res) => {
     let state;
 
     if (action === 'deal') {
-        if (bet < 10) { res.status(400); throw new Error('Apuesta mínima 10'); }
-        await chargeAndValidate(req.user._id, bet);
+        const apuesta = normalizarApuesta(bet);
+        if (apuesta === null) { res.status(400); throw new Error('Apuesta mínima 10'); }
+        await chargeAndValidate(req.user._id, apuesta);
 
         const deck = createDeck();
         const gameId = crypto.randomBytes(16).toString('hex'); // 🔥 CANDADO ÚNICO
@@ -360,7 +390,7 @@ const playBlackjack = asyncHandler(async (req, res) => {
         state = {
             gameId, // Incluimos el candado en el estado que se va a firmar
             deck, 
-            pHands: [{ cards: [deck.pop(), deck.pop()], bet, isDone: false, isDoubled: false }],
+            pHands: [{ cards: [deck.pop(), deck.pop()], bet: apuesta, isDone: false, isDoubled: false }],
             dHand: [deck.pop(), deck.pop()], activeHand: 0, status: 'playing'
         };
 
@@ -429,20 +459,23 @@ const playBlackjack = asyncHandler(async (req, res) => {
             }
         });
 
-        // 🔥 PAGAR Y ROMPER EL CANDADO EN UNA SOLA CONSULTA
-        if (totalPayout > 0) {
-            finalUser = await User.findByIdAndUpdate(
-                req.user._id, 
-                { $inc: { gameCoins: totalPayout }, $set: { activeGameToken: null } }, 
-                { new: true }
-            );
-        } else {
-            finalUser = await User.findByIdAndUpdate(
-                req.user._id, 
-                { $set: { activeGameToken: null } }, 
-                { new: true }
-            );
-        }
+        // 🔥 PAGAR Y ROMPER EL CANDADO EN UNA SOLA CONSULTA ATÓMICA.
+        //
+        // ⚠️ El candado va en el FILTRO, no sólo en la comprobación de arriba.
+        // Comprobar activeGameToken al entrar y pagar después filtrando sólo por
+        // _id deja una ventana: dos peticiones simultáneas con el MISMO token
+        // pasan las dos la comprobación y las dos ejecutan el $inc, así que la
+        // mano se cobra dos veces. Con el candado en el filtro, MongoDB sólo deja
+        // pasar a una (la actualización de un documento es atómica) y la segunda
+        // no encuentra nada que actualizar.
+        finalUser = await User.findOneAndUpdate(
+            { _id: req.user._id, activeGameToken: state.gameId },
+            totalPayout > 0
+                ? { $inc: { gameCoins: totalPayout }, $set: { activeGameToken: null } }
+                : { $set: { activeGameToken: null } },
+            { new: true }
+        );
+        if (!finalUser) { res.status(409); throw new Error('Esta mano ya estaba resuelta.'); }
     }
 
     const newStateToken = state.status === 'ended' ? null : encryptState(state);
@@ -507,22 +540,29 @@ const playTower = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('Partida expirada. Empieza de nuevo.');
     }
 
+    // ⚠️ Mismo motivo que en el blackjack: el candado va en el FILTRO. Sin él,
+    // dos 'cashout' simultáneos con el mismo token cobran los dos.
+    // Devuelve null si otra petición ya cerró esta partida.
     const cerrarPartida = async (payout) => {
-        if (payout > 0) {
-            return await User.findByIdAndUpdate(
-                req.user._id,
-                { $inc: { gameCoins: payout }, $set: { activeGameToken: null } },
-                { new: true }
-            );
-        }
-        return await User.findByIdAndUpdate(req.user._id, { $set: { activeGameToken: null } }, { new: true });
+        const cambio = payout > 0
+            ? { $inc: { gameCoins: payout }, $set: { activeGameToken: null } }
+            : { $set: { activeGameToken: null } };
+        return await User.findOneAndUpdate(
+            { _id: req.user._id, activeGameToken: state.gameId },
+            cambio,
+            { new: true }
+        );
+    };
+    const exigirCierre = (usuario) => {
+        if (!usuario) { res.status(409); throw new Error('Esta partida ya estaba resuelta.'); }
+        return usuario;
     };
 
     // --- RETIRARSE ---
     if (action === 'cashout') {
         if (state.floor === 0) { res.status(400); throw new Error('Sube al menos una planta'); }
         const payout = Math.round(state.bet * TOWER_MULTIPLIERS[state.floor - 1]);
-        const finalUser = await cerrarPartida(payout);
+        const finalUser = exigirCierre(await cerrarPartida(payout));
         return res.json({ status: 'cashed', payout, floor: state.floor, traps: state.traps, user: finalUser, token: null });
     }
 
@@ -535,7 +575,7 @@ const playTower = asyncHandler(async (req, res) => {
         const floorJugada = state.floor;
 
         if (tile === trapTile) {
-            const finalUser = await cerrarPartida(0);
+            const finalUser = exigirCierre(await cerrarPartida(0));
             return res.json({ status: 'lost', trapTile, floor: floorJugada, traps: state.traps, payout: 0, user: finalUser, token: null });
         }
 
@@ -544,7 +584,7 @@ const playTower = asyncHandler(async (req, res) => {
         // Torre completada: se paga sola
         if (state.floor >= TOWER_FLOORS) {
             const payout = Math.round(state.bet * TOWER_MULTIPLIERS[TOWER_FLOORS - 1]);
-            const finalUser = await cerrarPartida(payout);
+            const finalUser = exigirCierre(await cerrarPartida(payout));
             return res.json({ status: 'won', trapTile, floor: state.floor, traps: state.traps, payout, user: finalUser, token: null });
         }
 

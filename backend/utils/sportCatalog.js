@@ -64,11 +64,23 @@ const getSport = (id) => byId[String(id || '').toLowerCase()] || null;
  * Calorías sin IA: fórmula MET estándar, ajustada por intensidad.
  * Es el plan B, y también el tope de cordura para lo que devuelva la IA.
  */
-const estimateCalories = ({ sportId, minutes, weightKg = 75, intensity = 'Media' }) => {
+const estimateCalories = ({ sportId, minutes, weightKg, intensity = 'Media' }) => {
     const sport = getSport(sportId);
     const met = sport ? sport.met : 5;
     const factor = intensity === 'Alta' ? 1.25 : intensity === 'Baja' ? 0.75 : 1;
-    return Math.round(met * factor * weightKg * (Math.max(0, minutes) / 60));
+
+    // ⚠️ Antes el peso era `weightKg = 75` como default de parámetro, y los
+    // minutos entraban crudos en Math.max. Los defaults de parámetro sólo
+    // cubren `undefined`:
+    //   - weightKg: null  ->  0 kcal en TODA la actividad (es el mismo fallo
+    //     que dejaba tres widgets del Home a cero con value={null}).
+    //   - minutes: '30'   ->  Math.max(0,'30') funciona, pero 'treinta' da NaN,
+    //     y ese NaN se guardaba como calorías del día.
+    // Normalizar aquí es más barato que confiar en que todos los llamadores lo hagan.
+    const peso = Number(weightKg) > 0 ? Number(weightKg) : 75;
+    const mins = Number(minutes) > 0 ? Number(minutes) : 0;
+
+    return Math.round(met * factor * peso * (mins / 60));
 };
 
 module.exports = { SPORTS, getSport, estimateCalories };
