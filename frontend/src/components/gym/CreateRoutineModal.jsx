@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play } from 'lucide-react';
 import api from '../../services/api';
@@ -82,10 +82,18 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         setAddedExercises(newExercises);
     };
 
+    // Candado de reentrada. NO basta con `disabled={estado}`: el estado no cambia
+    // hasta el siguiente render, y entre el primer toque y ese render el botón
+    // sigue vivo. En un móvil lento un doble toque entra dos veces y duplica lo
+    // que se esté creando. El ref se actualiza en el acto.
+    const enVuelo = useRef(false);
+
     const handleSave = async () => {
+        if (enVuelo.current) return;
         if (!routineName.trim()) return setErrorMsg("Ponle un nombre a la rutina");
         if (addedExercises.length === 0) return setErrorMsg("Añade al menos un ejercicio");
 
+        enVuelo.current = true;
         setErrorMsg(null);
         setLoading(true);
         try {
@@ -108,6 +116,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             console.error(error);
             setErrorMsg(error.response?.data?.message || "No se pudo guardar la rutina");
         } finally {
+            enVuelo.current = false;
             setLoading(false);
         }
     };

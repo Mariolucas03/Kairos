@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import useSWR from 'swr';
 import { X, Timer, MapPin, Flame, Save, Loader2, Search, Watch, Sparkles, Activity } from 'lucide-react';
 import api from '../../services/api';
@@ -31,10 +31,18 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
         setNombreLibre(s.id === 'otro' ? '' : s.name);
     };
 
+    // Candado de reentrada. NO basta con `disabled={estado}`: el estado no cambia
+    // hasta el siguiente render, y entre el primer toque y ese render el botón
+    // sigue vivo. En un móvil lento un doble toque entra dos veces y duplica lo
+    // que se esté creando. El ref se actualiza en el acto.
+    const enVuelo = useRef(false);
+
     const guardar = async () => {
+        if (enVuelo.current) return;
         if (!minutos || Number(minutos) <= 0) return showToast('¿Cuántos minutos?', 'error');
         if (elegido.id === 'otro' && !nombreLibre.trim()) return showToast('Ponle nombre a la actividad', 'error');
 
+        enVuelo.current = true;
         setGuardando(true);
         try {
             const res = await api.post('/gym/sport', {
@@ -54,6 +62,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
         } catch (e) {
             showToast(e.response?.data?.message || 'No se pudo registrar', 'error');
         } finally {
+            enVuelo.current = false;
             setGuardando(false);
         }
     };

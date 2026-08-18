@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Skull, Lock, CheckCircle, RefreshCcw } from 'lucide-react';
 import api from '../../services/api';
 
 export default function RedemptionScreen({ user, setUser }) {
     const [loading, setLoading] = useState(false);
 
+    // Candado de reentrada. NO basta con `disabled={estado}`: el estado no cambia
+    // hasta el siguiente render, y entre el primer toque y ese render el botón
+    // sigue vivo. En un móvil lento un doble toque entra dos veces y duplica lo
+    // que se esté creando. El ref se actualiza en el acto.
+    const enVuelo = useRef(false);
+
     const handleRevive = async () => {
+        if (enVuelo.current) return;
+        enVuelo.current = true;
         setLoading(true);
         try {
             // 1. Petición al backend para revivir (HP sube a 20)
@@ -24,6 +32,7 @@ export default function RedemptionScreen({ user, setUser }) {
 
         } catch (error) {
             console.error("Error al revivir:", error);
+            enVuelo.current = false;
             // Si falla (error de red, etc), quitamos el loading para que puedas volver a probar
             setLoading(false);
         }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { X, Scale, Flame, Utensils, User, ToggleLeft, ToggleRight, Save, Activity, Edit2 } from 'lucide-react';
@@ -66,8 +66,16 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
         }
     };
 
+    // Candado de reentrada. NO basta con `disabled={estado}`: el estado no cambia
+    // hasta el siguiente render, y entre el primer toque y ese render el botón
+    // sigue vivo. En un móvil lento un doble toque entra dos veces y duplica lo
+    // que se esté creando. El ref se actualiza en el acto.
+    const enVuelo = useRef(false);
+
     const handleSaveStats = async () => {
+        if (enVuelo.current) return;
         if (!formData.age || !formData.height) return;
+        enVuelo.current = true;
         try {
             const res = await api.put('/users/physical-stats', {
                 age: parseInt(formData.age),
@@ -82,6 +90,8 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
             localStorage.setItem('includeBMR', 'true');
         } catch (error) {
             console.error('Error guardando datos físicos:', error);
+        } finally {
+            enVuelo.current = false;
         }
     };
 

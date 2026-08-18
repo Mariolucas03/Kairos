@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SWRConfig } from 'swr';
 import Layout from './components/layout/Layout';
@@ -39,6 +39,51 @@ const BlackJack = lazy(() => import('./pages/games/BlackJack'));
 const Slots = lazy(() => import('./pages/games/Slots'));
 const TowerGame = lazy(() => import('./pages/games/TowerGame'));
 
+/**
+ * Los mismos cargadores que usa lazy(), en una lista aparte para poder
+ * dispararlos a mano.
+ *
+ * El troceado por rutas evita descargar 1 MB de golpe al abrir la app, pero
+ * traslada la descarga al momento en que pulsas: la primera vez que entras en
+ * una sección hay que ir a por su trozo, y eso es justo el tirón que se nota.
+ * Precargándolos cuando el navegador está ocioso se tienen las dos cosas:
+ * arranque ligero y navegación instantánea a partir de ahí.
+ */
+const CARGADORES = [
+    () => import('./pages/Missions'),
+    () => import('./pages/Gym'),
+    () => import('./pages/Food'),
+    () => import('./pages/Shop'),
+    () => import('./pages/Social'),
+    () => import('./pages/Profile'),
+    () => import('./pages/Games'),
+    () => import('./pages/Settings'),
+    () => import('./pages/social/FriendsPage'),
+    () => import('./pages/social/ClansPage'),
+    () => import('./pages/social/RankingPage'),
+    () => import('./pages/social/UserProfilePage'),
+    () => import('./pages/games/FortuneWheel'),
+    () => import('./pages/games/ScratchGame'),
+    () => import('./pages/games/DiceGame'),
+    () => import('./pages/games/Roulette'),
+    () => import('./pages/games/BlackJack'),
+    () => import('./pages/games/Slots'),
+    () => import('./pages/games/TowerGame')
+];
+
+// De uno en uno y sólo con el navegador ocioso, para no competir con las
+// peticiones de la pantalla en la que estás.
+const precargarSecciones = () => {
+    let i = 0;
+    const siguiente = () => {
+        if (i >= CARGADORES.length) return;
+        CARGADORES[i++]().catch(() => { /* si falla, lazy lo reintentará al entrar */ });
+        programar(siguiente);
+    };
+    const programar = (fn) => (window.requestIdleCallback || ((f) => setTimeout(f, 300)))(fn, { timeout: 2000 });
+    programar(siguiente);
+};
+
 // Fetcher único para toda la app
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -62,6 +107,10 @@ const swrOptions = {
 };
 
 function App() {
+    // Tras el primer render, se van trayendo en segundo plano los trozos del
+    // resto de secciones para que al pulsar no haya nada que descargar.
+    useEffect(() => { precargarSecciones(); }, []);
+
     return (
         <SWRConfig value={swrOptions}>
             <Router>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Play } from 'lucide-react';
 import api from '../../services/api';
@@ -91,13 +91,21 @@ export default function ExerciseSelector({ onSelect, onClose }) {
         setNuevoSecundarios(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]);
     };
 
+    // Candado de reentrada. NO basta con `disabled={estado}`: el estado no cambia
+    // hasta el siguiente render, y entre el primer toque y ese render el botón
+    // sigue vivo. En un móvil lento un doble toque entra dos veces y duplica lo
+    // que se esté creando. El ref se actualiza en el acto.
+    const enVuelo = useRef(false);
+
     const handleCreateNew = async () => {
+        if (enVuelo.current) return;
         const nombre = nuevoNombre.trim();
         if (!nombre) return setErrorCrear('Ponle un nombre al ejercicio');
         if (exercises.some(e => e.name.toLowerCase() === nombre.toLowerCase())) {
             return setErrorCrear('Ya tienes un ejercicio con ese nombre');
         }
 
+        enVuelo.current = true;
         setGuardando(true);
         setErrorCrear('');
         try {
@@ -115,6 +123,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
         } catch (e) {
             setErrorCrear(e.response?.data?.message || 'No se pudo crear el ejercicio');
         } finally {
+            enVuelo.current = false;
             setGuardando(false);
         }
     };
