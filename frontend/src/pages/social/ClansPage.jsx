@@ -149,47 +149,63 @@ export default function ClansPage() {
             />
 
             {myClan ? (
-                <div className="bg-zinc-900 border border-white/10 rounded-3xl p-4 relative overflow-hidden shadow-2xl mb-6">
-                    <div className="absolute top-0 right-0 p-10 opacity-10 bg-purple-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10"></div>
+                <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 relative overflow-hidden mb-6">
+                    {/* Acento y halo del sistema, en vez del borron morado */}
+                    <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${RANK_CONFIG[myRank].hex || '#a855f7'}, transparent)` }} />
+                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: RANK_CONFIG[myRank].hex || '#a855f7', opacity: 0.11 }} />
 
-                    {/* CABECERA en una sola fila: estandarte · nombre · acciones.
-                        Los botones ya no van en posición absoluta (obligaban a
-                        reservar hueco a mano y el nombre se quedaba sin sitio):
-                        ocupan su propia columna y el nombre se lleva el resto,
-                        partiéndose en dos líneas si hace falta en vez de cortarse. */}
                     <div className="relative z-10 mb-4">
-                        <div className="flex items-start gap-3">
-                            <div className="text-3xl bg-black w-12 h-12 rounded-xl flex items-center justify-center shadow-inner border border-zinc-800 shrink-0">
+                        {/* ⚠️ El nombre YA NO comparte fila con el estandarte y los
+                            botones: con tres cosas en la misma linea se quedaba sin
+                            sitio y se cortaba. Ahora el estandarte y las acciones van
+                            arriba, y el nombre tiene la fila ENTERA para el solo. */}
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="text-[30px] bg-[#18181b] w-14 h-14 rounded-[18px] flex items-center justify-center border border-white/[0.07] shrink-0">
                                 {myClan.icon}
                             </div>
 
-                            <div className="flex-1 min-w-0">
-                                <h2 className="text-lg font-black text-white uppercase not-italic leading-tight break-words">
-                                    {myClan.name}
-                                </h2>
-                                <span className="inline-block mt-1 text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-black border border-white/10 px-2 py-0.5 rounded">
-                                    {RANK_CONFIG[myRank].label}
-                                </span>
-                            </div>
-
-                            <div className="flex gap-1.5 shrink-0">
+                            <div className="flex gap-2 shrink-0">
                                 {isLeader && (
-                                    <button onClick={openEditClan} aria-label="Editar clan" className="bg-zinc-800 p-1.5 rounded-lg text-zinc-400 border border-white/5 hover:text-white hover:bg-zinc-700 transition-colors">
-                                        <Edit size={14} />
+                                    <button onClick={openEditClan} aria-label="Editar clan" className="bg-[#18181b] w-9 h-9 rounded-xl text-zinc-400 border border-white/[0.07] hover:text-white flex items-center justify-center transition-colors active:scale-95">
+                                        <Edit size={15} />
                                     </button>
                                 )}
                                 <button
                                     onClick={() => setConfirmAction({ message: '¿Seguro que quieres salir del clan?', onConfirm: handleLeaveClan })}
                                     aria-label="Salir del clan"
-                                    className="bg-red-900/20 p-1.5 rounded-lg text-red-500 border border-red-500/30 hover:bg-red-900/40 transition-colors"
+                                    className="bg-[#18181b] w-9 h-9 rounded-xl text-red-500 border border-red-500/20 hover:bg-red-950/40 flex items-center justify-center transition-colors active:scale-95"
                                 >
-                                    <LogOut size={14} />
+                                    <LogOut size={15} />
                                 </button>
                             </div>
                         </div>
 
+                        {/* El nombre, a lo ancho y en el tamano de titular del
+                            sistema. Dos lineas como maximo y luego puntos suspensivos. */}
+                        <h2 className="mt-3.5 text-[22px] font-black text-white uppercase tracking-[-0.045em] leading-[1.05] not-italic line-clamp-2 break-words">
+                            {myClan.name}
+                        </h2>
+
+                        <div className="flex items-center gap-2 mt-2">
+                            <span
+                                className="text-[9px] font-black uppercase tracking-[0.16em] px-2 py-1 rounded-lg border not-italic"
+                                style={{
+                                    color: RANK_CONFIG[myRank].hex || '#a1a1aa',
+                                    borderColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '55',
+                                    backgroundColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '15'
+                                }}
+                            >
+                                {RANK_CONFIG[myRank].label}
+                            </span>
+                            {myClan.minLevel > 1 && (
+                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-600 not-italic">
+                                    Nivel {myClan.minLevel}+
+                                </span>
+                            )}
+                        </div>
+
                         {myClan.description && (
-                            <p className="text-[11px] text-zinc-400 not-italic mt-2.5 leading-snug">"{myClan.description}"</p>
+                            <p className="text-[12px] text-zinc-400 not-italic mt-3 leading-snug">{myClan.description}</p>
                         )}
 
                         {/* Cifras en celdas iguales, para que no se descuadren

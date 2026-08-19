@@ -19,12 +19,14 @@ export const getLevelStyle = (level) => {
 
 export const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-3 rounded-[20px] border border-white/5 mb-2 relative group hover:border-white/10 transition-all shadow-sm";
 
+// `hex` es el mismo tono que las clases de Tailwind de al lado, en un formato
+// que se puede usar en `style` (acentos, halos, bordes calculados).
 export const RANK_CONFIG = {
-    dios: { label: 'DIOS', color: 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10', value: 4 },
-    rey: { label: 'REY', color: 'text-purple-400 border-purple-500/50 bg-purple-500/10', value: 3 },
-    guerrero: { label: 'GUERRERO', color: 'text-red-400 border-red-500/50 bg-red-500/10', value: 2 },
-    recluta: { label: 'RECLUTA', color: 'text-blue-400 border-blue-500/50 bg-blue-500/10', value: 1 },
-    esclavo: { label: 'ESCLAVO', color: 'text-zinc-500 border-zinc-700 bg-zinc-800/50', value: 0 }
+    dios: { label: 'DIOS', color: 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10', hex: '#eab308', value: 4 },
+    rey: { label: 'REY', color: 'text-purple-400 border-purple-500/50 bg-purple-500/10', hex: '#a855f7', value: 3 },
+    guerrero: { label: 'GUERRERO', color: 'text-red-400 border-red-500/50 bg-red-500/10', hex: '#f87171', value: 2 },
+    recluta: { label: 'RECLUTA', color: 'text-blue-400 border-blue-500/50 bg-blue-500/10', hex: '#60a5fa', value: 1 },
+    esclavo: { label: 'ESCLAVO', color: 'text-zinc-500 border-zinc-700 bg-zinc-800/50', hex: '#71717a', value: 0 }
 };
 
 // `bg` es un color PLANO, no paradas de degradado. Antes era "from-x to-y",
