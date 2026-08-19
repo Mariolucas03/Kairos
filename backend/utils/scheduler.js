@@ -282,19 +282,38 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
  * castiga. Asi la app se cura sola en cuanto alguien la abre, sin depender de
  * que haya un cron externo configurado.
  */
-const ponerseAlDia = async () => {
-    try {
-        const ayer = new Date();
-        ayer.setDate(ayer.getDate() - 1);
-        const ayerStr = getMadridDateString(ayer);
+// Promesa de la puesta al dia en curso. Las peticiones la esperan, asi que
+// cuando el usuario recibe sus datos el castigo YA esta aplicado.
+let puestaAlDiaEnCurso = null;
 
-        if (await yaCastigado(ayerStr)) return;
+/**
+ * Devuelve la promesa de la puesta al dia, o una ya resuelta si no hay nada
+ * pendiente. Es lo que permite que /users y /daily no contesten con la vida
+ * antigua.
+ */
+const esperarPuestaAlDia = () => puestaAlDiaEnCurso || Promise.resolve();
 
-        console.log('⏰ El mantenimiento de ' + ayerStr + ' no se habia ejecutado. Poniendose al dia...');
-        await runNightlyMaintenance();
-    } catch (e) {
-        console.error('No se pudo poner al dia el mantenimiento:', e.message);
-    }
+const ponerseAlDia = () => {
+    // ⚠️ La promesa se asigna AQUI, de forma sincrona, no dentro del cuerpo
+    // asincrono. Si se asignara despues de comprobar si hace falta castigar,
+    // una peticion que llegara en ese instante veria `null`, pasaria de largo y
+    // devolveria la vida antigua: justo la carrera que esto viene a evitar.
+    puestaAlDiaEnCurso = (async () => {
+        try {
+            const ayer = new Date();
+            ayer.setDate(ayer.getDate() - 1);
+            const ayerStr = getMadridDateString(ayer);
+
+            if (await yaCastigado(ayerStr)) return;
+
+            console.log('⏰ El mantenimiento de ' + ayerStr + ' no se habia ejecutado. Poniendose al dia...');
+            await runNightlyMaintenance();
+        } catch (e) {
+            console.error('No se pudo poner al dia el mantenimiento:', e.message);
+        }
+    })();
+
+    return puestaAlDiaEnCurso;
 };
 
 // Función auxiliar para resetear misiones
@@ -333,4 +352,4 @@ const initScheduledJobs = () => {
     }, { scheduled: true, timezone: "Europe/Madrid" });
 };
 
-module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, ponerseAlDia };
+module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, ponerseAlDia, esperarPuestaAlDia };

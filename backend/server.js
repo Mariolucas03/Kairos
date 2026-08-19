@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
-const { initScheduledJobs, ponerseAlDia } = require('./utils/scheduler');
+const { initScheduledJobs, ponerseAlDia, esperarPuestaAlDia } = require('./utils/scheduler');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
@@ -70,6 +70,17 @@ app.use(rateLimit({
     legacyHeaders: false,
     message: { message: 'Demasiadas peticiones, inténtalo de nuevo más tarde.' }
 }));
+
+// ⚠️ Antes de responder NADA de la API se espera a que termine el castigo
+// pendiente, si lo hay. Sin esto, la puesta al dia corria en paralelo y el
+// servidor podia devolver /users con la vida ANTIGUA: el usuario entraba, veia
+// su vida intacta, y solo al recargar aparecia restada.
+// Solo espera de verdad la primera peticion tras arrancar; despues la promesa
+// ya esta resuelta y no cuesta nada.
+app.use('/api', async (req, res, next) => {
+    try { await esperarPuestaAlDia(); } catch (e) { /* que un fallo aqui no tumbe la API */ }
+    next();
+});
 
 // --- 2. DEFINICIÓN DE ENDPOINTS ---
 app.use('/api/auth', authRoutes);
