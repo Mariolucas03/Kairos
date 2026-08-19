@@ -6,7 +6,7 @@ import { getMadridDateString } from '../utils/dateHelpers';
 import DayCalendarModal from '../components/common/DayCalendarModal';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
-import { registerPush, probarPush } from '../utils/pushNotifications';
+import { registerPush } from '../utils/pushNotifications';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
@@ -384,18 +384,6 @@ export default function Home() {
                                         className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform"
                                     >
                                         ACTIVAR
-                                    </button>
-                                    {/* Sin esto, la unica forma de comprobar si llegan era
-                                        esperar a que otra persona te diera un me gusta. */}
-                                    <button
-                                        onClick={async () => {
-                                            const r = await probarPush();
-                                            setPushMsg({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
-                                            if (r.detalle) console.log('Diagnostico push:', r.detalle);
-                                        }}
-                                        className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-xl font-black uppercase tracking-wider border border-white/10 active:scale-95 transition-transform"
-                                    >
-                                        PROBAR
                                     </button>
                                 </div>
                             </div>

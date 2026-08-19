@@ -154,85 +154,94 @@ export default function ClansPage() {
                     <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${RANK_CONFIG[myRank].hex || '#a855f7'}, transparent)` }} />
                     <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: RANK_CONFIG[myRank].hex || '#a855f7', opacity: 0.11 }} />
 
-                    <div className="relative z-10 mb-4">
-                        {/* ⚠️ El nombre YA NO comparte fila con el estandarte y los
-                            botones: con tres cosas en la misma linea se quedaba sin
-                            sitio y se cortaba. Ahora el estandarte y las acciones van
-                            arriba, y el nombre tiene la fila ENTERA para el solo. */}
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="text-[30px] bg-[#18181b] w-14 h-14 rounded-[18px] flex items-center justify-center border border-white/[0.07] shrink-0">
+                    <div className="relative z-10 mb-5">
+                        {/* Estandarte CENTRADO con el nombre debajo, como en los
+                            juegos de clanes: el emblema manda y el nombre tiene
+                            todo el ancho. Las acciones van a la esquina en
+                            absoluto, que asi no le quitan sitio a nada. */}
+                        <div className="absolute top-0 right-0 flex gap-2 z-20">
+                            {isLeader && (
+                                <button onClick={openEditClan} aria-label="Editar clan" className="bg-[#18181b] w-8 h-8 rounded-xl text-zinc-500 border border-white/[0.07] hover:text-white flex items-center justify-center transition-colors active:scale-95">
+                                    <Edit size={14} />
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setConfirmAction({ message: '¿Seguro que quieres salir del clan?', onConfirm: handleLeaveClan })}
+                                aria-label="Salir del clan"
+                                className="bg-[#18181b] w-8 h-8 rounded-xl text-red-500 border border-red-500/20 hover:bg-red-950/40 flex items-center justify-center transition-colors active:scale-95"
+                            >
+                                <LogOut size={14} />
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col items-center text-center pt-1">
+                            <div
+                                className="text-[38px] w-[72px] h-[72px] rounded-[24px] bg-[#18181b] border flex items-center justify-center"
+                                style={{ borderColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '40' }}
+                            >
                                 {myClan.icon}
                             </div>
 
-                            <div className="flex gap-2 shrink-0">
-                                {isLeader && (
-                                    <button onClick={openEditClan} aria-label="Editar clan" className="bg-[#18181b] w-9 h-9 rounded-xl text-zinc-400 border border-white/[0.07] hover:text-white flex items-center justify-center transition-colors active:scale-95">
-                                        <Edit size={15} />
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setConfirmAction({ message: '¿Seguro que quieres salir del clan?', onConfirm: handleLeaveClan })}
-                                    aria-label="Salir del clan"
-                                    className="bg-[#18181b] w-9 h-9 rounded-xl text-red-500 border border-red-500/20 hover:bg-red-950/40 flex items-center justify-center transition-colors active:scale-95"
+                            <h2 className="mt-3.5 w-full text-[22px] font-black text-white uppercase tracking-[-0.045em] leading-[1.05] not-italic line-clamp-2 break-words">
+                                {myClan.name}
+                            </h2>
+
+                            <div className="flex items-center gap-2 mt-2.5">
+                                <span
+                                    className="text-[9px] font-black uppercase tracking-[0.16em] px-2.5 py-1 rounded-lg border not-italic"
+                                    style={{
+                                        color: RANK_CONFIG[myRank].hex || '#a1a1aa',
+                                        borderColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '55',
+                                        backgroundColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '15'
+                                    }}
                                 >
-                                    <LogOut size={15} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* El nombre, a lo ancho y en el tamano de titular del
-                            sistema. Dos lineas como maximo y luego puntos suspensivos. */}
-                        <h2 className="mt-3.5 text-[22px] font-black text-white uppercase tracking-[-0.045em] leading-[1.05] not-italic line-clamp-2 break-words">
-                            {myClan.name}
-                        </h2>
-
-                        <div className="flex items-center gap-2 mt-2">
-                            <span
-                                className="text-[9px] font-black uppercase tracking-[0.16em] px-2 py-1 rounded-lg border not-italic"
-                                style={{
-                                    color: RANK_CONFIG[myRank].hex || '#a1a1aa',
-                                    borderColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '55',
-                                    backgroundColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '15'
-                                }}
-                            >
-                                {RANK_CONFIG[myRank].label}
-                            </span>
-                            {myClan.minLevel > 1 && (
-                                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-600 not-italic">
-                                    Nivel {myClan.minLevel}+
+                                    {RANK_CONFIG[myRank].label}
                                 </span>
+                                {myClan.minLevel > 1 && (
+                                    <span className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-600 not-italic">
+                                        Nivel {myClan.minLevel}+
+                                    </span>
+                                )}
+                            </div>
+
+                            {myClan.description && (
+                                <p className="text-[12px] text-zinc-400 not-italic mt-3 leading-snug px-2">{myClan.description}</p>
                             )}
                         </div>
 
-                        {myClan.description && (
-                            <p className="text-[12px] text-zinc-400 not-italic mt-3 leading-snug">{myClan.description}</p>
-                        )}
+                        {/* El numero es el protagonista: antes iba a 12px con la
+                            etiqueta a 8px, mas pequena que cualquier otra cosa de
+                            la pantalla. Celdas iguales para que no se descuadren
+                            aunque el poder pase de 3 a 6 digitos. */}
+                        <div className="grid grid-cols-3 gap-2 mt-5">
+                            <div className="bg-[#18181b] border border-white/[0.07] rounded-[18px] py-3 px-1 text-center min-w-0">
+                                <div className="flex items-center justify-center gap-1.5">
+                                    <Zap size={14} fill="currentColor" className="text-purple-400 shrink-0" />
+                                    <span className="text-[18px] font-black text-white leading-none tracking-[-0.04em] not-italic truncate">
+                                        {(myClan.totalPower || 0).toLocaleString()}
+                                    </span>
+                                </div>
+                                <span className="block mt-1.5 text-[9px] font-black text-zinc-500 uppercase tracking-[0.16em] not-italic">Poder</span>
+                            </div>
 
-                        {/* Cifras en celdas iguales, para que no se descuadren
-                            aunque el poder pase de 3 a 6 dígitos */}
-                        <div className="grid grid-cols-3 gap-1.5 mt-3">
-                            <div className="bg-black/60 border border-white/10 rounded-xl py-2 px-1 text-center">
-                                <div className="flex items-center justify-center gap-1 text-purple-300">
-                                    <Zap size={11} fill="currentColor" />
-                                    <span className="text-xs font-black leading-none">{myClan.totalPower}</span>
+                            <div className="bg-[#18181b] border border-white/[0.07] rounded-[18px] py-3 px-1 text-center min-w-0">
+                                <div className="flex items-center justify-center gap-1.5">
+                                    <Users size={14} className="text-zinc-300 shrink-0" />
+                                    <span className="text-[18px] font-black text-white leading-none tracking-[-0.04em] not-italic">
+                                        {myClan.members.length}<span className="text-zinc-600">/10</span>
+                                    </span>
                                 </div>
-                                <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Poder</span>
+                                <span className="block mt-1.5 text-[9px] font-black text-zinc-500 uppercase tracking-[0.16em] not-italic">Miembros</span>
                             </div>
-                            <div className="bg-black/60 border border-white/10 rounded-xl py-2 px-1 text-center">
-                                <div className="flex items-center justify-center gap-1 text-zinc-200">
-                                    <Users size={11} />
-                                    <span className="text-xs font-black leading-none">{myClan.members.length}/10</span>
-                                </div>
-                                <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Miembros</span>
-                            </div>
-                            <div className="bg-black/60 border border-white/10 rounded-xl py-2 px-1 text-center min-w-0">
-                                <div className="flex items-center justify-center gap-1 text-yellow-500 min-w-0">
-                                    <Crown size={11} className="shrink-0" />
-                                    <span className="text-xs font-black leading-none truncate">
+
+                            <div className="bg-[#18181b] border border-white/[0.07] rounded-[18px] py-3 px-1 text-center min-w-0">
+                                <div className="flex items-center justify-center gap-1.5 min-w-0">
+                                    <Crown size={14} className="text-yellow-500 shrink-0" />
+                                    <span className="text-[13px] font-black text-white leading-none not-italic truncate">
                                         {myClan.members.find(m => String(m._id) === String(myClan.leader))?.username || '—'}
                                     </span>
                                 </div>
-                                <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Líder</span>
+                                <span className="block mt-1.5 text-[9px] font-black text-zinc-500 uppercase tracking-[0.16em] not-italic">Líder</span>
                             </div>
                         </div>
                     </div>
