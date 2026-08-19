@@ -1,7 +1,14 @@
 import api from '../services/api';
 
-// ⚠️ PEGA AQUÍ LA CLAVE PÚBLICA QUE GENERASTE EN EL PASO 0
-const VAPID_PUBLIC_KEY = "BHuNNV8fKxiIeIuObGJTavYPhf1G1Kpj4LN1TTCnaowLlmEJH6edktAmF0CcU5sZhpQZ5JxqzIK0qQ5sVSwmCuQ";
+// Clave publica VAPID. TIENE que ser la pareja de la VAPID_PRIVATE_KEY del
+// servidor: si no coinciden, el navegador se suscribe pero el envio falla.
+//
+// Se lee de VITE_VAPID_PUBLIC_KEY para poder rotar las claves sin tocar codigo.
+// El valor de abajo es el que habia fijo, y queda como respaldo para no romper
+// los despliegues que aun no definan la variable.
+const VAPID_PUBLIC_KEY =
+    import.meta.env.VITE_VAPID_PUBLIC_KEY ||
+    "BHuNNV8fKxiIeIuObGJTavYPhf1G1Kpj4LN1TTCnaowLlmEJH6edktAmF0CcU5sZhpQZ5JxqzIK0qQ5sVSwmCuQ";
 
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
