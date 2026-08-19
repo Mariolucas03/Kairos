@@ -4,6 +4,7 @@ const DailyLog = require('../models/DailyLog');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
 const { getMadridDateString } = require('../utils/dateHelpers');
+const { notificarA } = require('./pushController');
 const mongoose = require('mongoose');
 
 // 🔥 TABLA DE RECOMPENSAS
@@ -122,6 +123,15 @@ const createMission = asyncHandler(async (req, res) => {
 
     if (isCoop && friendId) {
         await User.findByIdAndUpdate(friendId, { $push: { missionRequests: mission._id } });
+
+        // Una invitacion coop sin aceptar bloquea la mision para los dos, asi
+        // que cuanto antes se entere el invitado, mejor.
+        notificarA(friendId, {
+            title: '🤝 Te invitan a una misión',
+            body: (req.user.username || 'Alguien') + ': "' + title.trim().slice(0, 60) + '"',
+            icon: '/assets/icons/icon-192x192.png',
+            url: '/missions'
+        });
     }
 
     res.status(201).json(mission);
@@ -293,16 +303,38 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
     if (!missionId) { res.status(400); throw new Error('Falta ID'); }
     const mission = await Mission.findById(missionId);
     if (!mission) { await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } }); return res.status(404).json({ message: 'No existe' }); }
+    // Quien creo la mision es el que espera respuesta: se le avisa en los dos
+    // casos. El rechazo importa incluso mas que la aceptacion, porque la mision
+    // se borra y si no se dice, desaparece de su lista sin explicacion.
+    const creador = mission.user;
+    const quien = req.user.username || 'Tu compañero';
+
     if (action === 'accept') {
         mission.invitationStatus = 'active';
         if (!mission.contributions) mission.contributions = new Map();
         mission.contributions.set(userId.toString(), 0);
         await mission.save();
         await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
+
+        notificarA(creador, {
+            title: '🤝 Misión aceptada',
+            body: quien + ' se une a "' + (mission.title || '').slice(0, 60) + '".',
+            icon: '/assets/icons/icon-192x192.png',
+            url: '/missions'
+        });
+
         res.json({ message: 'Aceptada', mission });
     } else {
         await Mission.findByIdAndDelete(missionId);
         await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
+
+        notificarA(creador, {
+            title: '🙅 Invitación rechazada',
+            body: quien + ' no acepta "' + (mission.title || '').slice(0, 60) + '". La misión se ha borrado.',
+            icon: '/assets/icons/icon-192x192.png',
+            url: '/missions'
+        });
+
         res.json({ message: 'Rechazada' });
     }
 });

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { runNightlyMaintenance, runMonthlyRankingRewards } = require('../utils/scheduler');
+const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder } = require('../utils/scheduler');
 const { protectCron } = require('../middleware/cronMiddleware');
 
 // --- 1. RUTA DE MANTENIMIENTO NOCTURNO (PESADA) ---
@@ -31,6 +31,21 @@ router.get('/monthly-rewards', protectCron, async (req, res) => {
         res.status(200).json(result);
     } catch (error) {
         console.error("❌ Error en premios mensuales:", error);
+        res.status(500).send('Error');
+    }
+});
+
+// --- 1.c RECORDATORIO DE LAS 20:00 ---
+// Mismo problema que el nocturno: node-cron no dispara nada si Render tiene la
+// instancia dormida a esa hora, asi que el aviso de misiones pendientes no
+// salia casi nunca. Programar en cron-job.org a las 20:00 (Madrid).
+// Es idempotente: llamarla dos veces el mismo dia NO manda dos avisos.
+router.get('/evening-reminder', protectCron, async (req, res) => {
+    try {
+        const result = await runEveningReminder({ forzar: req.query.forzar === '1' });
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("❌ Error en el recordatorio de las 20:00:", error);
         res.status(500).send('Error');
     }
 });

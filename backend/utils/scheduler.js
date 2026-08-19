@@ -10,41 +10,87 @@ const SystemState = require('../models/SystemState');
 
 // Clave donde se anota el ULTIMO dia ya castigado, para no castigar dos veces
 const CLAVE_NOCTURNO = 'nightly-maintenance';
+// Lo mismo para el aviso de las 20:00: marca el ultimo dia ya avisado
+const CLAVE_RECORDATORIO = 'evening-reminder';
 
-// --- Recordatorio Nocturno (20:00) ---
-const runEveningReminder = async () => {
-    console.log("🔔 Ejecutando recordatorio de misiones (20:00)...");
+// Vida que cuesta fallar cada mision. Vive aqui arriba porque la usan los DOS:
+// el castigo de la noche y el aviso de las 20:00, que anuncia exactamente lo
+// que se va a perder. Si estuviera duplicada, cambiar una tabla y no la otra
+// haria que el aviso mintiera.
+const DAMAGE_RULES = { easy: 5, medium: 10, hard: 20, epic: 50 };
 
-    const usersToWarn = await User.find({
+// --- Recordatorio de las 20:00 ---
+/**
+ * Avisa de las misiones que quedan sin marcar y de la vida que cuesta no
+ * hacerlas.
+ *
+ * Tenia el MISMO problema que el mantenimiento nocturno: el cron interno se
+ * programa a las 20:00, pero en el plan gratuito de Render la instancia esta
+ * dormida salvo que alguien este usando la app, y un proceso dormido no
+ * ejecuta crons. El aviso no salia practicamente nunca. Por eso ahora se puede
+ * disparar desde fuera (GET /api/cron/evening-reminder).
+ *
+ * Se anota el dia ya avisado: un cron externo que reintente, o dos crons
+ * solapados, no pueden mandar dos veces la misma notificacion.
+ */
+const runEveningReminder = async ({ forzar = false } = {}) => {
+    const hoy = getMadridDateString();
+
+    if (!forzar) {
+        const marca = await SystemState.findOne({ key: CLAVE_RECORDATORIO }).lean();
+        if (marca?.value === hoy) {
+            console.log('✅ El aviso de las 20:00 del ' + hoy + ' ya se mando, no se repite.');
+            return { saltado: true, dia: hoy };
+        }
+    }
+
+    console.log('🔔 Ejecutando recordatorio de misiones (20:00)...');
+
+    const usuarios = await User.find({
         pushSubscriptions: { $exists: true, $not: { $size: 0 } }
-    });
+    }).select('username pushSubscriptions');
 
-    // 🔥 OPTIMIZACIÓN: Ejecutar notificaciones en paralelo
-    const notifyPromises = usersToWarn.map(async (user) => {
-        const todayDay = new Date().getDay();
-        const pendingCount = await Mission.countDocuments({
+    const diaSemana = new Date().getDay();
+    let avisados = 0;
+
+    const envios = usuarios.map(async (user) => {
+        const pendientes = await Mission.find({
             frequency: 'daily',
             completed: false,
             invitationStatus: { $ne: 'pending' },
             $and: [
                 { $or: [{ user: user._id }, { participants: user._id }] },
-                { $or: [{ specificDays: { $size: 0 } }, { specificDays: todayDay }] }
+                { $or: [{ specificDays: { $size: 0 } }, { specificDays: diaSemana }] }
             ]
-        });
+        }).select('difficulty').lean();
 
-        if (pendingCount > 0) {
-            const payload = {
-                title: "⚠️ ¡Peligro de Daño!",
-                body: `Tienes ${pendingCount} misiones pendientes. Complétalas antes de medianoche o perderás HP.`,
-                icon: "/assets/icons/icon-192x192.png",
-                url: "/missions"
-            };
-            await sendPushToUser(user, payload);
-            console.log(`📨 Notificación enviada a ${user.username}`);
-        }
+        if (pendientes.length === 0) return;
+
+        // El daño REAL que se juega, con la misma tabla que aplica el castigo.
+        // "Perderas HP" sin decir cuanto no ayuda a decidir si merece la pena
+        // levantarse del sofa; "perderas 50 HP" si.
+        const dano = pendientes.reduce((total, m) => total + (DAMAGE_RULES[m.difficulty] || 5), 0);
+        const plural = pendientes.length === 1 ? 'misión' : 'misiones';
+
+        await sendPushToUser(user, {
+            title: '⚠️ Te quedan ' + pendientes.length + ' ' + plural,
+            body: 'Complétalas antes de medianoche o perderás ' + dano + ' HP.',
+            icon: '/assets/icons/corazon.png',
+            url: '/missions'
+        });
+        avisados++;
     });
 
-    await Promise.allSettled(notifyPromises);
+    await Promise.allSettled(envios);
+
+    await SystemState.updateOne(
+        { key: CLAVE_RECORDATORIO },
+        { $set: { value: hoy, updatedAt: new Date() } },
+        { upsert: true }
+    );
+
+    console.log('📨 Aviso de las 20:00: ' + avisados + ' avisados de ' + usuarios.length + ' con notificaciones activas.');
+    return { success: true, dia: hoy, avisados, candidatos: usuarios.length };
 };
 
 // --- PREMIOS MENSUALES RANKING ---
@@ -183,7 +229,6 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
         });
 
         if (failedMissions.length > 0) {
-            const DAMAGE_RULES = { easy: 5, medium: 10, hard: 20, epic: 50 };
             const userUpdates = {};
 
             // Agrupar fallos. En las misiones coop aceptadas el daño lo reciben
@@ -239,6 +284,22 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
                             { upsert: true }
                         )
                     ]);
+
+                    // La vida bajaba de madrugada y el usuario se encontraba el
+                    // destrozo sin saber de que. Se avisa con el detalle.
+                    const cuantas = data.failedItems.length;
+                    const plural = cuantas === 1 ? 'misión' : 'misiones';
+                    await sendPushToUser(user, newHp === 0 ? {
+                        title: '💀 Te has quedado sin vida',
+                        body: 'Fallaste ' + cuantas + ' ' + plural + ' y has perdido todo el HP.',
+                        icon: '/assets/icons/corazon.png',
+                        url: '/missions'
+                    } : {
+                        title: '💔 Has perdido ' + data.damage + ' HP',
+                        body: cuantas + ' ' + plural + ' sin cumplir. Te quedan ' + newHp + ' HP.',
+                        icon: '/assets/icons/corazon.png',
+                        url: '/missions'
+                    });
 
                     console.log(`💀 Usuario ${user.username} bajó a ${newHp} HP (-${data.damage})`);
                 } catch (err) {
@@ -352,4 +413,4 @@ const initScheduledJobs = () => {
     }, { scheduled: true, timezone: "Europe/Madrid" });
 };
 
-module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, ponerseAlDia, esperarPuestaAlDia };
+module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder, ponerseAlDia, esperarPuestaAlDia };

@@ -3,7 +3,7 @@ const DailyLog = require('../models/DailyLog');
 const WorkoutLog = require('../models/WorkoutLog');
 const NutritionLog = require('../models/NutritionLog');
 const Notification = require('../models/Notification');
-const { sendPushToUser } = require('./pushController');
+const { sendPushToUser, notificarA } = require('./pushController');
 const { getMadridDateString, getMadridMonthString } = require('../utils/dateHelpers');
 const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
 const { getMuscleRanks } = require('../services/muscleRankService');
@@ -450,6 +450,16 @@ const sendFriendRequest = async (req, res) => {
             return res.status(400).json({ message: 'No se pudo enviar (solicitud duplicada o ya sois amigos)' });
         }
 
+        // Sin aviso, la solicitud se queda en el buzon hasta que el otro abra
+        // la app por casualidad. No se espera con await: que el push tarde no
+        // debe retrasar la respuesta a quien la envia.
+        notificarA(targetId, {
+            title: '👋 Nueva solicitud de amistad',
+            body: (req.user.username || 'Alguien') + ' quiere ser tu amigo.',
+            icon: '/assets/icons/icon-192x192.png',
+            url: '/social/friends'
+        });
+
         res.json({ message: 'Solicitud enviada con éxito' });
 
     } catch (error) {
@@ -547,6 +557,15 @@ const respondToRequest = async (req, res) => {
                 User.findByIdAndUpdate(userId, { $addToSet: { friends: requesterId } }),
                 User.findByIdAndUpdate(requesterId, { $addToSet: { friends: userId } })
             ]);
+            // El que la mando no tenia forma de enterarse de que le habian dicho
+            // que si, salvo mirando su lista de amigos de vez en cuando.
+            notificarA(requesterId, {
+                title: '✅ Ya sois amigos',
+                body: (req.user.username || 'Alguien') + ' ha aceptado tu solicitud.',
+                icon: '/assets/icons/icon-192x192.png',
+                url: '/social/friends'
+            });
+
             return res.json({ message: 'Solicitud aceptada' });
         }
 

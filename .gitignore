@@ -16,3 +16,6 @@ dist/
 
 # Prototipo del handoff de diseno: solo referencia local, no se sube
 /frontend/public/_proto/
+
+# Script local para mandar notificaciones a mano (no se sube)
+enviar-notificacion.ps1

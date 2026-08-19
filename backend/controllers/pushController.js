@@ -228,4 +228,22 @@ const adminSendPush = asyncHandler(async (req, res) => {
     });
 });
 
-module.exports = { subscribeToPush, sendPushToUser, testPush, adminSendPush };
+/**
+ * Manda una notificacion a un usuario del que solo tenemos el id.
+ *
+ * Existe para no repetir en cada controlador el findById con el select de las
+ * suscripciones, y sobre todo para que un fallo al avisar NUNCA tumbe la
+ * peticion que lo provoco: la solicitud de amistad ya se guardo, que el push
+ * falle no puede devolver un error al que la mando.
+ */
+const notificarA = async (userId, payload) => {
+    if (!PUSH_CONFIGURADO || !userId) return;
+    try {
+        const user = await User.findById(userId).select('username pushSubscriptions');
+        if (user) await sendPushToUser(user, payload);
+    } catch (e) {
+        console.error('No se pudo notificar a ' + userId + ':', e.message);
+    }
+};
+
+module.exports = { subscribeToPush, sendPushToUser, notificarA, testPush, adminSendPush };
