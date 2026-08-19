@@ -146,4 +146,86 @@ const testPush = asyncHandler(async (req, res) => {
     });
 });
 
-module.exports = { subscribeToPush, sendPushToUser, testPush };
+/**
+ * ENVIO MANUAL de una notificacion, a una persona o a todas.
+ *
+ * ⚠️ Va protegido por CRON_SECRET (protectCron en la ruta), NO por sesion de
+ * usuario. Un endpoint que manda notificaciones arbitrarias con solo estar
+ * logueado seria un altavoz para spamear a cualquiera: solo quien tenga el
+ * secreto del servidor puede usarlo.
+ *
+ * Cuerpo:
+ *   { username } o { userId }   a quien (uno de los dos)
+ *   { todos: true }             a todo el que tenga notificaciones activadas
+ *   { title, body, url }        que se manda (url opcional, por defecto /home)
+ */
+const adminSendPush = asyncHandler(async (req, res) => {
+    if (!PUSH_CONFIGURADO) {
+        return res.status(503).json({ ok: false, mensaje: 'Faltan las claves VAPID en el servidor.' });
+    }
+
+    const { username, userId, todos, title, body, url } = req.body || {};
+
+    if (!title || !body) {
+        res.status(400);
+        throw new Error('Hacen falta "title" y "body"');
+    }
+
+    let destinatarios = [];
+
+    if (todos === true) {
+        // Solo los que tienen algun dispositivo: el resto no recibiria nada
+        destinatarios = await User.find({ 'pushSubscriptions.0': { $exists: true } })
+            .select('username pushSubscriptions');
+    } else if (userId) {
+        const encontrado = await User.findById(userId).select('username pushSubscriptions');
+        if (encontrado) destinatarios = [encontrado];
+    } else if (username) {
+        // Busqueda exacta sin distinguir mayusculas. Se escapa la entrada: un
+        // nombre con parentesis o puntos alteraria el RegExp y buscaria de mas.
+        const limpio = String(username).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const encontrado = await User.findOne({ username: new RegExp('^' + limpio + '$', 'i') })
+            .select('username pushSubscriptions');
+        if (encontrado) destinatarios = [encontrado];
+    } else {
+        res.status(400);
+        throw new Error('Indica "username", "userId" o "todos": true');
+    }
+
+    if (destinatarios.length === 0) {
+        return res.status(404).json({ ok: false, mensaje: 'No se encontro a nadie con notificaciones activadas.' });
+    }
+
+    const payload = { title, body, url: url || '/home' };
+    const informe = [];
+
+    for (const destinatario of destinatarios) {
+        const subs = destinatario.pushSubscriptions || [];
+        let entregadas = 0;
+
+        for (const sub of subs) {
+            try {
+                await webpush.sendNotification(sub, JSON.stringify(payload));
+                entregadas++;
+            } catch (err) {
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    await User.findByIdAndUpdate(destinatario._id, {
+                        $pull: { pushSubscriptions: { endpoint: sub.endpoint } }
+                    });
+                }
+            }
+        }
+
+        informe.push({ usuario: destinatario.username, dispositivos: subs.length, entregadas });
+    }
+
+    const total = informe.reduce((acc, i) => acc + i.entregadas, 0);
+
+    res.json({
+        ok: total > 0,
+        mensaje: 'Entregada en ' + total + ' dispositivo(s) de ' + destinatarios.length + ' usuario(s).',
+        informe
+    });
+});
+
+module.exports = { subscribeToPush, sendPushToUser, testPush, adminSendPush };
