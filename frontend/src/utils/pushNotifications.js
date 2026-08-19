@@ -100,6 +100,43 @@ export const registerPush = async () => {
     }
 };
 
+/**
+ * Deja registrada la suscripcion en la cuenta que hay abierta AHORA, sin
+ * preguntar nada.
+ *
+ * Las suscripciones se guardan por USUARIO, no por dispositivo. Si en el movil
+ * entras con otra cuenta, esa cuenta no tiene ninguna suscripcion y no le llega
+ * NADA, aunque el permiso del navegador siga concedido y el movil ya hubiera
+ * recibido notificaciones antes con otro usuario. Era justo lo que pasaba: los
+ * envios manuales llegaban (iban a la cuenta suscrita) y los me gusta no (iban
+ * a otra cuenta sin suscripcion), asi que parecia que el push fallara solo a
+ * ratos.
+ *
+ * Solo actua si el permiso YA esta concedido: nunca saca el popup del navegador
+ * por sorpresa. Y reutiliza la suscripcion existente en vez de tirarla y crear
+ * otra, para no acumular endpoints muertos en cada arranque.
+ */
+export const asegurarPush = async () => {
+    try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+        const registro = await navigator.serviceWorker.ready;
+        const sub = await registro.pushManager.getSubscription()
+            || await registro.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            });
+
+        // El servidor deduplica por endpoint, asi que repetirlo no crea copias.
+        await api.post('/push/subscribe', sub);
+    } catch (error) {
+        // Silencioso a proposito: esto corre solo al abrir el Home y nunca debe
+        // molestar a nadie. El boton ACTIVAR sigue dando el motivo exacto.
+        console.warn('No se pudo asegurar la suscripcion push:', error?.message);
+    }
+};
+
 /** Manda una notificacion de prueba a tus propios dispositivos. */
 export const probarPush = async () => {
     try {

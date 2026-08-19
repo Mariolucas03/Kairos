@@ -6,7 +6,7 @@ import { getMadridDateString } from '../utils/dateHelpers';
 import DayCalendarModal from '../components/common/DayCalendarModal';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
-import { registerPush } from '../utils/pushNotifications';
+import { registerPush, asegurarPush } from '../utils/pushNotifications';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
@@ -103,6 +103,12 @@ export default function Home() {
     const [historyData, setHistoryData] = useState(null);
     const [historyLoading, setHistoryLoading] = useState(false);
     const isHistory = viewDate !== today;
+
+    // Ata las notificaciones a la cuenta abierta. Sin esto, entrar con otro
+    // usuario en el mismo movil dejaba a esa cuenta sin recibir nada: el permiso
+    // del navegador seguia concedido, pero la suscripcion era del usuario
+    // anterior. No pregunta nada si el permiso no estaba ya dado.
+    useEffect(() => { asegurarPush(); }, []);
 
     useEffect(() => {
         if (!isHistory) { setHistoryData(null); return; }
