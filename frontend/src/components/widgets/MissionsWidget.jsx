@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Target, X, CheckCircle, Star, Coins, Gamepad2, HeartCrack } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
+import { Target, X, CheckCircle, Star, Coins, Gamepad2, HeartCrack, ChevronRight } from 'lucide-react';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
+import api from '../../services/api';
+
+const fetcher = (url) => api.get(url).then(res => res.data);
+
+// Un tono por dificultad, el mismo que usa la pantalla de Misiones
+const COLOR_DIFICULTAD = {
+    easy: '#4ade80', medium: '#22d3ee', hard: '#fb923c', epic: '#a855f7'
+};
 
 export default function MissionsWidget({
     completed = 0,
@@ -9,7 +19,17 @@ export default function MissionsWidget({
     completedMissions = []
 }) {
     const [isOpen, setIsOpen] = useState(false);
+    const navigate = useNavigate();
     const accent = WIDGET_ACCENTS.missions;
+
+    // Lo que queda POR HACER. El modal solo ensenaba el historial de lo ya
+    // hecho, que es justo lo que no necesitas saber a media manana.
+    // Layout ya precarga /missions, asi que esto sale de la cache de SWR y no
+    // dispara una peticion extra.
+    const { data: todas } = useSWR(isOpen ? '/missions' : null, fetcher);
+
+    const pendientes = (Array.isArray(todas) ? todas : [])
+        .filter(m => !m.completed && m.invitationStatus !== 'pending' && (m.frequency || 'daily') === 'daily');
 
     const safeCompleted = Math.max(0, completed);
     const safeTotal = Math.max(0, total);
@@ -53,8 +73,8 @@ export default function MissionsWidget({
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
 
                         <div className="flex justify-between items-center relative z-10 shrink-0">
-                            <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2 pr-2 not-italic">
-                                HISTORIAL <span style={{ color: accent }}>MISIONES</span>
+                            <h2 className="text-2xl font-black text-white uppercase tracking-[-0.045em] flex items-center gap-2 pr-2 not-italic">
+                                MIS <span style={{ color: accent }}>MISIONES</span>
                             </h2>
                             <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
                                 <X size={20} />
@@ -62,6 +82,50 @@ export default function MissionsWidget({
                         </div>
 
                         <div className="flex flex-col gap-3 relative z-10 overflow-y-auto custom-scrollbar pr-1 flex-1">
+
+                            {/* --- LO QUE QUEDA POR HACER --- */}
+                            {pendientes.length > 0 && (
+                                <>
+                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] not-italic">
+                                        Te quedan {pendientes.length}
+                                    </p>
+                                    {pendientes.map(m => {
+                                        const tono = COLOR_DIFICULTAD[m.difficulty] || '#71717a';
+                                        const objetivo = Math.max(1, m.target || 1);
+                                        const pct = Math.min(100, Math.round(((m.progress || 0) / objetivo) * 100));
+                                        return (
+                                            <div
+                                                key={m._id}
+                                                onClick={() => { setIsOpen(false); navigate('/missions'); }}
+                                                className="relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] p-3.5 cursor-pointer active:scale-[0.985] transition-transform"
+                                            >
+                                                <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${tono}, transparent)` }} />
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-[13px] font-bold text-white leading-tight line-clamp-1 not-italic">{m.title}</span>
+                                                    <span className="text-[11px] font-black shrink-0 not-italic" style={{ color: tono }}>
+                                                        {m.progress || 0}<span className="text-zinc-600">/{objetivo}</span>
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 h-1 w-full bg-[#18181b] rounded-full overflow-hidden">
+                                                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: tono }} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    <button
+                                        onClick={() => { setIsOpen(false); navigate('/missions'); }}
+                                        className="flex items-center justify-center gap-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500 hover:text-zinc-300 py-1 not-italic"
+                                    >
+                                        Ir a misiones <ChevronRight size={13} />
+                                    </button>
+
+                                    {completedMissions.length > 0 && (
+                                        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mt-2 not-italic">Ya hechas</p>
+                                    )}
+                                </>
+                            )}
+
                             {completedMissions.length > 0 ? (
                                 completedMissions.map((m, idx) => (
                                     <div key={idx} className={`p-4 rounded-2xl border flex flex-col gap-2 relative overflow-hidden ${m.failed ? 'bg-red-950/20 border-red-900/30' : 'bg-black border-zinc-800'}`}>
@@ -103,10 +167,14 @@ export default function MissionsWidget({
                                     </div>
                                 ))
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-10 text-center relative z-10 flex-1">
-                                    <Target size={48} className="text-zinc-800 mb-4" />
-                                    <p className="text-zinc-600 text-sm font-bold uppercase">Sin historial hoy.</p>
-                                </div>
+                                pendientes.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-10 text-center relative z-10 flex-1">
+                                        <Target size={48} className="text-zinc-800 mb-4" />
+                                        <p className="text-zinc-600 text-sm font-bold uppercase not-italic">
+                                            {todas ? 'Nada pendiente hoy.' : 'Cargando...'}
+                                        </p>
+                                    </div>
+                                )
                             )}
                         </div>
                     </div>

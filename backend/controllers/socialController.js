@@ -56,37 +56,9 @@ const shapeFeedItem = (log, viewerId) => {
  * La cabecera del perfil (foto, nombre, descripción, contadores) es visible para
  * todos aunque esto devuelva false; eso se decide en getFriendProfile.
  */
-const canViewContent = async (viewerId, ownerId) => {
-    if (viewerId.toString() === ownerId.toString()) return true;
-
-    const owner = await User.findById(ownerId).select('isPrivate friends');
-    if (!owner) return false;
-    if (!owner.isPrivate) return true;
-
-    return (owner.friends || []).some(f => f.toString() === viewerId.toString());
-};
-
-/**
- * ¿Y esa SECCIÓN en concreto?
- *
- * Son dos decisiones distintas y encadenadas: `isPrivate` dice quién puede
- * entrar en tu perfil, y `visibility` qué le enseñas una vez dentro. Puedes
- * tener el perfil abierto pero la comida escondida.
- * En tu propio perfil lo ves todo, ocultes lo que ocultes.
- */
-const SECTION_KEYS = { workouts: 'workouts', food: 'food', missions: 'missions', body: 'body' };
-
-const canViewSection = async (viewerId, ownerId, section) => {
-    if (viewerId.toString() === ownerId.toString()) return true;
-    if (!(await canViewContent(viewerId, ownerId))) return false;
-
-    const key = SECTION_KEYS[section];
-    if (!key) return true;
-
-    const owner = await User.findById(ownerId).select('visibility').lean();
-    // Sin campo (cuentas antiguas) se considera visible
-    return owner?.visibility?.[key] !== false;
-};
+// 🔐 Las comprobaciones de privacidad viven en utils/privacidad.js: el gimnasio
+// también las necesita y no puede haber dos copias que se desincronicen.
+const { canViewContent, canViewSection, SECTION_KEYS } = require('../utils/privacidad');
 
 /**
  * Crea la notificación para el dueño del entreno y le manda el aviso push.

@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BodyMap from '../body/BodyMap';
 import ZoomableImage from './ZoomableImage';
-import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy } from 'lucide-react';
+import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy, BookmarkPlus, Check } from 'lucide-react';
 import api from '../../services/api';
 import { getLevelStyle } from '../../utils/socialHelpers';
 
@@ -35,6 +35,35 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
 
     const [slideIndex, setSlideIndex] = useState(0);
     const carruselRef = useRef(null);
+
+    // Guardar el entreno de otra persona como rutina propia.
+    // El candado va en un ref y no en el estado: `disabled` no protege del
+    // doble toque, porque el estado no cambia hasta el siguiente render.
+    const copiando = useRef(false);
+    const [guardando, setGuardando] = useState(false);
+    const [guardada, setGuardada] = useState(false);
+    const [avisoCopia, setAvisoCopia] = useState('');
+
+    // Sólo tiene sentido en entrenos de gimnasio ajenos: los de deporte no
+    // llevan ejercicios, y copiarte a ti mismo no aporta nada.
+    const esGym = (post.type || 'gym') === 'gym' && (post.exercises || []).length > 0;
+
+    const guardarComoRutina = async () => {
+        if (copiando.current || guardada) return;
+        copiando.current = true;
+        setGuardando(true);
+        try {
+            const res = await api.post(`/gym/routines/from-log/${post._id}`);
+            setGuardada(true);
+            setAvisoCopia(res.data?.message || 'Guardada en tus rutinas');
+        } catch (e) {
+            setAvisoCopia(e.response?.data?.message || 'No se pudo guardar');
+        } finally {
+            copiando.current = false;
+            setGuardando(false);
+            setTimeout(() => setAvisoCopia(''), 4000);
+        }
+    };
 
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState(post.comments || []);
@@ -265,7 +294,30 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                     <MessageCircle size={24} className={showComments ? 'text-blue-400' : 'text-white'} />
                     <span className={`text-xs font-black ${showComments ? 'text-blue-400' : 'text-zinc-400'}`}>{comments.length}</span>
                 </button>
+
+                {/* Copiar este entreno a mis rutinas */}
+                {esGym && (
+                    <button
+                        onClick={guardarComoRutina}
+                        disabled={guardando || guardada}
+                        aria-label="Guardar este entreno en mis rutinas"
+                        className="ml-auto flex items-center gap-1.5 active:scale-90 transition-transform disabled:opacity-100"
+                    >
+                        {guardando
+                            ? <Loader2 size={22} className="animate-spin text-zinc-400" />
+                            : guardada
+                                ? <Check size={22} className="text-green-500" />
+                                : <BookmarkPlus size={22} className="text-white" />}
+                        <span className={`text-[10px] font-black uppercase tracking-wide ${guardada ? 'text-green-500' : 'text-zinc-400'}`}>
+                            {guardada ? 'Guardada' : 'Guardar'}
+                        </span>
+                    </button>
+                )}
             </div>
+
+            {avisoCopia && (
+                <p className="px-4 pt-2 text-[10px] font-bold text-zinc-400 not-italic">{avisoCopia}</p>
+            )}
 
             {/* COMENTARIOS (DESPLEGABLE) */}
             {showComments && (

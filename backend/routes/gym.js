@@ -5,6 +5,7 @@ const {
     getRoutines,
     createRoutine,
     deleteRoutine,
+    copyWorkoutToRoutine,
     updateRoutine,
     getAllExercises,
     getExerciseById,
@@ -37,6 +38,9 @@ router.get('/routines', protect, getRoutines);
 router.post('/routines', protect, createRoutine);
 router.put('/routines/:id', protect, updateRoutine);
 router.delete('/routines/:id', protect, deleteRoutine);
+// Copiar a tus rutinas el entreno de otra persona. Va antes que /routines/:id
+// no haría falta (métodos distintos), pero se deja junto al resto de rutinas.
+router.post('/routines/from-log/:logId', protect, copyWorkoutToRoutine);
 
 // Ejercicios
 router.get('/exercises', protect, getAllExercises);

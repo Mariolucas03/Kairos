@@ -9,7 +9,8 @@ router.get('/nightly-maintenance', protectCron, async (req, res) => {
     try {
         console.log("🌙 [CRON] Ejecutando mantenimiento nocturno...");
         // Ejecutamos la lógica, pero NO esperamos ni devolvemos el resultado gigante al cliente
-        runNightlyMaintenance().catch(err => console.error("Error background maintenance:", err));
+        // forzar: el cron externo manda aunque ya se hubiera puesto al dia solo
+        runNightlyMaintenance({ forzar: true }).catch(err => console.error("Error background maintenance:", err));
 
         // Respondemos rápido y corto
         res.status(200).send('Maintenance started');

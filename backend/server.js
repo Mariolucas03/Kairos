@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
-const { initScheduledJobs } = require('./utils/scheduler');
+const { initScheduledJobs, ponerseAlDia } = require('./utils/scheduler');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
@@ -89,6 +89,12 @@ app.use('/api/games', gamesRoutes);
 
 // Inicializar Cron Jobs Internos (Como respaldo o para tareas diurnas)
 initScheduledJobs();
+
+// El cron interno de las 03:00 NO se ejecuta si Render tiene la instancia
+// dormida a esa hora, que es lo normal en el plan gratuito. Al arrancar se
+// comprueba si el castigo de ayer quedo pendiente y, si es asi, se ejecuta.
+// Es idempotente: lleva su propia marca en base de datos.
+ponerseAlDia();
 
 app.get('/', (req, res) => res.send('API NoteGymk funcionando 🚀'));
 

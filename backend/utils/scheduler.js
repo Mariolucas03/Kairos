@@ -6,6 +6,10 @@ const { sendPushToUser } = require('../controllers/pushController');
 const { addRewards } = require('../services/levelService');
 const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
 const { getMadridDateString, getMadridMonthString } = require('./dateHelpers');
+const SystemState = require('../models/SystemState');
+
+// Clave donde se anota el ULTIMO dia ya castigado, para no castigar dos veces
+const CLAVE_NOCTURNO = 'nightly-maintenance';
 
 // --- Recordatorio Nocturno (20:00) ---
 const runEveningReminder = async () => {
@@ -111,13 +115,38 @@ const runMonthlyRankingRewards = async (targetPeriod = null) => {
 };
 
 // --- 🔥 LÓGICA CORE DE CASTIGO (OPTIMIZADA) ---
-const runNightlyMaintenance = async () => {
+/**
+ * El castigo NO es idempotente por si solo: ejecutado dos veces para el mismo
+ * dia, quita la vida dos veces. Esta marca en base de datos es lo que permite
+ * lanzarlo al arrancar el servidor sin miedo.
+ */
+const yaCastigado = async (fecha) => {
+    const marca = await SystemState.findOne({ key: CLAVE_NOCTURNO }).lean();
+    return marca?.value === fecha;
+};
+
+const anotarCastigo = async (fecha) => {
+    await SystemState.updateOne(
+        { key: CLAVE_NOCTURNO },
+        { $set: { value: fecha, updatedAt: new Date() } },
+        { upsert: true }
+    );
+};
+
+const runNightlyMaintenance = async ({ forzar = false } = {}) => {
     console.log("🌙 EJECUTANDO MANTENIMIENTO NOCTURNO...");
     const now = new Date();
 
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = getMadridDateString(yesterday);
+
+    // Render reinicia la instancia a menudo; sin esta guarda, lanzarlo al
+    // arrancar castigaria de nuevo en cada reinicio.
+    if (!forzar && await yaCastigado(yesterdayStr)) {
+        console.log('✅ El dia ' + yesterdayStr + ' ya estaba castigado, no se repite.');
+        return { saltado: true, dia: yesterdayStr };
+    }
 
     try {
         const frequenciesToPunish = ['daily'];
@@ -229,11 +258,42 @@ const runNightlyMaintenance = async () => {
             await processCycle(freq);
         }
 
-        return { success: true, message: "Mantenimiento ejecutado de forma óptima." };
+        // Se anota SOLO si todo fue bien: si algo revienta a medias, el proximo
+        // intento vuelve a entrar en vez de dar el dia por castigado.
+        await anotarCastigo(yesterdayStr);
+
+        return { success: true, message: "Mantenimiento ejecutado de forma óptima.", dia: yesterdayStr };
 
     } catch (error) {
         console.error('❌ Error crítico en Scheduler:', error);
         return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Se llama al arrancar el servidor.
+ *
+ * El cron interno esta programado a las 03:00 de Madrid, pero en el plan
+ * gratuito de Render la instancia esta DORMIDA a esa hora: un proceso dormido
+ * no ejecuta crons. Resultado: el castigo por misiones no cumplidas no corria
+ * NUNCA y la vida no bajaba nunca.
+ *
+ * Al despertar, se comprueba si el dia de ayer ya se castigo y, si no, se
+ * castiga. Asi la app se cura sola en cuanto alguien la abre, sin depender de
+ * que haya un cron externo configurado.
+ */
+const ponerseAlDia = async () => {
+    try {
+        const ayer = new Date();
+        ayer.setDate(ayer.getDate() - 1);
+        const ayerStr = getMadridDateString(ayer);
+
+        if (await yaCastigado(ayerStr)) return;
+
+        console.log('⏰ El mantenimiento de ' + ayerStr + ' no se habia ejecutado. Poniendose al dia...');
+        await runNightlyMaintenance();
+    } catch (e) {
+        console.error('No se pudo poner al dia el mantenimiento:', e.message);
     }
 };
 
@@ -273,4 +333,4 @@ const initScheduledJobs = () => {
     }, { scheduled: true, timezone: "Europe/Madrid" });
 };
 
-module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards };
+module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, ponerseAlDia };

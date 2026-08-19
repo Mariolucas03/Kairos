@@ -13,6 +13,7 @@ const { askAI } = require('../services/aiService');
 const { getTodayDateString } = require('../utils/dateHelpers');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 const { FAMILIAS, familiaDe } = require('../utils/equipment');
+const { canViewSection } = require('../utils/privacidad');
 // Catálogo completo (1292): los 141 curados de exerciseCatalog.js con su GIF
 // enganchado, más la ampliación de ExerciseGymGifsDB. Lo genera a mano
 // scripts/generateExerciseCatalog.js; aquí sólo se lee.
@@ -67,6 +68,92 @@ const updateRoutine = async (req, res) => {
         res.json(updatedRoutine);
     } catch (error) {
         res.status(500).json({ message: 'Error actualizando rutina' });
+    }
+};
+
+/**
+ * Copia el entreno de otra persona a TUS rutinas.
+ *
+ * Se hace entero en el servidor a propósito:
+ *  - La privacidad se comprueba aquí. El cliente no decide si puede ver ese
+ *    entreno; si la cuenta es privada o tiene los entrenos ocultos, 403.
+ *  - Los músculos se derivan del catálogo, no de lo que mande el navegador.
+ *    Un cliente manipulado podría inventarse los grupos e inflar sus rangos.
+ *
+ * Un log guarda cada serie con su peso y reps; una rutina guarda cuántas series
+ * y un rango de reps. La conversión toma el número de series realizadas y las
+ * repeticiones más frecuentes, que es lo que describe el entreno.
+ */
+const copyWorkoutToRoutine = async (req, res) => {
+    try {
+        const log = await WorkoutLog.findById(req.params.logId)
+            .populate('user', 'username')
+            .lean();
+
+        if (!log) return res.status(404).json({ message: 'Entreno no encontrado' });
+
+        // 🔐 ¿Puedo ver los entrenos de esta persona?
+        if (!(await canViewSection(req.user._id, log.user._id, 'workouts'))) {
+            return res.status(403).json({ message: 'No puedes ver los entrenos de esta cuenta' });
+        }
+
+        const ejercicios = (log.exercises || []).filter(e => e?.name && (e.sets || []).length > 0);
+        if (!ejercicios.length) {
+            return res.status(400).json({ message: 'Este entreno no tiene ejercicios que copiar' });
+        }
+
+        // Los músculos salen del catálogo, buscando por nombre igual que hace
+        // saveWorkoutLog. Sin esto la rutina copiada no pintaría el cuerpo.
+        const fichas = await Exercise.find({
+            name: { $in: ejercicios.map(e => e.name) },
+            $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
+        }).select('name muscle muscleDetail secondary').lean();
+
+        const porNombre = new Map(fichas.map(f => [f.name.toLowerCase(), f]));
+
+        const repsMasFrecuentes = (sets) => {
+            const cuenta = {};
+            sets.forEach(s => {
+                const r = Number(s.reps) || 0;
+                if (r > 0) cuenta[r] = (cuenta[r] || 0) + 1;
+            });
+            const claves = Object.keys(cuenta);
+            if (!claves.length) return '10-12';
+            return String(claves.sort((a, b) => cuenta[b] - cuenta[a] || b - a)[0]);
+        };
+
+        const exercises = ejercicios.map(e => {
+            const ficha = porNombre.get(e.name.toLowerCase());
+            return {
+                name: e.name,
+                muscle: ficha?.muscle || 'Pecho',
+                muscleDetail: ficha?.muscleDetail || '',
+                secondary: ficha?.secondary || [],
+                sets: e.sets.length,
+                reps: repsMasFrecuentes(e.sets),
+                // El peso del otro es una referencia, no un objetivo: se deja a 0
+                // para que cada uno ponga el suyo en vez de arrastrar el ajeno.
+                targetWeight: 0,
+                rest: 0
+            };
+        });
+
+        const autor = log.user?.username || 'otro';
+        const base = (log.routineName || 'Entreno').trim();
+        const nombre = `${base} · de ${autor}`.slice(0, 60);
+
+        const routine = await Routine.create({
+            user: req.user._id,
+            name: nombre,
+            color: 'blue',
+            exercises,
+            defaultRest: 60
+        });
+
+        res.status(201).json({ message: `Guardada como "${nombre}"`, routine });
+    } catch (error) {
+        console.error('Error copiando entreno a rutina:', error);
+        res.status(500).json({ message: 'No se pudo guardar la rutina' });
     }
 };
 
@@ -830,7 +917,7 @@ module.exports = {
     // Se exporta para poder sincronizar el catálogo en el arranque del servidor
     // (server.js), y no solo cuando el primer usuario abre la lista.
     syncExerciseCatalog,
-    getRoutines, createRoutine, deleteRoutine, updateRoutine,
+    getRoutines, createRoutine, deleteRoutine, updateRoutine, copyWorkoutToRoutine,
     getAllExercises, getExerciseById, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,
     getExerciseProgressController, getTrainedExercises,
