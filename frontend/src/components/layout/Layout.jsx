@@ -6,6 +6,7 @@ import Footer from './Footer';
 import api from '../../services/api';
 import RedemptionScreen from './RedemptionScreen';
 import IosInstallPrompt from '../common/IosInstallPrompt';
+import AvisoServidor from '../common/AvisoServidor';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -145,6 +146,10 @@ function LayoutContent() {
 
     return (
         <div className="h-[100dvh] w-full bg-black text-zinc-200 font-sans relative flex flex-col overflow-hidden">
+
+            {/* Aviso de servidor arrancando: va por encima de todo y en todas
+                las pantallas, porque la espera se sufre en cualquiera. */}
+            <AvisoServidor />
 
             {/* Ya no le pasamos el user como prop, el Header lo lee de Zustand */}
             {!hideChrome && <Header />}
