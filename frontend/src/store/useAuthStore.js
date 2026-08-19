@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { limpiarCacheSWR } from '../utils/swrCache';
 
 export const useAuthStore = create(
     persist(
@@ -17,7 +18,9 @@ export const useAuthStore = create(
                 user: typeof userData === 'function' ? userData(state.user) : userData
             })),
             setIsUiHidden: (isHidden) => set({ isUiHidden: isHidden }),
-            logout: () => set({ user: null }),
+            // También se tira la caché de SWR: si no, el siguiente en entrar
+            // vería por un instante los datos del anterior.
+            logout: () => { limpiarCacheSWR(); set({ user: null }); },
         }),
         {
             name: 'kairos-auth', // Nombre de la clave en localStorage

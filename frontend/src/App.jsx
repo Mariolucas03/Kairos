@@ -4,6 +4,7 @@ import { SWRConfig } from 'swr';
 import Layout from './components/layout/Layout';
 import LoadingScreen from './components/common/LoadingScreen';
 import api from './services/api';
+import { proveedorCache } from './utils/swrCache';
 
 // --- CARGA INMEDIATA ---
 // Login/Register (puerta de entrada) y Home (primera pantalla tras entrar) van en el
@@ -89,6 +90,10 @@ const fetcher = (url) => api.get(url).then(res => res.data);
 
 const swrOptions = {
     fetcher,
+    // Caché que sobrevive a la recarga. Sin esto, Home aparecía lleno (su
+    // usuario se guarda en localStorage) y el resto de secciones en blanco
+    // esperando a un servidor que tarda 30-50 s en despertar.
+    provider: proveedorCache,
     // 🔥 CLAVE PARA LA FLUIDEZ: al volver a una sección ya visitada se pintan los
     // datos que ya teníamos mientras se revalidan por detrás, en vez de mostrar
     // la pantalla de carga otra vez.
