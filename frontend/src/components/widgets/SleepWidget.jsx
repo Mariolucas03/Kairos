@@ -38,7 +38,7 @@ export default function SleepWidget({ hours = 0, onUpdate }) {
             </WidgetCard>
 
             {isOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={handleSave}>
+                <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={handleSave}>
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
 
                     <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden" onClick={(e) => e.stopPropagation()}>

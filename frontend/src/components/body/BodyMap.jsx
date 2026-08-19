@@ -49,7 +49,7 @@ const expandirNiveles = (levels) => {
  */
 
 // Una figura: la lámina recortada + las zonas de color encima
-function Figura({ view, getFill, onSelectMuscle }) {
+function Figura({ view, getFill, onSelectMuscle, marcado }) {
     const shapes = MUSCLE_SHAPES[view] || {};
     const idBase = useId();
     const recorte = `recorte-${view}-${idBase}`;
@@ -88,6 +88,7 @@ function Figura({ view, getFill, onSelectMuscle }) {
                 <g style={{ mixBlendMode: 'screen' }}>
                     {Object.entries(shapes).map(([group, paths]) => {
                         const { fill, opacity } = getFill(group);
+                        const esteMarcado = marcado === group;
                         return (
                             <g
                                 key={group}
@@ -97,6 +98,23 @@ function Figura({ view, getFill, onSelectMuscle }) {
                             >
                                 {paths.map((d, i) => (
                                     <path key={i} d={d} fill={fill} fillOpacity={opacity} />
+                                ))}
+                                {/* Contorno intermitente sobre el musculo pulsado.
+                                    Al tocar una zona solo cambiaba un texto debajo:
+                                    en un cuerpo lleno de colores no habia forma de
+                                    saber cual habias dado. El trazo va SIN relleno y
+                                    encima, para no alterar el color de la zona. */}
+                                {esteMarcado && paths.map((d, i) => (
+                                    <path
+                                        key={'marca-' + i}
+                                        d={d}
+                                        fill="none"
+                                        stroke="#ffffff"
+                                        strokeWidth="2.5"
+                                        strokeLinejoin="round"
+                                        className="animate-pulse"
+                                        style={{ vectorEffect: 'non-scaling-stroke' }}
+                                    />
                                 ))}
                                 <title>{group}</title>
                             </g>
@@ -117,6 +135,8 @@ export default function BodyMap({
     dual = false,
     labels = true,
     onSelectMuscle = null,
+    // Grupo actualmente seleccionado, para dibujarle el contorno
+    selected = null,
     className = ''
 }) {
     const [view, setView] = useState('front');
@@ -152,7 +172,7 @@ export default function BodyMap({
             <div className={`w-full flex items-stretch justify-center gap-1 ${className}`}>
                 {['front', 'back'].map(v => (
                     <div key={v} className="flex-1 min-w-0 flex flex-col items-center">
-                        <Figura view={v} getFill={getFill} onSelectMuscle={onSelectMuscle} />
+                        <Figura view={v} getFill={getFill} onSelectMuscle={onSelectMuscle} marcado={selected} />
                         {/* En miniatura (la rejilla del perfil) las etiquetas solo estorban */}
                         {labels && (
                             <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
@@ -174,7 +194,7 @@ export default function BodyMap({
     return (
         <div className={`relative w-full flex flex-col items-center ${className}`}>
             <div className="w-full flex-1 min-h-0 flex justify-center">
-                <Figura view={view} getFill={getFill} onSelectMuscle={onSelectMuscle} />
+                <Figura view={view} getFill={getFill} onSelectMuscle={onSelectMuscle} marcado={selected} />
             </div>
 
             {/* Girar el cuerpo */}

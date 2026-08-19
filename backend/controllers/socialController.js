@@ -462,7 +462,7 @@ const sendFriendRequest = async (req, res) => {
 const getFriends = async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
-            .populate('friends', 'username avatar level title frame lastActive')
+            .populate('friends', 'username avatar level title frame lastActive hp maxHp')
             .populate('friendRequests', 'username avatar level');
 
         // 🔥 Ventana de 10 min, no 5: authMiddleware solo reescribe `lastActive` cuando
@@ -496,6 +496,11 @@ const getFriends = async (req, res) => {
                 level: f.level,
                 title: f.title,
                 online: isOnline,
+                // La vida dice de un vistazo como le va: quien esta a 20 de 100
+                // lleva dias fallando misiones. El progreso de misiones se sigue
+                // enviando por si alguna pantalla lo necesita.
+                hp: f.hp ?? 100,
+                maxHp: f.maxHp ?? 100,
                 missionProgress: {
                     completed: stats.completed,
                     total: stats.total || 1

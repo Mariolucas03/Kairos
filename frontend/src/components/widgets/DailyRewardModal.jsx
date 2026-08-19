@@ -131,7 +131,7 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}></div>
             <div className="relative z-10 w-full max-w-lg flex flex-col items-center animate-in zoom-in-95 duration-300">
                 <div className="text-center mb-8">

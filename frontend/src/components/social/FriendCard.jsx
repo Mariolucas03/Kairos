@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Trash2, Target, Construction } from 'lucide-react';
+import { Trash2, Target, Construction, Heart } from 'lucide-react';
 import { getLevelStyle, cardBaseStyle } from '../../utils/socialHelpers';
 
 export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView, onViewProfile }) {
@@ -18,9 +18,14 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
     };
 
     const bgAction = dragX > 0 ? 'bg-zinc-800 text-yellow-500' : 'bg-red-900/20 text-red-500';
-    const missions = friend.missionProgress || { completed: 0, total: 1 };
-    const safeTotal = Math.max(missions.total || 1, missions.completed, 1);
-    const percent = Math.min((missions.completed / safeTotal) * 100, 100);
+    // Se muestra la VIDA, no el progreso de misiones: es lo que de verdad dice
+    // como le va a alguien. El maximo puede faltar en cuentas antiguas.
+    const maxHp = Math.max(1, friend.maxHp ?? 100);
+    const hp = Math.max(0, Math.min(friend.hp ?? maxHp, maxHp));
+    const percent = Math.round((hp / maxHp) * 100);
+
+    // Un tono por tramo: verde bien, ambar tocado, rojo al borde
+    const tonoVida = percent > 60 ? '#22c55e' : percent > 25 ? '#eab308' : '#ef4444';
     const levelClass = getLevelStyle(friend.level || 1);
 
     return (
@@ -58,15 +63,18 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
                         </div>
                     </div>
                 </div>
+                {/* La VIDA, no el progreso de misiones: es lo que dice de un
+                    vistazo como le va a alguien. Verde bien, ambar tocado, rojo
+                    al borde. */}
                 <div className="flex flex-col items-end gap-1.5 pl-4 border-l border-white/5 h-full justify-center">
                     <div className="flex items-center gap-1.5">
-                        <Target size={14} className="text-blue-500" />
-                        <span className="text-xs font-black text-zinc-300 tracking-wider">
-                            {missions.completed} <span className="text-zinc-600">/</span> {safeTotal}
+                        <Heart size={14} style={{ color: tonoVida }} fill="currentColor" />
+                        <span className="text-xs font-black tracking-wider" style={{ color: tonoVida }}>
+                            {hp}<span className="text-zinc-600">/{maxHp}</span>
                         </span>
                     </div>
                     <div className="w-16 h-1.5 bg-black rounded-full overflow-hidden border border-white/10">
-                        <div className="h-full bg-blue-600 rounded-full shadow-[0_0_8px_#2563eb]" style={{ width: `${percent}%` }}></div>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${percent}%`, background: tonoVida }}></div>
                     </div>
                 </div>
             </div>

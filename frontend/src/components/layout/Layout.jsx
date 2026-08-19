@@ -46,6 +46,7 @@ import ActiveWorkout from '../../components/gym/ActiveWorkout';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
 import useHeartbeat from '../../hooks/useHeartbeat';
+import useVentanaVisible from '../../hooks/useVentanaVisible';
 
 function LayoutContent() {
     const navigate = useNavigate();
@@ -62,6 +63,11 @@ function LayoutContent() {
     // 🟢 Latido de presencia: mantiene el punto verde de "en línea" en la lista
     // de amigos mientras la app está abierta en primer plano.
     useHeartbeat(!!user);
+
+    // Mantiene --vv-alto y --vv-top con el area visible real. Sin esto, al abrir
+    // el teclado los modales se quedan centrados en la pantalla COMPLETA y el
+    // teclado tapa justo el campo donde escribes.
+    useVentanaVisible();
 
     // ⚠️ /daily se pide con el MISMO hook que usan las páginas, no con api.get()
     // dentro de un efecto. Antes eran DOS viajes al servidor en cada carga:

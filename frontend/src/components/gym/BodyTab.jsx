@@ -54,7 +54,7 @@ export default function BodyTab() {
         <div className="space-y-6 pb-24">
             {/* --- EL CUERPO --- */}
             <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4">
-                <BodyMap levels={ranks} dual onSelectMuscle={(g) => setMuscleSel(g === muscleSel ? null : g)} />
+                <BodyMap levels={ranks} dual selected={muscleSel} onSelectMuscle={(g) => setMuscleSel(g === muscleSel ? null : g)} />
 
                 {/* Mini leyenda de rangos: sin ella los colores del cuerpo no
                     significan nada. Los tramos los manda el servidor (tiers),

@@ -76,7 +76,7 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
             </WidgetCard>
 
             {isOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={handleClose}>
+                <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={handleClose}>
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
