@@ -80,4 +80,70 @@ const sendPushToUser = async (user, payload) => {
     await Promise.all(notifications);
 };
 
-module.exports = { subscribeToPush, sendPushToUser };
+/**
+ * Envio de PRUEBA al propio usuario, con diagnostico.
+ *
+ * Sin esto la unica forma de saber si las notificaciones funcionan era esperar
+ * a que alguien te diera un me gusta, y si no llegaba no habia manera de saber
+ * por que: si faltaban las claves, si no habia suscripcion, o si el navegador
+ * la habia caducado. Aqui se devuelve el motivo exacto.
+ */
+const testPush = asyncHandler(async (req, res) => {
+    if (!PUSH_CONFIGURADO) {
+        return res.status(503).json({
+            ok: false,
+            motivo: 'sin-claves',
+            mensaje: 'El servidor no tiene claves VAPID configuradas (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY).'
+        });
+    }
+
+    const user = await User.findById(req.user._id).select('username pushSubscriptions');
+    const subs = user?.pushSubscriptions || [];
+
+    if (subs.length === 0) {
+        return res.status(400).json({
+            ok: false,
+            motivo: 'sin-suscripcion',
+            mensaje: 'Este usuario no tiene ningun dispositivo registrado. Pulsa ACTIVAR en el movil.'
+        });
+    }
+
+    const payload = {
+        title: 'Kairos',
+        body: 'Si ves esto, las notificaciones funcionan.',
+        url: '/home'
+    };
+
+    const resultados = await Promise.all(subs.map(async (sub) => {
+        try {
+            await webpush.sendNotification(sub, JSON.stringify(payload));
+            return { endpoint: sub.endpoint.slice(-12), ok: true };
+        } catch (err) {
+            if (err.statusCode === 410 || err.statusCode === 404) {
+                await User.findByIdAndUpdate(req.user._id, {
+                    $pull: { pushSubscriptions: { endpoint: sub.endpoint } }
+                });
+            }
+            return {
+                endpoint: sub.endpoint.slice(-12),
+                ok: false,
+                codigo: err.statusCode || null,
+                error: (err.body || err.message || '').toString().slice(0, 200)
+            };
+        }
+    }));
+
+    const enviadas = resultados.filter(r => r.ok).length;
+
+    res.json({
+        ok: enviadas > 0,
+        dispositivos: subs.length,
+        enviadas,
+        resultados,
+        mensaje: enviadas > 0
+            ? `Enviada a ${enviadas} de ${subs.length} dispositivo(s).`
+            : 'No se pudo entregar en ningun dispositivo. Mira el detalle.'
+    });
+});
+
+module.exports = { subscribeToPush, sendPushToUser, testPush };

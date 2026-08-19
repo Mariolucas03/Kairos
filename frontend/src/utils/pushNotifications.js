@@ -23,32 +23,94 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
+/**
+ * Activa las notificaciones en ESTE dispositivo.
+ *
+ * ⚠️ Antes devolvia solo true/false, asi que cuando no funcionaba no habia
+ * forma de saber por que: navegador sin soporte, permiso denegado, iPhone sin
+ * instalar en pantalla de inicio, clave que no cuadra... Ahora devuelve el
+ * motivo, que es lo unico que permite arreglarlo sin adivinar.
+ *
+ * @returns {Promise<{ok: boolean, motivo?: string, mensaje: string}>}
+ */
 export const registerPush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        console.error('Push no soportado en este navegador');
-        return false;
+    if (!('serviceWorker' in navigator)) {
+        return { ok: false, motivo: 'sin-sw', mensaje: 'Este navegador no soporta service workers.' };
+    }
+    if (!('PushManager' in window)) {
+        // Caso tipico de iPhone: en Safari normal no hay PushManager; solo
+        // aparece si la app esta instalada en la pantalla de inicio.
+        const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        return {
+            ok: false,
+            motivo: 'sin-push',
+            mensaje: esIOS
+                ? 'En iPhone hay que instalar la app: Compartir → Añadir a pantalla de inicio, y abrirla desde ahí.'
+                : 'Este navegador no soporta notificaciones push.'
+        };
     }
 
     try {
-        // 1. Registrar Service Worker
-        const register = await navigator.serviceWorker.register('/service-worker.js');
+        // 1. Permiso explicito. `subscribe()` lo pide de forma implicita, pero
+        //    entonces un "denegado" llega como una excepcion generica.
+        const permiso = await Notification.requestPermission();
+        if (permiso !== 'granted') {
+            return {
+                ok: false,
+                motivo: 'permiso',
+                mensaje: permiso === 'denied'
+                    ? 'Has bloqueado las notificaciones. Hay que permitirlas en los ajustes del navegador para este sitio.'
+                    : 'No se concedio el permiso de notificaciones.'
+            };
+        }
 
-        // 2. Esperar a que esté listo
+        // 2. Service worker listo
+        const register = await navigator.serviceWorker.register('/service-worker.js');
         await navigator.serviceWorker.ready;
 
-        // 3. Suscribirse al Push Manager de Google/Mozilla/Apple
+        // 3. Reaprovechar la suscripcion si ya existe; si la clave del servidor
+        //    ha cambiado hay que tirar la vieja o el envio fallara para siempre.
+        const existente = await register.pushManager.getSubscription();
+        if (existente) await existente.unsubscribe();
+
         const subscription = await register.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
         });
 
-        // 4. Enviar la suscripción a TU backend para guardarla
-        await api.post('/push/subscribe', subscription);
-        console.log("✅ Suscripción Push enviada al servidor");
-        return true;
+        // 4. Guardarla en el servidor
+        const res = await api.post('/push/subscribe', subscription);
 
+        if (res.data?.activo === false) {
+            return {
+                ok: false,
+                motivo: 'sin-claves',
+                mensaje: 'Este dispositivo quedo registrado, pero el servidor no tiene claves VAPID configuradas.'
+            };
+        }
+
+        return { ok: true, mensaje: 'Notificaciones activadas en este dispositivo.' };
     } catch (error) {
-        console.error("Error en suscripción Push:", error);
-        return false;
+        console.error('Error activando push:', error);
+        return {
+            ok: false,
+            motivo: 'error',
+            mensaje: (error?.message || 'No se pudo activar').slice(0, 140)
+        };
+    }
+};
+
+/** Manda una notificacion de prueba a tus propios dispositivos. */
+export const probarPush = async () => {
+    try {
+        const res = await api.post('/push/test');
+        return { ok: !!res.data?.ok, mensaje: res.data?.mensaje || 'Enviada.', detalle: res.data };
+    } catch (error) {
+        const d = error.response?.data;
+        return {
+            ok: false,
+            mensaje: d?.mensaje || 'No se pudo enviar la prueba.',
+            detalle: d
+        };
     }
 };

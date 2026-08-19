@@ -6,7 +6,7 @@ import { getMadridDateString } from '../utils/dateHelpers';
 import DayCalendarModal from '../components/common/DayCalendarModal';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
-import { registerPush } from '../utils/pushNotifications';
+import { registerPush, probarPush } from '../utils/pushNotifications';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
@@ -371,7 +371,33 @@ export default function Home() {
                             </div>
                             <div className="p-4 border border-white/5 rounded-3xl bg-zinc-900/50 flex justify-between items-center">
                                 <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">🔔 Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
-                                <button onClick={async () => { const success = await registerPush(); setPushMsg(success ? { message: '¡Alertas activadas!', type: 'success' } : { message: 'No se pudo activar. Revisa los permisos.', type: 'error' }); }} className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform">ACTIVAR</button>
+                                <div className="flex gap-2 shrink-0">
+                                    {/* ⚠️ registerPush ya no devuelve true/false sino el MOTIVO:
+                                        antes, cuando no iba, el aviso decia siempre "revisa los
+                                        permisos" aunque el problema fuera otro (iPhone sin
+                                        instalar, servidor sin claves...). */}
+                                    <button
+                                        onClick={async () => {
+                                            const r = await registerPush();
+                                            setPushMsg({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
+                                        }}
+                                        className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform"
+                                    >
+                                        ACTIVAR
+                                    </button>
+                                    {/* Sin esto, la unica forma de comprobar si llegan era
+                                        esperar a que otra persona te diera un me gusta. */}
+                                    <button
+                                        onClick={async () => {
+                                            const r = await probarPush();
+                                            setPushMsg({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
+                                            if (r.detalle) console.log('Diagnostico push:', r.detalle);
+                                        }}
+                                        className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-xl font-black uppercase tracking-wider border border-white/10 active:scale-95 transition-transform"
+                                    >
+                                        PROBAR
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <h3 className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-3 pl-1">Visibilidad</h3>
