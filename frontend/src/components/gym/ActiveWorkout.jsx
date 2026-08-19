@@ -9,6 +9,7 @@ import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 import ExerciseSelector from './ExerciseSelector';
 import ExerciseSheet from './ExerciseSheet';
+import RankUpModal from './RankUpModal';
 import BodyMap from '../body/BodyMap';
 import { compressImage } from '../../utils/imageCompressor';
 
@@ -118,6 +119,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     // Nombre del ejercicio cuya ficha (GIF + ejecución) está abierta
     const [fichaAbierta, setFichaAbierta] = useState(null);
+
+    // Subidas de rango muscular que devuelve el servidor al guardar el entreno.
+    // Se guardan aparte para poder enseñarlas ANTES de cerrar la pantalla: si se
+    // cerrara primero, el aviso se perdería con el desmontaje.
+    const [subidasRango, setSubidasRango] = useState(null);
 
     const [restTargetTime, setRestTargetTime] = useState(() => {
         const saved = localStorage.getItem(REST_KEY);
@@ -416,6 +422,18 @@ export default function ActiveWorkout({ routine, onFinish }) {
             localStorage.removeItem(STORAGE_KEY);
             localStorage.removeItem(REST_KEY);
 
+            // Si algun grupo ha subido de rango, se ensena el aviso ANTES de
+            // cerrar: onFinish desmonta esta pantalla y el aviso se perderia.
+            // El cierre queda pendiente de que el usuario lo lea.
+            if (res.data?.rankUps?.length) {
+                setSubidasRango({
+                    subidas: res.data.rankUps,
+                    monedas: res.data.rankUpCoins || 0,
+                    datos: res.data
+                });
+                return;
+            }
+
             if (onFinish) onFinish(res.data);
         } catch (error) {
             console.error(error);
@@ -480,6 +498,18 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             {fichaAbierta && (
                 <ExerciseSheet exerciseName={fichaAbierta} onClose={() => setFichaAbierta(null)} />
+            )}
+
+            {subidasRango && (
+                <RankUpModal
+                    subidas={subidasRango.subidas}
+                    monedas={subidasRango.monedas}
+                    onClose={() => {
+                        const datos = subidasRango.datos;
+                        setSubidasRango(null);
+                        if (onFinish) onFinish(datos);
+                    }}
+                />
             )}
 
             {/* LISTA */}

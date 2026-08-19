@@ -20,6 +20,7 @@ const { canViewSection } = require('../utils/privacidad');
 const EXERCISE_CATALOG = require('../data/exercises.json');
 const { SPORTS, getSport, estimateCalories } = require('../utils/sportCatalog');
 const { getMuscleRanks, getExerciseProgress, RANKS } = require('../services/muscleRankService');
+const { revisarSubidasDeRango } = require('../services/rankUpService');
 
 // ==========================================
 // 1. OBTENER RUTINAS
@@ -539,12 +540,33 @@ const saveWorkoutLog = async (req, res) => {
             { upsert: true }
         );
 
+        // El entreno da XP y NADA mas, a proposito:
+        //  - Monedas: ya daba 0. La tienda se gana con constancia (misiones),
+        //    no con una sesion suelta.
+        //  - Fichas: se quitan. Daban ~175 por entreno y con las misiones se
+        //    juntaban mas de 1.000 al dia; con apuesta minima de 10, el casino
+        //    no costaba nada. Las fichas se ganan jugando y en la racha diaria.
+        //  - XP: se queda. Es una app de gimnasio; que entrenar no mueva el
+        //    nivel seria contraintuitivo, y el premio grande del entreno son
+        //    los rangos musculares.
         const xpReward = Math.max(5, Math.ceil(caloriesBurned * 0.50));
-        const gameCoinsReward = Math.max(5, Math.ceil(caloriesBurned * 0.35));
+        const gameCoinsReward = 0;
 
         const result = await levelService.addRewards(req.user._id, xpReward, 0, gameCoinsReward);
 
-        res.status(201).json({ message: `Entreno guardado: ${caloriesBurned} kcal`, log, user: result.user, leveledUp: result.leveledUp });
+        // ¿Ha subido de rango algun grupo muscular con este entreno? Es el
+        // premio grande del gimnasio, y se cobra aqui una sola vez.
+        const { subidas, monedas, user: usuarioTrasPremio } = await revisarSubidasDeRango(req.user._id);
+
+        res.status(201).json({
+            message: `Entreno guardado: ${caloriesBurned} kcal`,
+            log,
+            user: usuarioTrasPremio || result.user,
+            leveledUp: result.leveledUp,
+            // El frontend usa esto para lanzar el aviso de subida de rango
+            rankUps: subidas,
+            rankUpCoins: monedas
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error guardando entrenamiento' });
@@ -609,8 +631,17 @@ const saveSportLog = async (req, res) => {
             { upsert: true }
         );
 
+        // El entreno da XP y NADA mas, a proposito:
+        //  - Monedas: ya daba 0. La tienda se gana con constancia (misiones),
+        //    no con una sesion suelta.
+        //  - Fichas: se quitan. Daban ~175 por entreno y con las misiones se
+        //    juntaban mas de 1.000 al dia; con apuesta minima de 10, el casino
+        //    no costaba nada. Las fichas se ganan jugando y en la racha diaria.
+        //  - XP: se queda. Es una app de gimnasio; que entrenar no mueva el
+        //    nivel seria contraintuitivo, y el premio grande del entreno son
+        //    los rangos musculares.
         const xpReward = Math.max(5, Math.ceil(caloriesBurned * 0.50));
-        const gameCoinsReward = Math.max(5, Math.ceil(caloriesBurned * 0.35));
+        const gameCoinsReward = 0;
         const result = await levelService.addRewards(req.user._id, xpReward, 0, gameCoinsReward);
 
         res.status(201).json({

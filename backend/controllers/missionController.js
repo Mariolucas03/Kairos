@@ -14,7 +14,15 @@ const REWARD_TABLE = {
     epic: { xp: 150, gameCoins: 250, coins: 70 }
 };
 
-const FREQUENCY_MULTIPLIERS = { daily: 1, weekly: 5, monthly: 15, yearly: 100 };
+// ⚠️ Estos multiplicadores eran 1 / 5 / 15 / 100. Como el usuario elige la 
+// dificultad Y la frecuencia, una mision anual + epica + coop daba
+// 150 x 100 x 1,5 = 22.500 XP y 10.500 monedas... y con objetivo 1 se
+// completaba de un toque. El objeto mas caro de la tienda cuesta 4.000: un
+// solo toque valia 2,6 veces el catalogo entero, y se podian crear sin limite.
+//
+// Con 1 / 4 / 10 / 25 una anual epica coop pasa a 1.750 monedas: sigue siendo
+// un premio gordo, pero no rompe la tienda.
+const FREQUENCY_MULTIPLIERS = { daily: 1, weekly: 4, monthly: 10, yearly: 25 };
 
 const calculateRewards = (difficulty, frequency, isCoop) => {
     const base = REWARD_TABLE[difficulty] || REWARD_TABLE.easy;

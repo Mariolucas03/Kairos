@@ -45,6 +45,12 @@ const userSchema = new mongoose.Schema({
     nextLevelXP: { type: Number, default: 100 },
     coins: { type: Number, default: 50 },
     gameCoins: { type: Number, default: 500 },
+    // Ultimo rango CONOCIDO de cada grupo muscular (indice 0-9).
+    // Los rangos se calculan al vuelo desde el historial, asi que sin guardar
+    // el anterior no hay forma de saber que acabas de subir. Esto es lo que
+    // permite lanzar el aviso y pagar el premio una sola vez.
+    muscleRanks: { type: Map, of: Number, default: undefined },
+
     hp: { type: Number, default: 100 },
     maxHp: { type: Number, default: 100 },
     lives: { type: Number, default: 100 },
