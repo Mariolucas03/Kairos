@@ -93,7 +93,12 @@ const userSchema = new mongoose.Schema({
         // Guardarlo como string evita depender de la zona horaria al comparar:
         // con Date puro, entre las 00:00 y 02:00 locales el día UTC era el anterior
         // y se podía reclamar dos veces la misma recompensa.
-        lastClaimDay: { type: String, default: null }
+        lastClaimDay: { type: String, default: null },
+        // Dia en que empezo el ciclo de 7 ("YYYY-MM-DD", hora de Madrid).
+        // El ciclo avanza por dias de CALENDARIO, no por reclamaciones: si te
+        // saltas un dia pierdes ESE premio, pero la rueda sigue girando. Antes
+        // faltarte un dia devolvia el ciclo al dia 1 y se perdia todo.
+        cycleStartDay: { type: String, default: null }
     },
 
     // Game Over

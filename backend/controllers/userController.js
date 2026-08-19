@@ -101,18 +101,36 @@ const claimDailyReward = asyncHandler(async (req, res) => {
     // no los frena. Comprobamos también la fecha derivada para no regalar un reclamo extra.
     if (lastStr === todayStr) return alreadyClaimed();
 
-    // Si la última vez fue ayer seguimos el ciclo; si se rompió la cadena, volvemos al día 1.
+    // ⚠️ El ciclo avanza por DIAS DE CALENDARIO, no por reclamaciones.
+    // Antes, si no entrabas un dia, cyclePosition volvia a 0 y perdias el ciclo
+    // entero. Ahora la rueda gira sola: te saltas un dia y pierdes SOLO ese
+    // premio; el hueco queda sin cobrar y se pinta en rojo.
     const previousDays = previousRewards.claimedDays || [];
-    const cyclePosition = lastStr === yesterdayStr ? (previousDays.length % 7) : 0;
-    const currentDay = cyclePosition + 1;
 
-    // `claimedDays` es siempre la lista canónica de días ya cobrados del ciclo en curso
-    // ([1..currentDay], como máximo hasta el 6) y se vacía al cobrar el día 7.
-    // Reconstruirla en vez de ir añadiendo evita que crezca sin límite —había cuentas
-    // con más de 7 entradas, y entonces el calendario marcaba todos los días como cobrados.
-    const nextClaimedDays = currentDay === 7
-        ? []
-        : Array.from({ length: currentDay }, (_, i) => i + 1);
+    const diasEntre = (desde, hasta) =>
+        Math.round((new Date(hasta + 'T00:00:00Z') - new Date(desde + 'T00:00:00Z')) / 86400000);
+
+    let inicioCiclo = previousRewards.cycleStartDay || todayStr;
+    let transcurridos = diasEntre(inicioCiclo, todayStr);
+
+    // Fuera de rango (ciclo terminado, o fecha rara): se empieza uno nuevo
+    let diasCobrados = previousDays;
+    if (transcurridos < 0 || transcurridos >= 7) {
+        inicioCiclo = todayStr;
+        transcurridos = 0;
+        diasCobrados = [];
+    }
+
+    const currentDay = transcurridos + 1;
+
+    // `claimedDays` lista SOLO los dias realmente cobrados de este ciclo.
+    // ⚠️ Antes se reconstruia como [1..currentDay], o sea que rellenaba de oficio
+    // los dias que NO habias reclamado: era imposible distinguir un dia cobrado
+    // de uno perdido. Ahora se anade el de hoy y punto; lo que falte entre 1 y
+    // currentDay es un dia perdido y la interfaz lo pinta en rojo.
+    const nextClaimedDays = [...new Set([...diasCobrados, currentDay])]
+        .filter(d => d >= 1 && d <= 7)
+        .sort((a, b) => a - b);
 
     // 🔥 Recompensa calculada en el servidor según el día del ciclo (nunca confiar en el cliente)
     const { coins: rewardCoins, gameCoins: rewardGameCoins, xp: rewardXP, hp: rewardHp } = getRewardForDay(currentDay);
@@ -121,6 +139,7 @@ const claimDailyReward = asyncHandler(async (req, res) => {
     user.dailyRewards.claimedDays = nextClaimedDays;
     user.dailyRewards.lastClaimDate = now;
     user.dailyRewards.lastClaimDay = todayStr;
+    user.dailyRewards.cycleStartDay = inicioCiclo;
     if (rewardHp > 0) {
         user.hp = Math.min(user.maxHp, (user.hp ?? 0) + rewardHp);
         user.lives = user.hp;
@@ -140,7 +159,7 @@ const claimDailyReward = asyncHandler(async (req, res) => {
         user: result.user,
         // Lo devolvemos aparte para que el frontend pueda sincronizar el estado
         // aunque el objeto `user` viaje incompleto por cualquier motivo.
-        dailyRewards: { claimedDays: nextClaimedDays, lastClaimDate: now, lastClaimDay: todayStr },
+        dailyRewards: { claimedDays: nextClaimedDays, lastClaimDate: now, lastClaimDay: todayStr, cycleStartDay: inicioCiclo, currentDay },
         reward: { xp: rewardXP, coins: rewardCoins, gameCoins: rewardGameCoins, hp: rewardHp, day: currentDay }
     });
 });

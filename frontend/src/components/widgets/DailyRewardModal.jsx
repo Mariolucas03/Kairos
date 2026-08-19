@@ -68,7 +68,11 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
             containerStyle = "bg-[#18181b] border-2 border-purple-500 scale-110 z-20 translate-y-[-8px]";
             textColors = "text-white";
         } else if (isPast) {
-            if (isClaimed || (isViewOnly && day <= currentDay)) {
+            // ⚠️ Antes, abriendo desde el calendario (isViewOnly) TODO dia pasado
+            // se pintaba verde aunque no lo hubieras cobrado, asi que los dias
+            // perdidos eran invisibles justo donde se van a mirar. Manda
+            // `claimedDays` y solo eso.
+            if (isClaimed) {
                 containerStyle = "bg-green-900/60 border border-green-500/50 scale-95 opacity-90";
                 textColors = "text-green-100";
             } else {

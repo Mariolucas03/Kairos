@@ -76,12 +76,19 @@ export function useDailyRewards(user, setUser) {
     const claimReward = async () => {
         if (claiming) return;
         setClaiming(true);
+
+        // ⚠️ El modal se cierra YA, sin esperar al servidor.
+        // Antes se esperaba a la respuesta para cerrarlo, y contra un Render
+        // dormido eso son 30-50 segundos con el boton bloqueado: parecia que la
+        // recompensa "tardaba en darse". El servidor sigue siendo quien decide
+        // el premio y quien lo cobra; lo unico que se adelanta es cerrar la
+        // ventana. Si falla, se vuelve a abrir mas abajo.
+        setShowRewardModal(false);
+        sessionStorage.setItem(`reward_seen_${getTodayString()}`, 'true');
+
         try {
             const res = await api.post('/users/claim-daily');
             syncDailyRewards(res.data.dailyRewards, res.data.user);
-
-            sessionStorage.setItem(`reward_seen_${getTodayString()}`, 'true');
-            setShowRewardModal(false);
 
             const r = res.data.reward;
             if (r) {
@@ -104,8 +111,11 @@ export function useDailyRewards(user, setUser) {
                 setShowRewardModal(false);
                 setToast({ message: data.message, type: 'info' });
             } else {
-                // Error transitorio (red caída, servidor despertando en Render...).
-                // Dejamos el modal abierto para poder reintentar sin perder el premio.
+                // Error transitorio (red caida, servidor despertando en Render...).
+                // Como el modal ya se cerro de forma optimista, hay que volver a
+                // abrirlo: si no, el premio quedaria inaccesible hasta manana.
+                sessionStorage.removeItem(`reward_seen_${getTodayString()}`);
+                setShowRewardModal(true);
                 setToast({ message: 'No se pudo reclamar. Comprueba tu conexión e inténtalo de nuevo.', type: 'error' });
             }
         } finally {
