@@ -107,10 +107,19 @@ export const probarPush = async () => {
         return { ok: !!res.data?.ok, mensaje: res.data?.mensaje || 'Enviada.', detalle: res.data };
     } catch (error) {
         const d = error.response?.data;
-        return {
-            ok: false,
-            mensaje: d?.mensaje || 'No se pudo enviar la prueba.',
-            detalle: d
-        };
+        const codigo = error.response?.status;
+
+        // ⚠️ Si el servidor no contesta con NUESTRO error estructurado, el
+        // problema esta antes de llegar al endpoint. Decir solo "no se pudo"
+        // deja al usuario igual de perdido, asi que se nombra la causa.
+        let mensaje = d?.mensaje;
+        if (!mensaje) {
+            if (!error.response) mensaje = 'Sin respuesta del servidor. Puede estar arrancando (Render tarda 30-50 s): espera y reintenta.';
+            else if (codigo === 404) mensaje = 'El servidor no tiene la ruta de prueba (404). Falta desplegar la ultima version del backend.';
+            else if (codigo === 401) mensaje = 'Sesion caducada (401). Cierra sesion y vuelve a entrar.';
+            else mensaje = `El servidor respondio ${codigo} sin detalle.`;
+        }
+
+        return { ok: false, mensaje, codigo, detalle: d };
     }
 };
