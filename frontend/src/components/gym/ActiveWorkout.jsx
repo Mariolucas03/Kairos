@@ -228,9 +228,21 @@ export default function ActiveWorkout({ routine, onFinish }) {
     }, [exercises, intensity, defaultRest, startTime, routine._id, routine.name, STORAGE_KEY]);
 
     // --- FUNCIONES DESCANSO ---
-    const startRest = () => {
-        if (defaultRest > 0) {
-            const targetTime = Date.now() + (defaultRest * 1000);
+    /**
+     * Arranca el descanso.
+     *
+     * Cada ejercicio puede llevar el suyo (`rest`); si vale 0 se usa el general
+     * de la rutina. El campo existía en el modelo desde el principio, pero aquí
+     * se ignoraba: todos los ejercicios descansaban lo mismo pasara lo que
+     * pasara, así que configurarlo no servía de nada.
+     */
+    const startRest = (segundosDelEjercicio) => {
+        const espera = Number(segundosDelEjercicio) > 0
+            ? Number(segundosDelEjercicio)
+            : defaultRest;
+
+        if (espera > 0) {
+            const targetTime = Date.now() + (espera * 1000);
             localStorage.setItem(REST_KEY, targetTime.toString());
             setRestTargetTime(targetTime);
         }
@@ -336,7 +348,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }));
 
         if (!currentSet.completed && currentSet.type !== 'D') {
-            startRest();
+            startRest(exercises[exIdx]?.rest);
         }
     };
 

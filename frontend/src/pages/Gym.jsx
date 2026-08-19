@@ -45,8 +45,13 @@ const TONOS_RUTINA = {
 };
 const ORDEN_TONOS = ['#eab308', '#3b82f6', '#4ade80', '#a855f7', '#f97316', '#22d3ee', '#FE90AF'];
 
-const tonoDeRutina = (routine, index) =>
-    TONOS_RUTINA[routine.color] || ORDEN_TONOS[index % ORDEN_TONOS.length];
+// Las rutinas nuevas guardan el color en HEX (el usuario elige el que quiera);
+// las de antes guardaban un nombre. Se aceptan las dos formas.
+const tonoDeRutina = (routine, index) => {
+    const c = routine.color || '';
+    if (/^#[0-9a-fA-F]{3,8}$/.test(c)) return c;
+    return TONOS_RUTINA[c] || ORDEN_TONOS[index % ORDEN_TONOS.length];
+};
 
 const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLocked }) => {
     const [offsetX, setOffsetX] = useState(0);

@@ -5,21 +5,29 @@ import api from '../../services/api';
 import ExerciseSelector from './ExerciseSelector';
 import ExerciseSheet from './ExerciseSheet';
 
-// Colores disponibles para la tarjeta de rutina
-const ROUTINE_COLORS = [
-    { id: 'blue', value: 'bg-blue-600', border: 'border-blue-500' },
-    { id: 'red', value: 'bg-red-600', border: 'border-red-500' },
-    { id: 'green', value: 'bg-green-600', border: 'border-green-500' },
-    { id: 'yellow', value: 'bg-yellow-500', border: 'border-yellow-500' },
-    { id: 'purple', value: 'bg-purple-600', border: 'border-purple-500' },
-    { id: 'orange', value: 'bg-orange-600', border: 'border-orange-500' },
-    { id: 'pink', value: 'bg-pink-600', border: 'border-pink-500' },
+// Paleta de la app. Es una sugerencia, no una jaula: debajo hay un selector
+// libre para cualquier color. Se guardan como HEX, no como nombre ('blue'),
+// para que quepa cualquiera; `tonoDeRutina` en Gym.jsx sigue entendiendo los
+// nombres antiguos de las rutinas ya creadas.
+const PALETA_RUTINAS = [
+    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+    '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
+    '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#78716c'
 ];
+
+// Equivalencia de los nombres antiguos, para que al EDITAR una rutina vieja
+// el selector aparezca marcando su color de verdad y no en blanco.
+const NOMBRE_A_HEX = {
+    yellow: '#eab308', blue: '#3b82f6', green: '#22c55e', purple: '#a855f7',
+    orange: '#f97316', red: '#ef4444', pink: '#ec4899'
+};
+
+const aHex = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(c || '') ? c : (NOMBRE_A_HEX[c] || '#3b82f6'));
 
 export default function CreateRoutineModal({ onClose, onRoutineCreated, routineToEdit = null }) {
     // Datos Rutina
     const [routineName, setRoutineName] = useState('');
-    const [routineColor, setRoutineColor] = useState(ROUTINE_COLORS[0].id);
+    const [routineColor, setRoutineColor] = useState(PALETA_RUTINAS[10]);
     const [restTime, setRestTime] = useState(60); // 🔥 FIX PUNTO 14: Tiempo descanso
     const [addedExercises, setAddedExercises] = useState([]);
 
@@ -39,7 +47,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         if (routineToEdit) {
             setRoutineName(routineToEdit.name);
             setAddedExercises(routineToEdit.exercises || []);
-            setRoutineColor(routineToEdit.color || 'blue');
+            setRoutineColor(aHex(routineToEdit.color));
             // Si la rutina guardada tenía descanso personalizado, lo cargamos, si no 60
             setRestTime(routineToEdit.defaultRest || 60);
         }
@@ -79,6 +87,21 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         const newExercises = [...addedExercises];
         const num = parseInt(val);
         newExercises[index].sets = isNaN(num) || num < 1 ? 1 : num;
+        setAddedExercises(newExercises);
+    };
+
+    /**
+     * Descanso propio de UN ejercicio.
+     *
+     * El campo `rest` ya existía en el modelo con la regla "0 = usa el descanso
+     * general de la rutina", pero no había forma de tocarlo desde la interfaz:
+     * todos los ejercicios se quedaban forzosamente con el general. Vaciar la
+     * casilla vuelve a 0, o sea, a heredar el de la rutina.
+     */
+    const updateExerciseRest = (index, val) => {
+        const newExercises = [...addedExercises];
+        const num = parseInt(val);
+        newExercises[index].rest = isNaN(num) || num < 0 ? 0 : Math.min(num, 600);
         setAddedExercises(newExercises);
     };
 
@@ -170,6 +193,10 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                         <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest flex items-center gap-1">
                             <Timer size={12} /> Descanso entre series (Seg)
                         </label>
+                        <p className="text-[10px] text-zinc-600 mb-2 ml-1 leading-tight">
+                            Es el de toda la rutina. Cada ejercicio puede llevar el suyo propio
+                            en su casilla <span className="text-zinc-400">SEG</span>; en blanco usa este.
+                        </p>
                         <input
                             type="number"
                             placeholder="60"
@@ -182,17 +209,39 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                     {/* SELECTOR DE COLOR */}
                     <div>
                         <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest">Color de la Tarjeta</label>
-                        <div className="flex gap-4 overflow-x-auto py-4 -mx-6 px-6 no-scrollbar">
-                            {ROUTINE_COLORS.map((c) => (
+                        <div className="grid grid-cols-9 gap-2 py-2">
+                            {PALETA_RUTINAS.map((c) => (
                                 <button
-                                    key={c.id}
-                                    onClick={() => setRoutineColor(c.id)}
-                                    className={`w-12 h-12 shrink-0 rounded-full ${c.value} flex items-center justify-center transition-all duration-300 ${routineColor === c.id ? 'scale-125 ring-4 ring-zinc-900 shadow-xl z-10' : 'opacity-60 hover:opacity-100 scale-100'}`}
+                                    key={c}
+                                    onClick={() => setRoutineColor(c)}
+                                    aria-label={'Color ' + c}
+                                    className={`aspect-square rounded-full flex items-center justify-center transition-transform ${routineColor.toLowerCase() === c ? 'scale-110 ring-2 ring-white' : 'active:scale-95'}`}
+                                    style={{ background: c }}
                                 >
-                                    {routineColor === c.id && <Check size={20} className="text-white drop-shadow-md" strokeWidth={4} />}
+                                    {routineColor.toLowerCase() === c && <Check size={13} className="text-black" strokeWidth={4} />}
                                 </button>
                             ))}
                         </div>
+
+                        {/* Cualquier otro color: el selector nativo del sistema.
+                            No hace falta libreria y en el movil abre la rueda
+                            de color del propio telefono. */}
+                        <label className="mt-3 flex items-center gap-3 bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-3 cursor-pointer">
+                            <span
+                                className="w-9 h-9 rounded-full border border-white/10 shrink-0"
+                                style={{ background: routineColor }}
+                            />
+                            <span className="flex-1 min-w-0">
+                                <span className="block text-[11px] font-black text-zinc-200 uppercase tracking-[0.12em] not-italic">Otro color</span>
+                                <span className="block text-[10px] text-zinc-500 mt-0.5 uppercase">{routineColor}</span>
+                            </span>
+                            <input
+                                type="color"
+                                value={routineColor}
+                                onChange={(e) => setRoutineColor(e.target.value)}
+                                className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                            />
+                        </label>
                     </div>
                 </div>
 
@@ -244,6 +293,24 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
 
                                     {/* 🔥 FIX PUNTO 14: INPUT SERIES DENTRO DE LA TARJETA */}
                                     <div className="flex items-center gap-3">
+                                        {/* Descanso propio. Vacío = hereda el de la rutina */}
+                                        <div className="flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
+                                            <label className="text-[8px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
+                                                <Timer size={8} /> SEG
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="600"
+                                                step="5"
+                                                value={ex.rest || ''}
+                                                placeholder={String(restTime)}
+                                                onChange={(e) => updateExerciseRest(idx, e.target.value)}
+                                                title="Descanso solo para este ejercicio. Vacío usa el general."
+                                                className="w-10 bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-700"
+                                            />
+                                        </div>
+
                                         <div className="flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
                                             <label className="text-[8px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
                                                 <Hash size={8} /> SETS

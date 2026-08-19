@@ -56,6 +56,27 @@ export default function BodyTab() {
             <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4">
                 <BodyMap levels={ranks} dual onSelectMuscle={(g) => setMuscleSel(g === muscleSel ? null : g)} />
 
+                {/* Mini leyenda de rangos: sin ella los colores del cuerpo no
+                    significan nada. Los tramos los manda el servidor (tiers),
+                    asi que no hay una segunda tabla que se pueda desincronizar.
+                    De momento solo el color; cuando haya iconos por rango se
+                    sustituye el circulo por su logo. */}
+                {Array.isArray(escala) && escala.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2 justify-center">
+                        {escala.map((t) => (
+                            <span key={t.label || t.name} className="flex items-center gap-1.5">
+                                <span
+                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ background: t.color || '#71717a' }}
+                                />
+                                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.1em] not-italic">
+                                    {t.label || t.name}
+                                </span>
+                            </span>
+                        ))}
+                    </div>
+                )}
+
                 {muscleSel && ranks[muscleSel] && (
                     <div className="mt-3 bg-black border border-white/10 rounded-2xl p-3 animate-in fade-in">
                         <div className="flex items-center justify-between">
