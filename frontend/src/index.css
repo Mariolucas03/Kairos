@@ -49,9 +49,17 @@ body {
     padding-bottom: 0px !important;
 }
 
-/* PADDING CONTENIDO: Para que el footer no tape el final de la lista al hacer scroll */
+/* FOOTER FLOTANTE: la barra se despega del borde inferior. El margen se suma
+   al area segura del movil para no quedar debajo de la barra de gestos. */
+.footer-flotante {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+/* PADDING CONTENIDO: Para que el footer no tape el final de la lista al hacer scroll.
+   Sube de 100 a 112 porque la barra ya no esta pegada abajo: ocupa su alto MAS
+   el margen que la separa del borde. */
 .pb-safe-content {
-    padding-bottom: 100px !important;
+    padding-bottom: 112px !important;
 }
 
 /* --- FIX ZOOM INPUTS IOS --- */

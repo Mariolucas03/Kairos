@@ -43,6 +43,26 @@ export default function Footer() {
         { name: 'Inicio', path: '/home', icon: Home },
     ];
 
+    // Un solo sitio donde se dibuja un icono del pie. Estaba copiado dos veces,
+    // una por lado, asi que cualquier retoque habia que hacerlo por duplicado.
+    const renderItem = (item) => (
+        <NavLink key={item.name} to={item.path} className="group relative flex-1 flex justify-center">
+            {({ isActive }) => (
+                <div className={`flex flex-col items-center justify-center gap-0.5 transition-all duration-300 ${isActive ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                    <div className="relative">
+                        <item.icon size={21} strokeWidth={isActive ? 2.5 : 2} />
+                        {item.hasBadge && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0a0a0c] animate-pulse"></span>
+                        )}
+                    </div>
+                    <span className={`text-[9px] font-bold tracking-wide uppercase transition-colors ${isActive ? 'text-yellow-500' : 'text-zinc-600'}`}>
+                        {item.name}
+                    </span>
+                </div>
+            )}
+        </NavLink>
+    );
+
     return (
         <>
             {/* --- OVERLAY GLOBAL OSCURO PARA EL BOTÓN + --- */}
@@ -52,7 +72,7 @@ export default function Footer() {
             />
 
             {/* --- MENÚ RADIAL FLOTANTE (BOTÓN +) --- */}
-            <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 flex items-end justify-center gap-6 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] z-40 pointer-events-none ${isFabOpen ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto' : 'translate-y-12 opacity-0 scale-50'}`}>
+            <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 flex items-end justify-center gap-6 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] z-40 pointer-events-none ${isFabOpen ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto' : 'translate-y-12 opacity-0 scale-50'}`}>
                 <NavLink to="/shop" className="flex flex-col items-center gap-2 group">
                     {/* Mismo chasis que las tarjetas: superficie plana, borde al
                         7% y el color SOLO en el icono. Antes cada acceso llevaba
@@ -78,61 +98,33 @@ export default function Footer() {
                 </NavLink>
             </div>
 
-            {/* --- BARRA DE NAVEGACIÓN INFERIOR --- */}
-            <nav className="fixed bottom-0 left-0 w-full bg-black/95 backdrop-blur-lg border-t border-white/[0.07] safe-bottom pt-2 pb-2 z-50">
-                <div className="flex justify-between items-center px-4 h-full relative">
-                    
-                    {/* Items Izquierda (IG, Comida) */}
-                    <div className="flex w-[40%] justify-around">
-                        {navItemsLeft.map((item) => (
-                            <NavLink key={item.name} to={item.path} className="group relative w-12 flex justify-center">
-                                {({ isActive }) => (
-                                    <div className={`flex flex-col items-center justify-center transition-all duration-300 ${isActive ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                                        <div className="relative">
-                                            <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-                                            {item.hasBadge && (
-                                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-black animate-pulse"></span>
-                                            )}
-                                        </div>
-                                        <span className={`text-[9px] mt-1 font-bold tracking-wide transition-colors uppercase ${isActive ? 'text-yellow-500' : 'text-zinc-600'}`}>
-                                            {item.name}
-                                        </span>
-                                    </div>
-                                )}
-                            </NavLink>
-                        ))}
-                    </div>
+            {/* --- BARRA FLOTANTE ---
+                Isla despegada del borde en vez de barra pegada abajo. El (+)
+                pasa a ir DENTRO: sobresaliendo por encima, como estaba antes,
+                rompia la silueta de la pastilla y volvia a leerse como una
+                barra clasica con un boton encima. */}
+            <nav className="fixed footer-flotante left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-50">
+                <div className="flex items-center justify-around gap-1 px-2 py-2 bg-[#0a0a0c]/90 backdrop-blur-xl border border-white/[0.07] rounded-[28px] shadow-[0_10px_30px_rgba(0,0,0,0.65)]">
 
-                    {/* BOTÓN CENTRAL FLOTANTE (+) */}
-                    <div className="absolute left-1/2 -translate-x-1/2 -top-6 flex justify-center w-[20%]">
-                        <button
-                            onClick={() => setIsFabOpen(!isFabOpen)}
-                            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 z-50 border-4 border-black
-                                ${isFabOpen 
-                                    ? 'bg-zinc-800 text-zinc-400 scale-90 rotate-45 border-zinc-900 shadow-none' 
-                                    : 'bg-yellow-500 text-black hover:scale-105 active:scale-95'
-                                }
-                            `}
-                        >
-                            <Plus size={28} strokeWidth={3} className="transition-transform duration-300" />
-                        </button>
-                    </div>
+                    {navItemsLeft.map(renderItem)}
 
-                    {/* Items Derecha (Gym, Inicio) */}
-                    <div className="flex w-[40%] justify-around">
-                        {navItemsRight.map((item) => (
-                            <NavLink key={item.name} to={item.path} className="group relative w-12 flex justify-center">
-                                {({ isActive }) => (
-                                    <div className={`flex flex-col items-center justify-center transition-all duration-300 ${isActive ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}>
-                                        <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-                                        <span className={`text-[9px] mt-1 font-bold tracking-wide transition-colors uppercase ${isActive ? 'text-yellow-500' : 'text-zinc-600'}`}>
-                                            {item.name}
-                                        </span>
-                                    </div>
-                                )}
-                            </NavLink>
-                        ))}
-                    </div>
+                    {/* BOTÓN CENTRAL (+) */}
+                    <button
+                        onClick={() => setIsFabOpen(!isFabOpen)}
+                        className="flex-1 flex justify-center"
+                        aria-label="Abrir accesos rápidos"
+                    >
+                        <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300
+                            ${isFabOpen
+                                ? 'bg-zinc-800 text-zinc-400 rotate-45 scale-90'
+                                : 'bg-yellow-500 text-black active:scale-95'
+                            }
+                        `}>
+                            <Plus size={24} strokeWidth={3} />
+                        </div>
+                    </button>
+
+                    {navItemsRight.map(renderItem)}
 
                 </div>
             </nav>
