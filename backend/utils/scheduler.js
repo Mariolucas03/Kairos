@@ -21,8 +21,48 @@ const DAMAGE_RULES = { easy: 5, medium: 10, hard: 20, epic: 50 };
 
 // --- Recordatorio de las 20:00 ---
 /**
- * Avisa de las misiones que quedan sin marcar y de la vida que cuesta no
- * hacerlas.
+ * Aviso a los diez primeros cuando el mes esta a punto de cerrarse.
+ *
+ * Los ultimos dias son los que la gente se pica; avisar el dia 1, cuando ya no
+ * se puede hacer nada, no sirve para nada. Va dentro del recordatorio de las
+ * 20:00 y no en su propio cron para no obligar a configurar un tercer trabajo
+ * externo en cron-job.org.
+ */
+const avisarCierreRanking = async () => {
+    const hoy = new Date();
+    if (hoy.getDate() !== 28) return 0;
+
+    const ranking = await getMonthlyRanking(getMadridMonthString(), 10);
+    if (ranking.length === 0) return 0;
+
+    // Dias que quedan contando hoy (28, 29, 30, 31 segun el mes)
+    const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+    const dias = ultimoDia - hoy.getDate() + 1;
+    const podio = MONTHLY_PRIZES[MONTHLY_PRIZES.length - 1];
+
+    let enviados = 0;
+
+    for (let i = 0; i < ranking.length; i++) {
+        const user = await User.findById(ranking[i]._id).select('username pushSubscriptions');
+        if (!user?.pushSubscriptions?.length) continue;
+
+        const premio = MONTHLY_PRIZES[i];
+        await sendPushToUser(user, {
+            title: '🏆 Vas ' + (i + 1) + 'º en el ranking',
+            body: premio
+                ? 'Quedan ' + dias + ' días de mes. Aguanta el puesto y son ' + premio + ' fichas.'
+                : 'Quedan ' + dias + ' días de mes. Entrar en el podio son ' + podio + ' fichas.',
+            icon: '/assets/icons/ficha.png',
+            url: '/social/ranking'
+        });
+        enviados++;
+    }
+
+    return enviados;
+};
+
+/**
+ * Aviso de las 20:00: lo que se pierde esta noche si no entra.
  *
  * Tenia el MISMO problema que el mantenimiento nocturno: el cron interno se
  * programa a las 20:00, pero en el plan gratuito de Render la instancia esta
@@ -32,6 +72,11 @@ const DAMAGE_RULES = { easy: 5, medium: 10, hard: 20, epic: 50 };
  *
  * Se anota el dia ya avisado: un cron externo que reintente, o dos crons
  * solapados, no pueden mandar dos veces la misma notificacion.
+ *
+ * Cada usuario recibe UNA sola notificacion (dos el dia 28, con la del
+ * ranking). Los tres avisos posibles —vuelve, misiones, diaria— se excluyen a
+ * proposito en vez de mandarse los tres: tres notificaciones seguidas a la
+ * misma hora es la forma mas rapida de que alguien las apague para siempre.
  */
 const runEveningReminder = async ({ forzar = false } = {}) => {
     const hoy = getMadridDateString();
@@ -44,16 +89,32 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         }
     }
 
-    console.log('🔔 Ejecutando recordatorio de misiones (20:00)...');
+    console.log('🔔 Ejecutando recordatorio de las 20:00...');
 
     const usuarios = await User.find({
         pushSubscriptions: { $exists: true, $not: { $size: 0 } }
-    }).select('username pushSubscriptions');
+    }).select('username pushSubscriptions streak dailyRewards.lastClaimDay lastActive');
 
     const diaSemana = new Date().getDay();
-    let avisados = 0;
+    const ahora = Date.now();
+    const informe = { vuelve: 0, misiones: 0, diaria: 0 };
 
     const envios = usuarios.map(async (user) => {
+        // 1. Al que lleva EXACTAMENTE tres dias sin aparecer se le manda esto y
+        //    nada mas. Solo el tercer dia: un "vuelve" cada noche no recupera a
+        //    nadie, solo consigue que apague las notificaciones.
+        const diasFuera = Math.floor((ahora - new Date(user.lastActive || 0).getTime()) / 86400000);
+        if (diasFuera === 3) {
+            await sendPushToUser(user, {
+                title: '👀 Llevas 3 días sin entrar',
+                body: 'Tus misiones siguen ahí y la racha ya está a cero. Empieza otra vez.',
+                icon: '/assets/icons/icon-192x192.png',
+                url: '/home'
+            });
+            informe.vuelve++;
+            return;
+        }
+
         const pendientes = await Mission.find({
             frequency: 'daily',
             completed: false,
@@ -64,24 +125,57 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
             ]
         }).select('difficulty').lean();
 
-        if (pendientes.length === 0) return;
+        const diariaPendiente = (user.dailyRewards?.lastClaimDay || null) !== hoy;
+        const racha = user.streak?.current || 0;
 
-        // El daño REAL que se juega, con la misma tabla que aplica el castigo.
-        // "Perderas HP" sin decir cuanto no ayuda a decidir si merece la pena
-        // levantarse del sofa; "perderas 50 HP" si.
-        const dano = pendientes.reduce((total, m) => total + (DAMAGE_RULES[m.difficulty] || 5), 0);
-        const plural = pendientes.length === 1 ? 'misión' : 'misiones';
+        // 2. Misiones sin marcar. El daño REAL, con la misma tabla que aplica el
+        //    castigo: "perderas HP" sin decir cuanto no ayuda a decidir si merece
+        //    la pena levantarse del sofa; "perderas 50 HP" si.
+        //
+        //    Y si hay racha en juego, ese es el titular: perder doce dias
+        //    seguidos escuece bastante mas que perder veinte puntos de vida.
+        if (pendientes.length > 0) {
+            const dano = pendientes.reduce((total, m) => total + (DAMAGE_RULES[m.difficulty] || 5), 0);
+            // "Te quedan 1 misión" quedaba fatal en el movil de quien solo tenia
+            // una, que es el caso mas comun.
+            const frase = pendientes.length === 1
+                ? 'Te queda 1 misión'
+                : 'Te quedan ' + pendientes.length + ' misiones';
 
-        await sendPushToUser(user, {
-            title: '⚠️ Te quedan ' + pendientes.length + ' ' + plural,
-            body: 'Complétalas antes de medianoche o perderás ' + dano + ' HP.',
-            icon: '/assets/icons/corazon.png',
-            url: '/missions'
-        });
-        avisados++;
+            const cuerpo = [
+                frase + ' y ' + dano + ' HP en juego.',
+                racha >= 3 ? 'También pierdes tu racha de ' + racha + ' días.' : '',
+                diariaPendiente ? 'Y la recompensa diaria sin reclamar.' : ''
+            ].filter(Boolean).join(' ');
+
+            await sendPushToUser(user, {
+                title: racha >= 3
+                    ? '🔥 Tu racha de ' + racha + ' días peligra'
+                    : '⚠️ ' + frase,
+                body: cuerpo,
+                icon: '/assets/icons/corazon.png',
+                url: '/missions'
+            });
+            informe.misiones++;
+            return;
+        }
+
+        // 3. Todo hecho, pero la diaria sin recoger: es dinero gratis que caduca
+        //    a medianoche.
+        if (diariaPendiente) {
+            await sendPushToUser(user, {
+                title: '🎁 Recompensa diaria sin reclamar',
+                body: 'Caduca a medianoche. Entra y recógela.',
+                icon: '/assets/icons/moneda.png',
+                url: '/home'
+            });
+            informe.diaria++;
+        }
     });
 
     await Promise.allSettled(envios);
+
+    const ranking = await avisarCierreRanking();
 
     await SystemState.updateOne(
         { key: CLAVE_RECORDATORIO },
@@ -89,8 +183,11 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         { upsert: true }
     );
 
-    console.log('📨 Aviso de las 20:00: ' + avisados + ' avisados de ' + usuarios.length + ' con notificaciones activas.');
-    return { success: true, dia: hoy, avisados, candidatos: usuarios.length };
+    console.log('📨 Aviso de las 20:00: ' + informe.misiones + ' por misiones, ' + informe.diaria +
+        ' por la diaria, ' + informe.vuelve + ' de vuelta, ' + ranking + ' del ranking (de ' +
+        usuarios.length + ' con notificaciones activas).');
+
+    return { success: true, dia: hoy, ...informe, ranking, candidatos: usuarios.length };
 };
 
 // --- PREMIOS MENSUALES RANKING ---

@@ -1,11 +1,48 @@
 const Routine = require('../models/Routine');
 const Exercise = require('../models/Exercise');
 const WorkoutLog = require('../models/WorkoutLog');
+const User = require('../models/User');
+const { sendPushToUser } = require('./pushController');
 const DailyLog = require('../models/DailyLog');
 const levelService = require('../services/levelService');
 
 // 🔥 Toda la IA pasa por el servicio único (una sola cascada de modelos gratis)
 const { askAI } = require('../services/aiService');
+
+/**
+ * Avisa a los amigos de que acaba de subir un entreno.
+ *
+ * Es el aviso con mas riesgo de cansar de todos los que hay: alguien con
+ * quince amigos que entrenen a diario recibe quince notificaciones. Por eso
+ * solo salta al REGISTRAR el entreno (una vez por sesion, nunca al editarlo) y
+ * respeta la privacidad: si tiene oculta la seccion de entrenos, avisar de algo
+ * que el amigo no puede abrir es peor que no avisar.
+ *
+ * No se espera con await en quien lo llama: el entreno ya esta guardado y que
+ * el push tarde no puede retrasar la respuesta al que acaba de entrenar.
+ */
+const avisarAmigosDelEntreno = async (autorId, nombreEntreno) => {
+    try {
+        const autor = await User.findById(autorId).select('username friends visibility');
+        if (!autor?.friends?.length) return;
+        if (autor.visibility?.workouts === false) return;
+
+        const amigos = await User.find({
+            _id: { $in: autor.friends },
+            'pushSubscriptions.0': { $exists: true }
+        }).select('username pushSubscriptions');
+
+        await Promise.allSettled(amigos.map(amigo => sendPushToUser(amigo, {
+            title: '💪 ' + autor.username + ' ha entrenado',
+            body: (nombreEntreno || 'Entreno') + '. Míralo en el feed.',
+            icon: '/assets/icons/icon-192x192.png',
+            url: '/social'
+        })));
+    } catch (error) {
+        console.error('No se pudo avisar a los amigos del entreno:', error.message);
+    }
+};
+
 
 // 🔥 Fecha en hora de Madrid. Este fichero definía su propio
 // `new Date().toISOString().split('T')[0]` (UTC), así que un entreno registrado
@@ -524,6 +561,8 @@ const saveWorkoutLog = async (req, res) => {
             records
         });
 
+        avisarAmigosDelEntreno(req.user._id, routineName || 'Entrenamiento Libre');
+
         const today = getTodayDateString();
 
         await DailyLog.findOneAndUpdate(
@@ -624,6 +663,8 @@ const saveSportLog = async (req, res) => {
         const log = await WorkoutLog.create({
             user: req.user._id, routineName: nombreFinal, duration: minutos * 60, intensity, distance, type: 'sport', caloriesBurned, date: new Date()
         });
+
+        avisarAmigosDelEntreno(req.user._id, nombreFinal);
 
         await DailyLog.findOneAndUpdate(
             { user: req.user._id, date: getTodayDateString() },

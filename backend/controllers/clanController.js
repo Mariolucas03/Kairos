@@ -5,6 +5,7 @@ const WorkoutLog = require('../models/WorkoutLog');
 const DailyLog = require('../models/DailyLog');
 const levelService = require('../services/levelService');
 const { getMadridDateString } = require('../utils/dateHelpers');
+const { notificarA } = require('./pushController');
 
 // --- CONFIGURACIÓN DE ROTACIÓN ---
 const EVENT_ROTATION = ['volume', 'missions', 'calories', 'xp'];
@@ -327,6 +328,17 @@ const joinClan = asyncHandler(async (req, res) => {
     user.clan = clanUpdate._id;
     user.clanRank = 'esclavo';
     await user.save();
+
+    // El lider es el unico que puede ascender o expulsar, asi que es el unico
+    // al que le sirve de algo enterarse en el momento.
+    if (clanUpdate.leader && clanUpdate.leader.toString() !== userId.toString()) {
+        notificarA(clanUpdate.leader, {
+            title: '🛡️ Nuevo miembro en el clan',
+            body: (user.username || 'Alguien') + ' se ha unido a ' + clanUpdate.name + '.',
+            icon: '/assets/icons/icon-192x192.png',
+            url: '/social/clans'
+        });
+    }
 
     res.json({ message: `Unido a ${clanUpdate.name}`, clan: clanUpdate });
 });
