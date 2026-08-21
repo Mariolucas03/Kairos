@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Save, Lock, Skull, Activity } from 'lucide-react';
+import { Save, Lock, Activity } from 'lucide-react';
 import api from '../../services/api';
 
 export default function HealthWidget({ user, setUser }) {
@@ -52,17 +52,6 @@ export default function HealthWidget({ user, setUser }) {
             localStorage.setItem('user', JSON.stringify(updatedUser));
             setIsOpen(false);
         } catch (error) { console.error(error); } finally { setLoading(false); }
-    };
-
-    const handleDamageTest = async () => {
-        try {
-            const damage = hp <= 10 ? 1 : 10;
-            const newHp = Math.max(0, (user.hp || 0) - damage);
-            const res = await api.put('/users/update-stats', { hp: newHp });
-            setUser(res.data);
-            localStorage.setItem('user', JSON.stringify(res.data));
-            if (newHp === 0) window.location.reload();
-        } catch (error) { console.error(error); }
     };
 
     const confirmedMission = user?.redemptionMission || null;
@@ -159,13 +148,6 @@ export default function HealthWidget({ user, setUser }) {
                             </div>
                         </div>
                     )}
-
-                    <button
-                        onClick={handleDamageTest}
-                        className="w-full bg-black hover:bg-red-900/20 text-zinc-500 hover:text-red-400 py-2 rounded-lg text-[10px] font-bold border border-dashed border-zinc-800"
-                    >
-                        <Skull size={12} className="inline mr-2" /> TEST DAÑO (-10)
-                    </button>
                 </div>
             )}
         </div>

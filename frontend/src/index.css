@@ -49,17 +49,20 @@ body {
     padding-bottom: 0px !important;
 }
 
-/* FOOTER FLOTANTE: la barra va lo mas abajo posible sin llegar a pegarse. Los
-   4px son solo para que se vea el borde redondeado por debajo; se suman al
-   area segura del movil para no acabar tapada por la barra de gestos. */
+/* FOOTER FLOTANTE: pegada abajo del todo, a 4px del borde.
+   Ya NO se suma env(safe-area-inset-bottom): en iPhone son 34px de golpe y por
+   eso la barra se veia alta. Se pidio bajarla al maximo. El contrapeso es que
+   en moviles con barra de gestos el indicador pasa por encima del borde
+   inferior de la pastilla; los iconos siguen despejados porque van centrados
+   con su propio padding. */
 .footer-flotante {
-    bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+    bottom: 4px;
 }
 
 /* PADDING CONTENIDO: Para que el footer no tape el final de la lista al hacer
    scroll. La barra ocupa su alto mas el hueco que la separa del borde. */
 .pb-safe-content {
-    padding-bottom: 104px !important;
+    padding-bottom: 96px !important;
 }
 
 /* --- FIX ZOOM INPUTS IOS --- */
