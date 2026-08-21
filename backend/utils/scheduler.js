@@ -81,9 +81,27 @@ const avisarCierreRanking = async () => {
 const runEveningReminder = async ({ forzar = false } = {}) => {
     const hoy = getMadridDateString();
 
+    // ⚠️ Se RESERVA el dia antes de mandar nada, no despues.
+    //
+    // Comprobar al principio y marcar al final deja una ventana de segundos: y
+    // ahora hay DOS disparadores a las 20:00 en punto —el cron interno, que
+    // desde que el ping mantiene el servidor despierto ya si se ejecuta, y el
+    // externo de cron-job.org—. Los dos leian "sin marcar" a la vez y los dos
+    // mandaban. Mismo patron que los premios mensuales: si el update no
+    // encuentra nada que cambiar, es que otro llego primero.
     if (!forzar) {
-        const marca = await SystemState.findOne({ key: CLAVE_RECORDATORIO }).lean();
-        if (marca?.value === hoy) {
+        const reserva = await SystemState.findOneAndUpdate(
+            { key: CLAVE_RECORDATORIO, value: { $ne: hoy } },
+            { $set: { value: hoy, updatedAt: new Date() } },
+            { upsert: true, new: false }
+        ).catch(err => {
+            // El upsert de dos procesos a la vez sobre la clave unica hace que
+            // uno reviente con duplicado: ese es justo el que llega tarde.
+            if (err.code === 11000) return 'perdida';
+            throw err;
+        });
+
+        if (reserva === 'perdida' || reserva?.value === hoy) {
             console.log('✅ El aviso de las 20:00 del ' + hoy + ' ya se mando, no se repite.');
             return { saltado: true, dia: hoy };
         }
@@ -177,11 +195,14 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
 
     const ranking = await avisarCierreRanking();
 
-    await SystemState.updateOne(
-        { key: CLAVE_RECORDATORIO },
-        { $set: { value: hoy, updatedAt: new Date() } },
-        { upsert: true }
-    );
+    // Con forzar no se reservo el dia al entrar, asi que se marca aqui.
+    if (forzar) {
+        await SystemState.updateOne(
+            { key: CLAVE_RECORDATORIO },
+            { $set: { value: hoy, updatedAt: new Date() } },
+            { upsert: true }
+        );
+    }
 
     console.log('📨 Aviso de las 20:00: ' + informe.misiones + ' por misiones, ' + informe.diaria +
         ' por la diaria, ' + informe.vuelve + ' de vuelta, ' + ranking + ' del ranking (de ' +

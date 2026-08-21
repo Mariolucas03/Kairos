@@ -38,9 +38,15 @@ const subscribeToPush = asyncHandler(async (req, res) => {
     //
     // El endpoint YA identifica al dispositivo de forma unica: se borra por
     // endpoint y se inserta una sola vez.
-    await User.findByIdAndUpdate(userId, {
-        $pull: { pushSubscriptions: { endpoint: subscription.endpoint } }
-    });
+    // ⚠️ El endpoint identifica al DISPOSITIVO, no a la cuenta. Se limpiaba
+    // solo en el usuario que se estaba suscribiendo, asi que un movil que
+    // entrara con una segunda cuenta quedaba registrado en las DOS: cada aviso
+    // de las 20:00 llegaba dos veces al mismo telefono, uno por cuenta, con
+    // textos distintos. Se quita de todas: el aparato es de quien lo usa ahora.
+    await User.updateMany(
+        { 'pushSubscriptions.endpoint': subscription.endpoint },
+        { $pull: { pushSubscriptions: { endpoint: subscription.endpoint } } }
+    );
 
     await User.findByIdAndUpdate(userId, {
         $push: {
