@@ -24,6 +24,9 @@ const ensureLevelConsistency = async (userId) => {
         user.level = (user.level || 1) + 1;
         user.nextLevelXP = calculateNextLevelXP(user.level);
         user.hp = user.maxHp; // Restaurar vida completa
+        user.lives = user.hp;   // El resto del código escribe los dos; dejar uno
+                                // sin tocar deja un numero viejo esperando a que
+                                // alguien lo lea y muestre una vida que no es.
 
         levelsGained++;
         changed = true;
@@ -66,7 +69,9 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
 
         // Restaurar vida al subir de nivel
         user.hp = user.maxHp;
-        // user.lives = user.hp; // (Descomentar si usas lives duplicado, pero con hp basta)
+        user.lives = user.hp; // Estaba comentado con un "con hp basta", pero el
+                              // castigo nocturno, la diaria y el revivir SÍ lo
+                              // escriben: quedaba desincronizado solo aquí.
 
         levelsGained++; // Contamos cuántos niveles ha subido
         leveledUp = true;

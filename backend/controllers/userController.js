@@ -254,24 +254,55 @@ const setRedemptionMission = asyncHandler(async (req, res) => {
     res.json({ message: "Pacto sellado", user });
 });
 
+/**
+ * Revivir tras la pantalla de redención.
+ *
+ * ⚠️ No comprobaba nada: llamarlo con 90 de vida te DEJABA en 20, porque asigna
+ * en vez de curar. Solo tiene sentido estando a cero.
+ */
 const reviveUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
+
+    if ((user.hp ?? 0) > 0) {
+        res.status(400);
+        throw new Error('Todavía estás vivo');
+    }
+
     user.hp = 20;
     user.lives = 20;
     await user.save();
     res.json({ message: "Has revivido.", user });
 });
 
+/**
+ * Bajar la vida a mano (el botón de daño de la cabecera).
+ *
+ * ⚠️ Esto aceptaba `hp`, `xp` y `coins` del cuerpo de la petición y los ESCRIBÍA
+ * tal cual. Con la sesión iniciada, una sola llamada dejaba `coins: 999999` o la
+ * vida a 100: se saltaba de golpe el castigo nocturno y la economía entera, que
+ * es justo lo que costó cerrar en las misiones.
+ *
+ * Ahora solo puede BAJAR la vida. Subirla se gana: pociones, recompensa diaria o
+ * subir de nivel. Y ya no toca ni el XP ni las monedas.
+ */
 const updateStatsManual = asyncHandler(async (req, res) => {
-    const { hp, xp, coins } = req.body;
-    const user = await User.findById(req.user._id);
+    const { hp } = req.body;
 
-    if (hp !== undefined) {
-        user.hp = Math.max(0, Math.min(user.maxHp, Number(hp) || 0));
-        user.lives = user.hp;
+    if (hp === undefined) {
+        res.status(400);
+        throw new Error('Indica "hp"');
     }
-    if (xp !== undefined) user.currentXP = xp;
-    if (coins !== undefined) user.coins = coins;
+
+    const user = await User.findById(req.user._id);
+    const solicitada = Math.max(0, Math.min(user.maxHp, Number(hp) || 0));
+
+    if (solicitada > (user.hp ?? 0)) {
+        res.status(400);
+        throw new Error('Por aquí solo se puede bajar la vida');
+    }
+
+    user.hp = solicitada;
+    user.lives = solicitada;
 
     await user.save();
     res.json(user);

@@ -1,5 +1,6 @@
 const ShopItem = require('../models/ShopItem');
 const User = require('../models/User');
+const { addRewards } = require('../services/levelService');
 
 /**
  * CATÁLOGO DE LA TIENDA
@@ -259,6 +260,15 @@ const useItem = async (req, res) => {
         let msg = 'Objeto usado';
         let rewardData = null;
 
+        // Gastar una poción de vida teniéndola llena es tirar el dinero, y el
+        // objeto se consumía igual sin decir nada. Se avisa ANTES de gastarla.
+        if (item.category === 'consumable' && item.effectType === 'heal') {
+            const maxHp = user.maxHp || 100;
+            if ((user.hp ?? 0) >= maxHp) {
+                return res.status(400).json({ message: 'Ya tienes la vida al máximo' });
+            }
+        }
+
         // CONSUMIBLES Y COFRES (Se gastan): descuento atómico (🔥 BLINDADO, igual que buyItem)
         // para que dos peticiones simultáneas con el mismo objeto no dupliquen el premio del
         // cofre ni pisen el descuento de cantidad (lost update).
@@ -291,6 +301,32 @@ const useItem = async (req, res) => {
                 { _id: user._id },
                 { $pull: { inventory: { item: itemId, quantity: { $lte: 0 } } } }
             );
+
+            // ⚠️ AQUÍ NO PASABA NADA. El objeto se descontaba del inventario y
+            // se devolvía "Poción usada", pero effectType/effectValue no se leían
+            // en ningún sitio del backend: las tres pociones de vida y las tres
+            // de XP se gastaban SIN efecto. Comprado, consumido y cero.
+            if (item.category === 'consumable' && item.effectValue > 0) {
+                if (item.effectType === 'heal') {
+                    const maxHp = updatedForItem.maxHp || 100;
+                    const hpPrevia = updatedForItem.hp ?? 0;
+                    const hpNueva = Math.min(maxHp, hpPrevia + item.effectValue);
+
+                    // lives va en paralelo a hp en el resto del código; si se deja
+                    // sin tocar queda un número viejo esperando a que alguien lo lea.
+                    await User.updateOne({ _id: user._id }, { $set: { hp: hpNueva, lives: hpNueva } });
+
+                    const curado = hpNueva - hpPrevia;
+                    msg = 'Recuperas ' + curado + ' de vida';
+                    rewardData = { type: 'hp', value: curado };
+                } else if (item.effectType === 'xp') {
+                    // Por addRewards y no con un $inc: el XP puede hacer subir de
+                    // nivel, y eso arrastra vida al máximo y poder del clan.
+                    await addRewards(user._id, item.effectValue, 0, 0);
+                    msg = '+' + item.effectValue + ' XP';
+                    rewardData = { type: 'xp', value: item.effectValue };
+                }
+            }
 
             const updatedUser = await User.findById(user._id).populate('inventory.item');
             return res.json({ message: msg, user: limpiarInventario(updatedUser), reward: rewardData });
