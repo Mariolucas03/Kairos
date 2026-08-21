@@ -49,17 +49,17 @@ body {
     padding-bottom: 0px !important;
 }
 
-/* FOOTER FLOTANTE: la barra se despega del borde inferior. El margen se suma
-   al area segura del movil para no quedar debajo de la barra de gestos. */
+/* FOOTER FLOTANTE: la barra va lo mas abajo posible sin llegar a pegarse. Los
+   4px son solo para que se vea el borde redondeado por debajo; se suman al
+   area segura del movil para no acabar tapada por la barra de gestos. */
 .footer-flotante {
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(4px + env(safe-area-inset-bottom, 0px));
 }
 
-/* PADDING CONTENIDO: Para que el footer no tape el final de la lista al hacer scroll.
-   Sube de 100 a 112 porque la barra ya no esta pegada abajo: ocupa su alto MAS
-   el margen que la separa del borde. */
+/* PADDING CONTENIDO: Para que el footer no tape el final de la lista al hacer
+   scroll. La barra ocupa su alto mas el hueco que la separa del borde. */
 .pb-safe-content {
-    padding-bottom: 112px !important;
+    padding-bottom: 104px !important;
 }
 
 /* --- FIX ZOOM INPUTS IOS --- */
