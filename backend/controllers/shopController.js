@@ -152,9 +152,20 @@ const createCustomReward = async (req, res) => {
         const price = parseInt(req.body.price);
         if (isNaN(price)) return res.status(400).json({ message: 'Precio inválido' });
 
+        // ⚠️ IMPRESORA DE MONEDAS. Solo se comprobaba que fuera un numero, y
+        // buyItem hace $inc: { coins: -item.price } con el filtro coins >= price.
+        // Con precio -5000 el filtro pasa siempre (todo el mundo tiene mas de
+        // -5000) y el $inc SUMA 5000. Una recompensa propia a precio negativo,
+        // comprada en bucle, daba monedas infinitas.
+        if (price < 0) return res.status(400).json({ message: 'El precio no puede ser negativo' });
+        if (price > 1000000) return res.status(400).json({ message: 'Precio demasiado alto' });
+
+        const name = String(req.body.name || '').trim();
+        if (!name) return res.status(400).json({ message: 'Ponle un nombre' });
+
         const newItem = await ShopItem.create({
             user: req.user._id,
-            name: req.body.name,
+            name: name.slice(0, 60),
             price: price,
             category: 'reward',
             icon: '🎟️',
@@ -175,6 +186,10 @@ const buyItem = async (req, res) => {
         // A. Validar ítem
         const item = await ShopItem.findById(itemId);
         if (!item) return res.status(404).json({ message: 'Objeto no encontrado' });
+
+        // Segunda barrera: si por lo que sea existe ya un item con precio
+        // negativo guardado de antes, comprarlo REGALARIA monedas.
+        if (!(item.price >= 0)) return res.status(400).json({ message: 'Objeto con precio invalido' });
 
         const isReward = item.category === 'reward';
         const currencyField = isReward ? 'coins' : 'gameCoins';
