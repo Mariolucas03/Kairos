@@ -18,6 +18,7 @@ const {
     removeFoodFromLog
 } = require('../controllers/foodController');
 const protect = require('../middleware/authMiddleware');
+const { protectCron } = require('../middleware/cronMiddleware');
 
 // 🔥 FIX ARQUITECTÓNICO: Usar memoria en lugar de disco (Ultra rápido para Serverless)
 const upload = multer({
@@ -28,7 +29,9 @@ const upload = multer({
 router.get('/log', protect, getNutritionLog);
 router.post('/add', protect, addFoodEntry);
 router.post('/category', protect, addMealCategory);
-router.post('/seed', protect, seedFoods);
+// Ya devuelve 'Seed desactivado', pero se cierra igual: si algun dia se
+// reactiva, no debe quedar abierto a cualquiera con sesion.
+router.post('/seed', protectCron, seedFoods);
 
 // Le pasamos el multer en memoria
 router.post('/analyze', protect, upload.single('image'), analyzeImage);

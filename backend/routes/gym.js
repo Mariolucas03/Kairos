@@ -28,6 +28,7 @@ const {
 } = require('../controllers/gymController');
 
 const protect = require('../middleware/authMiddleware');
+const { protectCron } = require('../middleware/cronMiddleware');
 
 // 🔥 IMPORTACIONES DE SEGURIDAD NUEVAS
 const validate = require('../middleware/validate');
@@ -70,11 +71,14 @@ router.get('/progress/:name', protect, getExerciseProgressController);
 router.post('/chat-routine', protect, chatRoutineGenerator);
 
 // Utilidades
-router.get('/seed', protect, seedExercises);
+// Mantenimiento del catalogo: va con CRON_SECRET, no con sesion de usuario.
+router.get('/seed', protectCron, seedExercises);
 
 // --- ESTADÍSTICAS Y WIDGETS ---
 router.get('/weekly', protect, getWeeklyStats);
-router.post('/seed-history', protect, seedFakeHistory);
+// Este SI necesita saber a quien le crea el historial falso, asi que lleva
+// las dos cosas: sesion para saber quien eres y secreto para poder usarlo.
+router.post('/seed-history', protect, protectCron, seedFakeHistory);
 router.get('/muscle-progress', protect, getMuscleProgress);
 router.post('/history-stats', protect, getRoutineHistory);
 router.get('/body-status', protect, getBodyStatus);
