@@ -10,6 +10,34 @@ const levelService = require('../services/levelService');
 const { askAI } = require('../services/aiService');
 
 /**
+ * Techos de cordura para lo que manda el movil.
+ *
+ * ⚠️ Las calorias de una sesion se convierten en XP (kcal x 0,5), y en deporte
+ * las que trae el usuario "mandan siempre" sin mirar cuanto valen. Una peticion
+ * con calories: 9999999 daba cinco millones de XP: decenas de niveles de golpe,
+ * la vida al maximo en cada uno y la cima del ranking mensual. Lo mismo por el
+ * otro lado con una duracion enorme, que inflaba la estimacion.
+ *
+ * 15 kcal/min sostenidos ya es ritmo de competicion; por encima de eso lo que
+ * hay es un reloj roto o un dato inventado. Y 10 horas de sesion es un techo que
+ * nadie honesto va a rozar.
+ */
+const MAX_KCAL_POR_MINUTO = 15;
+const MAX_MINUTOS_SESION = 600;
+
+const minutosSeguros = (minutos) => {
+    const n = Number(minutos);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.min(n, MAX_MINUTOS_SESION);
+};
+
+const caloriasSeguras = (kcal, minutos) => {
+    const n = Number(kcal);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.min(Math.round(n), Math.round(minutosSeguros(minutos) * MAX_KCAL_POR_MINUTO));
+};
+
+/**
  * Avisa a los amigos de que acaba de subir un entreno.
  *
  * Es el aviso con mas riesgo de cansar de todos los que hay: alguien con
@@ -456,6 +484,10 @@ const saveWorkoutLog = async (req, res) => {
     try {
         const { routineId, routineName, duration, exercises, intensity, photo } = req.body;
 
+        // Se usa esta y no `duration` a partir de aqui: la que llega del movil
+        // alimenta la estimacion de calorias, y de ahi el XP.
+        const duracionSegura = minutosSeguros(Number(duration) / 60) * 60;
+
         // 📸 La foto llega ya comprimida desde el móvil. Aquí solo validamos:
         // ~400 KB en base64 es el techo, para que la base de datos no se dispare.
         let fotoFinal = '';
@@ -526,7 +558,7 @@ const saveWorkoutLog = async (req, res) => {
         const prompt = `
             Calcula las calorías NETAS quemadas en esta sesión de pesas.
             - Peso Atleta: ${userWeight} kg
-            - Duración: ${Math.floor(duration / 60)} min
+            - Duración: ${Math.floor(duracionSegura / 60)} min
             - Intensidad: ${intensity}
             - Ejercicios:
             ${exercisesDescription}
@@ -541,20 +573,25 @@ const saveWorkoutLog = async (req, res) => {
             validate: (d) => typeof d.calories === 'number' && d.calories > 0
         });
 
+        const durationMin = duracionSegura / 60;
+
         if (ai.ok) {
             caloriesBurned = Math.round(ai.data.calories);
         } else {
             // Plan B determinista: estimación por duración, intensidad y peso
-            const durationMin = duration / 60;
             let factor = 3.5;
             if (intensity === 'Baja') factor = 2.5;
             if (intensity === 'Alta') factor = 6;
             caloriesBurned = Math.round(durationMin * factor * (userWeight / 75));
         }
 
+        // La IA se valida solo con "> 0", y su prompt lleva datos del cliente:
+        // el techo se aplica igual venga de donde venga.
+        caloriesBurned = caloriasSeguras(caloriesBurned, durationMin);
+
         const log = await WorkoutLog.create({
             user: req.user._id, routine: routineId, routineName: routineName || 'Entrenamiento Libre',
-            duration, exercises, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
+            duration: duracionSegura, exercises, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
             photo: fotoFinal,
             musclesWorked: [...principales],
             secondaryMuscles: [...secundarios],
@@ -570,7 +607,7 @@ const saveWorkoutLog = async (req, res) => {
             {
                 $push: {
                     gymWorkouts: {
-                        name: routineName, duration: duration, caloriesBurned: caloriesBurned, intensity: intensity || 'Media',
+                        name: routineName, duration: duracionSegura, caloriesBurned: caloriesBurned, intensity: intensity || 'Media',
                         exercises: exercises.map(ex => ({ name: ex.name, sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps })) })),
                         timestamp: new Date()
                     }
@@ -616,7 +653,7 @@ const saveSportLog = async (req, res) => {
     try {
         const { sportId, name, time, intensity, distance, calories } = req.body;
 
-        const minutos = Number(time) || 0;
+        const minutos = minutosSeguros(time);
         if (minutos <= 0) return res.status(400).json({ message: 'Indica cuántos minutos has entrenado' });
 
         const sport = getSport(sportId);
@@ -632,8 +669,10 @@ const saveSportLog = async (req, res) => {
         let origen;
 
         if (Number(calories) > 0) {
-            // 1º Las que trae el usuario (reloj / pulsómetro): mandan siempre
-            caloriesBurned = Math.round(Number(calories));
+            // 1º Las que trae el usuario (reloj / pulsómetro): mandan, pero con
+            // techo. Un reloj puede discrepar de la fórmula MET; lo que no puede
+            // es decir que has quemado un millón en media hora.
+            caloriesBurned = caloriasSeguras(calories, minutos);
             origen = 'reloj';
         } else {
             const prompt = `Calcula calorías NETAS (sin basal) para:
@@ -989,6 +1028,9 @@ module.exports = {
     // Se exporta para poder sincronizar el catálogo en el arranque del servidor
     // (server.js), y no solo cuando el primer usuario abre la lista.
     syncExerciseCatalog,
+    // Se exportan para poder comprobarlos sueltos: son la barrera entre lo que
+    // manda el movil y el XP que se reparte.
+    minutosSeguros, caloriasSeguras,
     getRoutines, createRoutine, deleteRoutine, updateRoutine, copyWorkoutToRoutine,
     getAllExercises, getExerciseById, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,

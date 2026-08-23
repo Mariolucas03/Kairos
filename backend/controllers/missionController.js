@@ -297,12 +297,36 @@ const deleteMission = asyncHandler(async (req, res) => {
     res.status(200).json({ id: req.params.id, message: "Eliminada" });
 });
 
+/**
+ * Aceptar o rechazar una invitacion a mision cooperativa.
+ *
+ * ⚠️ NO comprobaba de quien era la invitacion. Cogia el missionId del cuerpo y,
+ * con action 'reject', hacia findByIdAndDelete: con la sesion normal y un id
+ * cualquiera, se podian BORRAR las misiones de otra persona una a una. Y con
+ * 'accept' se activaba una mision coop ajena sin haber sido invitado.
+ *
+ * La invitacion vive en el array missionRequests del invitado, asi que eso es
+ * lo que hay que exigir. Se consume con findOneAndUpdate atomico: ademas de
+ * comprobar el permiso, cierra la carrera de dos toques seguidos (aceptar dos
+ * veces, o aceptar y rechazar a la vez).
+ */
 const respondMissionInvite = asyncHandler(async (req, res) => {
     const { missionId, action } = req.body;
     const userId = req.user._id;
     if (!missionId) { res.status(400); throw new Error('Falta ID'); }
+
+    const invitado = await User.findOneAndUpdate(
+        { _id: userId, missionRequests: missionId },
+        { $pull: { missionRequests: missionId } }
+    );
+
+    if (!invitado) {
+        res.status(403);
+        throw new Error('No tienes ninguna invitacion a esa mision');
+    }
+
     const mission = await Mission.findById(missionId);
-    if (!mission) { await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } }); return res.status(404).json({ message: 'No existe' }); }
+    if (!mission) { return res.status(404).json({ message: 'No existe' }); }
     // Quien creo la mision es el que espera respuesta: se le avisa en los dos
     // casos. El rechazo importa incluso mas que la aceptacion, porque la mision
     // se borra y si no se dice, desaparece de su lista sin explicacion.
@@ -314,7 +338,6 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
         if (!mission.contributions) mission.contributions = new Map();
         mission.contributions.set(userId.toString(), 0);
         await mission.save();
-        await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
 
         notificarA(creador, {
             title: '🤝 Misión aceptada',
@@ -326,7 +349,6 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
         res.json({ message: 'Aceptada', mission });
     } else {
         await Mission.findByIdAndDelete(missionId);
-        await User.findByIdAndUpdate(userId, { $pull: { missionRequests: missionId } });
 
         notificarA(creador, {
             title: '🙅 Invitación rechazada',

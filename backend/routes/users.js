@@ -6,7 +6,6 @@ const {
     getMe,
     updateMacros,
     claimDailyReward,
-    addGameReward,
     updatePhysicalStats,
     simulateYesterday,
     setManualStreak,
@@ -21,7 +20,6 @@ const {
 router.get('/', protect, getMe);
 router.put('/macros', protect, updateMacros);
 router.post('/claim-daily', protect, claimDailyReward); // <--- Esta fallaba
-router.post('/reward', protect, addGameReward);
 router.put('/physical-stats', protect, updatePhysicalStats);
 // Ajustes del perfil público: descripción, cuenta privada y modo de gym
 router.put('/profile', protect, updateProfileSettings);

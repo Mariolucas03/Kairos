@@ -204,23 +204,16 @@ const updateProfileSettings = asyncHandler(async (req, res) => {
 // ==========================================
 // 4. RECOMPENSA JUEGOS
 // ==========================================
-const addGameReward = asyncHandler(async (req, res) => {
-    const { coins, xp, gameCoins } = req.body;
-    const result = await levelService.addRewards(
-        req.user._id,
-        Number(xp || 0),
-        Number(coins || 0),
-        Number(gameCoins || 0)
-    );
-
-    res.status(200).json({
-        success: true,
-        user: result.user,
-        leveledUp: result.leveledUp,
-        newBalance: result.user.coins,
-        newGameCoins: result.user.gameCoins
-    });
-});
+/*
+ * ⚠️ AQUI HABIA UN GRIFO ABIERTO: addGameReward / POST /users/reward.
+ *
+ * Cogia coins, xp y gameCoins del CUERPO de la peticion y se los sumaba al
+ * usuario tal cual, con solo estar logueado. Una peticion con 999999 en cada
+ * campo y a correr: la economia entera dependia de que nadie mirara la lista de
+ * rutas. Y no la llamaba nadie, ni el frontend ni el backend: era codigo muerto
+ * de cuando los juegos pagaban desde el cliente. Los juegos cobran y pagan
+ * ahora en el servidor (gamesController), que es donde se decide si has ganado.
+ */
 
 // ==========================================
 // 5. ACTUALIZAR DATOS FÍSICOS
@@ -358,7 +351,6 @@ module.exports = {
     getMe,
     updateMacros,
     claimDailyReward,
-    addGameReward,
     updatePhysicalStats,
     setRedemptionMission,
     reviveUser,
