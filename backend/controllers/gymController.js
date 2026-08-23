@@ -31,6 +31,64 @@ const minutosSeguros = (minutos) => {
     return Math.min(n, MAX_MINUTOS_SESION);
 };
 
+/**
+ * Limpia las series que llegan del movil.
+ *
+ * ⚠️ No se validaba NADA. Y el volumen (kg x reps) de estas series es lo que
+ * decide el rango muscular, que es el premio grande del gimnasio: hasta 1.350
+ * monedas por escalon y unas 54.000 sumando los nueve de los ocho grupos. Una
+ * sola serie inventada de 999.999 kg x 999.999 reps subia los ocho grupos al
+ * maximo de golpe y vaciaba la tienda. De paso ensuciaba las marcas personales,
+ * las graficas de volumen y el 1RM para siempre, porque el historial no se
+ * recalcula: se acumula.
+ *
+ * Los topes son generosos a proposito: 500 kg pasa por encima del record
+ * mundial de sentadilla, y 200 repeticiones de una serie no las hace nadie. Lo
+ * que cae fuera de ahi no es un entreno.
+ */
+// 1000 kg y no 500: en la base ya hay un registro real de 543 kg, que en prensa
+// de piernas es de lo mas normal. Un tope de 500 habria recortado en silencio un
+// entreno de verdad. Da igual ser generoso aqui: quien manda numeros inventados
+// choca contra el techo de volumen de la sesion, que es el que protege el rango.
+const MAX_PESO_KG = 1000;
+const MAX_REPS = 200;
+const MAX_SERIES = 30;
+const MAX_EJERCICIOS = 50;
+
+// Los topes por serie NO bastan por si solos: 500 kg y 200 reps son creibles
+// por separado, pero su producto no lo hace nadie, y con 50 ejercicios de 30
+// series se llegaba a 150 millones de volumen. El rango maximo (Leyenda) pide
+// 1.000.000, asi que una sola sesion seguia subiendo los ocho grupos de golpe.
+// 100.000 por sesion ya es una barbaridad honesta: cien series de 100 kg x 10.
+const MAX_VOLUMEN_SESION = 100000;
+
+const volumenDe = (ejercicios) => ejercicios.reduce(
+    (total, ex) => total + (ex.sets || []).reduce((t, s) => t + (s.weight || 0) * (s.reps || 0), 0),
+    0
+);
+
+const ejerciciosSeguros = (lista) => {
+    if (!Array.isArray(lista)) return [];
+
+    return lista.slice(0, MAX_EJERCICIOS).map(ex => {
+        const sets = Array.isArray(ex?.sets) ? ex.sets.slice(0, MAX_SERIES) : [];
+
+        return {
+            ...ex,
+            name: String(ex?.name || '').trim().slice(0, 120),
+            sets: sets.map(set => {
+                const peso = Number(set?.weight);
+                const reps = Number(set?.reps);
+                return {
+                    ...set,
+                    weight: Number.isFinite(peso) ? Math.min(Math.max(peso, 0), MAX_PESO_KG) : 0,
+                    reps: Number.isFinite(reps) ? Math.min(Math.max(Math.round(reps), 0), MAX_REPS) : 0
+                };
+            })
+        };
+    }).filter(ex => ex.name);
+};
+
 const caloriasSeguras = (kcal, minutos) => {
     const n = Number(kcal);
     if (!Number.isFinite(n) || n <= 0) return 0;
@@ -484,9 +542,21 @@ const saveWorkoutLog = async (req, res) => {
     try {
         const { routineId, routineName, duration, exercises, intensity, photo } = req.body;
 
-        // Se usa esta y no `duration` a partir de aqui: la que llega del movil
-        // alimenta la estimacion de calorias, y de ahi el XP.
+        // Se usan estas y no `duration`/`exercises` a partir de aqui: lo que
+        // llega del movil alimenta las calorias (y de ahi el XP) y el volumen
+        // (y de ahi el rango muscular, que paga monedas).
         const duracionSegura = minutosSeguros(Number(duration) / 60) * 60;
+        const ejercicios = ejerciciosSeguros(exercises);
+
+        // El volumen de esta sesion decide el rango muscular, y el rango paga
+        // monedas. Por encima de este techo no hay entreno posible: hay alguien
+        // mandando numeros a mano.
+        const volumenSesion = volumenDe(ejercicios);
+        if (volumenSesion > MAX_VOLUMEN_SESION) {
+            return res.status(400).json({
+                message: 'Esos pesos y repeticiones no cuadran con un entreno real. Revisalos.'
+            });
+        }
 
         // 📸 La foto llega ya comprimida desde el móvil. Aquí solo validamos:
         // ~400 KB en base64 es el techo, para que la base de datos no se dispare.
@@ -503,7 +573,7 @@ const saveWorkoutLog = async (req, res) => {
 
         // 💪 Músculos trabajados: se derivan EN EL SERVIDOR desde el catálogo,
         // no de lo que diga el cliente (que podría mentir para inflar rangos).
-        const nombres = (exercises || []).map(e => (e.name || '').toLowerCase());
+        const nombres = ejercicios.map(e => (e.name || '').toLowerCase());
         const fichas = await Exercise.find({
             $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
         }).select('name muscle secondary').lean();
@@ -523,7 +593,7 @@ const saveWorkoutLog = async (req, res) => {
         // ejercicio ANTES de guardar este log (si no, el propio entreno sería su
         // propio récord). Solo cuenta si ya había marca previa: la primera vez
         // que haces un ejercicio no es una mejora, es un punto de partida.
-        const nombresReales = (exercises || []).map(e => e.name).filter(Boolean);
+        const nombresReales = ejercicios.map(e => e.name).filter(Boolean);
         const marcasPrevias = await WorkoutLog.aggregate([
             { $match: { user: req.user._id, 'exercises.name': { $in: nombresReales } } },
             { $unwind: '$exercises' },
@@ -535,7 +605,7 @@ const saveWorkoutLog = async (req, res) => {
         marcasPrevias.forEach(m => { maxPrevio[m._id] = m.max || 0; });
 
         const records = [];
-        (exercises || []).forEach(ex => {
+        ejercicios.forEach(ex => {
             const sets = ex.sets || [];
             if (!sets.length) return;
             const mejor = sets.reduce((a, s) => (s.weight > a.weight ? s : a), sets[0]);
@@ -550,7 +620,7 @@ const saveWorkoutLog = async (req, res) => {
 
         let caloriesBurned = 0;
 
-        const exercisesDescription = exercises.map(ex => {
+        const exercisesDescription = ejercicios.map(ex => {
             const setsDesc = ex.sets.map(s => `${s.weight}kg x ${s.reps}`).join(', ');
             return `- ${ex.name}: [${setsDesc}]`;
         }).join('\n');
@@ -591,7 +661,7 @@ const saveWorkoutLog = async (req, res) => {
 
         const log = await WorkoutLog.create({
             user: req.user._id, routine: routineId, routineName: routineName || 'Entrenamiento Libre',
-            duration: duracionSegura, exercises, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
+            duration: duracionSegura, exercises: ejercicios, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
             photo: fotoFinal,
             musclesWorked: [...principales],
             secondaryMuscles: [...secundarios],
@@ -608,7 +678,7 @@ const saveWorkoutLog = async (req, res) => {
                 $push: {
                     gymWorkouts: {
                         name: routineName, duration: duracionSegura, caloriesBurned: caloriesBurned, intensity: intensity || 'Media',
-                        exercises: exercises.map(ex => ({ name: ex.name, sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps })) })),
+                        exercises: ejercicios.map(ex => ({ name: ex.name, sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps })) })),
                         timestamp: new Date()
                     }
                 }
@@ -1030,7 +1100,7 @@ module.exports = {
     syncExerciseCatalog,
     // Se exportan para poder comprobarlos sueltos: son la barrera entre lo que
     // manda el movil y el XP que se reparte.
-    minutosSeguros, caloriasSeguras,
+    minutosSeguros, caloriasSeguras, ejerciciosSeguros, volumenDe, MAX_VOLUMEN_SESION,
     getRoutines, createRoutine, deleteRoutine, updateRoutine, copyWorkoutToRoutine,
     getAllExercises, getExerciseById, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,
