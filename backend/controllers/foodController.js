@@ -260,20 +260,41 @@ const addMealCategory = async (req, res) => {
 };
 
 // 🟢 FIX: AÑADIR ALIMENTO DE FORMA 100% ATÓMICA
+/**
+ * Convierte a numero lo que llega del movil, o devuelve 0.
+ *
+ * ⚠️ Antes se hacia Number(calories) a pelo y el resultado iba directo a un
+ * $inc de los totales del dia. Number('abc') es NaN, y $inc con NaN NO da
+ * error: deja totalCalories en NaN para siempre, y a partir de ahi el resumen
+ * del dia, las macros y el widget de comida no vuelven a mostrar un numero
+ * nunca mas. Es el mismo fallo que ya se cerro en los juegos.
+ *
+ * El tope existe por lo mismo: un alimento de 10 millones de kcal no es un
+ * alimento, y deja el dia igual de inservible.
+ */
+const numeroSeguro = (valor, maximo = 100000) => {
+    const n = Number(valor);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.min(n, maximo);
+};
+
 const addFoodToLog = async (req, res) => {
     try {
         const { mealId } = req.params;
         const { name, calories, protein, carbs, fat, fiber, quantity } = req.body;
         const today = getTodayStr();
 
+        const nombre = String(name || '').trim().slice(0, 120);
+        if (!nombre) return res.status(400).json({ message: 'El alimento necesita un nombre' });
+
         const newFood = {
-            name,
-            calories: Number(calories),
-            protein: Number(protein || 0),
-            carbs: Number(carbs || 0),
-            fat: Number(fat || 0),
-            fiber: Number(fiber || 0),
-            quantity: Number(quantity || 1)
+            name: nombre,
+            calories: numeroSeguro(calories),
+            protein: numeroSeguro(protein, 5000),
+            carbs: numeroSeguro(carbs, 5000),
+            fat: numeroSeguro(fat, 5000),
+            fiber: numeroSeguro(fiber, 5000),
+            quantity: numeroSeguro(quantity, 1000) || 1
         };
 
         // Operación atómica de MongoDB: Push al array e incremento de totales matemáticos EN UN SOLO PASO.
@@ -377,14 +398,16 @@ const saveCustomFood = async (req, res) => {
     try {
         const { name, calories, protein, carbs, fat, fiber, servingSize, folder } = req.body;
 
+        // Por el mismo filtro que el resto: lo que se guarda hoy es lo que se
+        // sumara manana a los totales del dia.
         const newFood = await Food.create({
             user: req.user._id,
-            name,
-            calories,
-            protein,
-            carbs,
-            fat,
-            fiber: fiber || 0,
+            name: String(name || '').trim().slice(0, 120),
+            calories: numeroSeguro(calories),
+            protein: numeroSeguro(protein, 5000),
+            carbs: numeroSeguro(carbs, 5000),
+            fat: numeroSeguro(fat, 5000),
+            fiber: numeroSeguro(fiber, 5000),
             servingSize: servingSize || '1 ración',
             icon: '🍽️',
             folder: folder || 'General'
@@ -402,7 +425,34 @@ const deleteSavedFood = async (req, res) => {
 
 const updateSavedFood = async (req, res) => {
     try {
-        const updated = await Food.findOneAndUpdate({ _id: req.params.id, user: req.user._id }, req.body, { new: true });
+        // ⚠️ Antes se pasaba req.body ENTERO al update. Eso deja al cliente
+        // escribir cualquier campo del esquema, incluido `user`: mandando el id
+        // de otra persona, el alimento cambiaba de dueno. Se escribe solo lo que
+        // tiene sentido editar, y los numeros pasan por el mismo filtro que el
+        // resto para no meter NaN en la ficha.
+        const cambios = {};
+        const { name, servingSize, folder, icon } = req.body;
+
+        if (name !== undefined) cambios.name = String(name).trim().slice(0, 120);
+        if (servingSize !== undefined) cambios.servingSize = String(servingSize).slice(0, 40);
+        if (folder !== undefined) cambios.folder = String(folder).slice(0, 60);
+        if (icon !== undefined) cambios.icon = String(icon).slice(0, 8);
+
+        for (const campo of ['calories', 'protein', 'carbs', 'fat', 'fiber']) {
+            if (req.body[campo] !== undefined) cambios[campo] = numeroSeguro(req.body[campo]);
+        }
+
+        if (Object.keys(cambios).length === 0) {
+            return res.status(400).json({ message: 'Nada que actualizar' });
+        }
+
+        const updated = await Food.findOneAndUpdate(
+            { _id: req.params.id, user: req.user._id },
+            { $set: cambios },
+            { new: true }
+        );
+
+        if (!updated) return res.status(404).json({ message: 'Alimento no encontrado' });
         res.json(updated);
     } catch (error) { res.status(500).json({ message: 'Error actualizando' }); }
 };

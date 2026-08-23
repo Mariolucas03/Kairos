@@ -191,8 +191,21 @@ const updateProgress = asyncHandler(async (req, res) => {
     // findOneAndUpdate va con upsert, podía crear un DailyLog fantasma con fecha mala.
     const todayStr = getMadridDateString();
 
-    // Resetear hábitos si es un nuevo día
+    // Resetear hábitos si es un nuevo día.
+    //
+    // ⚠️ Esto reiniciaba CUALQUIER hábito completado en cuanto cambiaba el día,
+    // sin mirar su frecuencia. Un hábito semanal, mensual o anual se completaba,
+    // cobraba, y al día siguiente volvía a estar disponible y volvía a cobrar.
+    // Con los multiplicadores de frecuencia eso es serio: uno anual + épico +
+    // coop paga 2.625 monedas, y el objeto más caro de la tienda cuesta 4.000.
+    //
+    // Los ciclos largos los reinicia el mantenimiento nocturno cuando de verdad
+    // toca (processCycle), que es quien sabe si el ciclo se ha cerrado.
     if (mission.type === 'habit' && mission.completed) {
+        if (mission.frequency !== 'daily') {
+            return res.status(200).json({ message: 'Ya completada en este ciclo', alreadyCompleted: true });
+        }
+
         const last = new Date(mission.lastUpdated);
         if (last.toDateString() === today.toDateString()) {
             return res.status(200).json({ message: 'Ya completada hoy', alreadyCompleted: true });

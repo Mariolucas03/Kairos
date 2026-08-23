@@ -398,10 +398,21 @@ const kickMember = asyncHandler(async (req, res) => {
     const requester = await User.findById(req.user._id);
     const target = await User.findById(memberId);
 
-    if (!requester.clan || requester.clan.toString() !== target.clan?.toString()) throw new Error('Error de validación');
+    // Sin esto, un id que no existe reventaba en target.clan y salia un 500
+    // generico en vez de decir que pasa.
+    if (!target) { res.status(404); throw new Error('Ese usuario no existe'); }
+    if (target._id.toString() === requester._id.toString()) { res.status(400); throw new Error('Para salirte del clan usa abandonar'); }
+
+    if (!requester.clan || requester.clan.toString() !== target.clan?.toString()) {
+        res.status(403);
+        throw new Error('No estais en el mismo clan');
+    }
 
     const ranks = { 'esclavo': 0, 'recluta': 1, 'guerrero': 2, 'rey': 3, 'dios': 4 };
-    if (ranks[requester.clanRank] <= ranks[target.clanRank]) throw new Error('Rango insuficiente para expulsar');
+    if (ranks[requester.clanRank] <= ranks[target.clanRank]) {
+        res.status(403);
+        throw new Error('Rango insuficiente para expulsar');
+    }
 
     const powerToSubtract = (target.level || 1) * 100;
 
