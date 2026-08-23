@@ -19,7 +19,7 @@ const shopRoutes = require('./routes/shop');
 const clanRoutes = require('./routes/clans');
 const challengeRoutes = require('./routes/challenges');
 const pushRoutes = require('./routes/push');
-const eventRoutes = require('./routes/eventRoutes');
+// const eventRoutes = require('./routes/eventRoutes'); // ver mas abajo
 const cronRoutes = require('./routes/cron');
 const gamesRoutes = require('./routes/games');
 const { syncExerciseCatalog } = require('./controllers/gymController');
@@ -95,7 +95,16 @@ app.use('/api/shop', shopRoutes);
 app.use('/api/clans', clanRoutes);
 app.use('/api/challenges', challengeRoutes);
 app.use('/api/push', pushRoutes);
-app.use('/api/events', eventRoutes);
+// ⚠️ DESCONECTADO. /api/events es codigo huerfano: el frontend no lo llama, no
+// lo lee nadie mas en el backend y su coleccion esta vacia (0 documentos). El
+// evento semanal de clan que SI funciona vive en clanController, y ese calcula
+// los puntos desde los entrenos reales.
+//
+// Se desconecta porque add-points deja que el propio cliente se sume hasta
+// 10.000 puntos por llamada. Hoy no paga nada, asi que no da dinero; el dia que
+// alguien enganche una recompensa a esos puntos, el grifo ya estaria abierto.
+// Los ficheros se quedan para cuando se retome la funcion.
+// app.use('/api/events', eventRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/games', gamesRoutes);
 
