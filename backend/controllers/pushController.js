@@ -165,16 +165,24 @@ const testPush = asyncHandler(async (req, res) => {
  *   { todos: true }             a todo el que tenga notificaciones activadas
  *   { title, body, url }        que se manda (url opcional, por defecto /home)
  */
-const adminSendPush = asyncHandler(async (req, res) => {
+/**
+ * Envio manual de una notificacion, con informe de a quien llego.
+ *
+ * Vive suelta y no dentro del controlador porque entran DOS caminos: la ruta
+ * protegida con CRON_SECRET (para llamarla desde fuera) y el panel de
+ * administracion (con sesion de admin). Duplicar el envio seria la forma segura
+ * de que un dia uno de los dos se quede atras.
+ *
+ * Devuelve { codigo, cuerpo } en vez de escribir en la respuesta, para que cada
+ * ruta lo suelte como quiera.
+ */
+const enviarNotificacionManual = async ({ username, userId, todos, title, body, url } = {}) => {
     if (!PUSH_CONFIGURADO) {
-        return res.status(503).json({ ok: false, mensaje: 'Faltan las claves VAPID en el servidor.' });
+        return { codigo: 503, cuerpo: { ok: false, mensaje: 'Faltan las claves VAPID en el servidor.' } };
     }
 
-    const { username, userId, todos, title, body, url } = req.body || {};
-
     if (!title || !body) {
-        res.status(400);
-        throw new Error('Hacen falta "title" y "body"');
+        return { codigo: 400, cuerpo: { ok: false, mensaje: 'Hacen falta "title" y "body"' } };
     }
 
     let destinatarios = [];
@@ -194,12 +202,11 @@ const adminSendPush = asyncHandler(async (req, res) => {
             .select('username pushSubscriptions');
         if (encontrado) destinatarios = [encontrado];
     } else {
-        res.status(400);
-        throw new Error('Indica "username", "userId" o "todos": true');
+        return { codigo: 400, cuerpo: { ok: false, mensaje: 'Indica "username", "userId" o "todos": true' } };
     }
 
     if (destinatarios.length === 0) {
-        return res.status(404).json({ ok: false, mensaje: 'No se encontro a nadie con notificaciones activadas.' });
+        return { codigo: 404, cuerpo: { ok: false, mensaje: 'No se encontro a nadie con notificaciones activadas.' } };
     }
 
     const payload = { title, body, url: url || '/home' };
@@ -227,11 +234,19 @@ const adminSendPush = asyncHandler(async (req, res) => {
 
     const total = informe.reduce((acc, i) => acc + i.entregadas, 0);
 
-    res.json({
-        ok: total > 0,
-        mensaje: 'Entregada en ' + total + ' dispositivo(s) de ' + destinatarios.length + ' usuario(s).',
-        informe
-    });
+    return {
+        codigo: 200,
+        cuerpo: {
+            ok: total > 0,
+            mensaje: 'Entregada en ' + total + ' dispositivo(s) de ' + destinatarios.length + ' usuario(s).',
+            informe
+        }
+    };
+};
+
+const adminSendPush = asyncHandler(async (req, res) => {
+    const { codigo, cuerpo } = await enviarNotificacionManual(req.body || {});
+    res.status(codigo).json(cuerpo);
 });
 
 /**
@@ -252,4 +267,4 @@ const notificarA = async (userId, payload) => {
     }
 };
 
-module.exports = { subscribeToPush, sendPushToUser, notificarA, testPush, adminSendPush };
+module.exports = { subscribeToPush, sendPushToUser, notificarA, testPush, adminSendPush, enviarNotificacionManual };

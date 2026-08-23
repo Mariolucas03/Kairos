@@ -84,6 +84,7 @@ app.use('/api', async (req, res, next) => {
 
 // --- 2. DEFINICIÓN DE ENDPOINTS ---
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/users', userRoutes);
 app.use('/api/daily', dailyRoutes);
 app.use('/api/gym', gymRoutes);

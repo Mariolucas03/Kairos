@@ -51,6 +51,22 @@ const userSchema = new mongoose.Schema({
     // permite lanzar el aviso y pagar el premio una sola vez.
     muscleRanks: { type: Map, of: Number, default: undefined },
 
+    // --- Administracion ---
+    // No existia ningun concepto de administrador: no habia forma de banear a
+    // nadie ni de borrar un comentario ajeno. Se pone a mano con
+    // `node backend/scripts/hacer-admin.js --usuario <nombre>`, nunca desde la
+    // app: un endpoint que reparta permisos de administrador es justo el que no
+    // debe existir.
+    isAdmin: { type: Boolean, default: false },
+
+    // Cuenta suspendida. `activo` en false (y no borrar el objeto) para que
+    // quede el registro de por que se suspendio y cuando.
+    baneado: {
+        activo: { type: Boolean, default: false },
+        motivo: { type: String, default: '' },
+        fecha: { type: Date }
+    },
+
     hp: { type: Number, default: 100 },
     maxHp: { type: Number, default: 100 },
     lives: { type: Number, default: 100 },

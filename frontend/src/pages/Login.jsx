@@ -26,6 +26,16 @@ export default function Login() {
         }
     }, [navigate]);
 
+    // Si la sesión se cortó por una suspensión, aquí es donde se dice. Echar a
+    // alguien sin explicarle por qué solo genera un mensaje preguntando qué pasó.
+    useEffect(() => {
+        const motivo = localStorage.getItem('motivoBaneo');
+        if (motivo) {
+            setError(motivo);
+            localStorage.removeItem('motivoBaneo');
+        }
+    }, []);
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
         if (error) setError(null);

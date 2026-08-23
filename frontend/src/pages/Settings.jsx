@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Lock, Globe, LogOut, Save, Loader2,
-    Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff
+    Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff, Shield
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -83,6 +83,24 @@ export default function Settings() {
                     <SettingsIcon size={20} className="text-yellow-500" /> Ajustes
                 </h1>
             </div>
+
+            {/* Acceso al panel de administracion. Solo aparece si lo eres: para
+                el resto de usuarios esta pantalla no existe. */}
+            {user?.isAdmin && (
+                <button
+                    onClick={() => navigate('/admin')}
+                    className="w-full bg-[#0a0a0c] border border-yellow-500/30 rounded-[24px] p-4 flex items-center gap-4 mb-6 active:scale-[0.99] transition-transform"
+                >
+                    <div className="p-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/40 text-yellow-500">
+                        <Shield size={18} />
+                    </div>
+                    <div className="flex-1 text-left">
+                        <p className="font-bold text-sm text-white">Panel de administración</p>
+                        <p className="text-[10px] text-zinc-500 mt-0.5">Usuarios, avisos y moderación</p>
+                    </div>
+                    <ChevronRight size={18} className="text-zinc-600" />
+                </button>
+            )}
 
             {/* --- TU PERFIL --- */}
             <section className="mb-6">

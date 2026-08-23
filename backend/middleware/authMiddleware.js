@@ -29,6 +29,18 @@ const protect = asyncHandler(async (req, res, next) => {
                 throw new Error('Usuario no encontrado en base de datos');
             }
 
+            // La suspension se comprueba AQUI y no en cada ruta: cortar en el
+            // unico sitio por el que pasan todas es lo que garantiza que no
+            // queda una puerta abierta por olvido.
+            if (req.user.baneado?.activo) {
+                return res.status(403).json({
+                    baneado: true,
+                    message: req.user.baneado.motivo
+                        ? 'Cuenta suspendida: ' + req.user.baneado.motivo
+                        : 'Cuenta suspendida'
+                });
+            }
+
             // 🔥 FIX: ACTUALIZACIÓN INTELIGENTE DEL "LAST ACTIVE"
             // Solo escribimos en la BD si han pasado más de 5 minutos desde su última acción
             const now = new Date();

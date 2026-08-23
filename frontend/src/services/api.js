@@ -62,6 +62,17 @@ api.interceptors.response.use(
             localStorage.removeItem('user');
             window.location.href = '/login';
         }
+
+        // Cuenta suspendida: se corta la sesion igual que con un 401, pero
+        // dejando el motivo escrito para que el login lo pueda enseñar. Echar a
+        // alguien sin decirle por que solo genera un mensaje preguntando que
+        // paso.
+        if (error.response?.status === 403 && error.response.data?.baneado) {
+            localStorage.setItem('motivoBaneo', error.response.data.message || 'Cuenta suspendida');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
         return Promise.reject(error);
     }
 );
