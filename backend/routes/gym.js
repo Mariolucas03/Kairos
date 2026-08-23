@@ -29,6 +29,7 @@ const {
 
 const protect = require('../middleware/authMiddleware');
 const { protectCron } = require('../middleware/cronMiddleware');
+const aiLimiter = require('../middleware/aiLimiter');
 
 // 🔥 IMPORTACIONES DE SEGURIDAD NUEVAS
 const validate = require('../middleware/validate');
@@ -68,7 +69,7 @@ router.get('/progress/:name', protect, getExerciseProgressController);
 // Generador de rutinas con IA.
 // La función existía en el controlador pero NUNCA se enrutó: el endpoint
 // devolvía "Cannot POST", así que la feature era inalcanzable.
-router.post('/chat-routine', protect, chatRoutineGenerator);
+router.post('/chat-routine', protect, aiLimiter, chatRoutineGenerator);
 
 // Utilidades
 // Mantenimiento del catalogo: va con CRON_SECRET, no con sesion de usuario.

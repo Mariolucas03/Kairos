@@ -88,9 +88,13 @@ const chatMacroCalculator = async (req, res) => {
 // 🪄 ANALIZAR TEXTO DE COMIDA (CASCADA IA)
 // ==========================================
 const analyzeFoodText = async (req, res) => {
-    const { text } = req.body;
+    // ⚠️ El texto se mete DENTRO del prompt y no tenia limite de tamano. Con un
+    // cuerpo de peticion de hasta 1 MB, cada llamada podia costar una fortuna en
+    // tokens de la cuenta del duenno de la app. Una descripcion de comida no
+    // necesita mas de 300 caracteres.
+    const text = String(req.body.text || '').trim().slice(0, 300);
 
-    if (!text || !text.trim()) return res.status(400).json({ message: 'Escribe qué has comido' });
+    if (!text) return res.status(400).json({ message: 'Escribe qué has comido' });
 
     const SYSTEM_PROMPT = `
     Eres un experto nutricionista y analista de alimentos.
@@ -152,7 +156,8 @@ const analyzeImage = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: 'No hay imagen' });
 
-        const userContext = req.body.context || "Sin contexto extra.";
+        // Mismo motivo que en analyzeFoodText: esto acaba dentro del prompt.
+        const userContext = String(req.body.context || "").trim().slice(0, 300) || "Sin contexto extra.";
 
         // Leemos directamente de la RAM (req.file.buffer), sin tocar disco
         const imageDataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;

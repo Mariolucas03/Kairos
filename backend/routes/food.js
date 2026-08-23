@@ -19,6 +19,7 @@ const {
 } = require('../controllers/foodController');
 const protect = require('../middleware/authMiddleware');
 const { protectCron } = require('../middleware/cronMiddleware');
+const aiLimiter = require('../middleware/aiLimiter');
 
 // 🔥 FIX ARQUITECTÓNICO: Usar memoria en lugar de disco (Ultra rápido para Serverless)
 const upload = multer({
@@ -34,7 +35,7 @@ router.post('/category', protect, addMealCategory);
 router.post('/seed', protectCron, seedFoods);
 
 // Le pasamos el multer en memoria
-router.post('/analyze', protect, upload.single('image'), analyzeImage);
+router.post('/analyze', protect, aiLimiter, upload.single('image'), analyzeImage);
 
 // RUTAS DE GUARDADO Y BÚSQUEDA
 router.post('/log/:mealId', protect, addFoodToLog);
@@ -42,7 +43,7 @@ router.delete('/log/:mealId/:foodItemId', protect, removeFoodFromLog); // Asegur
 router.get('/search', protect, searchFoods);
 
 // RUTA NUEVA IA TEXTO
-router.post('/analyze-text', protect, analyzeFoodText);
+router.post('/analyze-text', protect, aiLimiter, analyzeFoodText);
 
 // Mis Comidas
 router.get('/saved', protect, getSavedFoods);
@@ -51,6 +52,6 @@ router.delete('/saved/:id', protect, deleteSavedFood);
 router.put('/saved/:id', protect, updateSavedFood);
 
 // Chat Perfil
-router.post('/chat-macros', protect, chatMacroCalculator);
+router.post('/chat-macros', protect, aiLimiter, chatMacroCalculator);
 
 module.exports = router;

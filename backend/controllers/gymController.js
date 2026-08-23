@@ -1060,7 +1060,9 @@ const getBodyStatus = async (req, res) => {
 };
 
 const chatRoutineGenerator = async (req, res) => {
-    const { prompt } = req.body;
+    // Lo que escribe el usuario acaba dentro del prompt: sin tope, cada peticion
+    // podia arrastrar hasta 1 MB de texto a la cuenta de IA.
+    const prompt = String(req.body.prompt || '').trim().slice(0, 300);
 
     const SYSTEM_PROMPT = `
     Eres un Entrenador Personal de Élite. TU OBJETIVO: Crear una rutina basada en: "${prompt}".
