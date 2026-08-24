@@ -185,9 +185,15 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                 onConfirm={borrarPublicacion}
             />
         )}
-        // Publicación a sangre, sin marco ni esquinas: ocupa todo el ancho de la
-        // pantalla. Entre una y otra queda una banda oscura rematada por una
-        // línea clara, para que se vea de un vistazo dónde acaba cada una.
+        {/* Publicación a sangre, sin marco ni esquinas: ocupa todo el ancho de la
+            pantalla. Entre una y otra queda una banda oscura rematada por una
+            línea clara, para que se vea de un vistazo dónde acaba cada una.
+
+            ⚠️ Va con llaves. Antes era un comentario normal de JavaScript y
+            funcionaba porque estaba fuera del JSX; al envolver el componente para
+            añadir el diálogo de borrar quedó DENTRO, y ahí un comentario así no
+            es un comentario: es texto, y se pintaba entre publicación y
+            publicación. */}
         <article className="-mx-4 pb-4 mb-4 border-b-4 border-white/20">
             {/* CABECERA */}
             <div className="flex items-center gap-3 px-4 py-3">

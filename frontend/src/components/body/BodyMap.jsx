@@ -103,14 +103,24 @@ function Figura({ view, getFill, onSelectMuscle, marcado }) {
                                     Al tocar una zona solo cambiaba un texto debajo:
                                     en un cuerpo lleno de colores no habia forma de
                                     saber cual habias dado. El trazo va SIN relleno y
-                                    encima, para no alterar el color de la zona. */}
+                                    encima, para no alterar el color de la zona.
+
+                                    ⚠️ El color NO puede ser blanco, que es lo que
+                                    era: el propio dibujo del cuerpo ya lleva lineas
+                                    blancas y el rango Plata es casi blanco (#cbd5e1),
+                                    asi que la marca se perdia justo encima de los
+                                    musculos mas trabajados. Este rosa no lo usa
+                                    ningun rango —van del gris al rojo pasando por
+                                    marron, dorado, cian, azul y morado—, asi que no
+                                    se puede confundir con un nivel: si lo ves, es lo
+                                    que acabas de tocar. */}
                                 {esteMarcado && paths.map((d, i) => (
                                     <path
                                         key={'marca-' + i}
                                         d={d}
                                         fill="none"
-                                        stroke="#ffffff"
-                                        strokeWidth="2.5"
+                                        stroke="#ff2d95"
+                                        strokeWidth="3.5"
                                         strokeLinejoin="round"
                                         className="animate-pulse"
                                         style={{ vectorEffect: 'non-scaling-stroke' }}
