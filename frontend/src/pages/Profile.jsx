@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Lock, MapPin, LogOut } from 'lucide-react';
 import api from '../services/api';
@@ -22,7 +22,16 @@ import WeeklyWidget from '../components/widgets/WeeklyWidget';
 import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
 
 import RPGBody from '../components/profile/RPGBody';
-import ProfileStats from '../components/profile/ProfileStats';
+// Las graficas usan recharts, que son 338 kB: mas que el resto de la app junta.
+// Cargandolo aparte, el perfil ABRE al momento y la grafica aparece un instante
+// despues, en vez de dejar la pantalla en blanco esperando a la libreria.
+const ProfileStats = lazy(() => import('../components/profile/ProfileStats'));
+
+// Hueco del tamano aproximado de la grafica, para que no salte el contenido
+// cuando termina de cargar.
+const CargandoGrafica = ({ alto = 180 }) => (
+    <div className="w-full rounded-[24px] bg-[#0a0a0c] border border-white/[0.07] animate-pulse" style={{ height: alto }} />
+);
 import { getMadridDateString } from '../utils/dateHelpers';
 
 // 🔥 IMPORTAMOS ZUSTAND
@@ -173,7 +182,7 @@ export default function Profile() {
     return (
         <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none bg-black">
             <div className="flex flex-col gap-4 mb-8">
-                <ProfileStats mini={true} onClick={() => setOpenStrength(true)} />
+                <Suspense fallback={<CargandoGrafica alto={140} />}><ProfileStats mini={true} onClick={() => setOpenStrength(true)} /></Suspense>
                 <div className="relative w-full h-[160px] rounded-[32px] overflow-hidden border border-zinc-800 group bg-zinc-900">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
                         <Lock className="text-zinc-500 mb-2" size={32} />
@@ -216,7 +225,7 @@ export default function Profile() {
 
             {openStrength && (
                 <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="w-full max-w-2xl relative z-10"><ProfileStats onCloseExternal={() => setOpenStrength(false)} /></div>
+                    <div className="w-full max-w-2xl relative z-10"><Suspense fallback={<CargandoGrafica alto={320} />}><ProfileStats onCloseExternal={() => setOpenStrength(false)} /></Suspense></div>
                 </div>
             )}
         </div>

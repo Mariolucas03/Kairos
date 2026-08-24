@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import confetti from 'canvas-confetti';
 import { X, Lock, Zap, Heart, Loader2 } from 'lucide-react';
 import { getRewardForDay } from '../../utils/rewardsGenerator';
 
@@ -20,22 +19,34 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
     } = data;
 
     // --- EFECTO DE CONFETI ---
+    //
+    // La libreria se carga AQUI dentro y no arriba con el resto de imports. El
+    // confeti solo se ve al reclamar la recompensa, pero al importarlo arriba
+    // viajaba dentro del paquete inicial: todo el mundo se lo descargaba al
+    // abrir la app, incluido quien nunca abre esta ventana.
     useEffect(() => {
         if (!isViewOnly) {
+            let interval;
+            let cancelado = false;
             const duration = 3000;
             const animationEnd = Date.now() + duration;
             const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 20000 };
             const randomInRange = (min, max) => Math.random() * (max - min) + min;
 
-            const interval = setInterval(function () {
-                const timeLeft = animationEnd - Date.now();
-                if (timeLeft <= 0) return clearInterval(interval);
-                const particleCount = 50 * (timeLeft / duration);
-                confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#a855f7', '#3b82f6', '#ffffff'] });
-                confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#a855f7', '#3b82f6', '#ffffff'] });
-            }, 250);
+            import('canvas-confetti').then(({ default: confetti }) => {
+                // Si la ventana se cerro mientras se descargaba, no se lanza nada
+                if (cancelado) return;
 
-            return () => clearInterval(interval);
+                interval = setInterval(function () {
+                    const timeLeft = animationEnd - Date.now();
+                    if (timeLeft <= 0) return clearInterval(interval);
+                    const particleCount = 50 * (timeLeft / duration);
+                    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#a855f7', '#3b82f6', '#ffffff'] });
+                    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#a855f7', '#3b82f6', '#ffffff'] });
+                }, 250);
+            }).catch(() => { /* sin confeti no pasa nada: la recompensa se reclama igual */ });
+
+            return () => { cancelado = true; clearInterval(interval); };
         }
     }, [isViewOnly]);
 
