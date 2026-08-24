@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const SystemState = require('../models/SystemState');
 
 /**
  * SERVICIO ÚNICO DE IA
@@ -65,6 +66,60 @@ const TIMEOUT_VISION_EXTRA = 6000;
 // mensaje arrastra toda la conversación anterior a la cuota de IA.
 const MAX_MENSAJES_HISTORIAL = 10;
 const MAX_CARACTERES_MENSAJE = 800;
+
+/**
+ * TECHO DURO DE LLAMADAS AL DÍA (toda la app junta).
+ *
+ * Los dos proveedores son de nivel gratuito y ninguno puede cobrar sin que
+ * alguien active la facturación a mano. Pero "no puede pasar" y "no va a pasar"
+ * no son lo mismo cuando hay una tarjeta de por medio en algún sitio, así que
+ * esto es la red de seguridad: pasado el tope, la app deja de llamar a la IA por
+ * su cuenta y usa el plan B, que ya existe y funciona.
+ *
+ * No es por usuario, es el total del día. El límite por usuario (40 cada 15
+ * minutos) evita que uno solo se lo coma todo; este evita que entre todos se
+ * pase de la cuenta.
+ *
+ * Se cambia sin tocar código con la variable MAX_IA_DIA en Render.
+ */
+const MAX_LLAMADAS_DIA = Number(process.env.MAX_IA_DIA) || 300;
+
+const claveDeHoy = () => {
+    // Fecha en Madrid, igual que el resto de la app
+    const f = new Date().toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' }).split('/');
+    return 'ia-llamadas-' + f[2] + '-' + f[1] + '-' + f[0];
+};
+
+/**
+ * Suma una llamada al contador del día y dice si se puede seguir.
+ *
+ * El contador vive en SystemState (la misma tabla que usa el mantenimiento
+ * nocturno) y se incrementa de forma atómica, así que dos peticiones a la vez
+ * no pueden colarse por encima del tope.
+ */
+const quedaCuota = async () => {
+    try {
+        const clave = claveDeHoy();
+        const doc = await SystemState.findOneAndUpdate(
+            { key: clave },
+            { $inc: { contador: 1 }, $set: { updatedAt: new Date() } },
+            { upsert: true, new: true }
+        );
+
+        const usadas = doc?.contador || 1;
+
+        if (usadas === MAX_LLAMADAS_DIA + 1) {
+            console.warn('🛑 Alcanzado el tope diario de IA (' + MAX_LLAMADAS_DIA + '). El resto del día se usa el plan B.');
+        }
+
+        return usadas <= MAX_LLAMADAS_DIA;
+    } catch (error) {
+        // Si el contador falla, NO se bloquea la IA: un fallo de la base no debe
+        // apagar una función que si acaso costaria una llamada de mas.
+        console.warn('No se pudo contar la llamada de IA:', error.message);
+        return true;
+    }
+};
 
 // ──────────────────────────────────────────────────────────────────────────
 //  PROVEEDOR 1: GOOGLE (GEMINI)
@@ -236,6 +291,10 @@ const limpiarMensajes = (messages) => {
  * NUNCA lanza: devuelve { ok:false } para que quien llama aplique su plan B.
  */
 const runCascade = async ({ cascada, system, messages, json, temperature, validate, imageDataUrl, extraTimeout = 0 }) => {
+    if (!(await quedaCuota())) {
+        return { ok: false, data: null, text: '', model: null, proveedor: null, sinCuota: true };
+    }
+
     for (const { proveedor, modelo } of cascada) {
         const llamar = PROVEEDORES[proveedor];
         const timeout = (proveedor === 'gemini' ? TIMEOUT_GEMINI : TIMEOUT_OPENROUTER) + extraTimeout;

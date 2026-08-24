@@ -15,6 +15,9 @@ const mongoose = require('mongoose');
 const systemStateSchema = new mongoose.Schema({
     key: { type: String, required: true, unique: true, index: true },
     value: { type: String, default: '' },
+    // Contador numerico. Lo usa el techo diario de llamadas a la IA, que necesita
+    // sumar de forma atomica y no le sirve un campo de texto.
+    contador: { type: Number, default: 0 },
     updatedAt: { type: Date, default: Date.now }
 });
 
