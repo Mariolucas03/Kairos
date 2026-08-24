@@ -199,7 +199,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             try {
                 const exerciseNames = exercises.map(e => e.name);
-                const res = await api.post('/gym/history-stats', { exercises: exerciseNames });
+                // Se manda la rutina para que el servidor pueda ademas proponer
+                // que peso toca hoy en cada ejercicio.
+                const res = await api.post('/gym/history-stats', { exercises: exerciseNames, routineId: routine._id });
                 const historyData = res.data;
 
                 setExercises(prev => prev.map(ex => {
@@ -212,6 +214,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     if (isClean && stats.lastSets && stats.lastSets.length > 0) {
                         newSetsData = ex.setsData.map((set, index) => {
                             const historySet = stats.lastSets[index] || stats.lastSets[stats.lastSets.length - 1];
+                            // La sugerencia manda sobre el historial: el historial dice
+                            // lo que hiciste, la sugerencia lo que toca hoy. Sigue
+                            // siendo editable, que para eso es una sugerencia.
+                            const sugerida = stats.sugerencia;
+                            if (sugerida) return { ...set, kg: sugerida.peso, reps: sugerida.reps };
                             if (historySet) return { ...set, kg: historySet.weight, reps: historySet.reps };
                             return set;
                         });

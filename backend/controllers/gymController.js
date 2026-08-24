@@ -8,6 +8,7 @@ const levelService = require('../services/levelService');
 
 // 🔥 Toda la IA pasa por el servicio único (una sola cascada de modelos gratis)
 const { askAI } = require('../services/aiService');
+const { sugerirSiguiente } = require('../services/progresionService');
 
 /**
  * Techos de cordura para lo que manda el movil.
@@ -1038,6 +1039,21 @@ const getRoutineHistory = async (req, res) => {
             .sort({ date: 1 })
             .lean();
 
+        // Si se manda la rutina, se puede ademas PROPONER la siguiente sesion de
+        // cada ejercicio: sin ella solo sabemos que hiciste, no que toca hoy.
+        let configPorEjercicio = {};
+        if (req.body?.routineId) {
+            const rutina = await Routine.findOne({ _id: req.body.routineId, user: userId })
+                .select('exercises').lean();
+            for (const ex of (rutina?.exercises || [])) {
+                configPorEjercicio[ex.name] = {
+                    progresion: ex.progresion,
+                    incremento: ex.incremento,
+                    reps: ex.reps
+                };
+            }
+        }
+
         logs.forEach(log => {
             log.exercises.forEach(ex => {
                 if (exercises.includes(ex.name)) {
@@ -1060,9 +1076,21 @@ const getRoutineHistory = async (req, res) => {
             });
         });
 
+        // La sugerencia se calcula al final, cuando ya tenemos las ultimas series
+        // de cada ejercicio. Va DENTRO del mismo endpoint y no en uno aparte para
+        // no obligar al movil a hacer dos viajes justo al empezar a entrenar,
+        // que es cuando el servidor gratuito peor responde.
+        for (const nombre of Object.keys(stats)) {
+            const config = configPorEjercicio[nombre];
+            if (!config) continue;
+            const sugerencia = sugerirSiguiente(config, stats[nombre].lastSets);
+            if (sugerencia) stats[nombre].sugerencia = sugerencia;
+        }
+
         res.json(stats);
 
     } catch (error) {
+        console.error('Error obteniendo historial:', error);
         res.status(500).json({ message: 'Error obteniendo historial' });
     }
 };

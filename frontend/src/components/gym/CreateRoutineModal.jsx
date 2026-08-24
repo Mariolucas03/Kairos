@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play, Clock, PersonStanding, MoveHorizontal, Link2 } from 'lucide-react';
+import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play, Clock, PersonStanding, MoveHorizontal, Link2, TrendingUp } from 'lucide-react';
+
+// Sistemas de progresion, con la explicacion que se ve al elegir. El texto
+// importa: "doble" no le dice nada a nadie sin la frase de al lado.
+const PROGRESIONES = [
+    { valor: 'ninguna', texto: 'Manual', ayuda: 'Sin sugerencia: lo decides tú' },
+    { valor: 'lineal', texto: 'Lineal', ayuda: 'Sube el peso cada vez que completas todas las series' },
+    { valor: 'doble', texto: 'Doble', ayuda: 'Primero sube repeticiones hasta el tope, y solo entonces el peso' },
+    { valor: 'greyskull', texto: 'Greyskull', ayuda: 'Como lineal, pero si fallas baja un 10% y vuelves a subir' }
+];
 import api from '../../services/api';
 import ExerciseSelector from './ExerciseSelector';
 import ExerciseSheet from './ExerciseSheet';
@@ -114,6 +123,13 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         if (campo === 'esPorTiempo' && nuevos[index].esPorTiempo) nuevos[index].porLado = false;
         if (campo === 'porLado' && nuevos[index].porLado) nuevos[index].esPorTiempo = false;
 
+        setAddedExercises(nuevos);
+    };
+
+    /** Sistema de progresion e incremento por ejercicio. */
+    const cambiarProgresion = (index, campo, valor) => {
+        const nuevos = [...addedExercises];
+        nuevos[index] = { ...nuevos[index], [campo]: valor };
         setAddedExercises(nuevos);
     };
 
@@ -379,6 +395,39 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                 <Icono size={10} /> {texto}
                                             </button>
                                         ))}
+
+                                        {/* PROGRESION: que peso toca la proxima vez */}
+                                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black border border-zinc-800">
+                                            <TrendingUp size={10} className={ex.progresion && ex.progresion !== 'ninguna' ? 'text-yellow-500' : 'text-zinc-600'} />
+                                            <select
+                                                value={ex.progresion || 'ninguna'}
+                                                onChange={(e) => cambiarProgresion(idx, 'progresion', e.target.value)}
+                                                title={PROGRESIONES.find(p => p.valor === (ex.progresion || 'ninguna'))?.ayuda}
+                                                className="bg-transparent text-[9px] font-black uppercase text-zinc-400 outline-none cursor-pointer"
+                                            >
+                                                {PROGRESIONES.map(p => (
+                                                    <option key={p.valor} value={p.valor} className="bg-zinc-900">{p.texto}</option>
+                                                ))}
+                                            </select>
+
+                                            {/* Cuanto sube. Solo tiene sentido si hay progresion. */}
+                                            {ex.progresion && ex.progresion !== 'ninguna' && (
+                                                <>
+                                                    <span className="text-[9px] text-zinc-700">+</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0.5"
+                                                        max="20"
+                                                        step="0.5"
+                                                        value={ex.incremento ?? 2.5}
+                                                        onChange={(e) => cambiarProgresion(idx, 'incremento', parseFloat(e.target.value) || 2.5)}
+                                                        title="Cuánto sube cada vez. En ejercicios pequeños (curl, elevaciones) baja a 1"
+                                                        className="w-7 bg-transparent text-center text-[10px] font-black text-yellow-500 outline-none"
+                                                    />
+                                                    <span className="text-[8px] text-zinc-600">kg</span>
+                                                </>
+                                            )}
+                                        </div>
 
                                         {/* Superserie: misma letra = van seguidos sin descanso */}
                                         <div
