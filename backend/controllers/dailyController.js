@@ -122,4 +122,66 @@ const getWeightHistory = asyncHandler(async (req, res) => {
     res.status(200).json(logs);
 });
 
-module.exports = { getDailyLog, getDailyLogByDate, updateDailyLog, getWeightHistory };
+/**
+ * Mapa de actividad de los últimos meses, un cuadradito por día.
+ *
+ * Devuelve solo lo justo para pintarlo —fecha y nivel de 0 a 4— y no los
+ * registros enteros: son ~180 documentos con entrenos, comidas y misiones
+ * dentro, y mandarlos completos para colorear cuadraditos es varios cientos de
+ * kilobytes por una pantalla que se mira dos segundos.
+ *
+ * El nivel mezcla las tres cosas que cuentan como "hoy hice algo": entrenar,
+ * completar misiones y registrar comida. Un mapa que solo mirara los entrenos
+ * dejaría en blanco los días de descanso en los que sí cumpliste todo lo demás,
+ * que es justo lo contrario de lo que anima a seguir.
+ *
+ * @route GET /api/daily/actividad?dias=180
+ */
+const getActividad = asyncHandler(async (req, res) => {
+    const dias = Math.min(Math.max(parseInt(req.query.dias) || 180, 30), 400);
+
+    const desde = new Date();
+    desde.setDate(desde.getDate() - dias);
+    const desdeStr = getMadridDateString(desde);
+
+    // ⚠️ La nutricion se lee de NutritionLog y NO del campo copiado dentro de
+    // DailyLog: ese solo se rellena al crear el dia y despues nadie lo vuelve a
+    // tocar, asi que al probarlo con datos reales el mapa daba 12 dias activos a
+    // alguien que tenia 47 dias con comida registrada. Un mapa de constancia que
+    // se deja fuera dos tercios de lo que hiciste desanima en vez de animar.
+    const [registros, nutricion] = await Promise.all([
+        DailyLog.find({ user: req.user._id, date: { $gte: desdeStr } })
+            .select('date missionStats gymWorkouts sportWorkouts').lean(),
+        NutritionLog.find({ user: req.user._id, date: { $gte: desdeStr } })
+            .select('date totalCalories').lean()
+    ]);
+
+    const kcalPorDia = {};
+    for (const n of nutricion) kcalPorDia[n.date] = n.totalCalories || 0;
+
+    const mapa = registros.map(r => {
+        const entrenos = (r.gymWorkouts?.length || 0) + (r.sportWorkouts?.length || 0);
+        const misiones = r.missionStats?.completed || 0;
+        const comio = (kcalPorDia[r.date] || 0) > 0;
+
+        // Un entreno pesa más que una misión suelta: es lo que de verdad cuesta.
+        let puntos = entrenos * 2 + misiones + (comio ? 1 : 0);
+
+        return {
+            fecha: r.date,
+            nivel: puntos === 0 ? 0 : Math.min(4, Math.ceil(puntos / 2)),
+            entrenos,
+            misiones
+        };
+    }).filter(d => d.nivel > 0);
+
+    res.json({
+        desde: desdeStr,
+        dias,
+        activos: mapa.length,
+        mapa
+    });
+});
+
+module.exports = {
+    getActividad, getDailyLog, getDailyLogByDate, updateDailyLog, getWeightHistory };

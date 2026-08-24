@@ -41,6 +41,14 @@ const routineSchema = new mongoose.Schema({
     // 🔥 CAMPO NUEVO: Guardar el color elegido
     color: { type: String, default: 'blue' },
 
+    // Días de la semana en que toca esta rutina (0 = domingo ... 6 = sábado).
+    // Vacío = sin día fijo, se hace cuando se quiera.
+    //
+    // Se usa la MISMA numeración que las misiones (specificDays) y que
+    // Date.getDay(). Tener dos convenciones de días en la misma app es la forma
+    // más silenciosa de que algo salga el día equivocado.
+    dias: { type: [Number], default: [] },
+
     // Descanso general de la rutina, en segundos.
     // ⚠️ Faltaba en el esquema: el frontend lo enviaba desde el principio pero
     // Mongoose (modo strict) lo descartaba sin avisar, así que el descanso que

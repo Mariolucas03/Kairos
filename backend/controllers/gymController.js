@@ -241,17 +241,23 @@ const getRoutines = async (req, res) => {
     }
 };
 
+/** Dias de la semana que llegan del cliente: enteros 0-6, sin repetir. */
+const diasSeguros = (lista) => Array.isArray(lista)
+    ? [...new Set(lista.map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6))]
+    : [];
+
 const createRoutine = async (req, res) => {
     try {
         // `difficulty` se escribía aquí pero NO existe en el esquema de Routine,
         // así que Mongoose lo descartaba en silencio... y además nadie lo leía
         // en ninguna pantalla. Se elimina en vez de añadirlo: era campo muerto.
-        const { name, exercises, color, defaultRest } = req.body;
+        const { name, exercises, color, defaultRest, dias } = req.body;
         const routine = await Routine.create({
             user: req.user._id,
             name,
             color: color || 'blue',
             exercises,
+            dias: diasSeguros(dias),
             // El descanso lo enviaba el frontend pero aquí se ignoraba
             defaultRest: parseInt(defaultRest) || 60
         });
@@ -263,7 +269,7 @@ const createRoutine = async (req, res) => {
 
 const updateRoutine = async (req, res) => {
     try {
-        const { name, exercises, color } = req.body;
+        const { name, exercises, color, defaultRest, dias } = req.body;
         let routine = await Routine.findById(req.params.id);
         if (!routine) return res.status(404).json({ message: 'Rutina no encontrada' });
         if (routine.user.toString() !== req.user.id) return res.status(401).json({ message: 'No autorizado' });
@@ -271,6 +277,10 @@ const updateRoutine = async (req, res) => {
         routine.name = name || routine.name;
         routine.exercises = exercises || routine.exercises;
         if (color) routine.color = color;
+        // Los dias y el descanso tambien se editan: antes se mandaban desde la
+        // pantalla de editar y aqui se tiraban a la basura en silencio.
+        if (dias !== undefined) routine.dias = diasSeguros(dias);
+        if (defaultRest !== undefined) routine.defaultRest = parseInt(defaultRest) || routine.defaultRest;
 
         const updatedRoutine = await routine.save();
         res.json(updatedRoutine);

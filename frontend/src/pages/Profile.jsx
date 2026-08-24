@@ -29,6 +29,10 @@ const ProfileStats = lazy(() => import('../components/profile/ProfileStats'));
 
 // Hueco del tamano aproximado de la grafica, para que no salte el contenido
 // cuando termina de cargar.
+// El mapa de constancia es ligero (solo fechas y niveles), asi que va directo y
+// no en carga diferida como las graficas.
+const MapaActividad = lazy(() => import('../components/profile/MapaActividad'));
+
 const CargandoGrafica = ({ alto = 180 }) => (
     <div className="w-full rounded-[24px] bg-[#0a0a0c] border border-white/[0.07] animate-pulse" style={{ height: alto }} />
 );
@@ -183,6 +187,10 @@ export default function Profile() {
         <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none bg-black">
             <div className="flex flex-col gap-4 mb-8">
                 <Suspense fallback={<CargandoGrafica alto={140} />}><ProfileStats mini={true} onClick={() => setOpenStrength(true)} /></Suspense>
+
+                <div className="mt-3">
+                    <Suspense fallback={<CargandoGrafica alto={190} />}><MapaActividad /></Suspense>
+                </div>
                 <div className="relative w-full h-[160px] rounded-[32px] overflow-hidden border border-zinc-800 group bg-zinc-900">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
                         <Lock className="text-zinc-500 mb-2" size={32} />

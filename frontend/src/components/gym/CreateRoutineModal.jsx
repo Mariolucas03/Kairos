@@ -4,6 +4,14 @@ import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash
 
 // Sistemas de progresion, con la explicacion que se ve al elegir. El texto
 // importa: "doble" no le dice nada a nadie sin la frase de al lado.
+// Domingo primero para que coincida con Date.getDay(), pero se PINTA empezando
+// en lunes, que es como se lee una semana aquí.
+const DIAS = [
+    { valor: 1, letra: 'L' }, { valor: 2, letra: 'M' }, { valor: 3, letra: 'X' },
+    { valor: 4, letra: 'J' }, { valor: 5, letra: 'V' }, { valor: 6, letra: 'S' },
+    { valor: 0, letra: 'D' }
+];
+
 const PROGRESIONES = [
     { valor: 'ninguna', texto: 'Manual', ayuda: 'Sin sugerencia: lo decides tú' },
     { valor: 'lineal', texto: 'Lineal', ayuda: 'Sube el peso cada vez que completas todas las series' },
@@ -38,6 +46,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
     const [routineName, setRoutineName] = useState('');
     const [routineColor, setRoutineColor] = useState(PALETA_RUTINAS[10]);
     const [restTime, setRestTime] = useState(60); // 🔥 FIX PUNTO 14: Tiempo descanso
+    const [dias, setDias] = useState([]);
     const [addedExercises, setAddedExercises] = useState([]);
 
     // Estados UI
@@ -59,6 +68,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             setRoutineColor(aHex(routineToEdit.color));
             // Si la rutina guardada tenía descanso personalizado, lo cargamos, si no 60
             setRestTime(routineToEdit.defaultRest || 60);
+            setDias(routineToEdit.dias || []);
         }
     }, [routineToEdit]);
 
@@ -165,6 +175,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             const payload = {
                 name: routineName,
                 color: routineColor,
+                dias,
                 exercises: addedExercises,
                 defaultRest: parseInt(restTime) || 60 // 🔥 ENVIAMOS EL DESCANSO AL BACKEND
             };
@@ -228,6 +239,33 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                             onChange={(e) => setRoutineName(e.target.value)}
                             className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-white font-black text-lg focus:border-yellow-500 outline-none transition-colors placeholder:text-zinc-700 uppercase"
                         />
+                    </div>
+
+                    {/* QUE DIAS TOCA */}
+                    <div>
+                        <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest">
+                            ¿Qué días toca?
+                        </label>
+                        <p className="text-[10px] text-zinc-600 mb-2 ml-1 leading-tight">
+                            Opcional. Si marcas días, la rutina aparecerá destacada como
+                            <span className="text-zinc-400"> lo que toca hoy</span> en la pantalla de Gym.
+                        </p>
+                        <div className="flex gap-1.5">
+                            {DIAS.map(({ valor, letra }) => {
+                                const activo = dias.includes(valor);
+                                return (
+                                    <button
+                                        key={valor}
+                                        onClick={() => setDias(prev => activo ? prev.filter(d => d !== valor) : [...prev, valor])}
+                                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase border transition-colors ${activo
+                                            ? 'bg-yellow-500 text-black border-yellow-500'
+                                            : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}
+                                    >
+                                        {letra}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* 🔥 FIX PUNTO 14: INPUT DESCANSO */}

@@ -120,6 +120,12 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLock
                         <h4 className="font-black text-white text-[17px] uppercase tracking-[-0.03em] leading-none truncate not-italic">{routine.name}</h4>
                         <p className="mt-2 text-[9px] font-black uppercase tracking-[0.08em] not-italic" style={{ color: isLocked ? acento : '#71717a' }}>
                             {routine.exercises.length} Ejercicios{isLocked && ' · En curso'}
+                            {/* Si la rutina tiene dias asignados y hoy es uno de ellos,
+                                se dice aqui. Es la diferencia entre abrir la app y
+                                acordarte de que tocaba, o abrirla y que te lo diga. */}
+                            {!isLocked && (routine.dias || []).includes(new Date().getDay()) && (
+                                <span className="text-yellow-500"> · Hoy toca</span>
+                            )}
                         </p>
                     </div>
                 </div>

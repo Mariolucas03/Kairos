@@ -5,7 +5,8 @@ const {
     getDailyLog,
     updateDailyLog,
     getDailyLogByDate,
-    getWeightHistory
+    getWeightHistory,
+    getActividad
 } = require('../controllers/dailyController');
 
 const protect = require('../middleware/authMiddleware');
@@ -17,5 +18,8 @@ router.get('/', protect, checkStreak, getDailyLog);
 router.put('/', protect, updateDailyLog);
 router.get('/specific', protect, getDailyLogByDate);
 router.get('/history', protect, getWeightHistory);
+
+// Mapa de actividad para el calendario de cuadraditos
+router.get('/actividad', protect, getActividad);
 
 module.exports = router;
