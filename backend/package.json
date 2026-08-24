@@ -4,7 +4,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "lint": "eslint . --quiet",
+    "lint:avisos": "eslint ."
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -24,6 +26,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "eslint": "^9.39.5",
     "nodemon": "^2.0.22"
   }
 }
