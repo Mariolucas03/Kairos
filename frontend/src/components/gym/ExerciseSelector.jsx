@@ -3,6 +3,7 @@ import useSWR from 'swr';
 import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Play } from 'lucide-react';
 import api from '../../services/api';
 import ExerciseSheet from './ExerciseSheet';
+import { MUSCLES_OF_GROUP } from '../body/bodyPaths';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -40,6 +41,15 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     const [showCreate, setShowCreate] = useState(false);
     const [nuevoNombre, setNuevoNombre] = useState('');
     const [nuevoGrupo, setNuevoGrupo] = useState('Pecho');
+
+    // ⚠️ Esto FALTABA. Se usaba mas abajo en dos sitios sin declararlo en
+    // ninguno, asi que crear un ejercicio a mano tiraba la pantalla entera con
+    // "especificosDelGrupo is not defined".
+    //
+    // Se quita el musculo que se llama igual que el grupo (Pecho -> Pecho): en
+    // esos grupos no hay nada mas concreto que elegir, y el propio codigo de
+    // abajo ya solo pinta el selector si la lista tiene algo.
+    const especificosDelGrupo = (MUSCLES_OF_GROUP[nuevoGrupo] || []).filter(m => m !== nuevoGrupo);
     // Músculo concreto dentro del grupo ('' = todo el grupo)
     const [nuevoDetalle, setNuevoDetalle] = useState('');
     const [nuevoSecundarios, setNuevoSecundarios] = useState([]);

@@ -87,7 +87,14 @@ const carpetaDeComida = (mealName = '') => {
 };
 
 // --- COMPONENTE PRINCIPAL ---
-export default function FoodSearchModal({ mealId, onClose, onFoodAddedOptimistic, onBackgroundSync, onShowToast }) {
+export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAddedOptimistic, onBackgroundSync, onShowToast }) {
+    // ⚠️ Esta linea FALTABA y tiraba la pantalla entera al pulsar el + para
+    // anadir comida: "Can't find variable: carpetaDestino". Se usaba en seis
+    // sitios del componente sin declararla en ninguno, y la funcion de arriba
+    // (carpetaDeComida), escrita justo para esto, no se llamaba nunca. Ademas
+    // Food.jsx ya pasaba mealName, pero el componente no lo recogia.
+    const carpetaDestino = carpetaDeComida(mealName);
+
     // Se entra directamente al escáner: es lo que más se usa y antes había que
     // buscar la pestaña a mano cada vez.
     const [mode, setMode] = useState('ai');
