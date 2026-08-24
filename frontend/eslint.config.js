@@ -1,4 +1,5 @@
 import reactHooks from 'eslint-plugin-react-hooks';
+import react from 'eslint-plugin-react';
 
 /**
  * REVISOR AUTOMÁTICO DE CÓDIGO
@@ -44,7 +45,7 @@ export default [
             globals: globalesDelNavegador,
             parserOptions: { ecmaFeatures: { jsx: true } }
         },
-        plugins: { 'react-hooks': reactHooks },
+        plugins: { 'react-hooks': reactHooks, react },
         rules: {
             // --- LO QUE PARA EL DESPLIEGUE (fallos que revientan la pantalla) ---
             'no-undef': 'error',              // el de las seis pantallas rotas
@@ -63,6 +64,20 @@ export default [
             'no-self-assign': 'error',
             'no-dupe-else-if': 'error',
             'no-duplicate-case': 'error',
+
+            // ⚠️ SIN ESTO, ESLint NO CUENTA <Router /> como un uso de Router.
+            //
+            // Y eso no es un detalle: con la configuracion anterior, TODOS los
+            // componentes que solo se usan dentro de JSX salian como "no se usa".
+            // Eran 643 avisos, casi todos falsos. Al intentar limpiarlos en
+            // automatico se borraron los imports de Router, Routes, Layout, Home
+            // y Login de App.jsx: la app entera dejaba de arrancar, y el build
+            // seguia dando codigo 0 porque eso revienta al ABRIRLA, no al
+            // construirla. Se restauro sin llegar a subirse.
+            //
+            // Estas dos reglas marcan como usado lo que aparece en JSX.
+            'react/jsx-uses-vars': 'error',
+            'react/jsx-uses-react': 'error',
 
             // --- LO QUE SOLO AVISA (huele mal, pero no rompe nada) ---
             'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_' }],
