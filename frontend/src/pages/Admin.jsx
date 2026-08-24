@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Shield, Ban, Undo2, Trash2, Send, Loader2, Users, MessageSquare } from 'lucide-react';
+import { Shield, Ban, Undo2, Trash2, Send, Loader2, Users, MessageSquare, KeyRound, Copy } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import BackButton from '../components/common/BackButton';
@@ -31,6 +31,10 @@ export default function Admin() {
     const [toast, setToast] = useState(null);
     const [enVuelo, setEnVuelo] = useState(false);
     const [confirmar, setConfirmar] = useState(null);
+
+    // Clave temporal recien generada. Se ensena UNA vez: el servidor no la
+    // guarda en claro y no hay forma de volver a consultarla.
+    const [claveNueva, setClaveNueva] = useState(null);
 
     // Formulario de aviso
     const [destino, setDestino] = useState('todos');
@@ -72,6 +76,17 @@ export default function Admin() {
         } finally { setEnVuelo(false); }
     };
 
+    const restablecerClave = async (u) => {
+        if (enVuelo) return;
+        setEnVuelo(true);
+        try {
+            const r = await api.post('/admin/restablecer-clave', { userId: u._id });
+            setClaveNueva({ usuario: r.data.usuario, clave: r.data.temporal });
+        } catch (e) {
+            avisar(e.response?.data?.message || 'No se pudo restablecer', 'error');
+        } finally { setEnVuelo(false); }
+    };
+
     const mandarAviso = () => {
         if (!titulo.trim() || !texto.trim()) return avisar('Ponle título y texto', 'error');
         const cuerpo = destino === 'todos'
@@ -97,6 +112,37 @@ export default function Admin() {
                     onCancel={() => setConfirmar(null)}
                     onConfirm={() => { const f = confirmar.accion; setConfirmar(null); accion(f); }}
                 />
+            )}
+
+            {/* La clave temporal se ensena aqui y en ningun sitio mas */}
+            {claveNueva && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setClaveNueva(null)} />
+                    <div className="relative z-10 w-full max-w-xs bg-[#0a0a0c] border border-yellow-500/40 rounded-[24px] p-6 text-center">
+                        <KeyRound size={32} className="text-yellow-500 mx-auto mb-3" />
+                        <p className="text-white font-bold text-sm mb-1">Clave nueva de {claveNueva.usuario}</p>
+                        <p className="text-[10px] text-zinc-500 mb-4">
+                            Apúntala ahora: no se puede volver a ver. Pásasela y que la cambie él.
+                        </p>
+                        <p className="text-yellow-500 text-2xl font-black tracking-[0.2em] bg-black rounded-xl py-3 mb-4 select-all">
+                            {claveNueva.clave}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { navigator.clipboard?.writeText(claveNueva.clave); avisar('Copiada'); }}
+                                className="flex-1 py-3 bg-zinc-800 text-zinc-200 rounded-xl font-bold text-xs active:scale-95 transition-transform flex items-center justify-center gap-2"
+                            >
+                                <Copy size={14} /> Copiar
+                            </button>
+                            <button
+                                onClick={() => setClaveNueva(null)}
+                                className="flex-1 py-3 bg-yellow-500 text-black rounded-xl font-black text-xs active:scale-95 transition-transform"
+                            >
+                                Hecho
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <div className="flex items-center gap-3 mb-6">
@@ -153,6 +199,20 @@ export default function Admin() {
                                         <p className="text-[10px] text-red-400/80 mt-1 italic">"{u.baneado.motivo}"</p>
                                     )}
                                 </div>
+
+                                <button
+                                    onClick={() => setConfirmar({
+                                        title: 'Nueva clave para ' + u.username,
+                                        message: 'Se genera una contraseña temporal. La actual dejará de funcionar.',
+                                        confirmLabel: 'Generar',
+                                        accion: async () => { await restablecerClave(u); return { data: {} }; }
+                                    })}
+                                    disabled={enVuelo}
+                                    className="shrink-0 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-yellow-500 active:scale-95 transition-transform"
+                                    title="Restablecer contraseña"
+                                >
+                                    <KeyRound size={16} />
+                                </button>
 
                                 {!u.isAdmin && (
                                     u.baneado ? (

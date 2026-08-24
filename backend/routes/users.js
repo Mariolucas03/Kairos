@@ -13,7 +13,8 @@ const {
     setRedemptionMission,
     reviveUser,
     updateStatsManual,
-    updateProfileSettings
+    updateProfileSettings,
+    borrarMiCuenta
 } = require('../controllers/userController');
 
 // Rutas base: /api/users
@@ -23,6 +24,9 @@ router.post('/claim-daily', protect, claimDailyReward); // <--- Esta fallaba
 router.put('/physical-stats', protect, updatePhysicalStats);
 // Ajustes del perfil público: descripción, cuenta privada y modo de gym
 router.put('/profile', protect, updateProfileSettings);
+
+// Irse del todo: pide la contrasena en el cuerpo para confirmar
+router.delete('/me', protect, borrarMiCuenta);
 
 // Rutas Game Over
 router.post('/set-redemption-mission', protect, setRedemptionMission);

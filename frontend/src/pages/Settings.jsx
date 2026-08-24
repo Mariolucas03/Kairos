@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Lock, Globe, LogOut, Save, Loader2,
-    Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff, Shield
+    Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff, Shield, Trash2, FileText
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -35,6 +35,11 @@ export default function Settings() {
     const [toast, setToast] = useState(null);
     const [confirmLogout, setConfirmLogout] = useState(false);
 
+    // Borrado de cuenta: pide la contrasena, porque no hay vuelta atras
+    const [borrando, setBorrando] = useState(false);
+    const [claveBorrado, setClaveBorrado] = useState('');
+    const [enCurso, setEnCurso] = useState(false);
+
     // Cargamos los valores actuales del usuario al entrar
     useEffect(() => {
         if (!user) return;
@@ -49,6 +54,19 @@ export default function Settings() {
         !!user.isPrivate !== isPrivate ||
         SECCIONES.some(s => visActual[s.key] !== visibility[s.key])
     );
+
+    const handleBorrarCuenta = async () => {
+        if (enCurso) return;
+        setEnCurso(true);
+        try {
+            await api.delete('/users/me', { data: { password: claveBorrado } });
+            localStorage.clear();
+            window.location.href = '/login';
+        } catch (e) {
+            setToast({ message: e.response?.data?.message || 'No se pudo borrar', type: 'error' });
+            setEnCurso(false);
+        }
+    };
 
     const handleSave = async () => {
         if (saving) return;
@@ -243,6 +261,76 @@ export default function Settings() {
                     onConfirm={handleLogout}
                 />
             )}
+
+            {/* --- LEGAL Y ZONA PELIGROSA --- */}
+            <section className="mt-8">
+                <button
+                    onClick={() => navigate('/privacidad')}
+                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 mb-6 active:scale-[0.99] transition-transform"
+                >
+                    <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
+                        <FileText size={18} />
+                    </div>
+                    <div className="flex-1 text-left">
+                        <p className="font-bold text-sm text-white">Privacidad</p>
+                        <p className="text-[10px] text-zinc-500 mt-0.5">Qué se guarda de ti y quién lo ve</p>
+                    </div>
+                    <ChevronRight size={18} className="text-zinc-600" />
+                </button>
+
+                <h2 className="text-[10px] font-black text-red-500/70 uppercase tracking-widest mb-3 ml-1">Zona peligrosa</h2>
+
+                {!borrando ? (
+                    <button
+                        onClick={() => setBorrando(true)}
+                        className="w-full bg-[#0a0a0c] border border-red-500/20 rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
+                    >
+                        <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
+                            <Trash2 size={18} />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="font-bold text-sm text-red-400">Borrar mi cuenta</p>
+                            <p className="text-[10px] text-zinc-500 mt-0.5">Se borra todo y no se puede recuperar</p>
+                        </div>
+                    </button>
+                ) : (
+                    <div className="bg-[#0a0a0c] border border-red-500/30 rounded-[24px] p-5">
+                        <p className="text-white font-bold text-sm mb-2">¿Seguro del todo?</p>
+                        <p className="text-zinc-400 text-xs leading-relaxed mb-4">
+                            Se borran tus entrenos, comidas, fotos, rutinas, misiones y amistades.
+                            También tus comentarios y "me gusta" en las publicaciones de otros.
+                            <strong className="text-red-400"> No hay forma de recuperarlo.</strong>
+                        </p>
+
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                            Escribe tu contraseña para confirmar
+                        </label>
+                        <input
+                            type="password"
+                            value={claveBorrado}
+                            onChange={e => setClaveBorrado(e.target.value)}
+                            autoComplete="current-password"
+                            className="w-full mt-2 mb-4 bg-black border border-white/[0.07] rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-red-500/40"
+                        />
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setBorrando(false); setClaveBorrado(''); }}
+                                className="flex-1 py-3 bg-zinc-800 text-zinc-300 rounded-xl font-bold text-sm active:scale-95 transition-transform"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleBorrarCuenta}
+                                disabled={!claveBorrado || enCurso}
+                                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-sm active:scale-95 transition-transform disabled:opacity-40"
+                            >
+                                {enCurso ? 'Borrando...' : 'Borrar para siempre'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </section>
         </div>
     );
 }

@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const crypto = require('crypto');
 const User = require('../models/User');
 const WorkoutLog = require('../models/WorkoutLog');
 const Notification = require('../models/Notification');
@@ -144,6 +145,52 @@ const borrarEntreno = asyncHandler(async (req, res) => {
     res.json({ message: 'Entreno borrado' });
 });
 
+/**
+ * Restablecer la contrasena de un usuario.
+ *
+ * No hay recuperacion por correo, y montarla significa un servicio de envio, un
+ * dominio verificado y otra cuenta que mantener. Para una app de esta escala
+ * esto resuelve el mismo problema: el usuario te escribe, le generas una clave
+ * temporal y se la pasas. El la cambia luego si quiere.
+ *
+ * La clave se devuelve EN CLARO una sola vez, en la respuesta a este admin. No
+ * se guarda en ningun sitio ni se puede volver a consultar: en la base ya entra
+ * cifrada por el hook del modelo.
+ *
+ * @route   POST /api/admin/restablecer-clave
+ */
+const restablecerClave = asyncHandler(async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) { res.status(400); throw new Error('Falta el usuario'); }
+
+    const objetivo = await User.findById(userId);
+    if (!objetivo) { res.status(404); throw new Error('Usuario no encontrado'); }
+
+    // Igual que con el baneo: un administrador no puede tomar la cuenta de otro.
+    if (objetivo.isAdmin && objetivo._id.toString() !== req.user._id.toString()) {
+        res.status(400);
+        throw new Error('No se puede restablecer la clave de otro administrador');
+    }
+
+    // Alfabeto sin caracteres que se confunden al dictarla por telefono o
+    // WhatsApp: fuera 0/O, 1/I/l. Y crypto, no Math.random: una clave temporal
+    // adivinable no sirve de nada.
+    const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const temporal = Array.from(
+        { length: 10 },
+        () => ALFABETO[crypto.randomInt(ALFABETO.length)]
+    ).join('');
+
+    objetivo.password = temporal;
+    await objetivo.save(); // el hook del modelo la cifra
+
+    res.json({
+        message: 'Clave nueva para ' + objetivo.username,
+        usuario: objetivo.username,
+        temporal
+    });
+});
+
 // @desc    Mandar una notificación push a mano
 // @route   POST /api/admin/notificar
 const notificar = asyncHandler(async (req, res) => {
@@ -155,7 +202,7 @@ const notificar = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-    listarUsuarios, banear, desbanear,
+    listarUsuarios, banear, desbanear, restablecerClave,
     ultimosComentarios, borrarComentario, borrarEntreno,
     notificar
 };

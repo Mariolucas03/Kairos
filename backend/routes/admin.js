@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const {
-    listarUsuarios, banear, desbanear,
+    listarUsuarios, banear, desbanear, restablecerClave,
     ultimosComentarios, borrarComentario, borrarEntreno,
     notificar
 } = require('../controllers/adminController');
@@ -26,6 +26,7 @@ router.use(protect, soloAdmin);
 router.get('/usuarios', listarUsuarios);
 router.post('/banear', banear);
 router.post('/desbanear', desbanear);
+router.post('/restablecer-clave', restablecerClave);
 
 router.get('/comentarios', ultimosComentarios);
 router.delete('/comentario/:entrenoId/:comentarioId', borrarComentario);

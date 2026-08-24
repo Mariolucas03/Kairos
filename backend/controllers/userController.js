@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const { borrarUsuarioYSusDatos } = require('../services/borradoService');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
 // Importamos la función manual del scheduler
@@ -234,6 +235,42 @@ const updatePhysicalStats = asyncHandler(async (req, res) => {
     res.status(200).json(updatedUser);
 });
 
+/**
+ * Borrar la propia cuenta, con todo lo que arrastra.
+ *
+ * No existia ninguna forma de irse. Guardamos correo, peso, fotos de comida y de
+ * entrenos: son datos personales, y quien los da tiene derecho a que
+ * desaparezcan sin depender de que alguien le conteste.
+ *
+ * Pide la contrasena a proposito. Un boton de borrar cuenta sin confirmar la
+ * identidad convierte cualquier movil desbloqueado un momento —o una sesion
+ * abierta en un ordenador prestado— en una cuenta destruida sin vuelta atras.
+ *
+ * @route   DELETE /api/users/me
+ */
+const borrarMiCuenta = asyncHandler(async (req, res) => {
+    const { password } = req.body || {};
+
+    if (!password) { res.status(400); throw new Error('Escribe tu contraseña para confirmar'); }
+
+    const user = await User.findById(req.user._id).select('+password isAdmin username');
+    if (!user) { res.status(404); throw new Error('Usuario no encontrado'); }
+
+    const correcta = await user.comparePassword(password);
+    if (!correcta) { res.status(401); throw new Error('La contraseña no es correcta'); }
+
+    // Sin esto, el unico administrador podria dejar la app sin nadie que la
+    // pueda moderar, y sin forma de nombrar a otro desde dentro.
+    if (user.isAdmin) {
+        res.status(400);
+        throw new Error('Una cuenta de administrador no se puede borrar desde la app');
+    }
+
+    const resumen = await borrarUsuarioYSusDatos(user._id);
+
+    res.json({ message: 'Cuenta borrada. Hasta otra.', resumen });
+});
+
 // ==========================================
 // 6. GAME OVER / REDENCIÓN
 // ==========================================
@@ -348,6 +385,7 @@ const forceNightlyMaintenance = asyncHandler(async (req, res) => {
 // EXPORT FINAL (¡SIEMPRE AL FINAL!)
 // ==========================================
 module.exports = {
+    borrarMiCuenta,
     getMe,
     updateMacros,
     claimDailyReward,

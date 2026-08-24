@@ -27,6 +27,7 @@ const Social = lazy(() => import('./pages/Social'));
 const Settings = lazy(() => import('./pages/Settings'));
 // Solo lo carga quien entra, y solo entra quien es administrador.
 const Admin = lazy(() => import('./pages/Admin'));
+const Privacidad = lazy(() => import('./pages/Privacidad'));
 
 const FriendsPage = lazy(() => import('./pages/social/FriendsPage'));
 const ClansPage = lazy(() => import('./pages/social/ClansPage'));
@@ -143,6 +144,7 @@ function App() {
                             <Route path="/profile" element={<Profile />} />
                             <Route path="/settings" element={<Settings />} />
                             <Route path="/admin" element={<Admin />} />
+                            <Route path="/privacidad" element={<Privacidad />} />
 
                             {/* Juegos */}
                             <Route path="/games" element={<Games />} />
