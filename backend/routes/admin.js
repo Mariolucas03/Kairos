@@ -3,6 +3,7 @@ const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const {
     listarUsuarios, banear, desbanear, restablecerClave,
+    estadoDelSistema, lanzarMantenimiento, ajustarSaldo,
     ultimosComentarios, borrarComentario, borrarEntreno,
     notificar
 } = require('../controllers/adminController');
@@ -27,6 +28,11 @@ router.get('/usuarios', listarUsuarios);
 router.post('/banear', banear);
 router.post('/desbanear', desbanear);
 router.post('/restablecer-clave', restablecerClave);
+router.post('/ajustar-saldo', ajustarSaldo);
+
+// Estado del sistema y tareas programadas a mano
+router.get('/estado', estadoDelSistema);
+router.post('/mantenimiento', lanzarMantenimiento);
 
 router.get('/comentarios', ultimosComentarios);
 router.delete('/comentario/:entrenoId/:comentarioId', borrarComentario);

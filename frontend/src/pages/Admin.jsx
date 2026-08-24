@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Shield, Ban, Undo2, Trash2, Send, Loader2, Users, MessageSquare, KeyRound, Copy } from 'lucide-react';
+import { Shield, Ban, Undo2, Trash2, Send, Loader2, Users, MessageSquare, KeyRound, Copy, Activity, Coins, Play, CheckCircle2, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import BackButton from '../components/common/BackButton';
@@ -10,7 +10,16 @@ import { useAuthStore } from '../store/useAuthStore';
 const PESTANAS = [
     { key: 'usuarios', label: 'Usuarios', icon: Users },
     { key: 'avisos', label: 'Avisos', icon: Send },
-    { key: 'moderar', label: 'Moderar', icon: MessageSquare }
+    { key: 'moderar', label: 'Moderar', icon: MessageSquare },
+    { key: 'sistema', label: 'Sistema', icon: Activity }
+];
+
+// Las tres tareas que dependen de que un cron externo las llame a su hora. Si
+// ese día falló, esto es la forma de arreglarlo sin abrir un ordenador.
+const TAREAS = [
+    { key: 'aviso', texto: 'Mandar el aviso de las 20:00', aviso: 'Manda la notificación de misiones pendientes a todo el mundo AHORA.' },
+    { key: 'castigo', texto: 'Ejecutar el castigo nocturno', aviso: 'Resta vida por las misiones no cumplidas ayer. No castiga dos veces si ya se hizo.' },
+    { key: 'premios', texto: 'Repartir premios del ranking', aviso: 'Reparte las fichas del ranking del mes cerrado. No paga dos veces.' }
 ];
 
 const cuandoFue = (fecha) => {
@@ -36,6 +45,9 @@ export default function Admin() {
     // guarda en claro y no hay forma de volver a consultarla.
     const [claveNueva, setClaveNueva] = useState(null);
 
+    const [estado, setEstado] = useState(null);
+    const [ajuste, setAjuste] = useState({ userId: '', coins: '', gameCoins: '' });
+
     // Formulario de aviso
     const [destino, setDestino] = useState('todos');
     const [titulo, setTitulo] = useState('');
@@ -46,12 +58,14 @@ export default function Admin() {
     const cargar = async () => {
         setCargando(true);
         try {
-            const [u, c] = await Promise.all([
+            const [u, c, e] = await Promise.all([
                 api.get('/admin/usuarios'),
-                api.get('/admin/comentarios')
+                api.get('/admin/comentarios'),
+                api.get('/admin/estado')
             ]);
             setUsuarios(u.data);
             setComentarios(c.data);
+            setEstado(e.data);
         } catch (e) {
             avisar(e.response?.data?.message || 'No se pudo cargar', 'error');
         } finally { setCargando(false); }
@@ -303,6 +317,123 @@ export default function Admin() {
                         {enVuelo ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                         Enviar
                     </button>
+                </div>
+            )}
+
+            {/* --- SISTEMA --- */}
+            {!cargando && pestana === 'sistema' && estado && (
+                <div className="space-y-3">
+
+                    {/* Números del día */}
+                    <div className="grid grid-cols-2 gap-2">
+                        {[
+                            { etiqueta: 'Usuarios', valor: estado.usuarios.total, pie: estado.usuarios.activos7dias + ' activos (7 días)' },
+                            { etiqueta: 'Con avisos', valor: estado.usuarios.conNotificaciones, pie: 'reciben notificaciones' },
+                            { etiqueta: 'Entrenos hoy', valor: estado.actividad.entrenosHoy, pie: 'registrados' },
+                            { etiqueta: 'IA usada hoy', valor: estado.ia.usadasHoy, pie: 'de ' + estado.ia.tope + ' (' + estado.ia.porcentaje + '%)' }
+                        ].map(({ etiqueta, valor, pie }) => (
+                            <div key={etiqueta} className="bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] p-4">
+                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">{etiqueta}</p>
+                                <p className="text-2xl font-black text-white mt-1">{valor}</p>
+                                <p className="text-[9px] text-zinc-600 mt-0.5">{pie}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Tareas automáticas: lo que falla EN SILENCIO */}
+                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5">
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Tareas automáticas</p>
+
+                        {[
+                            { nombre: 'Aviso de las 20:00', ok: estado.tareas.avisoDeLas20.enviadoHoy, dia: estado.tareas.avisoDeLas20.ultimoDia, cuando: 'hoy' },
+                            { nombre: 'Castigo nocturno', ok: estado.tareas.castigoNocturno.alDia, dia: estado.tareas.castigoNocturno.ultimoDia, cuando: 'ayer' }
+                        ].map(({ nombre, ok, dia, cuando }) => (
+                            <div key={nombre} className="flex items-center gap-3 py-2">
+                                {ok
+                                    ? <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                                    : <AlertTriangle size={16} className="text-yellow-500 shrink-0" />}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-white font-bold">{nombre}</p>
+                                    <p className="text-[10px] text-zinc-500">
+                                        {ok ? 'Al día' : 'Pendiente de ' + cuando} · última vez: {dia || 'nunca'}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Lanzarlas a mano */}
+                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 space-y-2">
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Lanzar a mano</p>
+                        <p className="text-[10px] text-zinc-600 mb-3 leading-tight">
+                            Las tres se pueden repetir sin miedo: no castigan, ni pagan, ni avisan dos veces.
+                        </p>
+
+                        {TAREAS.map(({ key, texto, aviso }) => (
+                            <button
+                                key={key}
+                                onClick={() => setConfirmar({
+                                    title: texto,
+                                    message: aviso,
+                                    confirmLabel: 'Ejecutar',
+                                    accion: () => api.post('/admin/mantenimiento', { tarea: key })
+                                })}
+                                disabled={enVuelo}
+                                className="w-full flex items-center gap-3 p-3 rounded-xl bg-black border border-zinc-800 text-left active:scale-[0.99] transition-transform disabled:opacity-50"
+                            >
+                                <Play size={14} className="text-yellow-500 shrink-0" />
+                                <span className="text-xs text-zinc-300 font-bold">{texto}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Ajustar saldo */}
+                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 space-y-3">
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Ajustar saldo</p>
+                        <p className="text-[10px] text-zinc-600 leading-tight">
+                            Para compensar cuando algo falla. Se SUMA a lo que ya tiene; en negativo, resta.
+                        </p>
+
+                        <select
+                            value={ajuste.userId}
+                            onChange={e => setAjuste(a => ({ ...a, userId: e.target.value }))}
+                            className="w-full bg-black border border-white/[0.07] rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-yellow-500/40"
+                        >
+                            <option value="">Elige a quién...</option>
+                            {usuarios.map(u => (
+                                <option key={u._id} value={u._id}>{u.username} ({u.coins} monedas)</option>
+                            ))}
+                        </select>
+
+                        <div className="flex gap-2">
+                            <input
+                                type="number" placeholder="Monedas" value={ajuste.coins}
+                                onChange={e => setAjuste(a => ({ ...a, coins: e.target.value }))}
+                                className="flex-1 bg-black border border-white/[0.07] rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-yellow-500/40"
+                            />
+                            <input
+                                type="number" placeholder="Fichas" value={ajuste.gameCoins}
+                                onChange={e => setAjuste(a => ({ ...a, gameCoins: e.target.value }))}
+                                className="flex-1 bg-black border border-white/[0.07] rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-yellow-500/40"
+                            />
+                        </div>
+
+                        <button
+                            onClick={() => accion(async () => {
+                                const r = await api.post('/admin/ajustar-saldo', {
+                                    userId: ajuste.userId,
+                                    coins: Number(ajuste.coins) || 0,
+                                    gameCoins: Number(ajuste.gameCoins) || 0
+                                });
+                                setAjuste({ userId: '', coins: '', gameCoins: '' });
+                                return r;
+                            }, 'No se pudo ajustar')}
+                            disabled={enVuelo || !ajuste.userId}
+                            className="w-full bg-yellow-500 text-black py-3 rounded-xl font-black uppercase tracking-wider text-xs active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-40"
+                        >
+                            <Coins size={14} /> Aplicar ajuste
+                        </button>
+                    </div>
                 </div>
             )}
 

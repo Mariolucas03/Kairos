@@ -4,6 +4,10 @@ const User = require('../models/User');
 const WorkoutLog = require('../models/WorkoutLog');
 const Notification = require('../models/Notification');
 const { enviarNotificacionManual } = require('./pushController');
+const SystemState = require('../models/SystemState');
+const DailyLog = require('../models/DailyLog');
+const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder } = require('../utils/scheduler');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 /**
  * Panel de administración.
@@ -191,6 +195,153 @@ const restablecerClave = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * Estado del sistema de un vistazo.
+ *
+ * Existe porque hasta ahora la única forma de saber si la app estaba haciendo su
+ * trabajo —si el castigo nocturno corrió, si salió el aviso de las 20:00, si
+ * queda cuota de IA— era abrir la base de datos a mano o mirar los registros de
+ * Render desde un ordenador. Desde el móvil, nada.
+ *
+ * Todo lo que sale aquí son cosas que fallan EN SILENCIO: cuando el aviso de las
+ * 20:00 no sale, no aparece ningún error en ningún sitio, simplemente no llega.
+ *
+ * @route   GET /api/admin/estado
+ */
+const estadoDelSistema = asyncHandler(async (req, res) => {
+    const hoy = getMadridDateString();
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    const ayerStr = getMadridDateString(ayer);
+
+    const claveIA = 'ia-llamadas-' + hoy;
+
+    const [marcas, usuarios, conPush, entrenosHoy, activos7dias] = await Promise.all([
+        SystemState.find({}).lean(),
+        User.countDocuments({}),
+        User.countDocuments({ 'pushSubscriptions.0': { $exists: true } }),
+        WorkoutLog.countDocuments({ date: { $gte: new Date(hoy + 'T00:00:00') } }),
+        User.countDocuments({ lastActive: { $gte: new Date(Date.now() - 7 * 86400000) } })
+    ]);
+
+    const porClave = {};
+    for (const m of marcas) porClave[m.key] = m;
+
+    const llamadasIA = porClave[claveIA]?.contador || 0;
+    const topeIA = Number(process.env.MAX_IA_DIA) || 300;
+
+    res.json({
+        fecha: hoy,
+
+        usuarios: { total: usuarios, conNotificaciones: conPush, activos7dias },
+
+        actividad: { entrenosHoy },
+
+        ia: {
+            usadasHoy: llamadasIA,
+            tope: topeIA,
+            porcentaje: Math.round((llamadasIA / topeIA) * 100)
+        },
+
+        tareas: {
+            // El castigo se anota con la fecha del dia castigado, que es AYER
+            castigoNocturno: {
+                ultimoDia: porClave['nightly-maintenance']?.value || null,
+                alDia: porClave['nightly-maintenance']?.value === ayerStr
+            },
+            avisoDeLas20: {
+                ultimoDia: porClave['evening-reminder']?.value || null,
+                enviadoHoy: porClave['evening-reminder']?.value === hoy
+            }
+        }
+    });
+});
+
+/**
+ * Lanzar a mano una tarea programada.
+ *
+ * Las tres dependen de que un cron externo las llame a su hora. Si ese dia
+ * fallo —Render reiniciando, cron-job.org caido, el secreto mal puesto— hasta
+ * ahora la unica salida era una peticion con curl desde un ordenador. Esto
+ * permite arreglarlo desde el movil.
+ *
+ * Las tres son idempotentes: el castigo se anota por dia, los premios por
+ * usuario y periodo, y el aviso reserva el dia antes de mandar nada. Repetirlas
+ * no castiga dos veces, no paga dos veces y no avisa dos veces.
+ *
+ * @route   POST /api/admin/mantenimiento
+ */
+const lanzarMantenimiento = asyncHandler(async (req, res) => {
+    const { tarea } = req.body || {};
+
+    if (tarea === 'castigo') {
+        const r = await runNightlyMaintenance({ forzar: true });
+        return res.json({ message: 'Mantenimiento nocturno ejecutado', detalle: r });
+    }
+
+    if (tarea === 'premios') {
+        const r = await runMonthlyRankingRewards();
+        return res.json({ message: 'Premios del ranking repartidos: ' + (r.awarded || 0), detalle: r });
+    }
+
+    if (tarea === 'aviso') {
+        const r = await runEveningReminder({ forzar: true });
+        const total = (r.misiones || 0) + (r.diaria || 0) + (r.vuelve || 0);
+        return res.json({ message: 'Aviso enviado a ' + total + ' personas', detalle: r });
+    }
+
+    res.status(400);
+    throw new Error('Tarea no válida: usa castigo, premios o aviso');
+});
+
+/**
+ * Ajustar el saldo de alguien.
+ *
+ * Para compensar cuando algo falla: se pierde una recompensa por un error, un
+ * juego se queda a medias, se cobra algo que no era. Sin esto la unica forma de
+ * arreglarlo era entrar a la base de datos a mano.
+ *
+ * Es SUMAR o RESTAR, no fijar: escribir directamente el saldo final es como se
+ * borran mil monedas por equivocarse en un dedo, y ademas obliga a saber cuanto
+ * tenia antes.
+ *
+ * @route   POST /api/admin/ajustar-saldo
+ */
+const ajustarSaldo = asyncHandler(async (req, res) => {
+    const { userId, coins = 0, gameCoins = 0, motivo } = req.body || {};
+
+    const monedas = Math.round(Number(coins) || 0);
+    const fichas = Math.round(Number(gameCoins) || 0);
+
+    if (!userId) { res.status(400); throw new Error('Falta el usuario'); }
+    if (monedas === 0 && fichas === 0) { res.status(400); throw new Error('Indica cuánto sumar o restar'); }
+
+    // Tope por operacion: un cero de mas al escribir no puede regalar un millon
+    if (Math.abs(monedas) > 100000 || Math.abs(fichas) > 100000) {
+        res.status(400);
+        throw new Error('Como mucho 100.000 por ajuste');
+    }
+
+    const objetivo = await User.findById(userId).select('username coins gameCoins');
+    if (!objetivo) { res.status(404); throw new Error('Usuario no encontrado'); }
+
+    // El saldo NO puede quedar negativo: un saldo bajo cero rompe las compras,
+    // que comprueban "tienes suficiente" y no "tienes mas que cero".
+    const nuevasMonedas = Math.max(0, (objetivo.coins || 0) + monedas);
+    const nuevasFichas = Math.max(0, (objetivo.gameCoins || 0) + fichas);
+
+    await User.findByIdAndUpdate(userId, { $set: { coins: nuevasMonedas, gameCoins: nuevasFichas } });
+
+    console.log('💰 Ajuste de saldo a ' + objetivo.username + ': ' +
+        monedas + ' monedas, ' + fichas + ' fichas. Motivo: ' + (motivo || 'sin indicar'));
+
+    res.json({
+        message: objetivo.username + ': ' + nuevasMonedas + ' monedas, ' + nuevasFichas + ' fichas',
+        antes: { coins: objetivo.coins || 0, gameCoins: objetivo.gameCoins || 0 },
+        despues: { coins: nuevasMonedas, gameCoins: nuevasFichas }
+    });
+});
+
 // @desc    Mandar una notificación push a mano
 // @route   POST /api/admin/notificar
 const notificar = asyncHandler(async (req, res) => {
@@ -203,6 +354,7 @@ const notificar = asyncHandler(async (req, res) => {
 
 module.exports = {
     listarUsuarios, banear, desbanear, restablecerClave,
+    estadoDelSistema, lanzarMantenimiento, ajustarSaldo,
     ultimosComentarios, borrarComentario, borrarEntreno,
     notificar
 };
