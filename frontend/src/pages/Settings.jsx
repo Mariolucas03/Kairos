@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Lock, Globe, LogOut, Save, Loader2,
-    Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff, Shield, Trash2, FileText
+    Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff, Shield, Trash2, FileText, Download
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -54,6 +54,30 @@ export default function Settings() {
         !!user.isPrivate !== isPrivate ||
         SECCIONES.some(s => visActual[s.key] !== visibility[s.key])
     );
+
+    // Descarga de tus datos. Se hace con fetch y no con el <a href> de siempre
+    // porque la ruta necesita el token de sesion en la cabecera, y una descarga
+    // normal del navegador no lo lleva.
+    const [descargando, setDescargando] = useState(false);
+
+    const handleDescargarDatos = async () => {
+        if (descargando) return;
+        setDescargando(true);
+        try {
+            const res = await api.get('/users/mis-datos', { responseType: 'blob' });
+            const url = URL.createObjectURL(new Blob([res.data], { type: 'application/json' }));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'kairos-' + (user?.username || 'datos') + '.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setToast({ message: 'Datos descargados', type: 'success' });
+        } catch (e) {
+            setToast({ message: 'No se pudieron descargar', type: 'error' });
+        } finally { setDescargando(false); }
+    };
 
     const handleBorrarCuenta = async () => {
         if (enCurso) return;
@@ -274,6 +298,21 @@ export default function Settings() {
                     <div className="flex-1 text-left">
                         <p className="font-bold text-sm text-white">Privacidad</p>
                         <p className="text-[10px] text-zinc-500 mt-0.5">Qué se guarda de ti y quién lo ve</p>
+                    </div>
+                    <ChevronRight size={18} className="text-zinc-600" />
+                </button>
+
+                <button
+                    onClick={handleDescargarDatos}
+                    disabled={descargando}
+                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 mb-6 active:scale-[0.99] transition-transform disabled:opacity-50"
+                >
+                    <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
+                        <Download size={18} />
+                    </div>
+                    <div className="flex-1 text-left">
+                        <p className="font-bold text-sm text-white">{descargando ? 'Preparando...' : 'Descargar mis datos'}</p>
+                        <p className="text-[10px] text-zinc-500 mt-0.5">Todo lo que guarda la app, en un fichero</p>
                     </div>
                     <ChevronRight size={18} className="text-zinc-600" />
                 </button>

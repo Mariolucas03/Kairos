@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import usePantallaEncendida from '../../hooks/usePantallaEncendida';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
@@ -93,6 +94,10 @@ const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaul
 // ==========================================
 export default function ActiveWorkout({ routine, onFinish }) {
     const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
+
+    // La pantalla no se apaga mientras dure el entreno. Se suelta sola al
+    // terminar, para no dejarle la bateria secuestrada a nadie.
+    usePantallaEncendida(true);
 
     const STORAGE_KEY = `workout_active_${routine._id}`;
     const REST_KEY = `workout_rest_target_${routine._id}`;

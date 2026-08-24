@@ -14,7 +14,8 @@ const {
     reviveUser,
     updateStatsManual,
     updateProfileSettings,
-    borrarMiCuenta
+    borrarMiCuenta,
+    exportarMisDatos
 } = require('../controllers/userController');
 
 // Rutas base: /api/users
@@ -24,6 +25,10 @@ router.post('/claim-daily', protect, claimDailyReward); // <--- Esta fallaba
 router.put('/physical-stats', protect, updatePhysicalStats);
 // Ajustes del perfil público: descripción, cuenta privada y modo de gym
 router.put('/profile', protect, updateProfileSettings);
+
+// Llevarte tus datos. Va antes del borrado a proposito: quien se va deberia
+// poder llevarse lo suyo primero.
+router.get('/mis-datos', protect, exportarMisDatos);
 
 // Irse del todo: pide la contrasena en el cuerpo para confirmar
 router.delete('/me', protect, borrarMiCuenta);

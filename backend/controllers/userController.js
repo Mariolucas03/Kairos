@@ -1,5 +1,11 @@
 const asyncHandler = require('express-async-handler');
 const { borrarUsuarioYSusDatos } = require('../services/borradoService');
+const WorkoutLog = require('../models/WorkoutLog');
+const DailyLog = require('../models/DailyLog');
+const NutritionLog = require('../models/NutritionLog');
+const Routine = require('../models/Routine');
+const Mission = require('../models/Mission');
+const Food = require('../models/Food');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
 // Importamos la función manual del scheduler
@@ -236,6 +242,57 @@ const updatePhysicalStats = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Descargar TODO lo que la app guarda de ti, en un solo fichero.
+ *
+ * La politica de privacidad promete que puedes pedir una copia de tus datos. Sin
+ * esto, cumplir esa promesa significaba que alguien entrara a la base de datos a
+ * mano cada vez que alguien lo pidiera: en la practica, no se cumplia.
+ *
+ * Va todo: perfil, entrenos con sus series, dias registrados, nutricion,
+ * rutinas, misiones y alimentos guardados. NO va la contrasena (esta cifrada y
+ * no se puede devolver) ni las suscripciones de notificaciones (son claves de
+ * dispositivo, no datos tuyos).
+ *
+ * @route   GET /api/users/mis-datos
+ */
+const exportarMisDatos = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    const [perfil, entrenos, dias, nutricion, rutinas, misiones, alimentos] = await Promise.all([
+        User.findById(userId).select('-password -pushSubscriptions').lean(),
+        WorkoutLog.find({ user: userId }).sort({ date: -1 }).lean(),
+        DailyLog.find({ user: userId }).sort({ date: -1 }).lean(),
+        NutritionLog.find({ user: userId }).sort({ date: -1 }).lean(),
+        Routine.find({ user: userId }).lean(),
+        Mission.find({ $or: [{ user: userId }, { participants: userId }] }).lean(),
+        Food.find({ user: userId }).lean()
+    ]);
+
+    const datos = {
+        exportadoEl: new Date().toISOString(),
+        aplicacion: 'Kairos',
+        aviso: 'Copia completa de tus datos. No incluye tu contraseña (está cifrada y no se puede recuperar) ni los identificadores de tus dispositivos para notificaciones.',
+        perfil,
+        resumen: {
+            entrenos: entrenos.length,
+            diasRegistrados: dias.length,
+            diasDeNutricion: nutricion.length,
+            rutinas: rutinas.length,
+            misiones: misiones.length,
+            alimentosGuardados: alimentos.length
+        },
+        entrenos, dias, nutricion, rutinas, misiones, alimentos
+    };
+
+    // Con estas cabeceras el navegador lo descarga como fichero en vez de
+    // enseñarlo por pantalla, que con miles de lineas no le sirve a nadie.
+    const nombre = 'kairos-' + (perfil?.username || 'datos') + '-' + new Date().toISOString().slice(0, 10) + '.json';
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + nombre + '"');
+    res.send(JSON.stringify(datos, null, 2));
+});
+
+/**
  * Borrar la propia cuenta, con todo lo que arrastra.
  *
  * No existia ninguna forma de irse. Guardamos correo, peso, fotos de comida y de
@@ -385,6 +442,7 @@ const forceNightlyMaintenance = asyncHandler(async (req, res) => {
 // EXPORT FINAL (¡SIEMPRE AL FINAL!)
 // ==========================================
 module.exports = {
+    exportarMisDatos,
     borrarMiCuenta,
     getMe,
     updateMacros,
