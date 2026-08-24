@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play } from 'lucide-react';
+import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play, Clock, PersonStanding, MoveHorizontal, Link2 } from 'lucide-react';
 import api from '../../services/api';
 import ExerciseSelector from './ExerciseSelector';
 import ExerciseSheet from './ExerciseSheet';
@@ -98,6 +98,32 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
      * todos los ejercicios se quedaban forzosamente con el general. Vaciar la
      * casilla vuelve a 0, o sea, a heredar el de la rutina.
      */
+    /**
+     * Interruptores de cómo se mide un ejercicio.
+     *
+     * Van en la RUTINA y no en cada entreno a propósito: "plancha" se mide por
+     * tiempo siempre, no solo hoy. Marcarlo una vez y olvidarse es la diferencia
+     * entre que esto se use y que no se use.
+     */
+    const alternarOpcion = (index, campo) => {
+        const nuevos = [...addedExercises];
+        nuevos[index] = { ...nuevos[index], [campo]: !nuevos[index][campo] };
+
+        // Por tiempo y por lado no tienen sentido juntos: un isométrico no se
+        // cuenta por repeticiones, así que tampoco por repeticiones de cada lado.
+        if (campo === 'esPorTiempo' && nuevos[index].esPorTiempo) nuevos[index].porLado = false;
+        if (campo === 'porLado' && nuevos[index].porLado) nuevos[index].esPorTiempo = false;
+
+        setAddedExercises(nuevos);
+    };
+
+    /** Letra de superserie. Los ejercicios con la misma letra van seguidos. */
+    const cambiarSuperserie = (index, valor) => {
+        const nuevos = [...addedExercises];
+        nuevos[index] = { ...nuevos[index], superserie: valor.toUpperCase().slice(0, 1) };
+        setAddedExercises(nuevos);
+    };
+
     const updateExerciseRest = (index, val) => {
         const newExercises = [...addedExercises];
         const num = parseInt(val);
@@ -332,6 +358,42 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                 <button onClick={() => moveExercise(idx, 1)} disabled={idx === addedExercises.length - 1} className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 disabled:opacity-20"><ArrowDown size={12} /></button>
                                             </div>
                                             <button onClick={() => removeExercise(idx)} className="bg-red-900/20 p-1 rounded text-red-500 hover:bg-red-900/40 w-full flex justify-center"><Trash2 size={14} /></button>
+                                        </div>
+                                    </div>
+
+                                    {/* CÓMO SE MIDE ESTE EJERCICIO */}
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2 border-t border-zinc-900">
+                                        {[
+                                            { campo: 'esPorTiempo', icono: Clock, texto: 'Tiempo', ayuda: 'Se mide en segundos: plancha, isométricos, muerto colgado' },
+                                            { campo: 'esPesoCorporal', icono: PersonStanding, texto: 'Corporal', ayuda: 'Dominadas o fondos: cuenta tu peso más el lastre' },
+                                            { campo: 'porLado', icono: MoveHorizontal, texto: 'Por lado', ayuda: 'Las repeticiones son de cada lado' }
+                                        ].map(({ campo, icono: Icono, texto, ayuda }) => (
+                                            <button
+                                                key={campo}
+                                                onClick={() => alternarOpcion(idx, campo)}
+                                                title={ayuda}
+                                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide border transition-colors ${ex[campo]
+                                                    ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-500'
+                                                    : 'bg-black border-zinc-800 text-zinc-600'}`}
+                                            >
+                                                <Icono size={10} /> {texto}
+                                            </button>
+                                        ))}
+
+                                        {/* Superserie: misma letra = van seguidos sin descanso */}
+                                        <div
+                                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black border border-zinc-800"
+                                            title="Misma letra en los ejercicios que hagas seguidos sin descanso"
+                                        >
+                                            <Link2 size={10} className={ex.superserie ? 'text-yellow-500' : 'text-zinc-600'} />
+                                            <input
+                                                type="text"
+                                                maxLength={1}
+                                                value={ex.superserie || ''}
+                                                placeholder="—"
+                                                onChange={(e) => cambiarSuperserie(idx, e.target.value)}
+                                                className="w-4 bg-transparent text-center text-[10px] font-black uppercase text-yellow-500 outline-none placeholder:text-zinc-700"
+                                            />
                                         </div>
                                     </div>
                                 </div>

@@ -28,10 +28,49 @@ const workoutLogSchema = mongoose.Schema({
     caloriesBurned: { type: Number, default: 0 },
     exercises: [{
         name: String,
+
+        // --- CÓMO SE MIDE ESTE EJERCICIO ---
+        //
+        // Todo esto es OPCIONAL y por defecto se comporta como siempre (peso x
+        // repeticiones), así que los entrenos ya guardados siguen leyéndose
+        // igual sin tocar ni un documento.
+
+        // Medido por TIEMPO en vez de por repeticiones: plancha, muerto colgado,
+        // isométricos. Antes no había forma de registrarlos: o te inventabas unas
+        // repeticiones o no los apuntabas.
+        esPorTiempo: { type: Boolean, default: false },
+
+        // De peso corporal (dominadas, fondos, flexiones). El peso de cada serie
+        // lo calcula el SERVIDOR sumando tu peso corporal más el lastre, así el
+        // volumen y los récords cuentan lo que de verdad has movido.
+        esPesoCorporal: { type: Boolean, default: false },
+
+        // Superserie: los ejercicios con la misma letra ('A', 'B'...) se hacen
+        // seguidos sin descanso entre medias.
+        superserie: { type: String, default: '' },
+
         sets: [{
             weight: Number,
             reps: Number,
             completed: Boolean,
+
+            // Segundos aguantados, en los ejercicios medidos por tiempo
+            segundos: { type: Number, default: 0 },
+
+            // Peso añadido en los de peso corporal (cinturón de lastre, chaleco)
+            lastre: { type: Number, default: 0 },
+
+            // Las repeticiones son POR LADO. Se guarda como bandera en vez de
+            // duplicar el número: 10 por lado son 10 repeticiones de trabajo con
+            // cada brazo, no 20 seguidas, y para el volumen sí cuentan las 20.
+            porLado: { type: Boolean, default: false },
+
+            // Cuánto te ha costado: RIR (repeticiones que te quedaban) o RPE
+            // (esfuerzo del 1 al 10). Es lo que permite saber si progresas de
+            // verdad o solo estás moviendo más peso a base de apretar más.
+            esfuerzo: { type: Number },
+            tipoEsfuerzo: { type: String, enum: ['RIR', 'RPE', ''], default: '' },
+
             // 'N' = serie normal, 'D' = dropset, para poder distinguirlas en el post
             type: { type: String, enum: ['N', 'D'], default: 'N' }
         }]

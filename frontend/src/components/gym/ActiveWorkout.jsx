@@ -406,11 +406,26 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 intensity,
                 exercises: exercises.map(ex => ({
                     name: ex.name,
-                    sets: ex.setsData.filter(s => s.completed).map(s => ({
-                        weight: parseFloat(String(s.kg).replace(',', '.')) || 0,
-                        reps: parseFloat(String(s.reps).replace(',', '.')) || 0,
-                        type: s.type || 'N'
-                    }))
+                    // Como se mide este ejercicio. El servidor lo usa para
+                    // calcular lo que de verdad has movido: en los de peso
+                    // corporal suma tu peso, y en los de tiempo convierte los
+                    // segundos. Aqui solo se manda lo que dice la rutina.
+                    esPorTiempo: !!ex.esPorTiempo,
+                    esPesoCorporal: !!ex.esPesoCorporal,
+                    superserie: ex.superserie || '',
+                    sets: ex.setsData.filter(s => s.completed).map(s => {
+                        const numero = (v) => parseFloat(String(v).replace(',', '.')) || 0;
+                        return {
+                            // En los de peso corporal, la casilla de kg es el LASTRE
+                            weight: ex.esPesoCorporal ? 0 : numero(s.kg),
+                            lastre: ex.esPesoCorporal ? numero(s.kg) : 0,
+                            // Y en los de tiempo, la de repeticiones son SEGUNDOS
+                            reps: ex.esPorTiempo ? 0 : numero(s.reps),
+                            segundos: ex.esPorTiempo ? numero(s.reps) : 0,
+                            porLado: !!ex.porLado,
+                            type: s.type || 'N'
+                        };
+                    })
                 })).filter(ex => ex.sets.length > 0),
                 // La foto viaja ya comprimida; el servidor la valida y deriva
                 // por su cuenta los músculos trabajados a partir de los ejercicios.
@@ -547,7 +562,13 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
                             <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
-                                <div className="col-span-2">Set</div><div className="col-span-4">Kg</div><div className="col-span-3">Reps</div><div className="col-span-3">Check</div>
+                                {/* Las columnas se llaman distinto segun como se mida el
+                                    ejercicio: sin esto, escribir 90 segundos en una casilla
+                                    que pone "Reps" no lo entiende nadie. */}
+                                <div className="col-span-2">Set</div>
+                                <div className="col-span-4">{ex.esPesoCorporal ? 'Lastre' : 'Kg'}</div>
+                                <div className="col-span-3">{ex.esPorTiempo ? 'Seg' : (ex.porLado ? 'Reps/lado' : 'Reps')}</div>
+                                <div className="col-span-3">Check</div>
                             </div>
                             <div className="space-y-1">
                                 {ex.setsData.map((set, sIdx) => {

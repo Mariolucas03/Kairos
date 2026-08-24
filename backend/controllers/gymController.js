@@ -67,22 +67,105 @@ const volumenDe = (ejercicios) => ejercicios.reduce(
     0
 );
 
-const ejerciciosSeguros = (lista) => {
+const MAX_SEGUNDOS_SERIE = 3600;   // una hora aguantando algo ya no es una serie
+const MAX_LASTRE_KG = 200;
+
+/**
+ * Cuántos segundos se consideran una repetición en los ejercicios de tiempo.
+ *
+ * Hace falta una equivalencia porque TODO lo que mide el progreso —volumen
+ * semanal, rangos musculares, gráficas— está construido sobre peso x
+ * repeticiones. Sin esto, una plancha de tres minutos valdría exactamente cero y
+ * el usuario vería que entrenar abdomen no le sube nada.
+ *
+ * ⚠️ 10 y no 3, que es la equivalencia habitual para isométricos. Con 3, y
+ * midiendo con datos reales, una plancha de 90 segundos daba 2.400 de volumen
+ * contra los 800 de una serie dura de press banca: tres veces más. Como el
+ * volumen es lo que sube los rangos musculares y los rangos PAGAN monedas,
+ * aguantar planchas se habría convertido en la forma más rentable de progresar
+ * en la app. Con 10, esa misma plancha da 720: comparable a la serie de press,
+ * que es lo que de verdad se parece en esfuerzo.
+ */
+const SEGUNDOS_POR_REPETICION = 10;
+
+/**
+ * Limpia las series que llegan del móvil y las deja en la forma que entiende el
+ * resto de la app.
+ *
+ * ⚠️ CLAVE: `weight` y `reps` se guardan siempre como PESO Y REPETICIONES
+ * EQUIVALENTES, es decir, lo que de verdad se ha movido:
+ *
+ *   - Peso corporal  -> weight = tu peso + el lastre
+ *   - Por lado       -> reps = las que hiciste x 2
+ *   - Por tiempo     -> reps = segundos / 3
+ *
+ * Se hace así a propósito. El volumen se calcula en CUATRO sitios distintos
+ * (el tope de sesión, los rangos musculares, la gráfica semanal y el resumen del
+ * entreno), y uno de ellos es una consulta de agregación de Mongo. Convertir
+ * aquí, una vez, deja los cuatro correctos sin tocarlos; convertir en cada uno
+ * era garantía de que tarde o temprano se quedaría alguno atrás.
+ *
+ * Lo que escribió el usuario NO se pierde: `segundos`, `lastre` y `porLado` se
+ * guardan aparte, y la pantalla enseña eso ("10 por lado", "3:00").
+ */
+const ejerciciosSeguros = (lista, pesoUsuario = 0) => {
     if (!Array.isArray(lista)) return [];
+
+    const acotar = (valor, maximo, minimo = 0) => {
+        const n = Number(valor);
+        if (!Number.isFinite(n)) return minimo;
+        return Math.min(Math.max(n, minimo), maximo);
+    };
 
     return lista.slice(0, MAX_EJERCICIOS).map(ex => {
         const sets = Array.isArray(ex?.sets) ? ex.sets.slice(0, MAX_SERIES) : [];
+        const esPorTiempo = !!ex?.esPorTiempo;
+        const esPesoCorporal = !!ex?.esPesoCorporal;
 
         return {
             ...ex,
             name: String(ex?.name || '').trim().slice(0, 120),
+            esPorTiempo,
+            esPesoCorporal,
+            superserie: String(ex?.superserie || '').trim().slice(0, 2),
             sets: sets.map(set => {
-                const peso = Number(set?.weight);
-                const reps = Number(set?.reps);
+                // El lastre puede llegar en su propio campo o en la casilla de kg
+                // (que es lo que el usuario ve al escribirlo). Aceptar las dos
+                // formas evita perder el dato en silencio si alguna pantalla lo
+                // manda de la otra manera.
+                const lastre = esPesoCorporal
+                    ? acotar(set?.lastre !== undefined && set?.lastre !== null && set?.lastre !== '' ? set.lastre : set?.weight, MAX_LASTRE_KG)
+                    : 0;
+                const segundos = esPorTiempo ? Math.round(acotar(set?.segundos, MAX_SEGUNDOS_SERIE)) : 0;
+                const porLado = !!set?.porLado;
+
+                // Peso realmente movido
+                const peso = esPesoCorporal
+                    ? acotar(pesoUsuario, MAX_PESO_KG) + lastre
+                    : acotar(set?.weight, MAX_PESO_KG);
+
+                // Repeticiones equivalentes
+                let reps;
+                if (esPorTiempo) {
+                    reps = Math.round(segundos / SEGUNDOS_POR_REPETICION);
+                } else {
+                    reps = Math.round(acotar(set?.reps, MAX_REPS)) * (porLado ? 2 : 1);
+                }
+
+                const esfuerzo = set?.esfuerzo === undefined || set?.esfuerzo === null || set?.esfuerzo === ''
+                    ? undefined
+                    : acotar(set.esfuerzo, 10);
+
+                const tipoEsfuerzo = ['RIR', 'RPE'].includes(set?.tipoEsfuerzo) ? set.tipoEsfuerzo : '';
+
                 return {
                     ...set,
-                    weight: Number.isFinite(peso) ? Math.min(Math.max(peso, 0), MAX_PESO_KG) : 0,
-                    reps: Number.isFinite(reps) ? Math.min(Math.max(Math.round(reps), 0), MAX_REPS) : 0
+                    weight: Math.min(peso, MAX_PESO_KG),
+                    reps: Math.min(reps, MAX_REPS * 2),
+                    segundos,
+                    lastre,
+                    porLado,
+                    ...(esfuerzo !== undefined ? { esfuerzo, tipoEsfuerzo } : {})
                 };
             })
         };
@@ -546,7 +629,14 @@ const saveWorkoutLog = async (req, res) => {
         // llega del movil alimenta las calorias (y de ahi el XP) y el volumen
         // (y de ahi el rango muscular, que paga monedas).
         const duracionSegura = minutosSeguros(Number(duration) / 60) * 60;
-        const ejercicios = ejerciciosSeguros(exercises);
+
+        // El peso corporal hace falta ANTES de limpiar las series: en los
+        // ejercicios de peso corporal es lo que decide cuánto has movido.
+        const pesoRegistrado = await DailyLog.findOne({ user: req.user._id, weight: { $gt: 0 } })
+            .sort({ date: -1 }).lean();
+        const pesoUsuario = pesoRegistrado ? pesoRegistrado.weight : 75;
+
+        const ejercicios = ejerciciosSeguros(exercises, pesoUsuario);
 
         // El volumen de esta sesion decide el rango muscular, y el rango paga
         // monedas. Por encima de este techo no hay entreno posible: hay alguien
@@ -615,8 +705,9 @@ const saveWorkoutLog = async (req, res) => {
             }
         });
 
-        const lastWeightLog = await DailyLog.findOne({ user: req.user._id, weight: { $gt: 0 } }).sort({ date: -1 }).lean();
-        const userWeight = lastWeightLog ? lastWeightLog.weight : 75;
+        // Ya se busco arriba, para poder calcular el peso de las series de peso
+        // corporal antes de limpiarlas.
+        const userWeight = pesoUsuario;
 
         let caloriesBurned = 0;
 

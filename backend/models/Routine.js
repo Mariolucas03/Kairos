@@ -10,7 +10,16 @@ const exerciseSchema = new mongoose.Schema({
     reps: { type: String, default: '10-12' },
     targetWeight: { type: Number, default: 0 },
     // Descanso propio de este ejercicio. Si es 0 se usa el general de la rutina.
-    rest: { type: Number, default: 0 }
+    rest: { type: Number, default: 0 },
+
+    // Los mismos ajustes que en el registro, guardados en la rutina para no
+    // tener que marcarlos en cada entreno.
+    esPorTiempo: { type: Boolean, default: false },
+    esPesoCorporal: { type: Boolean, default: false },
+    porLado: { type: Boolean, default: false },
+    superserie: { type: String, default: '' },
+    // Segundos objetivo en los ejercicios de tiempo (equivale a `reps`)
+    targetSegundos: { type: Number, default: 0 }
 });
 
 const routineSchema = new mongoose.Schema({
