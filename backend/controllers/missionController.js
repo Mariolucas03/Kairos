@@ -37,6 +37,64 @@ const calculateRewards = (difficulty, frequency, isCoop) => {
     };
 };
 
+/**
+ * Sube la racha si hoy no queda ninguna misión diaria pendiente.
+ *
+ * ⚠️ LA RACHA NO SUBÍA NUNCA. Se ponía a 1 al registrarse y a 0 al fallar una
+ * diaria, y no había una sola línea en toda la app que la incrementara: los tres
+ * usuarios reales llevaban semanas con "racha: 1". El contador estaba en el
+ * modelo, se pintaba en el widget de Inicio, salía en el perfil público y hasta
+ * el aviso de las 20:00 lo mencionaba... y siempre valía 1.
+ *
+ * Sube aquí, al terminar la última diaria del día, y no en el mantenimiento
+ * nocturno, porque una racha se disfruta en el momento en que te la ganas, no a
+ * las tres de la mañana mientras duermes.
+ *
+ * La condición de fecha va DENTRO del findOneAndUpdate a propósito: si se
+ * comprobara antes, dos misiones terminadas a la vez sumarían dos días de golpe.
+ */
+const actualizarRacha = async (userId) => {
+    try {
+        const diaSemana = new Date().getDay();
+
+        // Las MISMAS condiciones que usan el castigo nocturno y el aviso de las
+        // 20:00. Si las tres listas no coincidieran, la racha premiaría días que
+        // el castigo considera fallados.
+        const filtroDelDia = {
+            frequency: 'daily',
+            invitationStatus: { $ne: 'pending' },
+            $and: [
+                { $or: [{ user: userId }, { participants: userId }] },
+                { $or: [{ specificDays: { $size: 0 } }, { specificDays: diaSemana }] }
+            ]
+        };
+
+        const [total, pendientes] = await Promise.all([
+            Mission.countDocuments(filtroDelDia),
+            Mission.countDocuments({ ...filtroDelDia, completed: false })
+        ]);
+
+        // Sin misiones para hoy no hay nada que premiar: si no, bastaría con no
+        // ponerse ninguna para tener una racha infinita sin hacer nada.
+        if (total === 0 || pendientes > 0) return null;
+
+        const inicioDeHoy = new Date();
+        inicioDeHoy.setHours(0, 0, 0, 0);
+
+        const actualizado = await User.findOneAndUpdate(
+            { _id: userId, 'streak.lastLogDate': { $lt: inicioDeHoy } },
+            { $inc: { 'streak.current': 1 }, $set: { 'streak.lastLogDate': new Date() } },
+            { new: true }
+        ).select('streak');
+
+        // null = la racha de hoy ya estaba contada
+        return actualizado ? actualizado.streak.current : null;
+    } catch (error) {
+        console.error('No se pudo actualizar la racha:', error.message);
+        return null;
+    }
+};
+
 const getMissions = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const userIdString = userId.toString();
@@ -288,12 +346,18 @@ const updateProgress = asyncHandler(async (req, res) => {
         return res.json({ message: 'Ya procesado', mission: current, progressOnly: true });
     }
 
+    // Si esta era la ultima diaria pendiente, la racha sube un dia. Devuelve el
+    // numero nuevo solo cuando acaba de subir, para poder celebrarlo en pantalla
+    // sin repetir el aviso cada vez que se toca una mision ya completada.
+    const rachaNueva = finalMainMission.completed ? await actualizarRacha(userId) : null;
+
     res.json({
         message: finalMainMission.completed ? '¡Completada!' : 'Actualizada',
         mission: finalMainMission,
         user: userResult,
         leveledUp,
         rewards,
+        rachaNueva,
         progressOnly: !finalMainMission.completed
     });
 });
