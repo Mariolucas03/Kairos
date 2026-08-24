@@ -25,7 +25,25 @@ self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(STATIC_CACHE).then((cache) => {
             console.log('[Service Worker] Precaching recursos críticos...');
-            return cache.addAll(CORE_ASSETS);
+
+            // ⚠️ Uno a uno, y no con addAll.
+            //
+            // addAll es todo o nada: si UNO solo de los ficheros de la lista
+            // devuelve 404, la promesa se rompe entera, la instalación falla y el
+            // service worker no llega a activarse nunca. Y este service worker no
+            // solo guarda ficheros: es el que recibe las NOTIFICACIONES PUSH. O
+            // sea que renombrar una imagen del listado —algo que pasa sin
+            // pensarlo— dejaría a todo el mundo sin avisos, en silencio y sin
+            // relación aparente con el cambio.
+            //
+            // Así, lo que exista se guarda y lo que falte solo se registra.
+            return Promise.all(
+                CORE_ASSETS.map((ruta) =>
+                    cache.add(ruta).catch((e) => {
+                        console.warn('[Service Worker] No se pudo precachear ' + ruta + ':', e.message);
+                    })
+                )
+            );
         })
     );
 });

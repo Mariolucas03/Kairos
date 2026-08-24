@@ -437,6 +437,27 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
             await processCycle(freq);
         }
 
+        // El dia 1 se reparten ademas los premios del ranking del mes que acaba
+        // de cerrarse.
+        //
+        // ⚠️ Esto solo estaba en su propio cron interno (0 0 1 * *) y en una ruta
+        // externa que nadie ha programado. Si Render reiniciaba la instancia justo
+        // a medianoche del dia 1 —cosa que hace—, el premio de 10.000 fichas NO se
+        // repartia y no habia forma de enterarse: a diferencia del castigo, no
+        // tenia ninguna puesta al dia. Colgandolo aqui hereda la del mantenimiento,
+        // que se ejecuta al arrancar el servidor si el dia anterior quedo pendiente.
+        //
+        // Es seguro llamarlo de mas: marca lastMonthlyRewardPeriod por usuario, asi
+        // que el segundo intento no paga dos veces.
+        if (now.getDate() === 1) {
+            try {
+                const premios = await runMonthlyRankingRewards();
+                console.log('🏆 Premios del ranking: ' + (premios.awarded || 0) + ' repartidos (' + premios.period + ')');
+            } catch (e) {
+                console.error('No se pudieron repartir los premios mensuales:', e.message);
+            }
+        }
+
         // Se anota SOLO si todo fue bien: si algo revienta a medias, el proximo
         // intento vuelve a entrar en vez de dar el dia por castigado.
         await anotarCastigo(yesterdayStr);
