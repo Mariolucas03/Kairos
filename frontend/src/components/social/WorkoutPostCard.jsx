@@ -2,9 +2,11 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BodyMap from '../body/BodyMap';
 import ZoomableImage from './ZoomableImage';
-import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy, BookmarkPlus, Check } from 'lucide-react';
+import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy, BookmarkPlus, Check, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import { getLevelStyle } from '../../utils/socialHelpers';
+import { useAuthStore } from '../../store/useAuthStore';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 // --- HELPER: TIEMPO RELATIVO ---
 // Hasta una semana se cuenta en relativo ("hace 3 h"); a partir de ahí se pone
@@ -27,8 +29,19 @@ const timeAgo = (dateStr) => {
     });
 };
 
-export default function WorkoutPostCard({ post, linkProfile = true }) {
+export default function WorkoutPostCard({ post, linkProfile = true, onBorrado }) {
     const navigate = useNavigate();
+
+    // Quién mira. Hace falta para saber qué puede borrar: su publicación, sus
+    // comentarios, y cualquier comentario que haya en SU publicación.
+    const yo = useAuthStore(state => state.user);
+    const soyElAutor = yo?._id && post.user?._id
+        ? String(yo._id) === String(post.user._id)
+        : false;
+
+    const [borrado, setBorrado] = useState(false);
+    const [confirmarBorrado, setConfirmarBorrado] = useState(false);
+    const [borrandoComentario, setBorrandoComentario] = useState(null);
     const [liked, setLiked] = useState(!!post.likedByMe);
     const [likesCount, setLikesCount] = useState(post.likesCount || 0);
     const [likeBusy, setLikeBusy] = useState(false);
@@ -98,6 +111,33 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
         }
     };
 
+    const borrarPublicacion = async () => {
+        setConfirmarBorrado(false);
+        try {
+            await api.delete(`/social/workout/${post._id}`);
+            setBorrado(true);           // desaparece al momento, sin recargar el feed
+            if (onBorrado) onBorrado(post._id);
+        } catch (e) {
+            console.error('No se pudo borrar la publicación', e);
+        }
+    };
+
+    const borrarComentario = async (comentario) => {
+        setBorrandoComentario(comentario._id);
+        try {
+            await api.delete(`/social/comment/${post._id}/${comentario._id}`);
+            setComments(prev => prev.filter(c => c._id !== comentario._id));
+        } catch (e) {
+            console.error('No se pudo borrar el comentario', e);
+        } finally {
+            setBorrandoComentario(null);
+        }
+    };
+
+    /** ¿Puedo quitar este comentario? El mío, o cualquiera si el post es mío. */
+    const puedoBorrarComentario = (c) =>
+        soyElAutor || (yo?._id && c.user?._id && String(yo._id) === String(c.user._id));
+
     const handleAddComment = async () => {
         const text = commentText.trim();
         if (!text || posting) return;
@@ -131,7 +171,20 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
         setSlideIndex(Math.round(el.scrollLeft / el.clientWidth));
     };
 
+    // Se ha borrado: se quita del feed en el acto, sin esperar a recargar
+    if (borrado) return null;
+
     return (
+        <>
+        {confirmarBorrado && (
+            <ConfirmDialog
+                title="Borrar publicación"
+                message="Se quitará del feed junto con sus me gusta y comentarios. No se puede deshacer."
+                confirmLabel="Borrar"
+                onCancel={() => setConfirmarBorrado(false)}
+                onConfirm={borrarPublicacion}
+            />
+        )}
         // Publicación a sangre, sin marco ni esquinas: ocupa todo el ancho de la
         // pantalla. Entre una y otra queda una banda oscura rematada por una
         // línea clara, para que se vea de un vistazo dónde acaba cada una.
@@ -154,6 +207,16 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                         <span className="text-[9px] text-zinc-500 font-bold">{timeAgo(post.date)}</span>
                     </div>
                 </div>
+
+                {soyElAutor && (
+                    <button
+                        onClick={() => setConfirmarBorrado(true)}
+                        className="p-2 rounded-xl bg-zinc-900 border border-white/5 text-zinc-600 hover:text-red-400 active:scale-95 transition-all"
+                        title="Borrar publicación"
+                    >
+                        <Trash2 size={15} />
+                    </button>
+                )}
 
                 <div className={`p-2 rounded-xl ${isGym ? 'bg-yellow-500/10 text-yellow-500' : 'bg-lime-500/10 text-lime-400'} border border-white/5`}>
                     {isGym ? <Dumbbell size={16} /> : <Activity size={16} />}
@@ -332,6 +395,19 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                                 <span className="text-[11px] font-black text-white mr-1">{c.user?.username}</span>
                                 <span className="text-[11px] text-zinc-300 break-words">{c.text}</span>
                             </div>
+
+                            {puedoBorrarComentario(c) && (
+                                <button
+                                    onClick={() => borrarComentario(c)}
+                                    disabled={borrandoComentario === c._id}
+                                    className="shrink-0 p-1.5 text-zinc-700 hover:text-red-400 active:scale-90 transition-all disabled:opacity-40"
+                                    title="Borrar comentario"
+                                >
+                                    {borrandoComentario === c._id
+                                        ? <Loader2 size={12} className="animate-spin" />
+                                        : <Trash2 size={12} />}
+                                </button>
+                            )}
                         </div>
                     ))}
 
@@ -352,5 +428,6 @@ export default function WorkoutPostCard({ post, linkProfile = true }) {
                 </div>
             )}
         </article>
+        </>
     );
 }

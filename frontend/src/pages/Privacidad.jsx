@@ -102,11 +102,13 @@ export default function Privacidad() {
             </Bloque>
 
             <Bloque titulo="Contacto">
-                <p className="text-yellow-500/90">
-                    ⚠️ Falta poner aquí un correo de contacto antes de publicar la app.
+                <p>
+                    <a href="mailto:mariolucas096@gmail.com" className="text-yellow-500 font-bold break-all">
+                        mariolucas096@gmail.com
+                    </a>
                 </p>
-                <p className="text-zinc-500">Para cualquier duda sobre tus datos, o para pedir una copia de ellos,
-                escribe a esa dirección.</p>
+                <p className="text-zinc-500">Para cualquier duda sobre tus datos, para pedir una copia de ellos o
+                para que se borre algo, escribe a esa dirección.</p>
             </Bloque>
 
             <p className="text-zinc-600 text-[11px] text-center mt-6 mb-2">

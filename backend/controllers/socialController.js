@@ -168,6 +168,91 @@ const toggleLike = async (req, res) => {
     }
 };
 
+/**
+ * Borrar un entreno propio del feed.
+ *
+ * No existia ninguna forma de quitar una publicacion. Se podia borrar una rutina
+ * y quitar un amigo, pero un entreno publicado —con su foto— se quedaba ahi para
+ * siempre, y la unica salida era escribirle al administrador. Publicar algo por
+ * error y no poder retirarlo es la primera queja que llega en cualquier app con
+ * un muro.
+ *
+ * Solo el dueno. Un entreno ajeno lo quita el administrador desde su panel, que
+ * es otra cosa y tiene su propia ruta.
+ *
+ * @route   DELETE /api/social/workout/:workoutId
+ */
+const borrarMiEntreno = async (req, res) => {
+    try {
+        const { workoutId } = req.params;
+
+        const entreno = await WorkoutLog.findById(workoutId).select('user');
+        if (!entreno) return res.status(404).json({ message: 'Ese entreno ya no existe' });
+
+        if (entreno.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Solo puedes borrar tus propios entrenos' });
+        }
+
+        await WorkoutLog.findByIdAndDelete(workoutId);
+
+        // Los avisos que lo anunciaban apuntan a algo que ya no esta: dejarlos
+        // llena el buzon de la gente de entradas que no llevan a ningun sitio.
+        await Notification.deleteMany({ workout: workoutId });
+
+        res.json({ message: 'Entreno borrado', id: workoutId });
+    } catch (error) {
+        console.error('Error borrando entreno:', error);
+        res.status(500).json({ message: 'Error al borrar' });
+    }
+};
+
+/**
+ * Borrar un comentario.
+ *
+ * Lo puede quitar quien lo escribio y tambien el dueno del entreno: en su propia
+ * publicacion manda el, igual que en cualquier red social. El administrador
+ * tiene su propia ruta para moderar lo de los demas.
+ *
+ * @route   DELETE /api/social/comment/:workoutId/:commentId
+ */
+const borrarComentarioPropio = async (req, res) => {
+    try {
+        const { workoutId, commentId } = req.params;
+        const userId = req.user._id.toString();
+
+        const entreno = await WorkoutLog.findById(workoutId).select('user comments');
+        if (!entreno) return res.status(404).json({ message: 'Ese entreno ya no existe' });
+
+        const comentario = (entreno.comments || []).find(c => c._id.toString() === commentId);
+        if (!comentario) return res.status(404).json({ message: 'Ese comentario ya no existe' });
+
+        const esMio = comentario.user?.toString() === userId;
+        const esMiEntreno = entreno.user.toString() === userId;
+
+        if (!esMio && !esMiEntreno) {
+            return res.status(403).json({ message: 'No puedes borrar este comentario' });
+        }
+
+        await WorkoutLog.updateOne(
+            { _id: workoutId },
+            { $pull: { comments: { _id: commentId } } }
+        );
+
+        // El aviso llevaba el texto del comentario dentro: si se queda, el texto
+        // sigue visible en el buzon aunque el comentario ya no este.
+        await Notification.deleteMany({
+            type: 'comment',
+            workout: workoutId,
+            actor: comentario.user
+        });
+
+        res.json({ message: 'Comentario borrado', id: commentId });
+    } catch (error) {
+        console.error('Error borrando comentario:', error);
+        res.status(500).json({ message: 'Error al borrar' });
+    }
+};
+
 // @desc    Comentar un entreno
 // @route   POST /api/social/feed/:workoutId/comment
 const addComment = async (req, res) => {
@@ -739,6 +824,6 @@ const getBadge = async (req, res) => {
 
 module.exports = {
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
-    getFeed, toggleLike, addComment, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
+    getFeed, toggleLike, addComment, borrarMiEntreno, borrarComentarioPropio, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
     removeFriend, getNotifications, markNotificationsRead, getBadge, heartbeat
 };

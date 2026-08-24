@@ -17,7 +17,9 @@ const {
     getNotifications,
     markNotificationsRead,
     getBadge,
-    heartbeat
+    heartbeat,
+    borrarMiEntreno,
+    borrarComentarioPropio
 } = require('../controllers/socialController');
 const protect = require('../middleware/authMiddleware');
 
@@ -27,6 +29,11 @@ router.post('/request', protect, sendFriendRequest);
 router.post('/respond', protect, respondToRequest);
 router.get('/search', protect, searchUsers);
 router.delete('/friends/:friendId', protect, removeFriend);
+
+// Borrar lo tuyo. El entreno solo su dueno; el comentario, quien lo escribio o
+// el dueno del entreno donde esta.
+router.delete('/workout/:workoutId', protect, borrarMiEntreno);
+router.delete('/comment/:workoutId/:commentId', protect, borrarComentarioPropio);
 router.get('/leaderboard', protect, getLeaderboard);
 router.get('/leaderboard/monthly', protect, getMonthlyLeaderboard);
 
