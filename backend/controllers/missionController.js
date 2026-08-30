@@ -25,6 +25,29 @@ const REWARD_TABLE = {
 // un premio gordo, pero no rompe la tienda.
 const FREQUENCY_MULTIPLIERS = { daily: 1, weekly: 4, monthly: 10, yearly: 25 };
 
+/**
+ * TOPES CONTRA LA FÁBRICA DE MISIONES.
+ *
+ * ⚠️ Las misiones las escribe el propio usuario Y pagan. Una diaria fácil da 10
+ * monedas, 100 fichas y 50 XP, y no había ningún límite: crear cincuenta
+ * misiones triviales ("beber agua", "respirar") y marcarlas daba 500 monedas,
+ * 5.000 fichas y 2.500 XP AL DÍA. El objeto más caro de la tienda cuesta 4.000
+ * monedas, y la persona que más XP hizo en todo un mes sumó 1.442.
+ *
+ * Hacen falta los DOS topes, no vale con uno:
+ *
+ *  - El de misiones activas evita tener cien a la vez.
+ *  - El de cobros al día evita darle la vuelta borrando y volviendo a crear,
+ *    que es lo que haría cualquiera al chocar con el primero.
+ *
+ * Los números salen de lo que hace la gente de verdad: los usuarios reales
+ * tienen entre 4 y 6 misiones. 40 activas y 25 cobros al día es entre seis y
+ * diez veces el uso más intenso que se ha visto, así que nadie honesto lo va a
+ * rozar; para farmear, en cambio, hacen falta cientos.
+ */
+const MAX_MISIONES_ACTIVAS = 40;
+const MAX_COBROS_POR_DIA = 25;
+
 const calculateRewards = (difficulty, frequency, isCoop) => {
     const base = REWARD_TABLE[difficulty] || REWARD_TABLE.easy;
     const mult = FREQUENCY_MULTIPLIERS[frequency] || 1;
@@ -151,6 +174,14 @@ const createMission = asyncHandler(async (req, res) => {
     const freq = frequency || 'daily';
     const diff = difficulty || 'easy';
     const days = Array.isArray(specificDays) ? specificDays : [];
+
+    // Tope de misiones activas. Va antes de crear nada: quien llega aqui con 40
+    // no necesita otra mision, necesita borrar alguna.
+    const activas = await Mission.countDocuments({ user: req.user._id });
+    if (activas >= MAX_MISIONES_ACTIVAS) {
+        res.status(400);
+        throw new Error('Tienes ' + activas + ' misiones. Borra alguna antes de crear otra (máximo ' + MAX_MISIONES_ACTIVAS + ').');
+    }
 
     const rewards = calculateRewards(diff, freq, !!isCoop);
 
@@ -283,6 +314,7 @@ const updateProgress = asyncHandler(async (req, res) => {
     const requestedAmount = Number(amount) || 1;
     const addAmount = Math.min(Math.max(requestedAmount, 1), remaining);
     let rewards = null, leveledUp = false, userResult = null;
+    let topeAlcanzado = false;
 
     // Función Helper para progresar y premiar sin Race Conditions
     const processMissionCompletion = async (targetMission, isMain) => {
@@ -307,8 +339,21 @@ const updateProgress = asyncHandler(async (req, res) => {
             );
 
             if (completedDoc) {
+                // ¿Cuantas van cobradas hoy? El registro diario ya lleva la lista
+                // de completadas, asi que no hace falta un contador aparte.
+                const registroHoy = await DailyLog.findOne({ user: userId, date: todayStr })
+                    .select('missionStats.listCompleted').lean();
+                const cobradasHoy = (registroHoy?.missionStats?.listCompleted || [])
+                    .filter(m => !m.failed).length;
+
+                // Pasado el tope la mision SE COMPLETA igual —tacharla es la mitad
+                // de la gracia— pero deja de pagar. Cobrar cero en silencio seria
+                // peor que no dejar completarla, asi que la respuesta lo dice.
+                const pagaPremio = cobradasHoy < MAX_COBROS_POR_DIA;
+                if (!pagaPremio) topeAlcanzado = true;
+
                 // ESTE HILO ES EL GANADOR: REPARTE PREMIOS
-                for (const pId of completedDoc.participants) {
+                for (const pId of (pagaPremio ? completedDoc.participants : [])) {
                     const r = await levelService.addRewards(pId, completedDoc.xpReward, completedDoc.coinReward, completedDoc.gameCoinReward);
                     if (isMain && pId.toString() === userId.toString()) {
                         userResult = r.user;
@@ -352,7 +397,10 @@ const updateProgress = asyncHandler(async (req, res) => {
     const rachaNueva = finalMainMission.completed ? await actualizarRacha(userId) : null;
 
     res.json({
-        message: finalMainMission.completed ? '¡Completada!' : 'Actualizada',
+        message: topeAlcanzado
+            ? 'Completada, pero hoy ya has cobrado el máximo de misiones'
+            : (finalMainMission.completed ? '¡Completada!' : 'Actualizada'),
+        topeAlcanzado,
         mission: finalMainMission,
         user: userResult,
         leveledUp,

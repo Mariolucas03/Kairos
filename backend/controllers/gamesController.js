@@ -177,13 +177,26 @@ const playScratch = asyncHandler(async (req, res) => {
 // ==========================================
 // 3. SLOTS (TRAGAPERRAS)
 // ==========================================
+/**
+ * ⚠️ VALORES SUBIDOS. Los slots se comian el 70% de cada tirada.
+ *
+ * Medido con 500.000 tiradas del codigo real: devolvian el 29,5%. No regalaban
+ * dinero —eso era el rasca y la ruleta de la fortuna— pero eran tan duros que
+ * jugar no tenia ningun sentido: en diez tiradas te quedabas sin nada y sin
+ * haber visto ganar una sola vez.
+ *
+ * Los valores se multiplican por ~2,9 (redondeados a numeros legibles) y quedan
+ * en el 83%, en linea con los dados (83,5%) y el rasca (84,4%). Los pesos NO se
+ * tocan: el ritmo de simbolos y lo raro que es ver una corona se quedan igual,
+ * solo cambia lo que paga cada linea.
+ */
 const SLOT_SYMBOLS = [
-    { id: 'cherry', icon: '🍒', val: 1.5, weight: 25 },
-    { id: 'clover', icon: '🍀', val: 3, weight: 15 },
-    { id: 'zap', icon: '⚡', val: 5, weight: 10 },
-    { id: 'star', icon: '⭐', val: 10, weight: 8 },
-    { id: 'gem', icon: '💎', val: 20, weight: 4 },
-    { id: 'crown', icon: '👑', val: 50, weight: 1 },
+    { id: 'cherry', icon: '🍒', val: 4, weight: 25 },
+    { id: 'clover', icon: '🍀', val: 9, weight: 15 },
+    { id: 'zap', icon: '⚡', val: 15, weight: 10 },
+    { id: 'star', icon: '⭐', val: 30, weight: 8 },
+    { id: 'gem', icon: '💎', val: 60, weight: 4 },
+    { id: 'crown', icon: '👑', val: 150, weight: 1 },
     { id: 'skull', icon: '💀', val: 0, weight: 20 },
     { id: 'ghost', icon: '👻', val: 0, weight: 17 },
 ];
