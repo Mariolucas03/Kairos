@@ -7,8 +7,16 @@ import { getRewardForDay } from '../../utils/rewardsGenerator';
 // Antes ambos eran la misma función, así que la X y el fondo también reclamaban
 // (y si fallaba, el premio se perdía sin avisar).
 export default function DailyRewardModal({ data, onClose, onClaim, claiming = false }) {
-    if (!data) return null;
-
+    // ⚠️ El "if (!data) return null" estaba AQUI, antes del useEffect de abajo.
+    //
+    // Eso rompe la regla de oro de los hooks: React exige que en cada render se
+    // llamen los MISMOS hooks y en el mismo orden. Si la ventana se pinta una vez
+    // con datos (ejecutando el efecto) y despues vuelve a pintarse con data en
+    // null, React cuenta menos hooks de los que esperaba y revienta con
+    // "Rendered fewer hooks than expected": pantalla roja, no un fallo silencioso.
+    //
+    // La salida anticipada baja despues de los hooks, y mientras tanto se
+    // desestructura sobre un objeto vacio para no petar por leer de null.
     const {
         currentDay = 1,
         claimedDays = [],
@@ -16,7 +24,7 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
         subMessage = "¡Tu constancia tiene premio!",
         buttonText = "RECLAMAR",
         isViewOnly = false
-    } = data;
+    } = data || {};
 
     // --- EFECTO DE CONFETI ---
     //
@@ -144,6 +152,10 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
             </div>
         );
     };
+
+    // Sin datos no hay ventana. Va AQUI y no arriba: los hooks ya se han
+    // llamado todos, asi que React cuenta siempre los mismos.
+    if (!data) return null;
 
     return createPortal(
         <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
