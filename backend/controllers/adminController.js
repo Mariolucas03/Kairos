@@ -216,11 +216,19 @@ const estadoDelSistema = asyncHandler(async (req, res) => {
 
     const claveIA = 'ia-llamadas-' + hoy;
 
-    const [marcas, usuarios, conPush, entrenosHoy, activos7dias] = await Promise.all([
+    const [marcas, usuarios, conPush, diasDeHoy, activos7dias] = await Promise.all([
         SystemState.find({}).lean(),
         User.countDocuments({}),
         User.countDocuments({ 'pushSubscriptions.0': { $exists: true } }),
-        WorkoutLog.countDocuments({ date: { $gte: new Date(hoy + 'T00:00:00') } }),
+        // Los entrenos de hoy se cuentan desde el registro diario y NO filtrando
+        // WorkoutLog.date por fecha.
+        //
+        // ⚠️ new Date('2026-08-24T00:00:00') se interpreta en la zona del SERVIDOR,
+        // y Render va en UTC: eso son las 02:00 de Madrid, asi que los entrenos de
+        // madrugada no se contaban. Y poner un desfase fijo estaria mal en invierno,
+        // cuando Madrid es +01:00. El registro diario ya guarda la fecha en formato
+        // de Madrid, asi que preguntarle a el no tiene ese problema.
+        DailyLog.find({ date: hoy }).select('gymWorkouts sportWorkouts').lean(),
         User.countDocuments({ lastActive: { $gte: new Date(Date.now() - 7 * 86400000) } })
     ]);
 
@@ -235,7 +243,9 @@ const estadoDelSistema = asyncHandler(async (req, res) => {
 
         usuarios: { total: usuarios, conNotificaciones: conPush, activos7dias },
 
-        actividad: { entrenosHoy },
+        actividad: {
+            entrenosHoy: diasDeHoy.reduce((t, d) => t + (d.gymWorkouts?.length || 0) + (d.sportWorkouts?.length || 0), 0)
+        },
 
         ia: {
             usadasHoy: llamadasIA,

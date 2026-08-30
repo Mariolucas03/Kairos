@@ -34,7 +34,12 @@ const rangoDeReps = (texto) => {
         const n = Number(numeros[0]);
         return { min: n, max: n };
     }
-    return { min: Number(numeros[0]), max: Number(numeros[1]) };
+    // Ordenados a la fuerza: alguien escribe "12-8" pensando "de 12 a 8" y sin
+    // esto el tope quedaba por debajo del suelo, asi que la app daba la serie por
+    // completada SIEMPRE y subia peso cada sesion.
+    const a = Number(numeros[0]);
+    const b = Number(numeros[1]);
+    return { min: Math.min(a, b), max: Math.max(a, b) };
 };
 
 /** Redondea a medios kilos: no existen las mancuernas de 41,3 kg. */
@@ -53,7 +58,16 @@ const sugerirSiguiente = (config = {}, ultimas = []) => {
 
     // Sin historial no se sugiere nada: la primera vez la decides tú, que es la
     // única forma de saber por dónde andas.
-    if (!Array.isArray(ultimas) || ultimas.length === 0) return null;
+    //
+    // Se descartan las series a cero: una serie apuntada sin repeticiones (o a
+    // medio rellenar) no dice nada de tu fuerza, y colandose en el calculo hacia
+    // que la peor serie fuera siempre esa y la app propusiera repetir peso
+    // eternamente.
+    const validas = (Array.isArray(ultimas) ? ultimas : [])
+        .filter(s => Number(s?.reps) > 0 && Number.isFinite(Number(s?.weight)));
+
+    if (validas.length === 0) return null;
+    ultimas = validas;
 
     const incremento = Number(config.incremento) > 0 ? Number(config.incremento) : 2.5;
     const { min, max } = rangoDeReps(config.reps);
