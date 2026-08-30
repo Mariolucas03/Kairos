@@ -1045,13 +1045,14 @@ const getRoutineHistory = async (req, res) => {
             user: userId,
             'exercises.name': { $in: exercises }
         })
-            .select('date exercises.name exercises.sets')
+            .select('date exercises.name exercises.sets exercises.esPorTiempo exercises.esPesoCorporal')
             .sort({ date: 1 })
             .lean();
 
         // Si se manda la rutina, se puede ademas PROPONER la siguiente sesion de
         // cada ejercicio: sin ella solo sabemos que hiciste, no que toca hoy.
         let configPorEjercicio = {};
+        const banderasPorEjercicio = {};
         if (req.body?.routineId) {
             const rutina = await Routine.findOne({ _id: req.body.routineId, user: userId })
                 .select('exercises').lean();
@@ -1071,9 +1072,42 @@ const getRoutineHistory = async (req, res) => {
                         stats[ex.name] = { lastSets: [], bestSet: { weight: 0, reps: 0, value1RM: 0 } };
                     }
 
-                    const validSets = ex.sets.map(s => ({ weight: s.weight, reps: s.reps }));
+                    // Las banderas del ejercicio, para saber cómo traducir
+                    banderasPorEjercicio[ex.name] = {
+                        esPorTiempo: !!ex.esPorTiempo,
+                        esPesoCorporal: !!ex.esPesoCorporal,
+                        porLado: (ex.sets || []).some(s => s.porLado)
+                    };
+
+                    // ⚠️ Se devuelve lo que el usuario ESCRIBIÓ, no lo que se guardó.
+                    //
+                    // Desde que existen los ejercicios por tiempo, de peso corporal
+                    // y por lado, `weight` y `reps` guardan lo que de VERDAD se
+                    // movió: el peso corporal ya sumado, las repeticiones de los dos
+                    // lados, los segundos convertidos. Devolver eso tal cual para
+                    // rellenar las casillas creaba una bola de nieve en cada sesión:
+                    //
+                    //   por lado    12 -> se guarda 24 -> la casilla muestra 24
+                    //               -> se guarda 48 -> 96... se duplica cada vez
+                    //   corporal    lastre 15 con 80 kg de peso -> se guarda 95
+                    //               -> la casilla de lastre muestra 95 -> 175 -> 255
+                    //   por tiempo  90 s -> se guarda 9 -> la casilla muestra 9 s
+                    //               -> se guarda 0,9... se desploma a cero
+                    //
+                    // La conversión va aquí, en el ÚNICO sitio que alimenta las
+                    // casillas, y no en la pantalla: así el móvil sigue sin tener
+                    // que saber nada de cómo se guardan las cosas.
+                    const validSets = ex.sets.map(s => ({
+                        weight: ex.esPesoCorporal ? (s.lastre || 0) : s.weight,
+                        reps: ex.esPorTiempo
+                            ? (s.segundos || 0)
+                            : (s.porLado ? Math.round((s.reps || 0) / 2) : s.reps)
+                    }));
                     if (validSets.length > 0) {
                         stats[ex.name].lastSets = validSets;
+                        // En bruto, para que la progresión compare peso real con
+                        // peso real y no lastre con lastre.
+                        stats[ex.name].brutas = ex.sets.map(s => ({ weight: s.weight, reps: s.reps }));
                     }
 
                     ex.sets.forEach(set => {
@@ -1090,11 +1124,35 @@ const getRoutineHistory = async (req, res) => {
         // de cada ejercicio. Va DENTRO del mismo endpoint y no en uno aparte para
         // no obligar al movil a hacer dos viajes justo al empezar a entrenar,
         // que es cuando el servidor gratuito peor responde.
+        // El peso corporal hace falta para traducir la sugerencia de los
+        // ejercicios de peso corporal: ahí lo que se escribe es el LASTRE.
+        const pesoRegistrado = await DailyLog.findOne({ user: userId, weight: { $gt: 0 } })
+            .sort({ date: -1 }).lean();
+        const pesoUsuario = pesoRegistrado ? pesoRegistrado.weight : 75;
+
         for (const nombre of Object.keys(stats)) {
             const config = configPorEjercicio[nombre];
             if (!config) continue;
-            const sugerencia = sugerirSiguiente(config, stats[nombre].lastSets);
-            if (sugerencia) stats[nombre].sugerencia = sugerencia;
+
+            // La progresión razona sobre lo que de verdad se movió (por eso
+            // recibe las series en bruto), pero lo que devuelve va a una casilla,
+            // así que se traduce igual que arriba.
+            const sugerencia = sugerirSiguiente(config, stats[nombre].brutas || stats[nombre].lastSets);
+            if (!sugerencia) continue;
+
+            const flags = banderasPorEjercicio[nombre] || {};
+
+            if (flags.esPesoCorporal) {
+                sugerencia.peso = Math.max(0, Math.round((sugerencia.peso - pesoUsuario) * 2) / 2);
+            }
+            if (flags.esPorTiempo) {
+                sugerencia.reps = Math.round(sugerencia.reps * SEGUNDOS_POR_REPETICION);
+            } else if (flags.porLado) {
+                sugerencia.reps = Math.round(sugerencia.reps / 2);
+            }
+
+            stats[nombre].sugerencia = sugerencia;
+            delete stats[nombre].brutas;
         }
 
         res.json(stats);
