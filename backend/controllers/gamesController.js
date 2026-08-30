@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const crypto = require('crypto'); // 🔥 IMPORTACIÓN NATIVA DE NODE PARA SEGURIDAD
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 // --- UTILIDADES GLOBALES ---
 
@@ -75,11 +76,31 @@ const playDice = asyncHandler(async (req, res) => {
 // ==========================================
 // 2. RASCA Y GANA (SCRATCH)
 // ==========================================
+/**
+ * ⚠️ PREMIOS REEQUILIBRADOS. El rasca REGALABA DINERO.
+ *
+ * Medido simulando 300.000 tiradas con este mismo codigo: por cada 100 fichas
+ * apostadas devolvia 279. O sea que jugar casi TRIPLICA el dinero cada vez, y
+ * como las fichas se cambian por monedas, era una impresora infinita: con darle
+ * al boton se compraba la tienda entera.
+ *
+ * No hacia falta hacer trampa para aprovecharlo, solo jugar: la cuenta que mas
+ * habia jugado tenia diez veces mas fichas que las demas.
+ *
+ * Los premios se dividen por 3,3 para dejarlo en el 84%, el mismo margen que los
+ * dados (83,5%). Se mantienen el ritmo de victorias (35%) y las proporciones
+ * entre premios, que es lo que hace que el juego se sienta igual de bien: sigues
+ * ganando algo una de cada tres veces y el diamante sigue siendo diez veces el
+ * limon.
+ *
+ * El XP baja de 200 a 75 por lo mismo: el XP decide el ranking mensual, y a 200
+ * por tirada el ranking se ganaba dandole al rasca, no entrenando.
+ */
 const SCRATCH_SYMBOLS = {
-    DIAMOND: { id: 'd', icon: '💎', prize: 500, type: 'coins', weight: 2 },
-    XP: { id: 'x', icon: '⚡', prize: 200, type: 'xp', weight: 8 },
-    COIN: { id: 'c', icon: '🪙', prize: 100, type: 'coins', weight: 15 },
-    LEMON: { id: 'l', icon: '🍋', prize: 50, type: 'coins', weight: 25 },
+    DIAMOND: { id: 'd', icon: '💎', prize: 150, type: 'coins', weight: 2 },
+    XP: { id: 'x', icon: '⚡', prize: 75, type: 'xp', weight: 8 },
+    COIN: { id: 'c', icon: '🪙', prize: 30, type: 'coins', weight: 15 },
+    LEMON: { id: 'l', icon: '🍋', prize: 15, type: 'coins', weight: 25 },
     SKULL: { id: 's', icon: '💀', prize: 0, type: 'none', weight: 25 },
     POOP: { id: 'p', icon: '💩', prize: 0, type: 'none', weight: 25 }
 };
@@ -301,12 +322,45 @@ const playFortuneWheel = asyncHandler(async (req, res) => {
     const cost = CONFIGS[type];
 
     if (cost === undefined) { res.status(400); throw new Error('Tipo inválido'); }
+
+    // ⚠️ LA TIRADA GRATIS SOLO SE LIMITABA EN EL MÓVIL.
+    //
+    // El "una al día" vivía en el localStorage del navegador, que el propio
+    // usuario puede borrar, y la API no comprobaba nada: girar sin parar era
+    // gratis y daba 32 fichas de media cada vez. Esto es el límite de verdad, y
+    // va con findOneAndUpdate atómico para que dos toques seguidos no cuelen dos
+    // tiradas.
+    if (type === 'daily') {
+        const hoy = getMadridDateString();
+        const reclamado = await User.findOneAndUpdate(
+            { _id: req.user._id, ultimaRuletaDiaria: { $ne: hoy } },
+            { $set: { ultimaRuletaDiaria: hoy } }
+        );
+        if (!reclamado) {
+            res.status(400);
+            throw new Error('La tirada gratis es una al día. Vuelve mañana.');
+        }
+    }
+
     await chargeAndValidate(req.user._id, cost);
 
+    /**
+     * ⚠️ PREMIOS REEQUILIBRADOS. Los tres modos pagaban MÁS de lo que costaban:
+     *
+     *     diaria     gratis y sin límite real -> 32,5 fichas por giro, infinitas
+     *     hardcore   cuesta 50 y devolvía 200 de media  -> 400%
+     *     premium    cuesta 200 y devolvía 443 de media -> 222%
+     *
+     * O sea que la forma óptima de conseguir fichas en la app era darle a la
+     * ruleta, no jugar a nada ni entrenar. Ahora hardcore y premium devuelven el
+     * 85%, el mismo margen que los dados y el rasca, y la diaria se queda como
+     * está porque ya no se puede repetir: 32 fichas gratis al día es un regalo
+     * de bienvenida razonable, no una fuente infinita.
+     */
     const PRIZES = {
         daily: [{ v: 10, t: 'c' }, { v: 50, t: 'c' }, { v: 5, t: 'c' }, { v: 25, t: 'c' }, { v: 100, t: 'c' }, { v: 5, t: 'c' }],
-        hardcore: [{ v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 1000, t: 'c' }, { v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 200, t: 'c' }],
-        premium: [{ v: 250, t: 'c' }, { v: 300, t: 'c' }, { v: 500, t: 'c' }, { v: 210, t: 'c' }, { v: 400, t: 'c' }, { v: 1000, t: 'c' }]
+        hardcore: [{ v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 200, t: 'c' }, { v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 55, t: 'c' }],
+        premium: [{ v: 100, t: 'c' }, { v: 120, t: 'c' }, { v: 180, t: 'c' }, { v: 90, t: 'c' }, { v: 150, t: 'c' }, { v: 380, t: 'c' }]
     };
 
     const winIndex = Math.floor(Math.random() * PRIZES[type].length);

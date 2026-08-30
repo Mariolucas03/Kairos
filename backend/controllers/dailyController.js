@@ -97,13 +97,47 @@ const updateDailyLog = asyncHandler(async (req, res) => {
     const targetDate = date || req.query.date || getServerDateString();
     let { log } = await ensureDailyLog(userId, targetDate, req.user.streak.current);
 
+    // ⚠️ Los CAMPOS ya estaban filtrados, pero no los VALORES.
+    //
+    // Number('abc') puesto en un campo numerico de Mongoose revienta con un error
+    // 500 en la cara del usuario, y un numero enorme se guarda tal cual: 99.999 kg
+    // de peso corporal, dos millones de pasos, cuarenta horas de sueno. Eso no es
+    // solo feo en la grafica: el peso es lo que usa el gimnasio para calcular
+    // cuanto mueves en los ejercicios de peso corporal, y las calorias de una
+    // sesion salen tambien de ahi.
+    const numeroEnRango = (v, min, max) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return null;
+        return Math.min(Math.max(n, min), max);
+    };
+
     switch (type) {
-        case 'mood': log.mood = value; break;
-        case 'weight': log.weight = value; break;
-        case 'sleepHours': log.sleepHours = value; break;
-        case 'steps': log.steps = value; break;
-        case 'streakCurrent': log.streakCurrent = value; break;
-        case 'nutrition': log.nutrition = { ...log.nutrition, ...value }; break;
+        // El animo es un texto corto elegido en pantalla, no un campo libre
+        case 'mood': log.mood = value === null ? null : String(value).slice(0, 40); break;
+
+        // Una persona pesa entre 20 y 500 kg. Fuera de ahi no hay nada que medir.
+        case 'weight': log.weight = numeroEnRango(value, 20, 500); break;
+
+        case 'sleepHours': log.sleepHours = numeroEnRango(value, 0, 24); break;
+
+        // 200.000 pasos son unos 150 km andando: imposible en un dia
+        case 'steps': log.steps = numeroEnRango(value, 0, 200000) ?? 0; break;
+
+        // ⚠️ streakCurrent SE QUITA de la lista. Es un reflejo de la racha real
+        // del usuario, que copia ensureDailyLog al crear el dia; dejar que el
+        // cliente la escriba solo servia para ensenar una racha falsa en el
+        // registro de ese dia sin haberla hecho.
+
+        // Solo las claves conocidas y numericas: antes se volcaba el objeto
+        // entero que mandara el cliente dentro de nutrition.
+        case 'nutrition': {
+            const limpio = {};
+            for (const clave of ['totalKcal', 'protein', 'carbs', 'fat', 'fiber']) {
+                if (value?.[clave] !== undefined) limpio[clave] = numeroEnRango(value[clave], 0, 30000) ?? 0;
+            }
+            log.nutrition = { ...log.nutrition, ...limpio };
+            break;
+        }
         // 🔒 'sport', 'training', 'missions' y 'gains' NO son editables por el cliente:
         // los gestiona el servidor (gymController con $push, levelService/missionController
         // con $inc) porque alimentan premios reales (ranking mensual, ranking de clanes).

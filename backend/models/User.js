@@ -101,6 +101,13 @@ const userSchema = new mongoose.Schema({
     // guardaba y TODOS los amigos aparecían siempre como desconectados.
     lastActive: { type: Date, default: Date.now },
 
+    // Último día en que se giró la ruleta GRATIS ("YYYY-MM-DD", hora de Madrid).
+    //
+    // ⚠️ Este límite vivía solo en el localStorage del móvil, o sea que no era
+    // un límite: borrando una clave del navegador —o llamando a la API a pelo—
+    // se giraba sin parar, y la tirada gratis da 32 fichas de media.
+    ultimaRuletaDiaria: { type: String, default: null },
+
     // Recompensas Diarias
     dailyRewards: {
         claimedDays: { type: [Number], default: [] },
