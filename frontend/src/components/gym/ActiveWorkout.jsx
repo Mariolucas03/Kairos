@@ -441,8 +441,21 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             const res = await api.post('/gym/log', logData);
 
-            const updatedStructure = exercises.map(ex => ({
-                name: ex.name, muscle: ex.muscle || 'Global', sets: ex.setsData.length, reps: "10-12", targetWeight: 0
+            // ⚠️ Esto REESCRIBIA la rutina con solo cuatro campos, asi que cada
+            // entreno terminado borraba su configuracion: el rango de
+            // repeticiones se forzaba a "10-12", el descanso propio del ejercicio
+            // y el musculo concreto desaparecian, y el peso objetivo se ponia a
+            // cero. Con lo anadido despues era peor todavia: tiempo, peso
+            // corporal, por lado, superserie, sistema de progresion e
+            // incremento se iban tambien. Configurabas la progresion, entrenabas
+            // UNA vez y se habia esfumado.
+            //
+            // Lo unico que tiene sentido actualizar aqui es cuantas series
+            // hiciste de verdad. Todo lo demas se conserva tal cual, quitando
+            // solo lo que vive en la pantalla y no en la rutina.
+            const updatedStructure = exercises.map(({ setsData, pr, lastWeights, ...ex }) => ({
+                ...ex,
+                sets: setsData.length
             }));
             await api.put(`/gym/routines/${routine._id}`, { exercises: updatedStructure });
 
