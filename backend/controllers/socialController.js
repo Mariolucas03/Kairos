@@ -15,6 +15,16 @@ const FEED_PAGE_SIZE = 15;
 
 // Da forma a un WorkoutLog para el feed/perfil: cuenta likes/comments sin exponer
 // la lista completa de quién ha dado like (privacidad + payload más ligero)
+// Cuantos comentarios viajan con cada publicacion del feed. El resto se pediria
+// aparte al abrirla; con 20 se ve la conversacion reciente sin traer el hilo
+// entero.
+const COMENTARIOS_EN_EL_FEED = 20;
+
+// Tope de comentarios por publicacion. No es censura: es que una publicacion con
+// miles de comentarios no se puede pintar ni cargar, y es la forma mas facil de
+// dejar inservible el feed de otra persona.
+const MAX_COMENTARIOS_POR_ENTRENO = 300;
+
 const shapeFeedItem = (log, viewerId) => {
     const obj = log.toObject ? log.toObject() : log;
     const likes = obj.likes || [];
@@ -36,12 +46,25 @@ const shapeFeedItem = (log, viewerId) => {
         records: obj.records || [],
         likesCount: likes.length,
         likedByMe: likes.some(id => id.toString() === viewerId.toString()),
-        comments: (obj.comments || []).map(c => ({
-            _id: c._id,
-            text: c.text,
-            createdAt: c.createdAt,
-            user: c.user
-        }))
+        // ⚠️ Solo los ULTIMOS, no todos.
+        //
+        // El feed devolvia los comentarios enteros de cada publicacion, y no hay
+        // ningun limite de cuantos puede tener: mil comentarios en un post
+        // —spam, o simplemente una publicacion muy comentada— convertian el feed
+        // de esa persona en varios megabytes que su movil se descarga entera
+        // cada vez que abre la pestana.
+        //
+        // Se manda el total aparte, para poder poner "ver los 340 comentarios"
+        // sin tener que traerlos.
+        comentariosTotales: (obj.comments || []).length,
+        comments: (obj.comments || [])
+            .slice(-COMENTARIOS_EN_EL_FEED)
+            .map(c => ({
+                _id: c._id,
+                text: c.text,
+                createdAt: c.createdAt,
+                user: c.user
+            }))
     };
 };
 
@@ -270,11 +293,19 @@ const addComment = async (req, res) => {
         const allowed = await canViewContent(userId, workout.user);
         if (!allowed) return res.status(403).json({ message: 'No tienes acceso a este entreno' });
 
-        const updated = await WorkoutLog.findByIdAndUpdate(
-            workoutId,
+        // El tope va en el FILTRO, no en una comprobacion previa: comprobar y
+        // despues escribir deja pasar de largo a dos comentarios simultaneos.
+        const updated = await WorkoutLog.findOneAndUpdate(
+            { _id: workoutId, [`comments.${MAX_COMENTARIOS_POR_ENTRENO}`]: { $exists: false } },
             { $push: { comments: { user: userId, text } } },
             { new: true }
         ).select('comments');
+
+        if (!updated) {
+            return res.status(400).json({
+                message: 'Esta publicación ya tiene demasiados comentarios'
+            });
+        }
 
         const savedComment = updated.comments[updated.comments.length - 1];
 

@@ -80,6 +80,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
 
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState(post.comments || []);
+    const [totalComentarios, setTotalComentarios] = useState(post.comentariosTotales ?? (post.comments || []).length);
     const [commentText, setCommentText] = useState('');
     const [posting, setPosting] = useState(false);
 
@@ -127,6 +128,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
         try {
             await api.delete(`/social/comment/${post._id}/${comentario._id}`);
             setComments(prev => prev.filter(c => c._id !== comentario._id));
+            setTotalComentarios(t => Math.max(0, t - 1));
         } catch (e) {
             console.error('No se pudo borrar el comentario', e);
         } finally {
@@ -145,6 +147,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
         try {
             const res = await api.post(`/social/feed/${post._id}/comment`, { text });
             setComments(prev => [...prev, res.data.comment]);
+            setTotalComentarios(t => t + 1);
             setCommentText('');
         } catch (e) { } finally {
             setPosting(false);
@@ -361,7 +364,12 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                 </button>
                 <button onClick={() => setShowComments(s => !s)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
                     <MessageCircle size={24} className={showComments ? 'text-blue-400' : 'text-white'} />
-                    <span className={`text-xs font-black ${showComments ? 'text-blue-400' : 'text-zinc-400'}`}>{comments.length}</span>
+                    {/* El feed manda solo los ultimos 20 comentarios, asi que la
+                        cuenta sale del total que envia el servidor. Si no, un post
+                        con 300 comentarios ensenaria un 20. */}
+                    <span className={`text-xs font-black ${showComments ? 'text-blue-400' : 'text-zinc-400'}`}>
+                        {Math.max(totalComentarios, comments.length)}
+                    </span>
                 </button>
 
                 {/* Copiar este entreno a mis rutinas */}
