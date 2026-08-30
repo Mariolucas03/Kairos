@@ -66,5 +66,10 @@ const missionSchema = new mongoose.Schema({
 
 // Índice optimizado para búsquedas por participante
 missionSchema.index({ participants: 1, frequency: 1, completed: 1 });
+// Las consultas de misiones son SIEMPRE $or: [{ user }, { participants }], y solo
+// habia indice para la segunda mitad. Mongo no puede usar un indice para media
+// condicion: sin este, la mitad del $or recorria la coleccion entera. Se nota en
+// el castigo nocturno y en el aviso de las 20:00, que recorren a todos.
+missionSchema.index({ user: 1, frequency: 1, completed: 1 });
 
 module.exports = mongoose.model('Mission', missionSchema);

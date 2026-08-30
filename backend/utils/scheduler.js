@@ -7,6 +7,7 @@ const { addRewards } = require('../services/levelService');
 const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
 const { getMadridDateString, getMadridMonthString } = require('./dateHelpers');
 const SystemState = require('../models/SystemState');
+const Notification = require('../models/Notification');
 
 // Clave donde se anota el ULTIMO dia ya castigado, para no castigar dos veces
 const CLAVE_NOCTURNO = 'nightly-maintenance';
@@ -435,6 +436,22 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
         // 4. LIMPIEZA
         for (const freq of frequenciesToPunish) {
             await processCycle(freq);
+        }
+
+        // Las notificaciones sociales no se borraban NUNCA. Son la unica coleccion
+        // que crece con cada me gusta y cada comentario y no tiene fin: con la app
+        // en marcha son miles al mes por persona, y el plan gratuito de Atlas son
+        // 512 MB para todo.
+        //
+        // Se van las LEIDAS de hace mas de 30 dias. Las no leidas se quedan: nadie
+        // deberia perder un aviso que aun no ha visto por haber estado un mes sin
+        // entrar.
+        try {
+            const hace30 = new Date(Date.now() - 30 * 86400000);
+            const viejas = await Notification.deleteMany({ read: true, createdAt: { $lt: hace30 } });
+            if (viejas.deletedCount > 0) console.log('🧹 ' + viejas.deletedCount + ' notificaciones leidas de hace mas de un mes, borradas.');
+        } catch (e) {
+            console.error('No se pudieron limpiar las notificaciones viejas:', e.message);
         }
 
         // El dia 1 se reparten ademas los premios del ranking del mes que acaba
