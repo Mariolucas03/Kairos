@@ -190,6 +190,21 @@ const playScratch = asyncHandler(async (req, res) => {
  * tocan: el ritmo de simbolos y lo raro que es ver una corona se quedan igual,
  * solo cambia lo que paga cada linea.
  */
+// Coste y premios de la ruleta de la fortuna.
+//
+// Viven aqui arriba y no dentro de la funcion por dos razones: no se
+// reconstruyen en cada peticion, y sobre todo se pueden COMPROBAR desde las
+// pruebas. Estas tablas ya regalaron dinero una vez (los tres modos pagaban
+// mas de lo que costaban); una prueba que mide lo que devuelven es lo unico
+// que evita que vuelva a pasar sin que nadie se entere.
+const FORTUNE_COSTS = { daily: 0, hardcore: 50, premium: 200 };
+
+    const FORTUNE_PRIZES = {
+        daily: [{ v: 10, t: 'c' }, { v: 50, t: 'c' }, { v: 5, t: 'c' }, { v: 25, t: 'c' }, { v: 100, t: 'c' }, { v: 5, t: 'c' }],
+        hardcore: [{ v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 200, t: 'c' }, { v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 55, t: 'c' }],
+        premium: [{ v: 100, t: 'c' }, { v: 120, t: 'c' }, { v: 180, t: 'c' }, { v: 90, t: 'c' }, { v: 150, t: 'c' }, { v: 380, t: 'c' }]
+    };
+
 const SLOT_SYMBOLS = [
     { id: 'cherry', icon: '🍒', val: 4, weight: 25 },
     { id: 'clover', icon: '🍀', val: 9, weight: 15 },
@@ -331,8 +346,7 @@ const playRoulette = asyncHandler(async (req, res) => {
 // ==========================================
 const playFortuneWheel = asyncHandler(async (req, res) => {
     const { type } = req.body;
-    const CONFIGS = { daily: 0, hardcore: 50, premium: 200 };
-    const cost = CONFIGS[type];
+    const cost = FORTUNE_COSTS[type];
 
     if (cost === undefined) { res.status(400); throw new Error('Tipo inválido'); }
 
@@ -370,14 +384,9 @@ const playFortuneWheel = asyncHandler(async (req, res) => {
      * está porque ya no se puede repetir: 32 fichas gratis al día es un regalo
      * de bienvenida razonable, no una fuente infinita.
      */
-    const PRIZES = {
-        daily: [{ v: 10, t: 'c' }, { v: 50, t: 'c' }, { v: 5, t: 'c' }, { v: 25, t: 'c' }, { v: 100, t: 'c' }, { v: 5, t: 'c' }],
-        hardcore: [{ v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 200, t: 'c' }, { v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 55, t: 'c' }],
-        premium: [{ v: 100, t: 'c' }, { v: 120, t: 'c' }, { v: 180, t: 'c' }, { v: 90, t: 'c' }, { v: 150, t: 'c' }, { v: 380, t: 'c' }]
-    };
 
-    const winIndex = Math.floor(Math.random() * PRIZES[type].length);
-    const winObj = PRIZES[type][winIndex];
+    const winIndex = Math.floor(Math.random() * FORTUNE_PRIZES[type].length);
+    const winObj = FORTUNE_PRIZES[type][winIndex];
 
     let finalUser = req.user;
     if (winObj.v > 0) {
@@ -668,4 +677,9 @@ const playTower = asyncHandler(async (req, res) => {
     throw new Error('Acción inválida');
 });
 
-module.exports = { playDice, playScratch, playSlots, playRoulette, playFortuneWheel, playBlackjack, playTower };
+module.exports = {
+    playDice, playScratch, playSlots, playRoulette, playFortuneWheel, playBlackjack, playTower,
+    // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
+    // devuelve cada juego, y ya regalaron dinero una vez.
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS
+};

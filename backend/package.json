@@ -6,7 +6,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "lint": "eslint . --quiet",
-    "lint:avisos": "eslint ."
+    "lint:avisos": "eslint .",
+    "test": "node --test \"pruebas/*.test.js\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
