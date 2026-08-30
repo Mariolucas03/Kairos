@@ -4,6 +4,7 @@ const WorkoutLog = require('../models/WorkoutLog');
 const User = require('../models/User');
 const { sendPushToUser } = require('./pushController');
 const DailyLog = require('../models/DailyLog');
+const SystemState = require('../models/SystemState');
 const levelService = require('../services/levelService');
 
 // 🔥 Toda la IA pasa por el servicio único (una sola cascada de modelos gratis)
@@ -549,11 +550,34 @@ const CATALOG_FINGERPRINT = require('crypto')
     .update(JSON.stringify(EXERCISE_CATALOG))
     .digest('hex');
 
+const CLAVE_HUELLA_CATALOGO = 'catalogo-ejercicios';
 let ultimaHuellaSincronizada = null;
 
 const syncExerciseCatalog = async ({ force = false } = {}) => {
     if (!force && ultimaHuellaSincronizada === CATALOG_FINGERPRINT) {
         return { synced: false, total: EXERCISE_CATALOG.length };
+    }
+
+    // ⚠️ La marca de "ya esta sincronizado" vivia SOLO en memoria, asi que se
+    // perdia en cada reinicio y el arranque reescribia los 1.292 ejercicios otra
+    // vez. Medido: un segundo entero de arranque y miles de escrituras que no
+    // cambiaban nada.
+    //
+    // En Render gratuito la instancia se reinicia a menudo, y el arranque en frio
+    // es justo lo que mas se sufre en esta app. Con la huella guardada en la base,
+    // un reinicio con el catalogo intacto no escribe nada.
+    if (!force) {
+        try {
+            const guardada = await SystemState.findOne({ key: CLAVE_HUELLA_CATALOGO }).lean();
+            if (guardada?.value === CATALOG_FINGERPRINT) {
+                ultimaHuellaSincronizada = CATALOG_FINGERPRINT;
+                return { synced: false, total: EXERCISE_CATALOG.length };
+            }
+        } catch (e) {
+            // Si no se puede leer, se sincroniza igual: es lento, pero deja el
+            // catalogo correcto, que es lo que importa.
+            console.warn('No se pudo leer la huella del catalogo:', e.message);
+        }
     }
 
     // El filtro sigue siendo el NOMBRE, no el slug: las rutinas y el historial
@@ -609,6 +633,18 @@ const syncExerciseCatalog = async ({ force = false } = {}) => {
     });
 
     ultimaHuellaSincronizada = CATALOG_FINGERPRINT;
+
+    // Se anota DESPUES de escribir: si el proceso muere a medias, el siguiente
+    // arranque vuelve a sincronizar en vez de dar por bueno un catalogo incompleto.
+    try {
+        await SystemState.updateOne(
+            { key: CLAVE_HUELLA_CATALOGO },
+            { $set: { value: CATALOG_FINGERPRINT, updatedAt: new Date() } },
+            { upsert: true }
+        );
+    } catch (e) {
+        console.warn('No se pudo guardar la huella del catalogo:', e.message);
+    }
     return { synced: true, total: EXERCISE_CATALOG.length, borrados: borrados.deletedCount };
 };
 

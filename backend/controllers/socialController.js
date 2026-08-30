@@ -131,7 +131,26 @@ const getFeed = async (req, res) => {
             return res.json({ items: [], hasMore: false });
         }
 
-        const logs = await WorkoutLog.find({ user: { $in: friendIds } })
+        // ⚠️ El feed NO miraba la visibilidad de cada amigo.
+        //
+        // En Ajustes se pueden ocultar los entrenos por separado, y esa opcion se
+        // respetaba al entrar en el PERFIL de alguien pero no en el feed: quien la
+        // activaba seguia apareciendo en el muro de todos sus amigos con sus
+        // entrenos, sus pesos y sus fotos. Una opcion de privacidad que solo
+        // funciona en la mitad de los sitios es peor que no tenerla, porque la
+        // persona cree que esta oculta.
+        //
+        // Sin el campo (cuentas antiguas) se considera visible, igual que hace la
+        // comprobacion del perfil.
+        const amigosVisibles = await User.find({
+            _id: { $in: friendIds },
+            'visibility.workouts': { $ne: false }
+        }).select('_id').lean();
+
+        const idsVisibles = amigosVisibles.map(a => a._id);
+        if (idsVisibles.length === 0) return res.json({ items: [], hasMore: false });
+
+        const logs = await WorkoutLog.find({ user: { $in: idsVisibles } })
             .sort({ date: -1 })
             .skip((page - 1) * FEED_PAGE_SIZE)
             .limit(FEED_PAGE_SIZE + 1) // Pedimos uno de más para saber si hay más páginas
