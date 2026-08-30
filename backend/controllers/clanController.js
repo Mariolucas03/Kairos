@@ -19,7 +19,10 @@ const EVENT_ROTATION = ['volume', 'missions', 'calories', 'xp'];
 // constante hace de verdad en una semana.
 const EVENT_GOALS_PER_MEMBER = {
     volume: 15000,      // 15.000 kg·rep ≈ 3 sesiones de pesas
-    missions: 12,       // 12 misiones ≈ 2 al día
+    // ⚠️ Sube de 12 a 35. Con 12 por persona y semana, la meta del clan se
+    // alcanzaba en DOS DIAS de uso normal, y eso paga 1.000 monedas. 35 son
+    // cinco al dia, que es un uso intenso pero real.
+    missions: 35,       // 35 misiones ≈ 5 al día
     calories: 2500,     // 2.500 kcal quemadas
     xp: 1200            // 1.200 XP
 };
@@ -118,7 +121,15 @@ const getClanMetrics = async (clanMemberIds, weekStart, eventType) => {
         const dateStr = getMadridDateString(weekStart);
         stats = await DailyLog.aggregate([
             { $match: { user: { $in: clanMemberIds }, date: { $gte: dateStr } } },
-            { $group: { _id: "$user", total: { $sum: "$missionStats.completed" } } }
+            // ⚠️ Como MUCHO 25 misiones por persona y dia.
+            //
+            // Las misiones las escribe el propio usuario, asi que sin tope bastaba
+            // con crear cuarenta triviales cada dia para reventar la meta del clan
+            // en una tarde y llevarse el premio maximo, que son 5.000 monedas: mas
+            // que el objeto mas caro de la tienda. 25 es el mismo tope que ya se
+            // aplica al cobro de misiones, asi que lo que cuenta para el clan es
+            // exactamente lo que se te ha pagado.
+            { $group: { _id: "$user", total: { $sum: { $min: ['$missionStats.completed', 25] } } } }
         ]);
     }
     else if (eventType === 'xp') {

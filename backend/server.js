@@ -122,6 +122,36 @@ app.get('/', (req, res) => res.send('API NoteGymk funcionando 🚀'));
 // Middleware de manejo de errores (SIEMPRE AL FINAL)
 app.use(errorHandler);
 
+/**
+ * RED DE SEGURIDAD DEL PROCESO.
+ *
+ * ⚠️ Desde Node 15, una promesa rechazada que nadie recoge TUMBA EL PROCESO
+ * ENTERO. Y en esta app hay varias llamadas lanzadas sin esperar respuesta a
+ * proposito —limpiar una suscripcion push caducada, avisar a los amigos de un
+ * entreno, mandar una notificacion— porque son secundarias y no deben retrasar
+ * la respuesta al usuario.
+ *
+ * Una de esas, fallando por un hipo de la base de datos, dejaba a TODO el mundo
+ * sin app hasta que Render reiniciara. Y en el plan gratuito, reiniciar son
+ * otros 30-50 segundos de arranque en frio para el siguiente que entre.
+ *
+ * Esto no oculta el problema: lo escribe en los registros con su traza. Lo que
+ * evita es que un fallo de algo accesorio se lleve por delante lo principal.
+ */
+process.on('unhandledRejection', (motivo) => {
+    console.error('⚠️  Promesa rechazada sin recoger (el servidor SIGUE en pie):', motivo);
+});
+
+/**
+ * Los errores sincronos sueltos si son harina de otro costal: el proceso puede
+ * quedar en un estado incoherente, asi que se registra y se sale de forma
+ * ordenada para que Render lo levante limpio.
+ */
+process.on('uncaughtException', (error) => {
+    console.error('💥 Error no capturado, cerrando para reiniciar limpio:', error);
+    process.exit(1);
+});
+
 const PORT = process.env.PORT || 5000;
 
 // Escuchar en 0.0.0.0 es correcto para Render y acceso red local
