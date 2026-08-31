@@ -79,9 +79,22 @@ export default [
             'react/jsx-uses-vars': 'error',
             'react/jsx-uses-react': 'error',
 
+            // ⚠️ UN HOOK EN EL SITIO EQUIVOCADO NO "HUELE MAL": TUMBA LA PANTALLA.
+            //
+            // Esta regla ya estaba, pero en 'warn' — y el build corre eslint con
+            // --quiet, que se salta los avisos. Estaba apagada de hecho.
+            //
+            // Ha pasado DOS veces: la pantalla de la recompensa diaria y el
+            // panel de admin. Las dos igual: un hook debajo de un return
+            // condicional. En el render en que se cumple la condicion, React
+            // cuenta un hook menos que en el anterior y aborta con "rendered
+            // fewer hooks than expected". No es que se vea raro: no se ve.
+            'react-hooks/rules-of-hooks': 'error',
+
             // --- LO QUE SOLO AVISA (huele mal, pero no rompe nada) ---
             'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_' }],
-            'react-hooks/rules-of-hooks': 'warn',
+            // Esta se queda en aviso: se queja de cosas que muchas veces son
+            // deliberadas, y una regla que se ignora no sirve para nada.
             'react-hooks/exhaustive-deps': 'warn'
         }
     }

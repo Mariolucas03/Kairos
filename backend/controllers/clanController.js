@@ -62,18 +62,73 @@ const buildTiers = (goal) => Object.keys(TIER_FACTORS).map(t => {
 });
 
 /**
- * Un clan sin nadie dentro no debe seguir existiendo: ocupaba sitio en el
- * explorador, se podía "entrar" en él y su nombre quedaba pillado para siempre
+ * Un clan sin nadie dentro no debe seguir existiendo: ocupa sitio en el
+ * explorador, se puede "entrar" en él y su nombre queda pillado para siempre
  * (el nombre es único). Se llama después de cada salida o expulsión.
+ *
+ * ⚠️ Cuenta PERSONAS QUE EXISTEN, no entradas en la lista.
+ *
+ * Antes miraba `members.length`, y eso dejaba un tipo de clan que no se borraba
+ * NUNCA: el fantasma. Cuando una cuenta desaparece sin pasar por el borrado en
+ * cascada —una limpieza a mano en la base, un usuario borrado antes de que ese
+ * servicio existiera— su id se queda en el array del clan para siempre. El clan
+ * figura "con un miembro" que no es nadie: aparece en el ranking, no se puede
+ * disolver, y su nombre no se puede volver a usar.
+ *
+ * Encontrado en producción: el clan "ESPAÑA" llevaba así con un miembro muerto.
+ *
+ * Si queda gente pero hay ids muertos, se limpian igualmente: el número de
+ * miembros y el poder total mentirían para siempre, y el poder ordena el
+ * ranking de clanes.
  */
 const borrarClanSiVacio = async (clanId) => {
     if (!clanId) return false;
-    const clan = await Clan.findById(clanId).select('members').lean();
+
+    const clan = await Clan.findById(clanId).select('members leader name').lean();
     if (!clan) return false;
-    if ((clan.members || []).length > 0) return false;
-    await Clan.findByIdAndDelete(clanId);
-    console.log(`🏰 Clan ${clanId} eliminado: se quedó sin miembros`);
-    return true;
+
+    const ids = clan.members || [];
+    const vivos = ids.length
+        ? await User.find({ _id: { $in: ids } }).select('_id level clanRank').lean()
+        : [];
+
+    if (vivos.length === 0) {
+        await Clan.findByIdAndDelete(clanId);
+        // Por si alguien seguía apuntando a él desde su ficha
+        await User.updateMany({ clan: clanId }, { $set: { clan: null, clanRank: null } });
+        console.log(`🏰 Clan ${clan.name || clanId} eliminado: no queda nadie dentro`);
+        return true;
+    }
+
+    if (vivos.length !== ids.length) {
+        const vivosIds = vivos.map(v => v._id);
+        const cambios = {
+            members: vivosIds,
+            // El poder se recalcula desde cero en vez de restar: si ya venía
+            // torcido por un miembro fantasma, restar lo deja torcido igual.
+            totalPower: vivos.reduce((t, v) => t + (v.level || 1) * 100, 0)
+        };
+
+        // Un clan sin líder vivo no se puede administrar ni disolver, así que
+        // hereda el de más rango (y a igualdad, el de más nivel).
+        const lideraAlguienVivo = clan.leader &&
+            vivos.some(v => v._id.toString() === clan.leader.toString());
+
+        if (!lideraAlguienVivo) {
+            const orden = { esclavo: 0, recluta: 1, guerrero: 2, rey: 3, dios: 4 };
+            const heredero = [...vivos].sort((a, b) => {
+                const r = (orden[b.clanRank] || 0) - (orden[a.clanRank] || 0);
+                return r !== 0 ? r : (b.level || 1) - (a.level || 1);
+            })[0];
+            cambios.leader = heredero._id;
+            await User.findByIdAndUpdate(heredero._id, { $set: { clanRank: 'dios' } });
+        }
+
+        await Clan.findByIdAndUpdate(clanId, { $set: cambios });
+        console.log(`🏰 Clan ${clan.name || clanId}: ${ids.length - vivos.length} miembro(s) fantasma limpiados`);
+    }
+
+    return false;
 };
 
 // Helper: Obtener el Lunes a las 04:00 AM
@@ -252,13 +307,16 @@ const claimEventReward = asyncHandler(async (req, res) => {
 
 // @desc    Buscar clanes (Ranking)
 const searchClans = asyncHandler(async (req, res) => {
-    // Los clanes vacíos se borran en cuanto se detectan: puede quedar alguno de
-    // antes de que existiera esa limpieza, y no tiene sentido enseñarlos.
-    const vacios = await Clan.find({ $or: [{ members: { $size: 0 } }, { members: { $exists: false } }] }).select('_id').lean();
-    if (vacios.length) {
-        await Clan.deleteMany({ _id: { $in: vacios.map(c => c._id) } });
-        console.log(`🏰 ${vacios.length} clan(es) vacío(s) eliminados`);
+    // Repaso de oportunidad: abrir el explorador es el momento natural para
+    // barrer lo que se haya quedado colgado. Pasa por el MISMO helper que las
+    // salidas y las expulsiones, así que aquí también caen los fantasmas (lista
+    // con ids de cuentas que ya no existen) y no solo los literalmente vacíos.
+    const candidatos = await Clan.find({}).select('_id').lean();
+    let borrados = 0;
+    for (const c of candidatos) {
+        if (await borrarClanSiVacio(c._id)) borrados++;
     }
+    if (borrados) console.log(`🏰 ${borrados} clan(es) sin nadie dentro eliminados`);
 
     const clans = await Clan.find({ 'members.0': { $exists: true } })
         .sort({ totalPower: -1 })

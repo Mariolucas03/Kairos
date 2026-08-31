@@ -160,6 +160,24 @@ export default function Admin() {
         if (pestana === 'registro' && registro === null) pedir('/admin/registro', setRegistro);
     }, [pestana, user?.isAdmin]);
 
+    const listaFiltrada = useMemo(() => {
+        const q = busqueda.trim().toLowerCase();
+        if (!q) return usuarios;
+        return usuarios.filter(u =>
+            u.username?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q));
+    }, [usuarios, busqueda]);
+
+    // ⚠️ TODOS los hooks van ARRIBA, antes de cualquier return.
+    //
+    // Este useMemo estaba debajo del return de aqui abajo, y eso tumbaba la
+    // pantalla entera: en el render en que se cumple la condicion, React cuenta
+    // un hook menos que en el anterior y aborta con "rendered fewer hooks than
+    // expected". No redirige: peta. Basta con que el usuario guardado en el
+    // movil llegue un instante sin isAdmin —una sesion abierta de antes, o el
+    // primer pintado antes de refrescar el perfil— para que salte.
+    //
+    // La comprobacion de verdad esta en el servidor (el router entero exige
+    // isAdmin); esto solo evita ensenar una pantalla que no va a funcionar.
     // La pantalla no existe para quien no es administrador. La comprobación de
     // verdad está en el servidor (el router entero exige isAdmin); esto solo
     // evita enseñar una pantalla que no va a funcionar.
@@ -221,13 +239,6 @@ export default function Admin() {
             return r;
         }, { mensajeError: 'No se pudo enviar' });
     };
-
-    const listaFiltrada = useMemo(() => {
-        const q = busqueda.trim().toLowerCase();
-        if (!q) return usuarios;
-        return usuarios.filter(u =>
-            u.username?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q));
-    }, [usuarios, busqueda]);
 
     return (
         <div className="min-h-screen bg-black pb-28 safe-top animate-in fade-in select-none">
