@@ -283,11 +283,18 @@ const createClan = asyncHandler(async (req, res) => {
 
     if (await Clan.findOne({ name })) { res.status(400); throw new Error('Nombre ocupado'); }
 
+    // El modelo acota el nombre y la descripcion, pero el icono y el nivel
+    // minimo entraban tal cual desde el movil: el icono es un texto sin tope que
+    // viaja en CADA listado de clanes, y un nivel minimo de 9.999 (o negativo)
+    // deja un clan al que no puede entrar nadie y que no se puede arreglar.
+    const iconoSeguro = String(icon || '🛡️').trim().slice(0, 4) || '🛡️';
+    const nivelSeguro = Math.max(1, Math.min(Math.floor(Number(minLevel)) || 1, 100));
+
     const clan = await Clan.create({
         name,
         description: description || "Clan de guerreros",
-        icon: icon || '🛡️',
-        minLevel: minLevel || 1,
+        icon: iconoSeguro,
+        minLevel: nivelSeguro,
         leader: userId,
         members: [userId],
         totalPower: (user.level || 1) * 100,

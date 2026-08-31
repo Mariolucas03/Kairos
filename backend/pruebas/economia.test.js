@@ -4,6 +4,7 @@ const assert = require('node:assert');
 const {
     SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS
 } = require('../controllers/gamesController');
+const { premioDeCofre } = require('../controllers/shopController');
 
 /**
  * LA ECONOMÍA DEL CASINO
@@ -134,5 +135,68 @@ describe('Casino: ningun juego puede regalar dinero', () => {
                 `La planta ${planta} paga mejor que la anterior: subir deberia ser mas arriesgado, no mas rentable`);
             anterior = devuelve;
         });
+    });
+});
+
+/**
+ * LOS COFRES
+ *
+ * Son el puente entre las fichas del casino y las monedas de la tienda, asi que
+ * comparten el problema del casino: si dan de mas, imprimen monedas; si dan de
+ * menos, comprarlos es tirar el dinero. Y no se nota abriendo uno.
+ *
+ * Lo que habia: los CUATRO devolvian exactamente lo mismo (100 o 10) costaran 50
+ * fichas o 1.000. El Legendario costaba veinte veces mas que el Ronoso y daba lo
+ * mismo, con "alto riesgo, alta recompensa" en la descripcion.
+ */
+describe('Cofres: lo caro tiene que dar mas que lo barato', () => {
+
+    const PRECIOS = [50, 120, 250, 1000];
+    const TIRADAS = 60000;
+
+    const mediaDe = (precio) => {
+        let total = 0;
+        for (let i = 0; i < TIRADAS; i++) total += premioDeCofre(precio);
+        return total / TIRADAS;
+    };
+
+    test('todos devuelven la misma proporcion, y ninguno regala dinero', () => {
+        for (const precio of PRECIOS) {
+            const porcentaje = (mediaDe(precio) / precio) * 100;
+
+            assert.ok(porcentaje < 100,
+                `El cofre de ${precio} devuelve el ${porcentaje.toFixed(1)}%: esta REGALANDO monedas`);
+
+            // La proporcion de referencia es la que ya tenia el cofre barato
+            // (56%): si un cofre se sale de ahi, es que su premio dejo de
+            // depender de su precio, que es justo el fallo que hubo.
+            assert.ok(Math.abs(porcentaje - 56) < 3,
+                `El cofre de ${precio} devuelve el ${porcentaje.toFixed(1)}%, y deberia rondar el 56% como los demas`);
+        }
+    });
+
+    test('cuanto mas caro es el cofre, mas da', () => {
+        let anterior = 0;
+        for (const precio of PRECIOS) {
+            const media = mediaDe(precio);
+            assert.ok(media > anterior,
+                `El cofre de ${precio} no da mas que el anterior: pagar mas tiene que servir para algo`);
+            anterior = media;
+        }
+    });
+
+    test('el cofre barato sigue dando lo mismo que siempre', () => {
+        // 50 fichas -> 100 monedas una de cada cinco veces, 10 el resto. Es el
+        // unico que estaba bien, asi que el arreglo no puede haberlo movido.
+        const salidas = new Set();
+        for (let i = 0; i < 2000; i++) salidas.add(premioDeCofre(50));
+        assert.deepStrictEqual([...salidas].sort((a, b) => a - b), [10, 100]);
+    });
+
+    test('un precio imposible no genera premios imposibles', () => {
+        for (const basura of ['mucho', -50, 0, null, undefined, Infinity, NaN]) {
+            const premio = premioDeCofre(basura);
+            assert.strictEqual(premio, 0, `premioDeCofre(${basura}) deberia dar 0 y da ${premio}`);
+        }
     });
 });

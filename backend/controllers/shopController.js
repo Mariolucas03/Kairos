@@ -196,6 +196,11 @@ const buyItem = async (req, res) => {
         const currencyName = isReward ? 'Monedas' : 'Fichas';
 
         // B. Verificamos si ya lo tiene (para categorías únicas)
+        //
+        // Esta comprobación es solo para responder rápido y con un mensaje
+        // claro. NO es la que protege: entre leer aquí y escribir abajo hay
+        // milisegundos, y en esa rendija caben dos peticiones. La de verdad va
+        // dentro del filtro de la escritura, en el punto C.
         const userCheck = await User.findById(userId).select('inventory');
         const isUniqueCategory = ['avatar', 'frame', 'theme', 'title', 'pet'].includes(item.category);
         const alreadyOwns = userCheck.inventory.some(entry => entry?.item && entry.item.toString() === itemId);
@@ -224,11 +229,19 @@ const buyItem = async (req, res) => {
             ).populate('inventory.item');
         } else {
             // Es nuevo -> Añadimos al array y restamos dinero
+            //
+            // ⚠️ En los objetos ÚNICOS, el "no lo tengo ya" entra en el MISMO
+            // filtro que el saldo. Comprobarlo arriba y empujar aquí dejaba una
+            // rendija real: dos toques seguidos con la conexión lenta —o el
+            // doble toque de un móvil que no responde— pasaban los dos por la
+            // comprobación antes de que ninguno escribiera, y acababas pagando
+            // el Fénix DOS VECES (8.000 fichas) y con dos copias del mismo
+            // avatar en el inventario.
+            const filtro = { _id: userId, [currencyField]: { $gte: item.price } };
+            if (isUniqueCategory) filtro['inventory.item'] = { $ne: itemId };
+
             updatedUser = await User.findOneAndUpdate(
-                {
-                    _id: userId,
-                    [currencyField]: { $gte: item.price } // CONDICIÓN ATÓMICA: Saldo >= Precio
-                },
+                filtro,
                 {
                     $inc: { [currencyField]: -item.price },
                     $push: { inventory: { item: itemId, quantity: 1 } }
@@ -237,9 +250,17 @@ const buyItem = async (req, res) => {
             ).populate('inventory.item');
         }
 
-        // Si updatedUser es null, significa que la condición de saldo ($gte) falló o el usuario no existe
+        // Si updatedUser es null, la escritura no encontró a nadie. Puede ser por
+        // saldo o porque el objeto ya estaba comprado (la carrera de arriba), y
+        // decir "no tienes suficientes fichas" cuando lo que pasa es que ya lo
+        // tienes manda a buscar un problema de dinero que no existe.
         if (!updatedUser) {
-            return res.status(400).json({ message: `No tienes suficientes ${currencyName} o hubo un error de sincronización.` });
+            if (isUniqueCategory) {
+                const ahora = await User.findById(userId).select('inventory').lean();
+                const loTiene = (ahora?.inventory || []).some(e => e?.item && e.item.toString() === itemId);
+                if (loTiene) return res.status(400).json({ message: '¡Ya tienes este objeto!' });
+            }
+            return res.status(400).json({ message: `No tienes suficientes ${currencyName}.` });
         }
 
         res.json({
@@ -254,6 +275,33 @@ const buyItem = async (req, res) => {
 };
 
 // 4. USAR / EQUIPAR
+/**
+ * Lo que devuelve un cofre, a partir de lo que cuesta.
+ *
+ * ⚠️ Los cuatro cofres daban EXACTAMENTE lo mismo: 100 monedas una de cada
+ * cinco veces y 10 el resto, costaran 50 fichas o 1.000. Es decir, el Cofre
+ * Legendario costaba VEINTE VECES más que el Roñoso y devolvía lo mismo, con
+ * "alto riesgo, alta recompensa" escrito debajo. Comprarlo era tirar el dinero,
+ * y no había forma de darse cuenta salvo abriendo unos cuantos y sospechando.
+ *
+ * Ahora el premio sale del precio, así que:
+ *
+ *  - La proporción es la misma para los cuatro (56% de media), que es
+ *    exactamente la que ya tenía el Roñoso: 50 → 100 ó 10. El cofre barato no
+ *    cambia ni un número; los caros dejan de ser una estafa.
+ *  - Lo que cambia entre cofres es el TAMAÑO del salto, que es lo que hace que
+ *    arriesgar signifique algo: el Legendario da 2.000 ó 200.
+ *
+ * Se exporta para poder comprobarlo desde las pruebas: un cofre que devuelve de
+ * menos no da ningún error, igual que el rasca que devolvía de más.
+ */
+const premioDeCofre = (precio) => {
+    const seguro = Number(precio);
+    if (!Number.isFinite(seguro) || seguro <= 0) return 0;
+    // Una de cada cinco veces sale el premio gordo
+    return Math.round(seguro * (Math.random() > 0.8 ? 2 : 0.2));
+};
+
 const useItem = async (req, res) => {
     try {
         const { itemId } = req.body;
@@ -290,8 +338,7 @@ const useItem = async (req, res) => {
         if (item.category === 'consumable' || item.category === 'chest') {
             let prize = 0;
             if (item.category === 'chest') {
-                const roll = Math.random();
-                prize = roll > 0.8 ? 100 : 10;
+                prize = premioDeCofre(item.price);
                 rewardData = { type: 'coins', value: prize };
                 msg = "Cofre abierto";
             } else {
@@ -367,19 +414,34 @@ const useItem = async (req, res) => {
 // 5. INTERCAMBIO (🔥 BLINDADO)
 const exchangeCurrency = async (req, res) => {
     try {
-        const { amountGameCoins } = req.body;
-        if (!amountGameCoins || amountGameCoins < 100) return res.status(400).json({ message: 'Mínimo 100 fichas' });
+        // El número tiene que ser un número. Sin esto, lo que llegue del móvil
+        // entra tal cual en la resta: es la misma vía por la que el casino
+        // acabó guardando `gameCoins: NaN`, que no da ningún error y deja la
+        // cuenta con un saldo que ya no se puede ni gastar ni arreglar.
+        const pedido = Math.floor(Number(req.body?.amountGameCoins));
+        if (!Number.isFinite(pedido) || pedido < 100) {
+            return res.status(400).json({ message: 'Mínimo 100 fichas' });
+        }
 
-        const coinsToReceive = Math.floor(amountGameCoins / 100);
+        const coinsToReceive = Math.floor(pedido / 100);
 
-        // Actualización Atómica: Busca al usuario SOLO si tiene fichas >= amountGameCoins
+        // ⚠️ Se cobra el múltiplo, no lo que se pidió.
+        //
+        // Antes se restaban las fichas PEDIDAS y se entregaban las monedas
+        // redondeadas hacia abajo: cambiar 199 fichas daba 1 moneda y la app se
+        // quedaba con las otras 99 sin decir nada. Como el mínimo son 100, el
+        // caso salta en cuanto alguien escribe "todas mis fichas" y tiene un
+        // número que no acaba en dos ceros.
+        const aCobrar = coinsToReceive * 100;
+
+        // Actualización Atómica: Busca al usuario SOLO si tiene fichas >= lo que se cobra
         const updatedUser = await User.findOneAndUpdate(
             {
                 _id: req.user._id,
-                gameCoins: { $gte: amountGameCoins }
+                gameCoins: { $gte: aCobrar }
             },
             {
-                $inc: { gameCoins: -amountGameCoins, coins: coinsToReceive }
+                $inc: { gameCoins: -aCobrar, coins: coinsToReceive }
             },
             { new: true }
         );
@@ -388,7 +450,10 @@ const exchangeCurrency = async (req, res) => {
             return res.status(400).json({ message: 'Fichas insuficientes o hubo un problema de conexión' });
         }
 
-        res.json({ message: `Canje exitoso: +${coinsToReceive} Monedas`, user: updatedUser });
+        res.json({
+            message: `Canje exitoso: +${coinsToReceive} Monedas por ${aCobrar} fichas`,
+            user: updatedUser
+        });
     } catch (error) {
         res.status(500).json({ message: 'Error en intercambio' });
     }
@@ -403,4 +468,9 @@ const seedShop = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error en seed' }); }
 };
 
-module.exports = { getShopItems, createCustomReward, buyItem, useItem, seedShop, exchangeCurrency };
+module.exports = {
+    getShopItems, createCustomReward, buyItem, useItem, seedShop, exchangeCurrency,
+    // Se exporta SOLO para las pruebas: los cuatro cofres devolvian lo mismo
+    // costaran lo que costaran, y eso no da ningun error.
+    premioDeCofre
+};
