@@ -1,0 +1,30 @@
+MARCOS DE RANGO
+===============
+
+Aqui van los diez marcos, uno por rango muscular. La app los busca por nombre
+exacto, en minusculas y sin acentos:
+
+    novato.png      oro.png
+    madera.png      platino.png
+    bronce.png      diamante.png
+    hierro.png      maestro.png
+    plata.png       leyenda.png
+
+REQUISITOS
+----------
+
+  - PNG con transparencia DE VERDAD (canal alfa). El centro tiene que ser un
+    agujero, no un cuadriculado dibujado: por ahi se ve el avatar.
+  - Cuadrados, o casi. Se pintan a 18-22 px de lado en la lista de musculos.
+  - Sin fondo ni marco de tarjeta alrededor. Van sobre el negro de la app.
+
+NO HACE FALTA TENERLOS TODOS
+----------------------------
+
+Cada icono que falte se pinta como antes: un punto del color del rango. Se
+pueden ir metiendo de uno en uno sin que nada se rompa por el camino.
+
+DONDE SE VEN
+------------
+
+Gym -> pestana Cuerpo: en la escala de rangos y al lado de cada musculo.

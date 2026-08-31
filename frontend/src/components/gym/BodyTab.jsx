@@ -4,6 +4,7 @@ import { TrendingUp, ChevronDown, Dumbbell, Trophy, Info } from 'lucide-react';
 import api from '../../services/api';
 import BodyMap from '../body/BodyMap';
 import ProgressChart from './ProgressChart';
+import IconoRango from './IconoRango';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -59,7 +60,10 @@ export default function BodyTab() {
                 {/* Mini leyenda de rangos: sin ella los colores del cuerpo no
                     significan nada. Los tramos los manda el servidor (tiers),
                     asi que no hay una segunda tabla que se pueda desincronizar.
-                    De momento solo el color; cuando haya iconos por rango se
+                    Aqui se deja el color a secas a proposito: esta franja
+                    explica los COLORES del mapa del cuerpo, no los rangos. Los
+                    iconos van en la escala de abajo y en cada musculo. Antes:
+                    cuando haya iconos por rango se
                     sustituye el circulo por su logo. */}
                 {Array.isArray(escala) && escala.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2 justify-center">
@@ -120,7 +124,7 @@ export default function BodyTab() {
                             <div className="grid grid-cols-2 gap-1.5">
                                 {escala.map(r => (
                                     <div key={r.key} className="flex items-center gap-2 bg-black rounded-lg px-2 py-1.5 border border-white/5">
-                                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                                        <IconoRango rango={r.key} color={r.color} tamano={18} />
                                         <span className="text-[10px] font-black uppercase" style={{ color: r.color }}>{r.label}</span>
                                         <span className="text-[9px] text-zinc-600 ml-auto font-bold">{miles(r.min)}</span>
                                     </div>
@@ -146,7 +150,7 @@ export default function BodyTab() {
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: info.rankColor }} />
+                                            <IconoRango rango={info.rank} color={info.rankColor} tamano={22} />
                                             <span className="text-xs font-black text-white uppercase truncate">{nombre}</span>
                                             {hijos.length > 0 && (
                                                 <ChevronDown
