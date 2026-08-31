@@ -108,6 +108,11 @@ app.use('/api/push', pushRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/games', gamesRoutes);
 
+// Fallos de pantalla que mandan los moviles. Cualquiera con sesion puede
+// escribir aqui —es la app la que avisa cuando se rompe—, asi que los topes
+// viven en el controlador. Se leen desde el panel de administracion.
+app.use('/api/errores', require('./routes/errores'));
+
 // Inicializar Cron Jobs Internos (Como respaldo o para tareas diurnas)
 initScheduledJobs();
 

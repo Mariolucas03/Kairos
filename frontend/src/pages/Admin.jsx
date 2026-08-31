@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import {
     Shield, Ban, Undo2, Trash2, Send, Loader2, Users, MessageSquare, KeyRound, Copy,
     Activity, Coins, Play, CheckCircle2, AlertTriangle, Search, X, ChevronRight,
-    Heart, Flame, Dumbbell, ScrollText, Server, Database, Image, Zap
+    Heart, Flame, Dumbbell, ScrollText, Server, Database, Image, Zap, Bug, EyeOff, RotateCcw
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -27,10 +27,16 @@ const PESTANAS = [
     { key: 'usuarios', label: 'Usuarios', icon: Users },
     { key: 'contenido', label: 'Contenido', icon: MessageSquare },
     { key: 'avisos', label: 'Avisos', icon: Send },
+    { key: 'fallos', label: 'Fallos', icon: Bug },
     { key: 'economia', label: 'Economía', icon: Coins },
     { key: 'sistema', label: 'Sistema', icon: Activity },
     { key: 'registro', label: 'Registro', icon: ScrollText }
 ];
+
+/** Hace legible una fecha suelta: "14 sep, 18:42". */
+const cuando = (f) => f
+    ? new Date(f).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : '—';
 
 // Las tres tareas que dependen de que un cron externo las llame a su hora. Si
 // ese día falló, esto es la forma de arreglarlo sin abrir un ordenador.
@@ -108,6 +114,8 @@ export default function Admin() {
     const [entrenos, setEntrenos] = useState(null);
     const [eco, setEco] = useState(null);
     const [registro, setRegistro] = useState(null);
+    const [fallos, setFallos] = useState(null);
+    const [falloAbierto, setFalloAbierto] = useState(null);
 
     const [busqueda, setBusqueda] = useState('');
     const [verEntrenos, setVerEntrenos] = useState(true);
@@ -156,6 +164,7 @@ export default function Admin() {
             pedir('/admin/comentarios', setComentarios);
             pedir('/admin/entrenos', setEntrenos);
         }
+        if (pestana === 'fallos' && fallos === null) pedir('/admin/errores', setFallos);
         if (pestana === 'economia' && eco === null) pedir('/admin/economia', setEco);
         if (pestana === 'registro' && registro === null) pedir('/admin/registro', setRegistro);
     }, [pestana, user?.isAdmin]);
@@ -194,6 +203,7 @@ export default function Admin() {
             // Lo que se toca deja de valer: se vuelve a pedir la próxima vez
             if (recargar.includes('contenido')) { setComentarios(null); setEntrenos(null); }
             if (recargar.includes('economia')) setEco(null);
+            if (recargar.includes('fallos')) setFallos(null);
             // El registro cambia con CUALQUIER acción, así que se invalida siempre
             setRegistro(null);
             if (ficha) await abrirFicha(ficha._id, { silencioso: true });
@@ -728,6 +738,97 @@ export default function Admin() {
                     </Tarjeta>
                 )}
 
+                {/* ─── FALLOS ───────────────────────────────────────────── */}
+                {!cargando && pestana === 'fallos' && (
+                    fallos === null ? (
+                        <div className="flex justify-center py-12 text-zinc-600"><Loader2 className="animate-spin" size={24} /></div>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="text-[10px] text-zinc-600 leading-tight ml-1 mb-3">
+                                Pantallas que se han roto en el móvil de alguien. Van agrupadas: el mismo
+                                fallo en la misma pantalla es una línea con su contador, aunque haya
+                                pasado cien veces. Se caducan solas al mes.
+                            </p>
+
+                            {fallos.errores.length === 0 && (
+                                <div className="py-14 text-center">
+                                    <Bug size={26} className="text-zinc-800 mx-auto mb-3" />
+                                    <p className="text-zinc-600 text-sm">No se ha roto nada.</p>
+                                    <p className="text-[10px] text-zinc-700 mt-1">Es la pantalla que quieres ver vacía.</p>
+                                </div>
+                            )}
+
+                            {fallos.errores.map(f => (
+                                <Tarjeta key={f._id} className={`p-4 ${f.resuelto ? 'opacity-45' : ''}`}>
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className={`text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                                                    f.origen === 'render' ? 'bg-red-500/15 text-red-400'
+                                                        : f.origen === 'promesa' ? 'bg-violet-500/15 text-violet-400'
+                                                            : 'bg-orange-500/15 text-orange-400'
+                                                }`}>
+                                                    {f.origen === 'render' ? 'pantalla' : f.origen === 'promesa' ? 'promesa' : 'suelto'}
+                                                </span>
+                                                {f.veces > 1 && (
+                                                    <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wide">
+                                                        ×{f.veces}
+                                                    </span>
+                                                )}
+                                                {f.ruta && (
+                                                    <span className="text-[9px] text-zinc-600 font-mono truncate">{f.ruta}</span>
+                                                )}
+                                            </div>
+
+                                            <p className="text-white text-sm font-bold mt-1.5 break-words">{f.mensaje}</p>
+
+                                            <p className="text-[10px] text-zinc-600 mt-1">
+                                                {/* A cuanta gente le pasa: a uno puede ser su movil; a los tres, es la app */}
+                                                {f.aQuien.length > 0 && <>A {f.aQuien.join(', ')} · </>}
+                                                última {cuandoFue(f.ultimaVez)}
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            onClick={() => accion(
+                                                () => api.post('/admin/error-visto', { errorId: f._id, resuelto: !f.resuelto }),
+                                                { recargar: ['fallos'] }
+                                            )}
+                                            disabled={enVuelo}
+                                            title={f.resuelto ? 'Devolver a la lista' : 'Marcar como visto'}
+                                            className="shrink-0 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white active:scale-95 transition-transform"
+                                        >
+                                            {f.resuelto ? <RotateCcw size={15} /> : <EyeOff size={15} />}
+                                        </button>
+                                    </div>
+
+                                    {/* El detalle, plegado: la pila ocupa mucho y solo hace falta
+                                        cuando te pones a arreglarlo. */}
+                                    {f.pila && (
+                                        <>
+                                            <button
+                                                onClick={() => setFalloAbierto(falloAbierto === f._id ? null : f._id)}
+                                                className="mt-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-zinc-400 transition-colors"
+                                            >
+                                                {falloAbierto === f._id ? 'Ocultar detalle' : 'Ver detalle'}
+                                            </button>
+                                            {falloAbierto === f._id && (
+                                                <div className="mt-2 bg-black border border-white/[0.06] rounded-xl p-3 overflow-x-auto">
+                                                    <pre className="text-[9px] text-zinc-500 font-mono whitespace-pre-wrap break-words">{f.pila}</pre>
+                                                    <p className="text-[9px] text-zinc-700 mt-2 pt-2 border-t border-white/[0.05]">
+                                                        Primera vez: {cuando(f.primeraVez)}
+                                                        {f.navegador && <><br />{f.navegador}</>}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </Tarjeta>
+                            ))}
+                        </div>
+                    )
+                )}
+
                 {/* ─── ECONOMÍA ─────────────────────────────────────────── */}
                 {!cargando && pestana === 'economia' && (
                     eco === null ? (
@@ -802,6 +903,29 @@ export default function Admin() {
                 {/* ─── SISTEMA ──────────────────────────────────────────── */}
                 {!cargando && pestana === 'sistema' && estado && (
                     <div className="space-y-3">
+                        {/* Si algo se esta rompiendo, se dice AQUI. La pestana
+                            de Fallos no sirve de nada si hay que acordarse de
+                            entrar a mirarla. */}
+                        {fallos?.resumen?.sinResolver > 0 && (
+                            <button
+                                onClick={() => setPestana('fallos')}
+                                className="w-full bg-red-950/30 border border-red-500/30 rounded-[24px] p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
+                            >
+                                <Bug size={18} className="text-red-400 shrink-0" />
+                                <div className="flex-1 min-w-0 text-left">
+                                    <p className="text-sm font-bold text-red-400">
+                                        {fallos.resumen.sinResolver} {fallos.resumen.sinResolver === 1 ? 'fallo sin ver' : 'fallos sin ver'}
+                                    </p>
+                                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                                        {fallos.resumen.enLasUltimas24h > 0
+                                            ? fallos.resumen.enLasUltimas24h + ' en las últimas 24 h'
+                                            : 'ninguno hoy'}
+                                    </p>
+                                </div>
+                                <ChevronRight size={16} className="text-zinc-600 shrink-0" />
+                            </button>
+                        )}
+
                         <div className="grid grid-cols-2 gap-2">
                             <Dato etiqueta="Usuarios" valor={estado.usuarios.total} pie={estado.usuarios.activos7dias + ' activos (7 días)'} />
                             <Dato etiqueta="Con avisos" valor={estado.usuarios.conNotificaciones} pie="reciben notificaciones" />

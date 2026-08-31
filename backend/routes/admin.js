@@ -7,7 +7,8 @@ const {
     ultimosComentarios, borrarComentario, borrarEntreno,
     notificar,
     fichaUsuario, ajustarStats, borrarCuenta,
-    ultimosEntrenos, economia, registroAdmin
+    ultimosEntrenos, economia, registroAdmin,
+    erroresDePantalla, marcarErrorVisto
 } = require('../controllers/adminController');
 
 /**
@@ -51,5 +52,9 @@ router.post('/notificar', notificar);
 // Economia y registro de acciones de administrador
 router.get('/economia', economia);
 router.get('/registro', registroAdmin);
+
+// Pantallas que se estan rompiendo en los moviles
+router.get('/errores', erroresDePantalla);
+router.post('/error-visto', marcarErrorVisto);
 
 module.exports = router;

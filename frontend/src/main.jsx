@@ -4,6 +4,12 @@ import App from './App';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import './index.css';
 import { API_BASE_URL } from './config';
+import { escucharFallosGlobales } from './utils/reportarFallo';
+
+// Se engancha ANTES de montar React: los fallos que ocurren durante el arranque
+// son justo los peores (pantalla en negro sin nada) y son los que hasta ahora
+// no veia absolutamente nadie.
+escucharFallosGlobales();
 
 // --- DESPERTAR AL BACKEND CUANTO ANTES ---
 // El backend (Render free tier) se duerme tras ~15 min de inactividad y tarda

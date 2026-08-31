@@ -10,6 +10,7 @@ const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder } = 
 const { getMadridDateString } = require('../utils/dateHelpers');
 const mongoose = require('mongoose');
 const AdminLog = require('../models/AdminLog');
+const ErrorLog = require('../models/ErrorLog');
 const Routine = require('../models/Routine');
 const Mission = require('../models/Mission');
 const NutritionLog = require('../models/NutritionLog');
@@ -846,6 +847,84 @@ const registroAdmin = asyncHandler(async (req, res) => {
     })));
 });
 
+
+/**
+ * LO QUE SE ESTÁ ROMPIENDO EN LOS MÓVILES.
+ *
+ * Antes, cuando una pantalla reventaba, la red de seguridad pintaba "algo se ha
+ * roto" y hacía un console.error. Nadie se enteraba nunca salvo que el usuario
+ * escribiera. En la historia de la app han reventado seis pantallas por usar una
+ * variable inexistente, y las seis las encontró alguien leyendo el código días
+ * después, no la app.
+ *
+ * Sale agrupado por huella (mismo mensaje, misma pantalla), y ordenado por lo
+ * que MÁS gente sufre y más reciente es, que es el orden en el que hay que
+ * arreglarlos. Los ya marcados como vistos van al final, pero no se borran: si
+ * uno vuelve después de darlo por resuelto, eso es información.
+ *
+ * @route   GET /api/admin/errores
+ */
+const erroresDePantalla = asyncHandler(async (req, res) => {
+    const filas = await ErrorLog.find({})
+        .sort({ resuelto: 1, ultimaVez: -1 })
+        .limit(50)
+        .populate('usuarios', 'username')
+        .lean();
+
+    const desde24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    res.json({
+        // El resumen es lo que se mira primero: si esto está a cero, no hay que
+        // leer la lista.
+        resumen: {
+            sinResolver: filas.filter(f => !f.resuelto).length,
+            enLasUltimas24h: filas.filter(f => !f.resuelto && new Date(f.ultimaVez) >= desde24h).length
+        },
+        errores: filas.map(f => ({
+            _id: f._id,
+            mensaje: f.mensaje,
+            ruta: f.ruta,
+            origen: f.origen,
+            pila: f.pila,
+            veces: f.veces,
+            // Los nombres, no los identificadores: "le pasa a Ari y a Daniel"
+            // se entiende; una lista de ids, no.
+            aQuien: (f.usuarios || []).map(u => u?.username).filter(Boolean),
+            navegador: f.navegador,
+            primeraVez: f.primeraVez,
+            ultimaVez: f.ultimaVez,
+            resuelto: !!f.resuelto
+        }))
+    });
+});
+
+/**
+ * Marcar un fallo como visto, o devolverlo a la lista.
+ *
+ * No se borra nunca desde aquí: si vuelve a pasar después de darlo por
+ * arreglado, el contador sigue subiendo y eso es justo lo que hay que ver.
+ *
+ * @route   POST /api/admin/error-visto
+ */
+const marcarErrorVisto = asyncHandler(async (req, res) => {
+    const { errorId, resuelto = true } = req.body || {};
+    if (!mongoose.isValidObjectId(errorId)) { res.status(400); throw new Error('Error no valido'); }
+
+    const fila = await ErrorLog.findByIdAndUpdate(
+        errorId,
+        { $set: { resuelto: !!resuelto, resueltoEn: resuelto ? new Date() : null } },
+        { new: true }
+    );
+    if (!fila) { res.status(404); throw new Error('Ese fallo ya no esta'); }
+
+    await anotar(req, resuelto ? 'fallo-visto' : 'fallo-reabierto', {
+        resumen: (resuelto ? 'dio por visto' : 'reabrio') + ' el fallo "' + fila.mensaje.slice(0, 60) + '"',
+        detalle: { ruta: fila.ruta, veces: fila.veces }
+    });
+
+    res.json({ message: resuelto ? 'Marcado como visto' : 'Devuelto a la lista' });
+});
+
 module.exports = {
     listarUsuarios, banear, desbanear, restablecerClave,
     estadoDelSistema, lanzarMantenimiento, ajustarSaldo,
@@ -853,5 +932,6 @@ module.exports = {
     notificar,
     // Ampliacion del panel
     fichaUsuario, ajustarStats, borrarCuenta,
-    ultimosEntrenos, economia, registroAdmin
+    ultimosEntrenos, economia, registroAdmin,
+    erroresDePantalla, marcarErrorVisto
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { reportarFallo } from '../../utils/reportarFallo';
 
 /**
  * RED DE SEGURIDAD GLOBAL.
@@ -19,6 +20,21 @@ export default class ErrorBoundary extends React.Component {
 
     componentDidCatch(error, info) {
         console.error('💥 Error no controlado:', error, info);
+
+        // Se avisa al servidor. Hasta ahora este console.error era TODO lo que
+        // pasaba: quedaba escrito en la consola de un movil que nadie va a
+        // abrir nunca, y el fallo solo se descubria si el usuario lo contaba.
+        //
+        // Va antes de la posible recarga de mas abajo a proposito, y el envio
+        // usa keepalive para que el navegador lo termine aunque la pagina se
+        // muera a mitad.
+        reportarFallo({
+            mensaje: error?.message || String(error),
+            // La pila de React (que componente ha sido) dice mucho mas que la
+            // de JavaScript, que en produccion viene minificada.
+            pila: (info?.componentStack || error?.stack || '').slice(0, 1200),
+            origen: 'render'
+        });
 
         // Tras un despliegue nuevo, el index.html que tiene el móvil en caché
         // apunta a trozos de código con un nombre que ya no existe: el import
