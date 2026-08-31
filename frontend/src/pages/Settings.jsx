@@ -9,6 +9,7 @@ import Toast from '../components/common/Toast';
 import BackButton from '../components/common/BackButton';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useAuthStore } from '../store/useAuthStore';
+import { Z } from '../utils/zLayers';
 
 const BIO_MAX = 150;
 
@@ -126,24 +127,6 @@ export default function Settings() {
                 </h1>
             </div>
 
-            {/* Acceso al panel de administracion. Solo aparece si lo eres: para
-                el resto de usuarios esta pantalla no existe. */}
-            {user?.isAdmin && (
-                <button
-                    onClick={() => navigate('/admin')}
-                    className="w-full bg-[#0a0a0c] border border-yellow-500/30 rounded-[24px] p-4 flex items-center gap-4 mb-6 active:scale-[0.99] transition-transform"
-                >
-                    <div className="p-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/40 text-yellow-500">
-                        <Shield size={18} />
-                    </div>
-                    <div className="flex-1 text-left">
-                        <p className="font-bold text-sm text-white">Panel de administración</p>
-                        <p className="text-[10px] text-zinc-500 mt-0.5">Usuarios, avisos y moderación</p>
-                    </div>
-                    <ChevronRight size={18} className="text-zinc-600" />
-                </button>
-            )}
-
             {/* --- TU PERFIL --- */}
             <section className="mb-6">
                 <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Tu perfil</h2>
@@ -255,26 +238,31 @@ export default function Settings() {
                 </div>
             </section>
 
-            {/* --- GUARDAR --- */}
-            <button
-                onClick={handleSave}
-                disabled={!dirty || saving}
-                className="w-full py-4 bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black rounded-2xl uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 border-b-4 border-yellow-600 disabled:border-zinc-900 mb-8"
-            >
-                {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {saving ? 'Guardando...' : dirty ? 'Guardar cambios' : 'Todo guardado'}
-            </button>
+            {/* BARRA DE GUARDAR — flotante, y solo cuando hay algo que guardar.
 
-            {/* --- CERRAR SESIÓN --- */}
-            <div className="border-t border-zinc-900 pt-6">
-                <button
-                    onClick={() => setConfirmLogout(true)}
-                    className="w-full bg-red-950/20 border border-red-900/30 text-red-500 p-4 rounded-2xl flex items-center justify-center gap-3 font-bold text-sm hover:bg-red-900/40 transition-all active:scale-95"
+                Antes era un botón fijo en mitad de la pantalla, gris y apagado
+                casi siempre ("Todo guardado"), y por debajo seguía habiendo
+                media página: cerrar sesión, la política y borrar la cuenta.
+                Parecía el final de los ajustes sin serlo, y ocupaba el mejor
+                sitio de la pantalla para no decir nada.
+
+                Ahora no existe hasta que tocas algo, y cuando existe está
+                siempre a mano, sin tener que buscar dónde se guardaba. */}
+            {dirty && (
+                <div
+                    className="fixed left-0 right-0 bottom-24 px-4 animate-in slide-in-from-bottom-4 fade-in duration-200"
+                    style={{ zIndex: Z.header }}
                 >
-                    <LogOut size={18} /> CERRAR SESIÓN
-                </button>
-                <p className="text-center text-[10px] text-zinc-700 mt-4 font-mono">ID: {user?._id}</p>
-            </div>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="w-full max-w-md mx-auto py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-2xl uppercase tracking-widest shadow-2xl shadow-black/70 active:scale-95 transition-all flex items-center justify-center gap-2 border-b-4 border-yellow-600 disabled:opacity-70"
+                    >
+                        {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                        {saving ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                </div>
+            )}
 
             {confirmLogout && (
                 <ConfirmDialog
@@ -286,11 +274,33 @@ export default function Settings() {
                 />
             )}
 
-            {/* --- LEGAL Y ZONA PELIGROSA --- */}
-            <section className="mt-8">
+            {/* --- HERRAMIENTAS ---
+
+                Lo que LLEVA a otro sitio, junto y con su título. Antes el panel
+                de admin era lo primero de la pantalla —se abre una vez al mes— y
+                la política y la descarga de datos estaban sueltas al final, sin
+                título, entre el cierre de sesión y el borrado de cuenta. */}
+            <section className="mb-6">
+                <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Herramientas</h2>
+                <div className="space-y-2">
+                {user?.isAdmin && (
+                    <button
+                        onClick={() => navigate('/admin')}
+                        className="w-full bg-[#0a0a0c] border border-yellow-500/30 rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
+                    >
+                        <div className="p-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/40 text-yellow-500">
+                            <Shield size={18} />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="font-bold text-sm text-white">Panel de administración</p>
+                            <p className="text-[10px] text-zinc-500 mt-0.5">Usuarios, avisos y moderación</p>
+                        </div>
+                        <ChevronRight size={18} className="text-zinc-600" />
+                    </button>
+                )}
                 <button
                     onClick={() => navigate('/privacidad')}
-                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 mb-6 active:scale-[0.99] transition-transform"
+                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
                 >
                     <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
                         <FileText size={18} />
@@ -305,7 +315,7 @@ export default function Settings() {
                 <button
                     onClick={handleDescargarDatos}
                     disabled={descargando}
-                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 mb-6 active:scale-[0.99] transition-transform disabled:opacity-50"
+                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform disabled:opacity-50"
                 >
                     <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
                         <Download size={18} />
@@ -317,6 +327,23 @@ export default function Settings() {
                     <ChevronRight size={18} className="text-zinc-600" />
                 </button>
 
+                </div>
+            </section>
+
+            {/* --- SESIÓN --- */}
+            <section className="mb-6">
+                <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Sesión</h2>
+                <button
+                    onClick={() => setConfirmLogout(true)}
+                    className="w-full bg-red-950/20 border border-red-900/30 text-red-500 p-4 rounded-2xl flex items-center justify-center gap-3 font-bold text-sm hover:bg-red-900/40 transition-all active:scale-95"
+                >
+                    <LogOut size={18} /> CERRAR SESIÓN
+                </button>
+                <p className="text-center text-[10px] text-zinc-800 mt-4 font-mono select-text">ID: {user?._id}</p>
+            </section>
+
+            {/* --- ZONA PELIGROSA --- */}
+            <section>
                 <h2 className="text-[10px] font-black text-red-500/70 uppercase tracking-widest mb-3 ml-1">Zona peligrosa</h2>
 
                 {!borrando ? (

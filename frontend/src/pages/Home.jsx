@@ -101,7 +101,20 @@ export default function Home() {
     // En modo historial los widgets son solo lectura (no se puede reescribir ayer).
     const today = getMadridDateString();
     const [showCalendar, setShowCalendar] = useState(false);
-    const [viewDate, setViewDate] = useState(today);
+
+    // Se puede entrar apuntando a un dia pasado (/home?dia=2026-08-14). Lo usa
+    // el calendario del perfil: alli se ve DONDE hubo actividad, y al tocar un
+    // dia se viene aqui, que es el unico sitio donde ese dia se ve entero.
+    const [viewDate, setViewDate] = useState(() => {
+        try {
+            const pedido = new URLSearchParams(window.location.search).get('dia');
+            // Formato exacto y nunca el futuro: una fecha rara dejaria el home
+            // en modo historial de un dia que no existe, sin forma de salir
+            // salvo tocando el calendario.
+            if (pedido && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= today) return pedido;
+        } catch { /* sin URL utilizable, se abre en hoy */ }
+        return today;
+    });
     const [historyData, setHistoryData] = useState(null);
     const [historyLoading, setHistoryLoading] = useState(false);
     const isHistory = viewDate !== today;

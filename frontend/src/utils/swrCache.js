@@ -24,6 +24,25 @@ const NO_PERSISTIR = [/^\/social\/feed/, /^\/gym\/exercises/];
 const persistible = (clave) =>
     typeof clave === 'string' && !NO_PERSISTIR.some(re => re.test(clave));
 
+/**
+ * De lo que SWR guarda por clave, solo se persiste el DATO.
+ *
+ * ⚠️ Antes se guardaba el estado entero, y ahi dentro va tambien el `error`.
+ * Eso convertia un fallo de red de un segundo en permanente: la entrada se
+ * escribia con `error` puesto y `data` a medias, y al abrir la app se restauraba
+ * tal cual — con isLoading en false, asi que la pantalla la daba por buena y no
+ * volvia a pedir nada. Encontrado en el mapa de constancia: se quedo diciendo
+ * "0 dias activos" a alguien que tenia 20, y sobrevivia a las recargas.
+ *
+ * Un error es del momento en que ocurrio. El dato es lo unico que sigue
+ * valiendo manana.
+ */
+const soloElDato = (estado) => {
+    if (!estado || typeof estado !== 'object') return null;
+    if (estado.data === undefined) return null;
+    return { data: estado.data };
+};
+
 export function proveedorCache() {
     let inicial = [];
     try {
@@ -37,7 +56,10 @@ export function proveedorCache() {
 
     const guardar = () => {
         try {
-            const entradas = [...mapa.entries()].filter(([k]) => persistible(k));
+            const entradas = [...mapa.entries()]
+                .filter(([k]) => persistible(k))
+                .map(([k, v]) => [k, soloElDato(v)])
+                .filter(([, v]) => v !== null);
             const texto = JSON.stringify(entradas);
             // Si se pasa del tope no se guarda nada en vez de dejar algo a medias
             if (texto.length <= TOPE_BYTES) localStorage.setItem(CLAVE, texto);

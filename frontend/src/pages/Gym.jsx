@@ -173,7 +173,15 @@ export default function Gym() {
     const [toast, setToast] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [routineToEdit, setRoutineToEdit] = useState(null);
-    const [tab, setTab] = useState('gym');
+    // Se puede llegar apuntando a una pestana concreta (/gym?tab=body). Lo usa
+    // el mapa muscular del perfil, que antes solo podia decirte "esta en la
+    // pestana Cuerpo del Gym" y dejarte ir a buscarla.
+    const [tab, setTab] = useState(() => {
+        try {
+            const pedida = new URLSearchParams(window.location.search).get('tab');
+            return PESTANAS.some(p => p.id === pedida) ? pedida : 'gym';
+        } catch { return 'gym'; }
+    });
     // Confirmación de borrado con el modal de la app (antes era un window.confirm nativo)
     const [routineToDelete, setRoutineToDelete] = useState(null);
 

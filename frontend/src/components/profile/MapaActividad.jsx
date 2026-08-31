@@ -34,7 +34,7 @@ const ACENTO = '#eab308';
 
 export default function MapaActividad({ semanas = 26 }) {
     const dias = semanas * 7;
-    const { data, isLoading } = useSWR(`/daily/actividad?dias=${dias}`, fetcher);
+    const { data, isLoading, error } = useSWR(`/daily/actividad?dias=${dias}`, fetcher);
 
     // Seis meses no caben de ancho, asi que hay que elegir por donde empieza.
     // Se empieza por el final: lo que quieres ver de un vistazo es como vas
@@ -85,9 +85,13 @@ export default function MapaActividad({ semanas = 26 }) {
                 <h2 className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] flex items-center gap-2">
                     <Flame size={13} className="text-yellow-500" /> Constancia
                 </h2>
+                {/* Si la peticion fallo NO se dice "0 dias activos": eso es una
+                    mentira, y encima desanima justo a quien si ha entrenado.
+                    La cache guardada puede traer un cero de un intento fallido
+                    anterior, asi que se mira el error y no solo el dato. */}
                 {!isLoading && (
                     <span className="text-[10px] text-zinc-500 font-bold">
-                        {totalActivos} días activos
+                        {error ? 'sin conexión' : totalActivos + ' días activos'}
                     </span>
                 )}
             </div>
