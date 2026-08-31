@@ -1,30 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, UserPlus, User, Mail, Lock, ArrowRight, FilePlus, Check } from 'lucide-react';
+import { UserPlus, User, Mail, Lock, ArrowRight, FilePlus } from 'lucide-react';
 import api from '../services/api';
-// 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
+import PantallaAuth from '../components/auth/PantallaAuth';
+import { CampoAuth, BotonAuth } from '../components/auth/CampoAuth';
 
 const ACENTO = '#3b82f6'; // azul: diferencia el registro del login (oro)
 const MAX_ALIAS = 8;      // el límite real que valida el backend
 
+/**
+ * Fuerza de la contraseña, para poder pintarla mientras se escribe.
+ *
+ * No bloquea nada —el backend es quien decide qué acepta—, pero decirlo AHORA
+ * evita la única versión mala de esto: enterarte de que no vale después de
+ * enviar el formulario y esperar al servidor.
+ */
+const fuerzaDe = (clave) => {
+    if (!clave) return { nivel: 0, texto: '', color: '#3f3f46' };
+
+    let puntos = 0;
+    if (clave.length >= 6) puntos++;
+    if (clave.length >= 10) puntos++;
+    if (/[A-Z]/.test(clave) && /[a-z]/.test(clave)) puntos++;
+    if (/\d/.test(clave)) puntos++;
+    if (/[^A-Za-z0-9]/.test(clave)) puntos++;
+
+    if (puntos <= 1) return { nivel: 1, texto: 'Muy débil', color: '#ef4444' };
+    if (puntos === 2) return { nivel: 2, texto: 'Floja', color: '#f97316' };
+    if (puntos === 3) return { nivel: 3, texto: 'Aceptable', color: '#eab308' };
+    if (puntos === 4) return { nivel: 4, texto: 'Buena', color: '#84cc16' };
+    return { nivel: 5, texto: 'Muy buena', color: '#22c55e' };
+};
+
 export default function Register() {
     const navigate = useNavigate();
-    // 🔥 CONECTAMOS CON ZUSTAND
     const setUser = useAuthStore(state => state.setUser);
 
     const [formData, setFormData] = useState({ username: '', email: '', password: '' });
-    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [campoActivo, setCampoActivo] = useState(null);
+    const [exito, setExito] = useState(null);
 
-    // 🔥 AUTO-REDIRECCIÓN
+    const temporizador = useRef(null);
+
     useEffect(() => {
         if (localStorage.getItem('token')) {
             navigate('/home', { replace: true });
         }
     }, [navigate]);
+
+    useEffect(() => () => clearTimeout(temporizador.current), []);
+
+    const fuerza = useMemo(() => fuerzaDe(formData.password), [formData.password]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -40,141 +68,33 @@ export default function Register() {
             const response = await api.post('/auth/register', formData);
 
             localStorage.setItem('token', response.data.token);
-            // 🔥 GUARDAMOS EN ZUSTAND
             setUser(response.data);
 
-            navigate('/home', { replace: true });
+            setExito('Expediente creado');
+            temporizador.current = setTimeout(
+                () => navigate('/home', { replace: true }),
+                750
+            );
         } catch (err) {
-            const msg = err.response?.data?.message || 'Error al conectar con el servidor';
-            setError(msg);
-        } finally {
+            setError(err.response?.data?.message || 'Error al conectar con el servidor');
             setLoading(false);
         }
     };
 
-    const claseCampo = (nombre) =>
-        `w-full bg-black border rounded-[16px] py-[14px] text-white font-semibold text-sm outline-none transition-colors placeholder:text-zinc-700 ${campoActivo === nombre ? 'border-blue-500/45' : 'border-white/[0.09]'}`;
-
-    const colorIcono = (nombre) => (campoActivo === nombre ? ACENTO : '#52525b');
+    const letrasRestantes = MAX_ALIAS - formData.username.length;
 
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6 py-10 select-none">
-            <div className="w-full max-w-sm animate-in fade-in duration-300">
-
-                {/* MARCA */}
-                <div className="flex flex-col items-center mb-9">
-                    <div
-                        className="w-16 h-16 rounded-[20px] flex items-center justify-center border"
-                        style={{ background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.3)' }}
-                    >
-                        <UserPlus size={30} style={{ color: ACENTO }} />
-                    </div>
-                    <h1 className="mt-5 text-[30px] font-black text-white uppercase tracking-[-0.05em] leading-none text-center not-italic">
-                        Nuevo recluta
-                    </h1>
-                    <p className="mt-3 text-[9px] font-black text-zinc-600 uppercase tracking-[0.24em] not-italic">
-                        Empieza tu partida
-                    </p>
-                </div>
-
-                {/* TARJETA DE REGISTRO */}
-                <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-[28px] p-6 overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO}, transparent)` }} />
-                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: ACENTO }} />
-
-                    <h2 className="relative z-10 text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] flex items-center gap-2 mb-6 not-italic">
-                        <FilePlus size={16} style={{ color: ACENTO }} /> Crear expediente
-                    </h2>
-
-                    {error && (
-                        <div className="relative z-10 mb-5 p-3 bg-red-950/40 border border-red-500/30 rounded-2xl text-red-400 text-[11px] font-bold text-center not-italic">
-                            {error}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} className="relative z-10 space-y-4">
-                        {/* Alias */}
-                        <div>
-                            <div className="flex items-baseline justify-between mb-2">
-                                <label className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] not-italic">Alias</label>
-                                <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.1em] not-italic">Máx. {MAX_ALIAS}</span>
-                            </div>
-                            <div className="relative">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors" size={17} style={{ color: colorIcono('username') }} />
-                                <input
-                                    type="text"
-                                    name="username"
-                                    placeholder="Guerrero"
-                                    maxLength={MAX_ALIAS}
-                                    value={formData.username}
-                                    onChange={handleChange}
-                                    onFocus={() => setCampoActivo('username')}
-                                    onBlur={() => setCampoActivo(null)}
-                                    required
-                                    className={`${claseCampo('username')} pl-12 pr-4`}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Email */}
-                        <div>
-                            <label className="block text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] mb-2 not-italic">Correo</label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors" size={17} style={{ color: colorIcono('email') }} />
-                                <input
-                                    type="email"
-                                    name="email"
-                                    placeholder="tu@email.com"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    onFocus={() => setCampoActivo('email')}
-                                    onBlur={() => setCampoActivo(null)}
-                                    required
-                                    className={`${claseCampo('email')} pl-12 pr-4`}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Password */}
-                        <div>
-                            <label className="block text-[9px] font-black text-zinc-600 uppercase tracking-[0.14em] mb-2 not-italic">Contraseña</label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors" size={17} style={{ color: colorIcono('password') }} />
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    name="password"
-                                    placeholder="••••••••"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    onFocus={() => setCampoActivo('password')}
-                                    onBlur={() => setCampoActivo(null)}
-                                    required
-                                    className={`${claseCampo('password')} pl-12 pr-12`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white transition-colors"
-                                >
-                                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full rounded-[18px] py-4 mt-6 font-black uppercase tracking-[0.16em] text-[12px] text-white active:scale-[0.985] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 not-italic"
-                            style={{ background: ACENTO }}
-                        >
-                            {loading ? 'Creando...' : <>Confirmar <Check size={18} strokeWidth={3} /></>}
-                        </button>
-                    </form>
-                </div>
-
-                {/* PIE */}
-                <div className="mt-7 text-center">
+        <PantallaAuth
+            acento={ACENTO}
+            icono={FilePlus}
+            titulo="KAIROS"
+            subtitulo="Alta de expediente"
+            tarjetaIcono={UserPlus}
+            tarjetaTitulo="Crear cuenta"
+            error={error}
+            exito={exito}
+            pie={
+                <>
                     <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">
                         ¿Ya tienes expediente?
                     </p>
@@ -183,10 +103,91 @@ export default function Register() {
                         className="mt-2 inline-flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] hover:brightness-125 transition-all group not-italic"
                         style={{ color: ACENTO }}
                     >
-                        Iniciar sesión <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                        Iniciar sesión
+                        <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
-                </div>
-            </div>
-        </div>
+                </>
+            }
+        >
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <CampoAuth
+                    etiqueta="Alias"
+                    icono={User}
+                    acento={ACENTO}
+                    nombre="username"
+                    valor={formData.username}
+                    onChange={handleChange}
+                    placeholder="Guerrero"
+                    maxLength={MAX_ALIAS}
+                    autoComplete="username"
+                    contador={
+                        <span
+                            className="text-[9px] font-black uppercase tracking-[0.1em] not-italic transition-colors"
+                            style={{ color: letrasRestantes === 0 ? ACENTO : '#3f3f46' }}
+                        >
+                            {letrasRestantes === 0 ? 'Al límite' : `Máx. ${MAX_ALIAS}`}
+                        </span>
+                    }
+                />
+
+                <CampoAuth
+                    etiqueta="Correo"
+                    icono={Mail}
+                    acento={ACENTO}
+                    tipo="email"
+                    nombre="email"
+                    valor={formData.email}
+                    onChange={handleChange}
+                    placeholder="tu@email.com"
+                    autoComplete="email"
+                />
+
+                <CampoAuth
+                    etiqueta="Contraseña"
+                    icono={Lock}
+                    acento={ACENTO}
+                    nombre="password"
+                    valor={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    esClave
+                    autoComplete="new-password"
+                >
+                    {/* Medidor de fuerza. Aparece solo al empezar a escribir:
+                        cinco rayas grises antes de tocar nada son ruido. */}
+                    {formData.password && (
+                        <div className="flex items-center gap-2 mt-2.5 px-1">
+                            <div className="flex gap-1 flex-1">
+                                {[1, 2, 3, 4, 5].map(n => (
+                                    <span
+                                        key={n}
+                                        className="h-[3px] flex-1 rounded-full transition-all duration-300"
+                                        style={{
+                                            background: n <= fuerza.nivel ? fuerza.color : '#27272a',
+                                            transform: `scaleY(${n <= fuerza.nivel ? 1 : 0.6})`
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            <span
+                                className="text-[9px] font-black uppercase tracking-[0.1em] not-italic w-[68px] text-right transition-colors"
+                                style={{ color: fuerza.color }}
+                            >
+                                {fuerza.texto}
+                            </span>
+                        </div>
+                    )}
+                </CampoAuth>
+
+                <BotonAuth
+                    cargando={loading}
+                    acento={ACENTO}
+                    colorTexto="#fff"
+                    textoCargando="Creando..."
+                >
+                    Confirmar
+                </BotonAuth>
+            </form>
+        </PantallaAuth>
     );
 }

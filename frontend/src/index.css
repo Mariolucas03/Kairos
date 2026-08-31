@@ -134,3 +134,124 @@ body {
     -webkit-user-select: none;
     user-select: none;
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   PANTALLAS DE ACCESO (login y registro)
+
+   Todo es CSS: son las dos primeras pantallas que se ven, y meter una librería
+   de animaciones ahí significaría retrasar justo lo que hay que enseñar rápido.
+   Las animaciones mueven solo `transform` y `opacity`, que son las dos cosas
+   que el navegador puede animar sin repintar.
+
+   El color lo pone cada pantalla en --acento (oro en el login, azul en el
+   registro), así que estas reglas valen para las dos.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Manchas de color que van a la deriva por el fondo. Tres duraciones distintas
+   y primas entre sí, para que no vuelvan a coincidir nunca y no se note el
+   bucle. */
+@keyframes auth-deriva-a {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    33%      { transform: translate3d(7vw, -5vh, 0) scale(1.18); }
+    66%      { transform: translate3d(-5vw, 6vh, 0) scale(0.88); }
+}
+@keyframes auth-deriva-b {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1.1); }
+    50%      { transform: translate3d(-8vw, 7vh, 0) scale(0.85); }
+}
+@keyframes auth-deriva-c {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(0.9); }
+    40%      { transform: translate3d(5vw, 8vh, 0) scale(1.25); }
+    75%      { transform: translate3d(8vw, -3vh, 0) scale(1); }
+}
+
+.auth-mancha {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    pointer-events: none;
+    will-change: transform;
+}
+.auth-mancha-a { animation: auth-deriva-a 19s ease-in-out infinite; }
+.auth-mancha-b { animation: auth-deriva-b 26s ease-in-out infinite; }
+.auth-mancha-c { animation: auth-deriva-c 31s ease-in-out infinite; }
+
+/* Rejilla que baja despacio: es lo que le da el aire de "sistema" sin cargar
+   ninguna imagen. */
+@keyframes auth-rejilla {
+    from { transform: translateY(0); }
+    to   { transform: translateY(56px); }
+}
+.auth-rejilla {
+    position: absolute;
+    inset: -56px 0 -56px 0;
+    background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+    background-size: 56px 56px;
+    animation: auth-rejilla 9s linear infinite;
+    pointer-events: none;
+    will-change: transform;
+}
+
+/* Entrada escalonada: cada pieza llega un poco después que la anterior, así la
+   pantalla se "monta" en vez de aparecer de golpe. El retraso lo pone cada
+   elemento con style={{ animationDelay }}. */
+@keyframes auth-entrar {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.auth-entra {
+    animation: auth-entrar 0.55s cubic-bezier(0.22, 0.85, 0.24, 1) both;
+}
+
+/* El emblema respira, y su halo late por detrás */
+@keyframes auth-flota {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+}
+@keyframes auth-late {
+    0%, 100% { opacity: 0.22; transform: scale(1); }
+    50%      { opacity: 0.5;  transform: scale(1.18); }
+}
+.auth-flota { animation: auth-flota 4.5s ease-in-out infinite; }
+.auth-late  { animation: auth-late 3.2s ease-in-out infinite; }
+
+/* Destello que cruza el botón cada pocos segundos */
+@keyframes auth-destello {
+    0%       { transform: translateX(-140%) skewX(-18deg); }
+    55%,100% { transform: translateX(320%) skewX(-18deg); }
+}
+.auth-destello { animation: auth-destello 3.6s ease-in-out infinite; }
+
+/* Un error que aparece quieto se lee como parte del formulario; temblando se
+   lee como lo que es. */
+@keyframes auth-temblor {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(3px); }
+    30%, 50%, 70% { transform: translateX(-5px); }
+    40%, 60% { transform: translateX(5px); }
+}
+.auth-tiembla { animation: auth-temblor 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+
+/* Confirmación: el círculo se hincha y la marca se dibuja */
+@keyframes auth-sello {
+    0%   { transform: scale(0.4); opacity: 0; }
+    60%  { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.auth-sello { animation: auth-sello 0.45s cubic-bezier(0.22, 1.2, 0.36, 1) both; }
+
+/* ⚠️ Quien haya pedido menos movimiento en su móvil lo ha pedido por algo:
+   mareos, migrañas o simplemente que le molesta. Se queda todo quieto, pero
+   VISIBLE: opacity a 1, o la entrada escalonada dejaría la pantalla en blanco. */
+@media (prefers-reduced-motion: reduce) {
+    .auth-mancha, .auth-rejilla, .auth-flota, .auth-late,
+    .auth-destello, .auth-tiembla {
+        animation: none !important;
+    }
+    .auth-entra, .auth-sello {
+        animation: none !important;
+        opacity: 1;
+        transform: none;
+    }
+}

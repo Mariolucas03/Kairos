@@ -53,11 +53,30 @@ api.interceptors.request.use(
 );
 
 // Interceptor para manejar errores de sesión (401)
+/**
+ * Un 401 casi siempre significa "tu sesion ha caducado" y hay que echar a la
+ * gente al login. Pero hay dos casos en los que NO:
+ *
+ *  1. El 401 del PROPIO login o registro. Ahi un 401 no es una sesion caducada:
+ *     es una contrasena mal escrita, y la pantalla ya sabe contarlo.
+ *  2. Cuando ya estas en el login. Recargar el login para llevarte al login no
+ *     arregla nada; solo borra lo que hubiera escrito en pantalla.
+ *
+ * ⚠️ Sin esto, escribir mal la contrasena hacia que la pagina se recargara
+ * ENTERA: volvias a un formulario vacio, sin ningun mensaje, sin enterarte de
+ * que lo que fallaba era la clave. El aviso de error se pintaba durante unos
+ * milisegundos y se lo llevaba la recarga por delante.
+ */
+const esIntentoDeAcceso = (url) => /\/auth\/(login|register)/.test(url || '');
+const yaEstamosEnLaPuerta = () => ['/login', '/register'].includes(window.location.pathname);
+
 api.interceptors.response.use(
     (response) => { marcarFin(); return response; },
     (error) => {
         marcarFin();
-        if (error.response && error.response.status === 401) {
+        if (error.response?.status === 401
+            && !esIntentoDeAcceso(error.config?.url)
+            && !yaEstamosEnLaPuerta()) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/login';
@@ -71,7 +90,9 @@ api.interceptors.response.use(
             localStorage.setItem('motivoBaneo', error.response.data.message || 'Cuenta suspendida');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            // Si ya estas en la puerta, recargar solo borraria el mensaje que
+            // acabas de guardar antes de que le de tiempo a leerse.
+            if (!yaEstamosEnLaPuerta()) window.location.href = '/login';
         }
         return Promise.reject(error);
     }
