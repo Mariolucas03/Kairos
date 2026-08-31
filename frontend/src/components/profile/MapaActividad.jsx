@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { Flame } from 'lucide-react';
 import api from '../../services/api';
+import WidgetCard from '../common/WidgetCard';
 
 const fetcher = url => api.get(url).then(r => r.data);
 
@@ -15,6 +17,10 @@ const fetcher = url => api.get(url).then(r => r.data);
  * un mapa que solo mirase el gimnasio dejaría en blanco los días de descanso en
  * los que sí cumpliste todo lo demás, que es justo lo contrario de lo que anima
  * a seguir.
+ *
+ * Vive en dos sitios: en el perfil y como widget del home. Por eso usa el
+ * chasis comun (WidgetCard) en vez de pintarse su propia tarjeta: en el home
+ * comparte fila con las demas y una tarjeta distinta se nota.
  */
 
 // Del apagado al encendido. El nivel 0 no se pinta con color, se deja hueco.
@@ -22,9 +28,22 @@ const COLORES = ['#18181b', '#3f3f46', '#a16207', '#eab308', '#fde047'];
 
 const DIAS_SEMANA = ['L', '', 'X', '', 'V', '', 'D'];
 
+// Amarillo, el mismo de los cuadraditos: el acento de la tarjeta tiene que
+// ser el color de lo que hay dentro.
+const ACENTO = '#eab308';
+
 export default function MapaActividad({ semanas = 26 }) {
     const dias = semanas * 7;
     const { data, isLoading } = useSWR(`/daily/actividad?dias=${dias}`, fetcher);
+
+    // Seis meses no caben de ancho, asi que hay que elegir por donde empieza.
+    // Se empieza por el final: lo que quieres ver de un vistazo es como vas
+    // ESTA semana, no como ibas en marzo. Arrancando por la izquierda, el
+    // cuadradito de hoy quedaba fuera de la pantalla.
+    const carril = useRef(null);
+    useEffect(() => {
+        if (carril.current) carril.current.scrollLeft = carril.current.scrollWidth;
+    }, [data]);
 
     // Diccionario fecha -> nivel, para no recorrer el array por cada cuadradito
     const porFecha = {};
@@ -61,9 +80,9 @@ export default function MapaActividad({ semanas = 26 }) {
     const totalActivos = data?.activos || 0;
 
     return (
-        <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[11px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+        <WidgetCard accent={ACENTO} padding="p-5" className="h-full">
+            <div className="relative z-10 flex items-center justify-between mb-4">
+                <h2 className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] flex items-center gap-2">
                     <Flame size={13} className="text-yellow-500" /> Constancia
                 </h2>
                 {!isLoading && (
@@ -76,7 +95,7 @@ export default function MapaActividad({ semanas = 26 }) {
             {isLoading ? (
                 <div className="h-[110px] rounded-xl bg-zinc-900/50 animate-pulse" />
             ) : (
-                <div className="flex gap-2">
+                <div className="relative z-10 flex gap-2">
                     {/* Iniciales de los días, solo en las filas impares para que quepan */}
                     <div className="flex flex-col gap-[3px] pt-[1px] shrink-0">
                         {DIAS_SEMANA.map((d, i) => (
@@ -84,8 +103,8 @@ export default function MapaActividad({ semanas = 26 }) {
                         ))}
                     </div>
 
-                    {/* El mapa scrollea en horizontal: seis meses no caben en un móvil */}
-                    <div className="flex-1 overflow-x-auto no-scrollbar">
+                    {/* Scroll horizontal, colocado al final: seis meses no caben en un móvil */}
+                    <div ref={carril} className="flex-1 overflow-x-auto no-scrollbar">
                         <div className="flex gap-[3px] min-w-min">
                             {columnas.map((col, ci) => (
                                 <div key={ci} className="flex flex-col gap-[3px]">
@@ -110,13 +129,13 @@ export default function MapaActividad({ semanas = 26 }) {
                 </div>
             )}
 
-            <div className="flex items-center justify-end gap-1.5 mt-4">
+            <div className="relative z-10 flex items-center justify-end gap-1.5 mt-4">
                 <span className="text-[8px] text-zinc-600 font-bold uppercase mr-1">Menos</span>
                 {COLORES.map((c, i) => (
                     <div key={i} className="w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: c }} />
                 ))}
                 <span className="text-[8px] text-zinc-600 font-bold uppercase ml-1">Más</span>
             </div>
-        </div>
+        </WidgetCard>
     );
 }

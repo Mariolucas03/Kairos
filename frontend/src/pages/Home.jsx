@@ -25,6 +25,7 @@ import StepsWidget from '../components/widgets/StepsWidget';
 import MissionsWidget from '../components/widgets/MissionsWidget';
 import SportWidget from '../components/widgets/SportWidget';
 import KcalBalanceWidget from '../components/widgets/KcalBalanceWidget';
+import MapaActividad from '../components/profile/MapaActividad';
 import { useWeeklyStats } from '../components/widgets/WeeklyWidget';
 
 import { useAuthStore } from '../store/useAuthStore';
@@ -78,7 +79,8 @@ const WIDGET_LAYOUT = {
     sleep: 'col-span-2 min-h-[116px]',
     weight: 'col-span-2 min-h-[116px]',
     kcalBalance: 'col-span-2 min-h-[116px]',
-    mood: 'col-span-4'
+    mood: 'col-span-4',
+    constancia: 'col-span-4'
 };
 
 export default function Home() {
@@ -129,8 +131,8 @@ export default function Home() {
     // Volumen semanal: ahora se pinta dentro de RUTINA GYM
     const { stats: weeklyStats } = useWeeklyStats();
 
-    const DEFAULTS_ORDER = ['streak', 'food', 'missions', 'sport', 'training', 'steps', 'sleep', 'weight', 'kcalBalance', 'mood'];
-    const DEFAULTS_CONFIG = { streak: true, food: true, missions: true, sport: true, training: true, steps: true, sleep: true, weight: true, kcalBalance: true, mood: true };
+    const DEFAULTS_ORDER = ['streak', 'food', 'missions', 'sport', 'training', 'steps', 'sleep', 'weight', 'kcalBalance', 'mood', 'constancia'];
+    const DEFAULTS_CONFIG = { streak: true, food: true, missions: true, sport: true, training: true, steps: true, sleep: true, weight: true, kcalBalance: true, mood: true, constancia: true };
 
     const [widgetOrder, setWidgetOrder] = useState(() => {
         try {
@@ -199,7 +201,8 @@ export default function Home() {
         sleep: 'Sueño',
         weight: 'Peso corporal',
         kcalBalance: 'Balance kcal',
-        mood: 'Estado de ánimo'
+        mood: 'Estado de ánimo',
+        constancia: 'Mapa de constancia'
     };
 
     const getWidgetContent = (key) => {
@@ -256,6 +259,10 @@ export default function Home() {
                 const burned = (data.sportWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0) + (data.gymWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0);
                 return (<div className={wrapperClass}><KcalBalanceWidget intake={intake} burned={burned} weight={data.weight} /></div>);
             }
+            // El mapa mira los ultimos seis meses, no el dia que estas viendo:
+            // en modo historial no pinta nada y se quita de la rejilla (el
+            // bucle salta los widgets sin contenido).
+            case 'constancia': return isHistory ? null : <MapaActividad />;
             default: return null;
         }
     };
