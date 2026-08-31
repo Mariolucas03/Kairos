@@ -8,6 +8,18 @@ const SystemState = require('../models/SystemState');
 const DailyLog = require('../models/DailyLog');
 const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder } = require('../utils/scheduler');
 const { getMadridDateString } = require('../utils/dateHelpers');
+const mongoose = require('mongoose');
+const AdminLog = require('../models/AdminLog');
+const Routine = require('../models/Routine');
+const Mission = require('../models/Mission');
+const NutritionLog = require('../models/NutritionLog');
+const { borrarUsuarioYSusDatos } = require('../services/borradoService');
+// Las tablas del casino, para poder MEDIR lo que devuelve cada juego sin
+// duplicar aqui los numeros: si se copiaran, el panel seguiria diciendo que
+// todo va bien despues de que alguien cambiara un premio.
+const {
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS
+} = require('./gamesController');
 
 /**
  * Panel de administración.
@@ -18,6 +30,31 @@ const { getMadridDateString } = require('../utils/dateHelpers');
  * daba igual; en cuanto entra gente de fuera, el primer comentario ofensivo te
  * deja sin herramientas.
  */
+
+/**
+ * Deja constancia de lo que acaba de hacer un administrador.
+ *
+ * Se llama DESPUES de que la accion haya salido bien: un registro de intentos
+ * fallidos solo mete ruido en el unico sitio donde hay que poder mirar rapido.
+ *
+ * Nunca revienta la peticion. Si la anotacion falla, la accion ya se hizo y
+ * devolver un error haria pensar que no; se avisa por consola y se sigue.
+ */
+const anotar = async (req, accion, { objetivo, objetivoNombre, resumen, detalle } = {}) => {
+    try {
+        await AdminLog.create({
+            admin: req.user?._id,
+            adminNombre: req.user?.username || 'desconocido',
+            accion,
+            objetivo,
+            objetivoNombre: objetivoNombre || '',
+            resumen: resumen || '',
+            detalle
+        });
+    } catch (e) {
+        console.error('No se pudo anotar la accion de admin (' + accion + '):', e.message);
+    }
+};
 
 // @desc    Lista de usuarios con lo justo para moderar
 // @route   GET /api/admin/usuarios
@@ -76,6 +113,12 @@ const banear = asyncHandler(async (req, res) => {
         }
     });
 
+    await anotar(req, 'banear', {
+        objetivo: objetivo._id, objetivoNombre: objetivo.username,
+        resumen: 'suspendio a ' + objetivo.username,
+        detalle: { motivo: String(motivo || '').trim().slice(0, 200) || 'sin indicar' }
+    });
+
     res.json({ message: objetivo.username + ' ha sido suspendido' });
 });
 
@@ -90,6 +133,12 @@ const desbanear = asyncHandler(async (req, res) => {
     ).select('username');
 
     if (!objetivo) { res.status(404); throw new Error('Usuario no encontrado'); }
+
+    await anotar(req, 'desbanear', {
+        objetivo: objetivo._id, objetivoNombre: objetivo.username,
+        resumen: 'levanto la suspension de ' + objetivo.username
+    });
+
     res.json({ message: objetivo.username + ' vuelve a tener acceso' });
 });
 
@@ -132,6 +181,11 @@ const borrarComentario = asyncHandler(async (req, res) => {
 
     if (r.modifiedCount === 0) { res.status(404); throw new Error('Ese comentario ya no está'); }
 
+    await anotar(req, 'borrar-comentario', {
+        resumen: 'borro un comentario',
+        detalle: { entrenoId, comentarioId }
+    });
+
     // La notificación que lo anunciaba se va con él: dejarla es dejar el texto
     // del comentario visible en el buzón de la víctima.
     await Notification.deleteMany({ type: 'comment', workout: entrenoId });
@@ -146,6 +200,13 @@ const borrarEntreno = asyncHandler(async (req, res) => {
     if (!entreno) { res.status(404); throw new Error('Ese entreno ya no está'); }
 
     await Notification.deleteMany({ workout: entreno._id });
+
+    await anotar(req, 'borrar-entreno', {
+        objetivo: entreno.user,
+        resumen: 'borro el entreno "' + (entreno.routineName || 'sin nombre') + '"',
+        detalle: { entrenoId: entreno._id, fecha: entreno.date }
+    });
+
     res.json({ message: 'Entreno borrado' });
 });
 
@@ -188,6 +249,14 @@ const restablecerClave = asyncHandler(async (req, res) => {
     objetivo.password = temporal;
     await objetivo.save(); // el hook del modelo la cifra
 
+    // La clave NO se anota: el registro lo pueden leer otros administradores, y
+    // una contrasena en claro guardada "por trazabilidad" es una contrasena
+    // filtrada. Queda constancia de que se genero, que es lo que importa.
+    await anotar(req, 'restablecer-clave', {
+        objetivo: objetivo._id, objetivoNombre: objetivo.username,
+        resumen: 'genero una clave temporal para ' + objetivo.username
+    });
+
     res.json({
         message: 'Clave nueva para ' + objetivo.username,
         usuario: objetivo.username,
@@ -216,7 +285,13 @@ const estadoDelSistema = asyncHandler(async (req, res) => {
 
     const claveIA = 'ia-llamadas-' + hoy;
 
-    const [marcas, usuarios, conPush, diasDeHoy, activos7dias] = await Promise.all([
+    // El estado de la base puede fallar (permisos del usuario de Atlas), y que
+    // el panel entero se caiga por un dato accesorio seria peor que no tenerlo.
+    const pedirEstadoBase = async () => {
+        try { return await mongoose.connection.db.stats(); } catch { return null; }
+    };
+
+    const [marcas, usuarios, conPush, diasDeHoy, activos7dias, estadoBase] = await Promise.all([
         SystemState.find({}).lean(),
         User.countDocuments({}),
         User.countDocuments({ 'pushSubscriptions.0': { $exists: true } }),
@@ -229,7 +304,8 @@ const estadoDelSistema = asyncHandler(async (req, res) => {
         // cuando Madrid es +01:00. El registro diario ya guarda la fecha en formato
         // de Madrid, asi que preguntarle a el no tiene ese problema.
         DailyLog.find({ date: hoy }).select('gymWorkouts sportWorkouts').lean(),
-        User.countDocuments({ lastActive: { $gte: new Date(Date.now() - 7 * 86400000) } })
+        User.countDocuments({ lastActive: { $gte: new Date(Date.now() - 7 * 86400000) } }),
+        pedirEstadoBase()
     ]);
 
     const porClave = {};
@@ -251,6 +327,26 @@ const estadoDelSistema = asyncHandler(async (req, res) => {
             usadasHoy: llamadasIA,
             tope: topeIA,
             porcentaje: Math.round((llamadasIA / topeIA) * 100)
+        },
+
+        // Salud de la maquina y de la base. Sale aqui porque son las dos cosas
+        // que, cuando van mal, hacen que la app "vaya rara" sin dar ningun
+        // error: la base gratuita tiene 512 MB y Render reinicia el proceso a
+        // menudo, y ninguna de las dos cosas se ve desde dentro de la app.
+        base: {
+            megasUsados: estadoBase ? Math.round((estadoBase.dataSize / 1048576) * 10) / 10 : null,
+            topeMegas: 512,
+            documentos: estadoBase ? estadoBase.objects : null,
+            colecciones: estadoBase ? estadoBase.collections : null
+        },
+
+        proceso: {
+            // Un uptime de dos minutos con usuarios dentro significa que el
+            // servidor acaba de reiniciarse, que es la explicacion de la mitad
+            // de los "me ha dado error una vez".
+            minutosEncendido: Math.round(process.uptime() / 60),
+            memoriaMB: Math.round(process.memoryUsage().rss / 1048576),
+            version: process.version
         },
 
         tareas: {
@@ -286,17 +382,20 @@ const lanzarMantenimiento = asyncHandler(async (req, res) => {
 
     if (tarea === 'castigo') {
         const r = await runNightlyMaintenance({ forzar: true });
+        await anotar(req, 'tarea-castigo', { resumen: 'lanzo el castigo nocturno a mano', detalle: r });
         return res.json({ message: 'Mantenimiento nocturno ejecutado', detalle: r });
     }
 
     if (tarea === 'premios') {
         const r = await runMonthlyRankingRewards();
+        await anotar(req, 'tarea-premios', { resumen: 'repartio los premios del ranking a mano', detalle: r });
         return res.json({ message: 'Premios del ranking repartidos: ' + (r.awarded || 0), detalle: r });
     }
 
     if (tarea === 'aviso') {
         const r = await runEveningReminder({ forzar: true });
         const total = (r.misiones || 0) + (r.diaria || 0) + (r.vuelve || 0);
+        await anotar(req, 'tarea-aviso', { resumen: 'lanzo el aviso de las 20:00 a mano', detalle: r });
         return res.json({ message: 'Aviso enviado a ' + total + ' personas', detalle: r });
     }
 
@@ -345,6 +444,21 @@ const ajustarSaldo = asyncHandler(async (req, res) => {
     console.log('💰 Ajuste de saldo a ' + objetivo.username + ': ' +
         monedas + ' monedas, ' + fichas + ' fichas. Motivo: ' + (motivo || 'sin indicar'));
 
+    await anotar(req, 'ajustar-saldo', {
+        objetivo: objetivo._id, objetivoNombre: objetivo.username,
+        // Se redacta con "sumo"/"resto" por cantidad y no un "sumo -100", que al
+        // releer el registro dentro de un mes se entiende justo al reves.
+        resumen: 'le ' + [
+            monedas && (monedas > 0 ? 'sumo ' + monedas : 'resto ' + Math.abs(monedas)) + ' monedas',
+            fichas && (fichas > 0 ? 'sumo ' + fichas : 'resto ' + Math.abs(fichas)) + ' fichas'
+        ].filter(Boolean).join(' y ') + ' a ' + objetivo.username,
+        detalle: {
+            monedas, fichas, motivo: motivo || 'sin indicar',
+            antes: { coins: objetivo.coins || 0, gameCoins: objetivo.gameCoins || 0 },
+            despues: { coins: nuevasMonedas, gameCoins: nuevasFichas }
+        }
+    });
+
     res.json({
         message: objetivo.username + ': ' + nuevasMonedas + ' monedas, ' + nuevasFichas + ' fichas',
         antes: { coins: objetivo.coins || 0, gameCoins: objetivo.gameCoins || 0 },
@@ -359,12 +473,385 @@ const notificar = asyncHandler(async (req, res) => {
     // un solo sitio, así que no puede haber dos comportamientos distintos según
     // por dónde entres.
     const resultado = await enviarNotificacionManual(req.body || {});
+
+    if ((resultado.codigo || 200) < 400) {
+        const { title, body, username, todos } = req.body || {};
+        await anotar(req, 'notificar', {
+            resumen: 'mando un aviso a ' + (todos ? 'todo el mundo' : (username || 'alguien')),
+            detalle: { title, body, destino: todos ? 'todos' : username }
+        });
+    }
+
     res.status(resultado.codigo || 200).json(resultado.cuerpo);
+});
+
+
+/**
+ * FICHA COMPLETA DE UN USUARIO.
+ *
+ * La lista de usuarios ensena lo justo para moderar (nombre, nivel, saldo). En
+ * cuanto alguien escribe "me ha pasado algo raro", eso no basta: hace falta ver
+ * si entrena, desde cuando, cuantas rutinas tiene y como va de vida. Hasta ahora
+ * eso significaba abrir la base de datos desde un ordenador.
+ *
+ * @route   GET /api/admin/usuario/:id
+ */
+const fichaUsuario = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) { res.status(400); throw new Error('Usuario no valido'); }
+
+    const u = await User.findById(id).select('-password').lean();
+    if (!u) { res.status(404); throw new Error('Usuario no encontrado'); }
+
+    const hace30 = new Date(Date.now() - 30 * 86400000);
+
+    const [entrenos, ultimos, rutinas, misiones, misionesHechas, diasActivos, comidas, avisos] = await Promise.all([
+        WorkoutLog.countDocuments({ user: id }),
+        WorkoutLog.find({ user: id }).sort({ date: -1 }).limit(5)
+            .select('routineName date duration caloriesBurned type').lean(),
+        Routine.countDocuments({ user: id }),
+        Mission.countDocuments({ user: id }),
+        Mission.countDocuments({ user: id, completed: true }),
+        DailyLog.countDocuments({ user: id, createdAt: { $gte: hace30 } }),
+        NutritionLog.countDocuments({ user: id, totalCalories: { $gt: 0 } }),
+        Notification.countDocuments({ user: id })
+    ]);
+
+    res.json({
+        _id: u._id,
+        username: u.username,
+        email: u.email,
+        isAdmin: !!u.isAdmin,
+        baneado: u.baneado?.activo ? { motivo: u.baneado.motivo, fecha: u.baneado.fecha } : null,
+        alta: u.createdAt,
+        ultimoAcceso: u.lastActive,
+        dispositivos: (u.pushSubscriptions || []).length,
+
+        stats: {
+            level: u.level || 1,
+            currentXP: u.currentXP || 0,
+            nextLevelXP: u.nextLevelXP || 100,
+            title: u.title || '',
+            hp: u.hp ?? 100,
+            maxHp: u.maxHp ?? 100,
+            lives: u.lives ?? 0,
+            coins: u.coins || 0,
+            gameCoins: u.gameCoins || 0,
+            racha: u.streak?.current || 0
+        },
+
+        actividad: {
+            entrenos,
+            rutinas,
+            misiones,
+            misionesHechas,
+            diasConRegistro30: diasActivos,
+            diasConComida: comidas,
+            notificaciones: avisos
+        },
+
+        ultimosEntrenos: ultimos
+    });
+});
+
+/**
+ * Ajustar las estadisticas de alguien: vida, nivel, racha, vidas.
+ *
+ * Hermano de ajustarSaldo, para lo que no es dinero. Nace de un caso real: una
+ * noche el castigo nocturno se ejecuto sobre un dia ya castigado y dejo a dos
+ * personas a 0 de vida sin merecerlo. Devolverles la vida exigio abrir la base
+ * de datos a mano.
+ *
+ * Aqui SI se fija el valor en vez de sumar, al reves que con el saldo: "ponle
+ * 100 de vida" es la frase que uno piensa, mientras que con el dinero lo que se
+ * piensa es "devuelvele las 500 fichas que perdio".
+ *
+ * @route   POST /api/admin/ajustar-stats
+ */
+const ajustarStats = asyncHandler(async (req, res) => {
+    const { userId, hp, level, racha, lives, motivo } = req.body || {};
+    if (!userId) { res.status(400); throw new Error('Falta el usuario'); }
+
+    const u = await User.findById(userId);
+    if (!u) { res.status(404); throw new Error('Usuario no encontrado'); }
+
+    const antes = { hp: u.hp, level: u.level, racha: u.streak?.current, lives: u.lives };
+    const cambios = [];
+    const numero = (v) => (v === undefined || v === null || v === '') ? null : Number(v);
+
+    const nuevaHp = numero(hp);
+    if (nuevaHp !== null && Number.isFinite(nuevaHp)) {
+        // Nunca por encima del maximo: una vida de 300 sobre 100 pinta la barra
+        // fuera de su caja y ademas no se gasta nunca.
+        u.hp = Math.max(0, Math.min(Math.round(nuevaHp), u.maxHp || 100));
+        cambios.push('vida a ' + u.hp);
+    }
+
+    const nuevoNivel = numero(level);
+    if (nuevoNivel !== null && Number.isFinite(nuevoNivel)) {
+        const objetivo = Math.max(1, Math.min(Math.round(nuevoNivel), 999));
+        // El XP que hace falta para el siguiente nivel se recalcula con la misma
+        // formula del modelo (x1,2 por nivel). Sin esto, alguien puesto a nivel
+        // 20 subiria al 21 con los 100 XP que cuesta el nivel 1.
+        let siguiente = 100;
+        for (let n = 1; n < objetivo; n++) siguiente = Math.floor(siguiente * 1.2);
+        u.level = objetivo;
+        u.nextLevelXP = siguiente;
+        u.currentXP = Math.min(u.currentXP || 0, siguiente - 1);
+        cambios.push('nivel a ' + objetivo);
+    }
+
+    const nuevaRacha = numero(racha);
+    if (nuevaRacha !== null && Number.isFinite(nuevaRacha)) {
+        u.streak = u.streak || {};
+        u.streak.current = Math.max(0, Math.min(Math.round(nuevaRacha), 3650));
+        cambios.push('racha a ' + u.streak.current);
+    }
+
+    const nuevasVidas = numero(lives);
+    if (nuevasVidas !== null && Number.isFinite(nuevasVidas)) {
+        u.lives = Math.max(0, Math.min(Math.round(nuevasVidas), 100));
+        cambios.push('vidas a ' + u.lives);
+    }
+
+    if (cambios.length === 0) { res.status(400); throw new Error('No has indicado nada que cambiar'); }
+
+    await u.save();
+
+    await anotar(req, 'ajustar-stats', {
+        objetivo: u._id, objetivoNombre: u.username,
+        resumen: 'cambio a ' + u.username + ': ' + cambios.join(', '),
+        detalle: {
+            antes,
+            despues: { hp: u.hp, level: u.level, racha: u.streak?.current, lives: u.lives },
+            motivo: motivo || 'sin indicar'
+        }
+    });
+
+    res.json({ message: u.username + ': ' + cambios.join(', ') });
+});
+
+/**
+ * Borrar una cuenta entera desde el panel.
+ *
+ * Usa el MISMO servicio que el borrado voluntario desde Ajustes, y no un
+ * deleteOne suelto: si no, la cuenta desaparece pero sus entrenos siguen en el
+ * feed, sus comentarios en los entrenos de otros y sus misiones en la base.
+ *
+ * @route   DELETE /api/admin/usuario/:id
+ */
+const borrarCuenta = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) { res.status(400); throw new Error('Usuario no valido'); }
+
+    if (id.toString() === req.user._id.toString()) {
+        res.status(400);
+        throw new Error('No puedes borrar tu propia cuenta desde aqui');
+    }
+
+    const objetivo = await User.findById(id).select('username isAdmin');
+    if (!objetivo) { res.status(404); throw new Error('Usuario no encontrado'); }
+
+    // Misma regla que con el baneo: entre administradores, nadie borra a nadie.
+    if (objetivo.isAdmin) {
+        res.status(400);
+        throw new Error('No se puede borrar a otro administrador');
+    }
+
+    const resumen = await borrarUsuarioYSusDatos(objetivo._id);
+
+    await anotar(req, 'borrar-cuenta', {
+        objetivoNombre: objetivo.username,
+        resumen: 'borro la cuenta de ' + objetivo.username,
+        detalle: resumen
+    });
+
+    res.json({ message: 'Cuenta de ' + objetivo.username + ' borrada', detalle: resumen });
+});
+
+/**
+ * Ultimos entrenos publicados, para poder moderarlos.
+ *
+ * El endpoint para borrar un entreno ya existia, pero no habia forma de VER
+ * cuales hay: solo se podia borrar uno cuyo identificador ya conocieras, y desde
+ * el movil no lo conoces nunca.
+ *
+ * @route   GET /api/admin/entrenos
+ */
+const ultimosEntrenos = asyncHandler(async (req, res) => {
+    const entrenos = await WorkoutLog.find({})
+        .sort({ createdAt: -1 })
+        .limit(40)
+        .select('user routineName date duration caloriesBurned type postText photo comments createdAt')
+        .populate('user', 'username')
+        .lean();
+
+    res.json(entrenos.map(e => ({
+        _id: e._id,
+        autor: e.user?.username || 'desconocido',
+        nombre: e.routineName || 'Entreno',
+        fecha: e.date,
+        cuando: e.createdAt,
+        duracion: e.duration || 0,
+        calorias: e.caloriesBurned || 0,
+        tipo: e.type || 'gym',
+        texto: e.postText || '',
+        // Solo si la hay, no la foto: mandar cuarenta fotos de 200 KB serian
+        // ocho megas cada vez que se abre la pestana.
+        tieneFoto: !!e.photo,
+        comentarios: (e.comments || []).length
+    })));
+});
+
+/**
+ * LA ECONOMIA, DE UN VISTAZO.
+ *
+ * Existe por lo que se encontro en agosto de 2026: el rasca devolvia el 279% y
+ * los tres modos de la ruleta de la fortuna pagaban mas de lo que costaban.
+ * Estuvo asi meses. No dio ni un error, no aparecio en ningun registro y nadie
+ * se entero, porque un juego que regala dinero funciona perfectamente: solo
+ * esta mal. Lo unico que lo detecta es medirlo.
+ *
+ * Dos mitades:
+ *
+ *  - Lo que HAY: cuanto dinero existe y en manos de quien. Si las fichas se
+ *    disparan de un dia para otro, hay una fuga en alguna parte.
+ *  - Lo que DEBERIA pasar: el retorno de cada juego, calculado en el momento
+ *    desde las MISMAS tablas que usa el juego de verdad. Si alguien toca un
+ *    premio, se ve aqui al recargar, sin esperar a que se note en los saldos.
+ *
+ * @route   GET /api/admin/economia
+ */
+
+// El de los slots se simula (el pago depende de que salgan lineas de 3 o 4
+// iguales en una cuadricula, y eso no tiene formula corta), asi que se calcula
+// UNA vez por proceso y se reutiliza: no puede costar medio segundo cada vez que
+// se abre el panel.
+let retornoSlotsCache = null;
+const retornoSlots = () => {
+    if (retornoSlotsCache !== null) return retornoSlotsCache;
+
+    const TIRADAS = 50000;
+    const APUESTA = 10;
+    const pesoTotal = SLOT_SYMBOLS.reduce((a, s) => a + s.weight, 0);
+    const sacar = () => {
+        let r = Math.random() * pesoTotal;
+        for (const s of SLOT_SYMBOLS) { if (r < s.weight) return s; r -= s.weight; }
+        return SLOT_SYMBOLS[0];
+    };
+
+    let apostado = 0, pagado = 0;
+    for (let i = 0; i < TIRADAS; i++) {
+        apostado += APUESTA;
+        for (let f = 0; f < 4; f++) {
+            const fila = [sacar(), sacar(), sacar(), sacar()];
+            if (fila[0].val === 0) continue;
+            let iguales = [];
+            if (fila[0].id === fila[1].id && fila[1].id === fila[2].id && fila[2].id === fila[3].id) iguales = [0, 1, 2, 3];
+            else if (fila[0].id === fila[1].id && fila[1].id === fila[2].id) iguales = [0, 1, 2];
+            else if (fila[1].id === fila[2].id && fila[2].id === fila[3].id && fila[1].val > 0) iguales = [1, 2, 3];
+            if (iguales.length >= 3) pagado += APUESTA * fila[iguales[0]].val * (iguales.length === 4 ? 2 : 1);
+        }
+    }
+    retornoSlotsCache = Math.round((pagado / apostado) * 1000) / 10;
+    return retornoSlotsCache;
+};
+
+const economia = asyncHandler(async (req, res) => {
+    const [totales, ricos] = await Promise.all([
+        User.aggregate([{
+            $group: {
+                _id: null,
+                monedas: { $sum: '$coins' },
+                fichas: { $sum: '$gameCoins' },
+                cuentas: { $sum: 1 }
+            }
+        }]),
+        User.find({}).select('username coins gameCoins').sort({ gameCoins: -1 }).limit(10).lean()
+    ]);
+
+    const t = totales[0] || { monedas: 0, fichas: 0, cuentas: 0 };
+
+    // --- Retorno de cada juego, desde sus propias tablas ---
+    const juegos = [];
+
+    // Rasca: valor esperado cerrado. El XP no son fichas, asi que no cuenta.
+    const repartoRasca = [
+        { s: SCRATCH_SYMBOLS.DIAMOND, p: 0.05 },
+        { s: SCRATCH_SYMBOLS.XP, p: 0.15 },
+        { s: SCRATCH_SYMBOLS.COIN, p: 0.30 },
+        { s: SCRATCH_SYMBOLS.LEMON, p: 0.50 }
+    ];
+    const mediaRasca = repartoRasca
+        .filter(r => r.s.type !== 'xp')
+        .reduce((total, r) => total + r.p * r.s.prize, 0);
+    juegos.push({ juego: 'Rasca', devuelve: Math.round((0.35 * mediaRasca / 10) * 1000) / 10 });
+
+    for (const modo of ['hardcore', 'premium']) {
+        const premios = FORTUNE_PRIZES[modo].map(x => x.v);
+        const media = premios.reduce((a, b) => a + b, 0) / premios.length;
+        juegos.push({ juego: 'Ruleta ' + modo, devuelve: Math.round((media / FORTUNE_COSTS[modo]) * 1000) / 10 });
+    }
+
+    juegos.push({ juego: 'Slots', devuelve: retornoSlots() });
+
+    // Torre: la planta 1 es la que se juega siempre, asi que es la que se ensena.
+    juegos.push({
+        juego: 'Torre (planta 1)',
+        devuelve: Math.round(((2 / 3) * TOWER_MULTIPLIERS[0]) * 1000) / 10
+    });
+
+    const premiosDiaria = FORTUNE_PRIZES.daily.map(x => x.v);
+
+    res.json({
+        circulacion: {
+            monedas: t.monedas || 0,
+            fichas: t.fichas || 0,
+            cuentas: t.cuentas || 0,
+            fichasPorCuenta: t.cuentas ? Math.round((t.fichas || 0) / t.cuentas) : 0
+        },
+        ricos: ricos.map(u => ({ username: u.username, coins: u.coins || 0, gameCoins: u.gameCoins || 0 })),
+        juegos: juegos.sort((a, b) => b.devuelve - a.devuelve),
+        // La tirada gratis no tiene retorno (no cuesta nada): lo unico que la
+        // contiene es que sea una al dia, y de eso se encarga el servidor.
+        tiradaGratis: {
+            media: Math.round(premiosDiaria.reduce((a, b) => a + b, 0) / premiosDiaria.length),
+            maximo: Math.max(...premiosDiaria)
+        },
+        // Por encima de 100 el juego regala dinero; por debajo de 70 es tan duro
+        // que nadie vuelve a jugar.
+        limites: { techo: 100, suelo: 70 }
+    });
+});
+
+/**
+ * El registro de lo que han hecho los administradores.
+ *
+ * @route   GET /api/admin/registro
+ */
+const registroAdmin = asyncHandler(async (req, res) => {
+    const filas = await AdminLog.find({})
+        .sort({ createdAt: -1 })
+        .limit(60)
+        .lean();
+
+    res.json(filas.map(f => ({
+        _id: f._id,
+        quien: f.adminNombre,
+        accion: f.accion,
+        sobre: f.objetivoNombre || '',
+        resumen: f.resumen,
+        detalle: f.detalle,
+        cuando: f.createdAt
+    })));
 });
 
 module.exports = {
     listarUsuarios, banear, desbanear, restablecerClave,
     estadoDelSistema, lanzarMantenimiento, ajustarSaldo,
     ultimosComentarios, borrarComentario, borrarEntreno,
-    notificar
+    notificar,
+    // Ampliacion del panel
+    fichaUsuario, ajustarStats, borrarCuenta,
+    ultimosEntrenos, economia, registroAdmin
 };

@@ -160,7 +160,21 @@ function LayoutContent() {
             {/* Ya no le pasamos el user como prop, el Header lo lee de Zustand */}
             {!hideChrome && <Header />}
 
-            <main className={`flex-1 overflow-y-auto no-scrollbar w-full max-w-md mx-auto relative z-0 overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pt-28 pb-safe-content px-4'}`}>
+            {/* El overflow-x-hidden NO sobra.
+
+                Con solo overflow-y-auto, el CSS calcula el otro eje como
+                `auto` (no puede dejar uno visible y el otro recortado). Asi
+                que cualquier elemento mas ancho que la pantalla convertia la
+                app entera en algo que se arrastra de lado, y como aqui
+                ademas se esconde la barra (no-scrollbar), se movia sin que
+                nada explicara por que. Con un solo input demasiado ancho en
+                el panel de admin se iba 184 px a la derecha.
+
+                Recortar aqui es la red de seguridad, no el arreglo: lo que se
+                salga hay que arreglarlo en su sitio, o queda inalcanzable.
+                Los hijos con su propio scroll horizontal (el mapa de
+                constancia) siguen funcionando igual. */}
+            <main className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-md mx-auto relative z-0 overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pt-28 pb-safe-content px-4'}`}>
                 {/* Pasamos el contexto memoizado a las páginas temporalmente */}
                 <Outlet context={contextValue} />
             </main>
