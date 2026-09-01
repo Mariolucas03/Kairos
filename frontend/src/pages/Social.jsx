@@ -34,6 +34,20 @@ export default function Social() {
     const friends = friendsData?.friends || [];
     const requests = friendsData?.requests || [];
     const missionInvites = user?.missionRequests || [];
+
+    // Retos a Carta Alta pendientes de contestar. Se piden aparte porque no
+    // viven en el usuario: son partidas.
+    const { data: retosCartas, mutate: recargarRetos } = useSWR('/carta-alta/invitaciones', fetcher);
+
+    const handleRespondReto = async (partidaId, respuesta) => {
+        try {
+            await api.post(`/carta-alta/${partidaId}/responder`, { respuesta });
+            recargarRetos();
+            if (respuesta === 'aceptar') navigate('/games/carta-alta');
+        } catch (e) {
+            console.error('No se pudo responder al reto', e);
+        }
+    };
     const notifications = notifData?.items || [];
     const unreadNotifs = notifData?.unread || 0;
 
@@ -285,6 +299,8 @@ export default function Social() {
                 <InboxModal
                     requests={requests}
                     missionInvites={missionInvites}
+                    retosCartas={retosCartas || []}
+                    onRespondReto={handleRespondReto}
                     notifications={notifications}
                     onClose={() => setShowInbox(false)}
                     onRespondFriend={handleRespondFriend}

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight } from 'lucide-react';
+import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords } from 'lucide-react';
 import api from '../services/api';
 import WidgetCard, { WidgetLabel, WidgetBar } from '../components/common/WidgetCard';
 
@@ -15,6 +15,9 @@ const fetcher = (url) => api.get(url).then(res => res.data);
  * es la misma superficie que el resto de la app.
  */
 const GAMES = [
+    // El unico contra una PERSONA, asi que va el primero: es el que hace que
+    // abrir los juegos sea quedar con alguien y no matar el rato solo.
+    { id: 'carta-alta', name: 'Carta Alta', desc: 'Contra un amigo', accent: '#c9822b', Icon: Swords },
     { id: 'roulette', name: 'Ruleta', desc: 'Casino Royal', accent: '#ef4444', Icon: Disc },
     { id: 'blackjack', name: 'Blackjack', desc: 'Suma 21', accent: '#22c55e', Icon: Spade },
     { id: 'slots', name: 'Neon Slots', desc: 'Jackpot', accent: '#d946ef', Icon: Zap },

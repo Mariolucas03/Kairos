@@ -134,6 +134,9 @@ app.use('/api/push', pushRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/games', gamesRoutes);
 
+// Carta Alta: partidas entre dos amigos con una baraja espanola
+app.use('/api/carta-alta', require('./routes/cartaAlta'));
+
 // Fallos de pantalla que mandan los moviles. Cualquiera con sesion puede
 // escribir aqui —es la app la que avisa cuando se rompe—, asi que los topes
 // viven en el controlador. Se leen desde el panel de administracion.

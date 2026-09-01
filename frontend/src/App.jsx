@@ -42,6 +42,7 @@ const Roulette = lazy(() => import('./pages/games/Roulette'));
 const BlackJack = lazy(() => import('./pages/games/BlackJack'));
 const Slots = lazy(() => import('./pages/games/Slots'));
 const TowerGame = lazy(() => import('./pages/games/TowerGame'));
+const CartaAlta = lazy(() => import('./pages/games/CartaAlta'));
 
 /**
  * Los mismos cargadores que usa lazy(), en una lista aparte para poder
@@ -180,6 +181,7 @@ function App() {
                             <Route path="/games/blackjack" element={<BlackJack />} />
                             <Route path="/games/slots" element={<Slots />} />
                             <Route path="/games/tower" element={<TowerGame />} />
+                            <Route path="/games/carta-alta" element={<CartaAlta />} />
                         </Route>
                     </Routes>
                 </Suspense>

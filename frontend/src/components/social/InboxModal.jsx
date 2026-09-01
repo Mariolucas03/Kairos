@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, Check, Heart, MessageCircle } from 'lucide-react';
+import { Bell, X, Check, Heart, MessageCircle, Swords } from 'lucide-react';
 
 // Tiempo relativo corto para la lista de avisos
 const hace = (fecha) => {
@@ -14,10 +14,12 @@ const hace = (fecha) => {
 export default function InboxModal({
     requests = [],
     missionInvites = [],
+    retosCartas = [],
     notifications = [],
     onClose,
     onRespondFriend,
-    onRespondMission
+    onRespondMission,
+    onRespondReto
 }) {
     const navigate = useNavigate();
     return (
@@ -29,6 +31,32 @@ export default function InboxModal({
                 </div>
 
                 <div className="space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+                    {/* --- RETOS A CARTA ALTA ---
+                        Van los primeros: hay fichas de por medio y alguien esta
+                        esperando al otro lado a que contestes. */}
+                    {retosCartas.length > 0 && (
+                        <div>
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#c9822b' }}>
+                                Retos a Carta Alta
+                            </h3>
+                            {retosCartas.map(r => (
+                                <div key={r._id} className="p-3 rounded-2xl border flex justify-between items-center mb-2" style={{ background: 'rgba(201,130,43,0.08)', borderColor: 'rgba(201,130,43,0.3)' }}>
+                                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                                        <Swords size={16} style={{ color: '#c9822b' }} className="shrink-0" />
+                                        <div className="min-w-0">
+                                            <p className="text-white font-bold text-sm truncate">{r.de}</p>
+                                            <p className="text-[10px]" style={{ color: '#c9822b' }}>{r.apuesta} fichas por mano</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
+                                        <button onClick={() => onRespondReto(r._id, 'rechazar')} className="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white"><X size={14} /></button>
+                                        <button onClick={() => onRespondReto(r._id, 'aceptar')} className="p-2 text-black rounded-lg" style={{ background: '#c9822b' }}><Check size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {/* --- ME GUSTA Y COMENTARIOS --- */}
                     {notifications.length > 0 && (
                         <div>
