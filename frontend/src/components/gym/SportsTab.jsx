@@ -152,9 +152,14 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
 
             {/* --- FORMULARIO --- */}
             {elegido && (
-                <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[200] flex items-end sm:items-center justify-center animate-in fade-in">
+                /* Cuadro flotante y centrado, no una hoja que sube desde abajo.
+                   Pegada al borde inferior quedaba a ras del menu y del borde
+                   del movil, y con el teclado abierto se apretaba contra la
+                   parte de arriba. Centrado y con aire por los cuatro lados
+                   cuadra en cualquier alto de pantalla. */
+                <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[200] flex items-center justify-center p-4 animate-in fade-in">
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setElegido(null)} />
-                    <div className="relative z-10 w-full sm:max-w-sm bg-zinc-950 border-t sm:border border-lime-500/20 rounded-t-[32px] sm:rounded-[32px] p-5 animate-in slide-in-from-bottom duration-200 safe-bottom max-h-[92vh] overflow-y-auto custom-scrollbar">
+                    <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-lime-500/20 rounded-[28px] p-5 shadow-2xl shadow-black/70 animate-in zoom-in-95 fade-in duration-200 max-h-[85vh] overflow-y-auto custom-scrollbar">
 
                         <div className="flex items-center justify-between mb-5">
                             <div className="flex items-center gap-3 min-w-0">
