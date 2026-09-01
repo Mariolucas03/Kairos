@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords } from 'lucide-react';
+import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords, Club } from 'lucide-react';
 import api from '../services/api';
 import WidgetCard, { WidgetLabel, WidgetBar } from '../components/common/WidgetCard';
 
@@ -23,6 +23,7 @@ const fetcher = (url) => api.get(url).then(res => res.data);
  * otra tragaperras.
  */
 const MULTIJUGADOR = [
+    { id: 'poker', name: 'Póquer', desc: "Texas Hold'em", accent: '#2f8f5b', Icon: Club },
     { id: 'carta-alta', name: 'Carta Alta', desc: 'Sala con amigos', accent: '#c9822b', Icon: Swords }
 ];
 

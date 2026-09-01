@@ -860,11 +860,13 @@ const getBadge = async (req, res) => {
         // Al anadir cualquier cosa que se conteste desde ahi, hay que sumarla
         // tambien aqui, o pasa lo mismo.
         const CartaAlta = require('../models/CartaAlta');
+        const Poker = require('../models/Poker');
 
-        const [actividad, usuario, cartas] = await Promise.all([
+        const [actividad, usuario, cartas, poker] = await Promise.all([
             Notification.countDocuments({ user: req.user._id, read: false }),
             User.findById(req.user._id).select('friendRequests missionRequests challengeRequests').lean(),
-            CartaAlta.countDocuments({ invitados: req.user._id, estado: 'sala' })
+            CartaAlta.countDocuments({ invitados: req.user._id, estado: 'sala' }),
+            Poker.countDocuments({ invitados: req.user._id, estado: 'sala' })
         ]);
 
         const solicitudes = (usuario?.friendRequests || []).length;
@@ -877,7 +879,8 @@ const getBadge = async (req, res) => {
             missions: misiones,
             challenges: retos,
             cartas,
-            total: actividad + solicitudes + misiones + retos + cartas
+            poker,
+            total: actividad + solicitudes + misiones + retos + cartas + poker
         });
     } catch (error) {
         console.error('Error en getBadge:', error);

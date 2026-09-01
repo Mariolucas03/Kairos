@@ -137,6 +137,9 @@ app.use('/api/games', gamesRoutes);
 // Carta Alta: partidas entre dos amigos con una baraja espanola
 app.use('/api/carta-alta', require('./routes/cartaAlta'));
 
+// Poquer Texas Hold'em entre amigos
+app.use('/api/poker', require('./routes/poker'));
+
 // Fallos de pantalla que mandan los moviles. Cualquiera con sesion puede
 // escribir aqui —es la app la que avisa cuando se rompe—, asi que los topes
 // viven en el controlador. Se leen desde el panel de administracion.

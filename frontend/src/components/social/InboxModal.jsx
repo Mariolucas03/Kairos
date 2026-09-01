@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, Check, Heart, MessageCircle, Swords } from 'lucide-react';
+import { Bell, X, Check, Heart, MessageCircle, Swords, Club } from 'lucide-react';
 
 // Tiempo relativo corto para la lista de avisos
 const hace = (fecha) => {
@@ -15,11 +15,13 @@ export default function InboxModal({
     requests = [],
     missionInvites = [],
     retosCartas = [],
+    mesasPoker = [],
     notifications = [],
     onClose,
     onRespondFriend,
     onRespondMission,
-    onRespondReto
+    onRespondReto,
+    onRespondPoker
 }) {
     const navigate = useNavigate();
     return (
@@ -31,6 +33,30 @@ export default function InboxModal({
                 </div>
 
                 <div className="space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+                    {/* --- MESAS DE PÓQUER --- */}
+                    {mesasPoker.length > 0 && (
+                        <div>
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#2f8f5b' }}>
+                                Mesas de póquer
+                            </h3>
+                            {mesasPoker.map(r => (
+                                <div key={r._id} className="p-3 rounded-2xl border flex justify-between items-center mb-2" style={{ background: 'rgba(47,143,91,0.08)', borderColor: 'rgba(47,143,91,0.3)' }}>
+                                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                                        <Club size={16} style={{ color: '#2f8f5b' }} className="shrink-0" />
+                                        <div className="min-w-0">
+                                            <p className="text-white font-bold text-sm truncate">{r.de}</p>
+                                            <p className="text-[10px]" style={{ color: '#2f8f5b' }}>Entrada {r.entrada} · ciega {r.ciegaGrande}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
+                                        <button onClick={() => onRespondPoker(r._id, 'rechazar')} className="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white"><X size={14} /></button>
+                                        <button onClick={() => onRespondPoker(r._id, 'aceptar')} className="p-2 text-black rounded-lg" style={{ background: '#2f8f5b' }}><Check size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {/* --- RETOS A CARTA ALTA ---
                         Van los primeros: hay fichas de por medio y alguien esta
                         esperando al otro lado a que contestes. */}

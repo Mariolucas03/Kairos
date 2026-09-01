@@ -38,6 +38,17 @@ export default function Social() {
     // Retos a Carta Alta pendientes de contestar. Se piden aparte porque no
     // viven en el usuario: son partidas.
     const { data: retosCartas, mutate: recargarRetos } = useSWR('/carta-alta/invitaciones', fetcher);
+    const { data: mesasPoker, mutate: recargarPoker } = useSWR('/poker/invitaciones', fetcher);
+
+    const handleRespondPoker = async (mesaId, respuesta) => {
+        try {
+            await api.post(`/poker/${mesaId}/responder`, { respuesta });
+            recargarPoker();
+            if (respuesta === 'aceptar') navigate('/games/poker');
+        } catch (e) {
+            console.error('No se pudo responder a la mesa', e);
+        }
+    };
 
     const handleRespondReto = async (partidaId, respuesta) => {
         try {
@@ -300,6 +311,8 @@ export default function Social() {
                     requests={requests}
                     missionInvites={missionInvites}
                     retosCartas={retosCartas || []}
+                    mesasPoker={mesasPoker || []}
+                    onRespondPoker={handleRespondPoker}
                     onRespondReto={handleRespondReto}
                     notifications={notifications}
                     onClose={() => setShowInbox(false)}
