@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
@@ -8,7 +8,7 @@ import {
 import api from '../../services/api';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import CartaEspanola, { PALOS, NOMBRES } from '../../components/games/CartaEspanola';
+import CartaEspanola, { NOMBRES } from '../../components/games/CartaEspanola';
 
 const fetcher = (url) => api.get(url).then(r => r.data);
 
@@ -17,8 +17,6 @@ const ACENTO = '#c9822b';
 // La escalera de fuerza, de la más floja a la que manda. Es la de la brisca:
 // hay que enseñarla, porque quien no la conozca no puede calcular nada.
 const ESCALERA = [2, 4, 5, 6, 7, 10, 11, 12, 3, 1];
-const NUMEROS = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12];
-const LISTA_PALOS = ['oros', 'copas', 'espadas', 'bastos'];
 
 /**
  * CARTA ALTA — salas de juego con baraja española.
@@ -90,6 +88,12 @@ export default function CartaAlta() {
         return r;
     });
 
+    const cambiarApuesta = (v) => accion(async () => {
+        const r = await api.post(`/carta-alta/${abiertaId}/apuesta`, { apuesta: v });
+        avisar(`Ahora se juega a ${v}`);
+        return r;
+    }, 'No se pudo cambiar la apuesta');
+
     const empezar = () => accion(async () => {
         const r = await api.post(`/carta-alta/${abiertaId}/empezar`);
         setResultado(null);
@@ -114,18 +118,6 @@ export default function CartaAlta() {
         return r;
     });
 
-    // Cartas ya salidas, para el panel de conteo
-    const salidas = useMemo(() => {
-        const fuera = new Set();
-        for (const m of (abierta?.historial || [])) {
-            for (const t of (m.tiradas || [])) fuera.add(`${t.carta.numero}-${t.carta.palo}`);
-        }
-        if (abierta?.enCurso?.miCarta) {
-            fuera.add(`${abierta.enCurso.miCarta.numero}-${abierta.enCurso.miCarta.palo}`);
-        }
-        return fuera;
-    }, [abierta]);
-
     // ── LISTA ──────────────────────────────────────────────────────────────
     if (!abierta) {
         const mias = (salas || []).filter(s => s.estado === 'sala');
@@ -145,9 +137,11 @@ export default function CartaAlta() {
                         partida. <strong className="text-white">Si no invitas a nadie, juegas contra la máquina.</strong>
                     </p>
                     <p className="text-[12px] text-zinc-400 leading-relaxed mt-2">
+                        Son <strong className="text-white">40 cartas</strong> y lo que sale no vuelve: si te
+                        acuerdas de lo que ha caído, sabes lo que queda.{' '}
                         Cada mano ponéis lo mismo y levantáis una carta: la más alta se lleva el bote.
-                        Son <strong className="text-white">40 cartas</strong> y lo que sale no vuelve, así que
-                        cuantos más seáis, más corta la partida.
+                        <strong className="text-white"> Si hay empate, la apuesta se dobla</strong> y quien gane
+                        la siguiente se lo lleva todo.
                     </p>
                     <div className="flex items-center gap-1 mt-3 flex-wrap">
                         <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mr-1">Manda</span>
@@ -406,11 +400,14 @@ export default function CartaAlta() {
                     </div>
 
                     {s.bote > 0 && (
-                        <div className="rounded-[20px] p-4 mb-5 flex items-center gap-3 border" style={{ background: ACENTO + '14', borderColor: ACENTO + '44' }}>
-                            <Coins size={18} style={{ color: ACENTO }} className="shrink-0" />
+                        <div className="rounded-[20px] p-4 mb-5 flex items-center gap-3 border animate-in fade-in" style={{ background: ACENTO + '18', borderColor: ACENTO + '66' }}>
+                            <Coins size={20} style={{ color: ACENTO }} className="shrink-0" />
                             <div className="min-w-0">
-                                <p className="text-sm font-black" style={{ color: ACENTO }}>{s.bote} fichas de bote</p>
-                                <p className="text-[10px] text-zinc-400">Hubo empate: se lo lleva quien gane la próxima mano.</p>
+                                <p className="text-base font-black" style={{ color: ACENTO }}>{s.bote} fichas en la mesa</p>
+                                <p className="text-[11px] text-zinc-300 leading-tight mt-0.5">
+                                    Empate: la mano ahora cuesta <strong className="text-white">{s.apuesta}</strong> y
+                                    quien gane <strong className="text-white">se lo lleva todo</strong>.
+                                </p>
                             </div>
                         </div>
                     )}
@@ -443,6 +440,30 @@ export default function CartaAlta() {
                             </p>
                         )}
 
+                        {/* El líder decide lo que cuesta la mano siguiente. Solo
+                            entre manos: en mitad de una, alguien ya habría pagado
+                            el precio viejo. */}
+                        {!terminada && s.soyLider && !yaTire && s.bote === 0 && (
+                            <div className="mt-5">
+                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-2 text-center">
+                                    Lo que cuesta la mano
+                                </p>
+                                <div className="flex gap-2">
+                                    {[10, 50, 100, 250].map(v => (
+                                        <button
+                                            key={v}
+                                            onClick={() => cambiarApuesta(v)}
+                                            disabled={enVuelo}
+                                            className="flex-1 min-w-0 py-2 rounded-xl border text-[11px] font-black transition-colors disabled:opacity-40"
+                                            style={s.apuesta === v
+                                                ? { background: ACENTO + '22', borderColor: ACENTO, color: ACENTO }
+                                                : { background: '#000', borderColor: 'rgba(255,255,255,0.09)', color: '#71717a' }}
+                                        >{v}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {!terminada && (
                             <button
                                 onClick={() => { setResultado(null); levantar(); }}
@@ -467,34 +488,6 @@ export default function CartaAlta() {
                                 </p>
                             </div>
                         )}
-                    </div>
-
-                    {/* ── EL PANEL DE CONTEO ─────────────────────────────────
-                        Aquí está la mitad del juego. No calcula las
-                        probabilidades a propósito: eso sería jugar en tu lugar.
-                        Enseña lo que ya ha salido, que es público. */}
-                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 mb-5">
-                        <div className="flex items-baseline justify-between mb-1">
-                            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Lo que ya ha salido</p>
-                            <span className="text-[10px] font-black" style={{ color: ACENTO }}>{salidas.size} de 40</span>
-                        </div>
-                        <p className="text-[10px] text-zinc-600 mb-3 leading-tight">
-                            Las apagadas ya no están en el mazo. Las cuentas, las haces tú.
-                        </p>
-                        <div className="overflow-x-auto no-scrollbar -mx-1 px-1">
-                            <div className="min-w-min space-y-1.5">
-                                {LISTA_PALOS.map(palo => (
-                                    <div key={palo} className="flex items-center gap-1.5">
-                                        <span className="text-[8px] font-black uppercase tracking-wider w-[52px] shrink-0" style={{ color: PALOS[palo].color }}>
-                                            {PALOS[palo].nombre}
-                                        </span>
-                                        {NUMEROS.map(n => (
-                                            <CartaEspanola key={n} carta={{ numero: n, palo }} tamano="sm" apagada={salidas.has(`${n}-${palo}`)} />
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
                     </div>
 
                     {s.historial.length > 0 && (

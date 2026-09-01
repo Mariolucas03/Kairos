@@ -850,9 +850,21 @@ const heartbeat = async (req, res) => {
 // así que tiene que ser barato.
 const getBadge = async (req, res) => {
     try {
-        const [actividad, usuario] = await Promise.all([
+        // ⚠️ Aqui tiene que estar TODO lo que se contesta desde el buzon.
+        //
+        // Las invitaciones a Carta Alta llegaban al buzon pero no encendian el
+        // punto rojo, asi que el invitado no tenia forma de enterarse: alguien
+        // le estaba esperando para empezar una partida y el aviso solo existia
+        // si le daba por abrir el buzon a ciegas.
+        //
+        // Al anadir cualquier cosa que se conteste desde ahi, hay que sumarla
+        // tambien aqui, o pasa lo mismo.
+        const CartaAlta = require('../models/CartaAlta');
+
+        const [actividad, usuario, cartas] = await Promise.all([
             Notification.countDocuments({ user: req.user._id, read: false }),
-            User.findById(req.user._id).select('friendRequests missionRequests challengeRequests').lean()
+            User.findById(req.user._id).select('friendRequests missionRequests challengeRequests').lean(),
+            CartaAlta.countDocuments({ invitados: req.user._id, estado: 'sala' })
         ]);
 
         const solicitudes = (usuario?.friendRequests || []).length;
@@ -864,7 +876,8 @@ const getBadge = async (req, res) => {
             requests: solicitudes,
             missions: misiones,
             challenges: retos,
-            total: actividad + solicitudes + misiones + retos
+            cartas,
+            total: actividad + solicitudes + misiones + retos + cartas
         });
     } catch (error) {
         console.error('Error en getBadge:', error);

@@ -128,6 +128,7 @@ const crearSala = asyncHandler(async (req, res) => {
     const sala = await CartaAlta.create({
         lider: req.user._id,
         apuesta: fichas,
+        apuestaBase: fichas,
         jugadores: [{ user: yo._id, nombre: yo.username, avatar: yo.avatar || '', esMaquina: false }],
         estado: 'sala'
     });
@@ -326,25 +327,33 @@ const resolverMano = async (sala, mano) => {
     mano.resueltaEn = new Date();
 
     if (empatados > 1) {
+        // ⚠️ UN EMPATE DOBLA LA APUESTA Y NO PAGA A NADIE.
+        //
+        // Todo lo que había en la mesa se queda para la siguiente, y la próxima
+        // mano cuesta el doble. Dos empates seguidos son cuatro veces. Quien
+        // gane, se lo lleva TODO.
+        //
+        // Es lo que convierte un empate de "vaya, nada" en el momento más tenso
+        // de la partida: cuanto más se alarga, más hay encima y más cuesta
+        // seguir. Misma regla contra la máquina que entre amigos — una regla que
+        // cambia según con quién juegas es una regla que nadie recuerda.
         mano.empate = true;
         mano.ganador = -1;
+        mano.premio = 0;
+        sala.bote = enJuego;
 
-        if (sala.contraMaquina) {
-            // Contra la casa, los empates son suyos. Es su única ventaja, y así
-            // se puede decir en una frase en vez de esconderla en un porcentaje.
-            mano.premio = 0;
-            sala.bote = 0;
-        } else {
-            // Entre personas no hay casa: el bote se queda para la siguiente.
-            sala.bote = enJuego;
-            mano.premio = 0;
-        }
+        // Con tope: doblar sin freno acabaría en una mano que nadie puede pagar
+        // y la partida se quedaría clavada.
+        sala.apuesta = Math.min(sala.apuesta * 2, APUESTA_MAXIMA);
         return;
     }
 
     mano.ganador = ganador;
     mano.premio = enJuego;
     sala.bote = 0;
+
+    // Se acabó la escalada: la siguiente mano vuelve a costar lo normal.
+    sala.apuesta = sala.apuestaBase;
 
     const puestoGanador = sala.jugadores[ganador];
     if (puestoGanador.user) {
@@ -358,6 +367,39 @@ const resolverMano = async (sala, mano) => {
         sala.jugadores[i].saldo += (i === ganador ? enJuego - sala.apuesta : -sala.apuesta);
     }
 };
+
+/**
+ * Cambiar la apuesta. Solo el lider, y solo entre manos.
+ *
+ * En mitad de una mano no se puede: alguien ya habria pagado el precio viejo y
+ * el siguiente pagaria otro, asi que el bote no seria de nadie en concreto.
+ *
+ * @route POST /api/carta-alta/:id/apuesta
+ */
+const cambiarApuesta = asyncHandler(async (req, res) => {
+    const sala = await cargar(req.params.id);
+    if (!sala) { res.status(404); throw new Error('Sala no encontrada'); }
+    if (sala.lider.toString() !== req.user._id.toString()) { res.status(403); throw new Error('Solo el líder cambia la apuesta'); }
+    if (!['sala', 'activa'].includes(sala.estado)) { res.status(400); throw new Error('La partida ya ha terminado'); }
+
+    const fichas = Math.floor(Number(req.body?.apuesta));
+    if (!Number.isFinite(fichas) || fichas < APUESTA_MINIMA || fichas > APUESTA_MAXIMA) {
+        res.status(400);
+        throw new Error(`La apuesta va de ${APUESTA_MINIMA} a ${APUESTA_MAXIMA} fichas`);
+    }
+
+    const manoAMedias = sala.manos.find(m => m.ganador === null && !m.empate && m.tiradas.length > 0);
+    if (manoAMedias) {
+        res.status(400);
+        throw new Error('Hay una mano a medias: espera a que se resuelva');
+    }
+
+    sala.apuesta = fichas;
+    sala.apuestaBase = fichas;
+    await sala.save();
+
+    res.json(vista(sala, req.user._id));
+});
 
 /** Levantar carta. */
 const levantarCarta = asyncHandler(async (req, res) => {
@@ -417,16 +459,13 @@ const levantarCarta = asyncHandler(async (req, res) => {
                 : `${nombreDe(mano.tiradas.find(t => t.puesto === mano.ganador).carta)} — gana ${sala.jugadores[mano.ganador].nombre}`
         };
 
-        for (const j of sala.jugadores) {
-            if (j.user && j.user.toString() !== req.user._id.toString()) {
-                notificarA(j.user, {
-                    title: '🃏 Mano resuelta',
-                    body: resultado.texto,
-                    icon: '/assets/icons/icon-192x192.png',
-                    url: '/games/carta-alta'
-                });
-            }
-        }
+        // ⚠️ NO se avisa de quien ha ganado la mano, a proposito.
+        //
+        // Con veinte manos por partida serian veinte notificaciones seguidas
+        // por algo que se ve al abrir la app. Un aviso que llega tantas veces
+        // deja de leerse, y arrastra consigo a los que si importan — la
+        // invitacion a una sala, por ejemplo. Lo que pasa dentro de una partida
+        // se mira dentro de la partida.
     }
 
     // ¿Se acabó?
@@ -466,22 +505,40 @@ const salir = asyncHandler(async (req, res) => {
 
     const soyLider = sala.lider.toString() === req.user._id.toString();
 
-    if (sala.estado === 'sala') {
-        // Si se va el líder, la sala se cierra: sin líder no hay quien empiece.
-        if (soyLider) {
-            for (const j of sala.jugadores) {
-                if (j.user && j.user.toString() !== req.user._id.toString()) {
-                    notificarA(j.user, {
-                        title: '🃏 Sala cerrada',
-                        body: 'El líder ha cerrado la partida antes de empezar.',
-                        icon: '/assets/icons/icon-192x192.png',
-                        url: '/games/carta-alta'
-                    });
-                }
+    // ⚠️ SI SE VA EL LÍDER, LA SALA DESAPARECE. Empezada o no.
+    //
+    // Sin líder no hay quien empiece, ni quien invite, ni quien cambie la
+    // apuesta: lo que queda no es una partida, es una fila muerta en la lista de
+    // todos los que estaban dentro.
+    //
+    // Lo que estaba ganado ya está pagado —cada mano se cobra en el momento—,
+    // así que lo único pendiente es el bote de un empate. Se reparte antes de
+    // borrar: quedárselo al cerrar sería una forma muy tonta de robar.
+    if (soyLider) {
+        if (sala.bote > 0) {
+            const vivos = sala.jugadores.filter(j => j.activo && j.user);
+            if (vivos.length > 0) {
+                const parte = Math.floor(sala.bote / vivos.length);
+                for (const j of vivos) await User.findByIdAndUpdate(j.user, { $inc: { gameCoins: parte } });
             }
-            await CartaAlta.findByIdAndDelete(sala._id);
-            return res.json({ message: 'Sala cerrada' });
         }
+
+        for (const j of sala.jugadores) {
+            if (j.user && j.user.toString() !== req.user._id.toString()) {
+                notificarA(j.user, {
+                    title: '🃏 Partida cerrada',
+                    body: 'El líder ha cerrado la sala.',
+                    icon: '/assets/icons/icon-192x192.png',
+                    url: '/games/carta-alta'
+                });
+            }
+        }
+
+        await CartaAlta.findByIdAndDelete(sala._id);
+        return res.json({ message: 'Sala cerrada' });
+    }
+
+    if (sala.estado === 'sala') {
         sala.jugadores.splice(miPuesto, 1);
         await sala.save();
         return res.json({ message: 'Has salido de la sala' });
@@ -543,6 +600,6 @@ const misInvitaciones = asyncHandler(async (req, res) => {
 
 module.exports = {
     crearSala, invitar, responderInvitacion, expulsar, empezar,
-    levantarCarta, salir, misSalas, verSala, misInvitaciones,
+    levantarCarta, salir, misSalas, verSala, misInvitaciones, cambiarApuesta,
     APUESTA_MINIMA, APUESTA_MAXIMA, MAX_JUGADORES, NOMBRE_MAQUINA
 };

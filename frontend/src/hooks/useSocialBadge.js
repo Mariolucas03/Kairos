@@ -4,8 +4,8 @@ import api from '../services/api';
 const fetcher = (url) => api.get(url).then(res => res.data);
 
 /**
- * Avisos pendientes: solicitudes de amistad, invitaciones de misión y
- * actividad en tus publicaciones (me gusta y comentarios).
+ * Avisos pendientes: solicitudes de amistad, invitaciones de misión, retos a
+ * Carta Alta y actividad en tus publicaciones (me gusta y comentarios).
  *
  * Lo usan a la vez el footer (punto rojo en el icono de IG) y la cabecera del
  * feed (número sobre el buzón). Al compartir la misma clave de SWR se hace una
@@ -25,6 +25,7 @@ export default function useSocialBadge() {
         activity: data?.activity || 0,
         requests: data?.requests || 0,
         missions: data?.missions || 0,
+        cartas: data?.cartas || 0,
         refreshBadge: mutate
     };
 }

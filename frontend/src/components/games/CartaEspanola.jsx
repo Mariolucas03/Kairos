@@ -21,8 +21,15 @@ const NOMBRES = {
     6: '6', 7: '7', 10: 'SOTA', 11: 'CABALLO', 12: 'REY'
 };
 
-/** Las figuras llevan su inicial grande; los números, su cifra. */
-const etiquetaCorta = (n) => (n === 10 ? 'S' : n === 11 ? 'C' : n === 12 ? 'R' : n === 1 ? 'A' : String(n));
+/**
+ * Cada carta lleva SU NÚMERO: 1 al 7, y 10, 11 y 12 para sota, caballo y rey.
+ *
+ * Antes iban con la inicial (A, S, C, R) y era peor de leer: hay que saberse
+ * que la C es el caballo y no el cinco, y sobre todo hay que traducir la letra a
+ * un sitio en la escalera para saber si tu carta gana. Con el número, el 12 se
+ * ve mayor que el 11 sin pensar.
+ */
+const etiquetaCorta = (n) => String(n);
 
 function Simbolo({ palo, size = 40, color }) {
     const comun = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -103,7 +110,7 @@ export default function CartaEspanola({ carta, tamano = 'md', apagada = false, c
 
     return (
         <div
-            className={`relative shrink-0 flex flex-col justify-between overflow-hidden ${className}`}
+            className={`relative shrink-0 flex flex-col overflow-hidden ${className}`}
             style={{
                 width: medidas.ancho, height: medidas.alto, borderRadius: medidas.radio,
                 background: apagada ? '#0d0d0f' : `linear-gradient(160deg, ${p.fondo}, #0a0a0c 70%)`,
@@ -124,12 +131,10 @@ export default function CartaEspanola({ carta, tamano = 'md', apagada = false, c
                 <Simbolo palo={carta.palo} size={medidas.simbolo} color={p.color} />
             </div>
 
-            <span
-                className="font-black leading-none self-end rotate-180"
-                style={{ fontSize: medidas.cifra, color: p.color, letterSpacing: '-0.04em' }}
-            >
-                {corta}
-            </span>
+            {/* Sin el número repetido y girado abajo, que es de baraja
+                francesa. En una española va arriba y ya — y además el 6 girado
+                se lee como un 9 y el 10 como "0L", que en un juego donde la
+                carta decide quién cobra no es un detalle bonito. */}
         </div>
     );
 }

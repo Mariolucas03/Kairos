@@ -63,8 +63,13 @@ const manoSchema = new mongoose.Schema({
 const cartaAltaSchema = new mongoose.Schema({
     lider: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
-    // Fichas que pone CADA UNO en cada mano
+    // Fichas que pone CADA UNO en la mano que viene. Sube con cada empate y
+    // vuelve a la base en cuanto alguien gana.
     apuesta: { type: Number, required: true, min: 1 },
+
+    // La que puso el líder. Es a la que se vuelve después de un empate: sin
+    // esto, una racha de empates dejaría la apuesta por las nubes para siempre.
+    apuestaBase: { type: Number, required: true, min: 1 },
 
     jugadores: { type: [jugadorSchema], default: [] },
 
@@ -73,14 +78,14 @@ const cartaAltaSchema = new mongoose.Schema({
 
     estado: { type: String, enum: ['sala', 'activa', 'terminada'], default: 'sala' },
 
-    // Contra la máquina los empates se los queda la casa, y eso es lo único que
-    // le da ventaja. Entre personas, un empate acumula el bote.
+    // Si juegas solo, la máquina ocupa un puesto. No cambia ninguna regla: los
+    // empates doblan la apuesta igual que entre amigos.
     contraMaquina: { type: Boolean, default: false },
 
     mazo: { type: [cartaSchema], default: [] },
     manos: { type: [manoSchema], default: [] },
 
-    // Lo acumulado por empates. Se lo lleva quien gane la siguiente mano.
+    // Lo acumulado por los empates. Se lo lleva ENTERO quien gane la siguiente.
     bote: { type: Number, default: 0 },
 
     manosTotales: { type: Number, default: 0 },

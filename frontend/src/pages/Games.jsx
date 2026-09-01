@@ -14,10 +14,19 @@ const fetcher = (url) => api.get(url).then(res => res.data);
  * Ahora el color se reduce a la línea de acento de 2px y al icono, y la tarjeta
  * es la misma superficie que el resto de la app.
  */
-const GAMES = [
-    // El unico contra una PERSONA, asi que va el primero: es el que hace que
-    // abrir los juegos sea quedar con alguien y no matar el rato solo.
-    { id: 'carta-alta', name: 'Carta Alta', desc: 'Contra un amigo', accent: '#c9822b', Icon: Swords },
+/**
+ * Los juegos, separados por CONTRA QUIÉN se juega.
+ *
+ * No es un adorno: es la única diferencia que importa antes de entrar. En los de
+ * arriba hay alguien esperando al otro lado y lo que pierdes lo gana un amigo;
+ * en los de abajo juegas solo contra la casa. Mezclados, "Carta Alta" parecía
+ * otra tragaperras.
+ */
+const MULTIJUGADOR = [
+    { id: 'carta-alta', name: 'Carta Alta', desc: 'Sala con amigos', accent: '#c9822b', Icon: Swords }
+];
+
+const CONTRA_LA_MAQUINA = [
     { id: 'roulette', name: 'Ruleta', desc: 'Casino Royal', accent: '#ef4444', Icon: Disc },
     { id: 'blackjack', name: 'Blackjack', desc: 'Suma 21', accent: '#22c55e', Icon: Spade },
     { id: 'slots', name: 'Neon Slots', desc: 'Jackpot', accent: '#d946ef', Icon: Zap },
@@ -26,6 +35,34 @@ const GAMES = [
     { id: 'tower', name: 'La Torre', desc: 'Sube o piérdelo', accent: '#10b981', Icon: Building2 },
     { id: 'fortune-wheel', name: 'Fortuna', desc: 'Giro diario', accent: '#eab308', Icon: CircleDollarSign }
 ];
+
+const TarjetaJuego = ({ id, name, desc, accent, Icon }) => (
+    <Link to={`/games/${id}`} className="block">
+        <WidgetCard accent={accent} padding="p-4" className="h-[132px] active:scale-[0.985]">
+            <div className="relative z-10 h-full flex flex-col justify-between">
+                <Icon size={26} style={{ color: accent }} />
+                <div>
+                    <WidgetLabel>{name}</WidgetLabel>
+                    <p className="mt-1.5 text-[10px] font-bold text-zinc-600 uppercase tracking-wide leading-none">
+                        {desc}
+                    </p>
+                </div>
+            </div>
+        </WidgetCard>
+    </Link>
+);
+
+const Grupo = ({ titulo, pie, juegos }) => (
+    <section className="mb-7">
+        <div className="mb-3">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.16em] not-italic">{titulo}</h2>
+            <p className="text-[10px] text-zinc-600 mt-1 leading-tight">{pie}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+            {juegos.map(j => <TarjetaJuego key={j.id} {...j} />)}
+        </div>
+    </section>
+);
 
 const ACENTO_BLOQUEO = '#f43f5e';
 
@@ -110,23 +147,17 @@ export default function Games() {
                 </h1>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-                {GAMES.map(({ id, name, desc, accent, Icon }) => (
-                    <Link key={id} to={`/games/${id}`} className="block">
-                        <WidgetCard accent={accent} padding="p-4" className="h-[132px] active:scale-[0.985]">
-                            <div className="relative z-10 h-full flex flex-col justify-between">
-                                <Icon size={26} style={{ color: accent }} />
-                                <div>
-                                    <WidgetLabel>{name}</WidgetLabel>
-                                    <p className="mt-1.5 text-[10px] font-bold text-zinc-600 uppercase tracking-wide leading-none">
-                                        {desc}
-                                    </p>
-                                </div>
-                            </div>
-                        </WidgetCard>
-                    </Link>
-                ))}
-            </div>
+            <Grupo
+                titulo="Con amigos"
+                pie="Hay alguien al otro lado. Lo que pierdes, lo gana él."
+                juegos={MULTIJUGADOR}
+            />
+
+            <Grupo
+                titulo="Contra la máquina"
+                pie="Tú contra la casa, cuando te apetezca."
+                juegos={CONTRA_LA_MAQUINA}
+            />
         </div>
     );
 }
