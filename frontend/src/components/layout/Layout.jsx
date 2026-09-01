@@ -160,6 +160,22 @@ function LayoutContent() {
             {/* Ya no le pasamos el user como prop, el Header lo lee de Zustand */}
             {!hideChrome && <Header />}
 
+            {/* ⚠️ AQUI NO PUEDE HABER z-0.
+
+                Un z-index en `main` crea una CAPA DE APILAMIENTO: a partir de
+                ahi, el z-index de todo lo que hay dentro solo compite entre
+                hermanos, no con el resto de la pagina. Y como el menu de abajo
+                vive FUERA de main con z-50, se dibujaba encima de cualquier
+                ventana abierta dentro de una pantalla por mucho z-200 que
+                llevara.
+
+                Se veia en el formulario de "Otros deportes": el boton de
+                REGISTRAR quedaba 66 px por debajo del menu, medido. Y le pasaba
+                igual a cualquier modal que se abra desde dentro de una pagina.
+
+                Sin z-index, `relative` no abre capa y cada modal compite con el
+                menu y la cabecera como debe.
+
             {/* El overflow-x-hidden NO sobra.
 
                 Con solo overflow-y-auto, el CSS calcula el otro eje como
@@ -174,7 +190,7 @@ function LayoutContent() {
                 salga hay que arreglarlo en su sitio, o queda inalcanzable.
                 Los hijos con su propio scroll horizontal (el mapa de
                 constancia) siguen funcionando igual. */}
-            <main className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-md mx-auto relative z-0 overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pt-28 pb-safe-content px-4'}`}>
+            <main className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-md mx-auto relative overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pt-28 pb-safe-content px-4'}`}>
                 {/* Pasamos el contexto memoizado a las páginas temporalmente */}
                 <Outlet context={contextValue} />
             </main>

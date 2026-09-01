@@ -75,7 +75,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                     <h3 className="text-lime-500 text-xs font-black uppercase tracking-widest mb-3 px-1">Hoy</h3>
                     <div className="space-y-2">
                         {hoy.map((s, i) => (
-                            <div key={i} className="bg-zinc-950 border border-white/5 rounded-2xl p-3 flex items-center justify-between">
+                            <div key={i} className="bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] p-3 flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className="w-10 h-10 rounded-xl bg-lime-500/10 flex items-center justify-center text-lime-400 border border-lime-500/20 shrink-0">
                                         <Activity size={18} />
@@ -99,13 +99,13 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
 
             {/* BUSCADOR */}
             <div className="relative mb-4">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" size={16} />
                 <input
                     type="text"
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar deporte..."
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 text-white font-bold outline-none focus:border-lime-500/50 transition-colors placeholder:text-zinc-700"
+                    className="w-full min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] py-3 pl-11 pr-4 text-white text-sm font-bold outline-none focus:border-lime-500/40 transition-colors placeholder:text-zinc-700"
                 />
             </div>
 
@@ -121,10 +121,22 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                                 <button
                                     key={s.id}
                                     onClick={() => abrir(s)}
-                                    className="bg-zinc-950 border border-white/5 rounded-2xl py-4 px-2 flex flex-col items-center gap-1.5 hover:border-lime-500/40 active:scale-95 transition-all"
+                                    title={s.name}
+                                    /* ⚠️ ALTURA FIJA. Es lo que arregla el descuadre.
+                                       Sin ella, "Artes marciales" partía en dos líneas y su
+                                       tarjeta quedaba 12 px más alta que la de al lado: la
+                                       fila entera salía torcida. Medido en pantalla: había
+                                       tarjetas de 77 px y de 89 conviviendo. */
+                                    className="h-[84px] bg-[#0a0a0c] border border-white/[0.07] rounded-[18px] px-1.5 flex flex-col items-center justify-center gap-1.5 hover:border-lime-500/40 active:scale-95 transition-all"
                                 >
-                                    <span className="text-2xl leading-none">{s.icon}</span>
-                                    <span className="text-[10px] font-black text-zinc-300 uppercase text-center leading-tight">{s.name}</span>
+                                    {/* El emoji también con caja fija: los hay más altos que
+                                        otros y sin esto empujan el nombre hacia abajo. */}
+                                    <span className="h-[26px] flex items-center justify-center text-[23px] leading-none">
+                                        {s.icon}
+                                    </span>
+                                    <span className="text-[9px] font-black text-zinc-300 uppercase text-center leading-[1.15] line-clamp-2 w-full">
+                                        {s.name}
+                                    </span>
                                 </button>
                             ))}
                         </div>

@@ -12,6 +12,10 @@
  *
  * `distance` indica si tiene sentido pedir kilómetros: en tenis o pesas no.
  */
+// ⚠️ Los iconos son emoji y NO todos los pinta todo el mundo: el patin de
+// ruedas (U+1F6FC) sale como un cuadrado vacio en Windows, que es donde se
+// mira esta app la mitad de las veces. Al anadir uno nuevo, hay que verlo en
+// pantalla antes de darlo por bueno.
 const SPORTS = [
     // --- Correr y caminar ---
     { id: 'andar', name: 'Andar', icon: '🚶', met: 3.5, distance: true, group: 'Aeróbico' },
@@ -24,7 +28,7 @@ const SPORTS = [
     { id: 'spinning', name: 'Spinning', icon: '🚲', met: 8.5, distance: false, group: 'Aeróbico' },
     { id: 'natacion', name: 'Natación', icon: '🏊', met: 8.3, distance: true, group: 'Aeróbico' },
     { id: 'remo', name: 'Remo', icon: '🚣', met: 7.0, distance: true, group: 'Aeróbico' },
-    { id: 'patinaje', name: 'Patinaje', icon: '🛼', met: 7.5, distance: true, group: 'Aeróbico' },
+    { id: 'patinaje', name: 'Patinaje', icon: '⛸️', met: 7.5, distance: true, group: 'Aeróbico' },
     { id: 'surf', name: 'Surf', icon: '🏄', met: 5.0, distance: false, group: 'Aeróbico' },
     { id: 'esqui', name: 'Esquí', icon: '⛷️', met: 7.0, distance: true, group: 'Aeróbico' },
 
@@ -40,14 +44,14 @@ const SPORTS = [
 
     // --- Fuerza y combate ---
     { id: 'crossfit', name: 'CrossFit', icon: '🏋️', met: 8.0, distance: false, group: 'Fuerza y combate' },
-    { id: 'calistenia', name: 'Calistenia', icon: '🤸', met: 6.0, distance: false, group: 'Fuerza y combate' },
+    { id: 'calistenia', name: 'Calistenia', icon: '💪', met: 6.0, distance: false, group: 'Fuerza y combate' },
     { id: 'escalada', name: 'Escalada', icon: '🧗', met: 8.0, distance: false, group: 'Fuerza y combate' },
     { id: 'boxeo', name: 'Boxeo', icon: '🥊', met: 9.0, distance: false, group: 'Fuerza y combate' },
     { id: 'artes-marciales', name: 'Artes marciales', icon: '🥋', met: 10.3, distance: false, group: 'Fuerza y combate' },
 
     // --- Cuerpo y mente ---
     { id: 'yoga', name: 'Yoga', icon: '🧘', met: 3.0, distance: false, group: 'Cuerpo y mente' },
-    { id: 'pilates', name: 'Pilates', icon: '🤍', met: 3.8, distance: false, group: 'Cuerpo y mente' },
+    { id: 'pilates', name: 'Pilates', icon: '🤸', met: 3.8, distance: false, group: 'Cuerpo y mente' },
     { id: 'estiramientos', name: 'Estiramientos', icon: '🙆', met: 2.3, distance: false, group: 'Cuerpo y mente' },
     { id: 'baile', name: 'Baile', icon: '💃', met: 5.5, distance: false, group: 'Cuerpo y mente' },
 
