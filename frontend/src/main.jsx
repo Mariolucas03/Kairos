@@ -5,11 +5,19 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import './index.css';
 import { API_BASE_URL } from './config';
 import { escucharFallosGlobales } from './utils/reportarFallo';
+import { vigilarCola } from './utils/colaEntrenos';
 
 // Se engancha ANTES de montar React: los fallos que ocurren durante el arranque
 // son justo los peores (pantalla en negro sin nada) y son los que hasta ahora
 // no veia absolutamente nadie.
 escucharFallosGlobales();
+
+// Entrenos que se quedaron sin enviar por falta de cobertura: se reintentan al
+// abrir la app y en cuanto vuelve la conexion. El usuario no tiene que hacer
+// nada, ni acordarse de nada.
+vigilarCola(({ enviados }) => {
+    console.log(`Entrenos pendientes enviados: ${enviados}`);
+});
 
 // --- DESPERTAR AL BACKEND CUANTO ANTES ---
 // El backend (Render free tier) se duerme tras ~15 min de inactividad y tarda

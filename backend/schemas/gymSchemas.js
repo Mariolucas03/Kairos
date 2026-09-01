@@ -4,6 +4,11 @@ const Joi = require('joi');
 const workoutLogSchema = Joi.object({
     routineId: Joi.string().hex().length(24).optional(), // ID de mongo opcional
     routineName: Joi.string().required(),
+
+    // Marca del movil para no guardar dos veces el mismo entreno. La pone la
+    // app al EMPEZAR, asi que un reintento reusa la misma y el servidor lo
+    // reconoce. Opcional: los envios de antes no la traen.
+    clienteId: Joi.string().max(64).optional(),
     duration: Joi.number().min(1).required(), // Debe ser número positivo
     intensity: Joi.string().valid('Baja', 'Media', 'Alta').default('Media'),
 

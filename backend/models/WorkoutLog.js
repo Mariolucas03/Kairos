@@ -96,6 +96,10 @@ const workoutLogSchema = mongoose.Schema({
 
     earnedXP: { type: Number, default: 0 },
     earnedCoins: { type: Number, default: 0 },
+    // Marca que pone el movil al empezar el entreno, para no guardarlo dos
+    // veces si hay que reintentar el envio. Ver el indice de mas abajo.
+    clienteId: { type: String },
+
     date: {
         type: Date,
         default: Date.now
@@ -114,6 +118,20 @@ const workoutLogSchema = mongoose.Schema({
 
 // 🔥 OPTIMIZACIÓN KAIROS: Índices para consultas ultra-rápidas
 // 1. Índice principal para el historial cronológico y widgets semanales
+// MARCA QUE PONE EL MOVIL AL EMPEZAR EL ENTRENO.
+//
+// Existe para que el mismo entreno no se pueda guardar dos veces. Sin esto, un
+// reintento tras una respuesta perdida (el guardado llego, la respuesta no)
+// crearia un entreno duplicado, con su XP y su entrada en el registro del dia.
+// Y en cuanto se pueda reintentar sin cobertura, eso deja de ser raro.
+//
+// Es unico POR USUARIO y sparse: los entrenos de antes no la llevan y no deben
+// chocar entre si por no tenerla.
+workoutLogSchema.index(
+    { user: 1, clienteId: 1 },
+    { unique: true, sparse: true, partialFilterExpression: { clienteId: { $type: 'string' } } }
+);
+
 workoutLogSchema.index({ user: 1, date: -1 });
 
 // 2. Índice compuesto para filtrar por tipo (gym/sport) rápidamente

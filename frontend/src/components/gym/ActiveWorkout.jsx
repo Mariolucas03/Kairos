@@ -13,6 +13,7 @@ import ExerciseSheet from './ExerciseSheet';
 import RankUpModal from './RankUpModal';
 import BodyMap from '../body/BodyMap';
 import { compressImage } from '../../utils/imageCompressor';
+import { encolar, esFalloDeRed } from '../../utils/colaEntrenos';
 
 // ==========================================
 // SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
@@ -106,6 +107,23 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const [startTime] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved).startTime : Date.now();
+    });
+
+    /**
+     * Marca de ESTE entreno, puesta al empezar.
+     *
+     * Es lo que permite reintentar el envio sin miedo: el servidor la usa para
+     * reconocer un entreno que ya guardo y no darlo por bueno dos veces. Tiene
+     * que sobrevivir a cerrar la app a medio entreno, asi que va en el borrador
+     * como todo lo demas — si se generara al pulsar "terminar", cada reintento
+     * traeria una marca distinta y no serviria de nada.
+     */
+    const [clienteId] = useState(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const guardado = saved ? JSON.parse(saved).clienteId : null;
+        if (guardado) return guardado;
+        const aleatorio = (globalThis.crypto?.randomUUID?.() || String(Math.random()).slice(2));
+        return `${routine._id}-${startTime}-${aleatorio}`.slice(0, 64);
     });
 
     const [exercises, setExercises] = useState(() => {
@@ -236,14 +254,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
     useEffect(() => {
         // En lugar de guardar de inmediato, programamos el guardado para dentro de 1 segundo
         const timeoutId = setTimeout(() => {
-            const state = { startTime, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
+            const state = { startTime, clienteId, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         }, 1000);
 
         // Si el usuario vuelve a teclear antes de que pase 1 segundo, el timeout anterior se cancela.
         // ¡Cero tirones al escribir!
         return () => clearTimeout(timeoutId);
-    }, [exercises, intensity, defaultRest, startTime, routine._id, routine.name, STORAGE_KEY]);
+    }, [exercises, intensity, defaultRest, startTime, clienteId, routine._id, routine.name, STORAGE_KEY]);
 
     // --- FUNCIONES DESCANSO ---
     /**
@@ -403,10 +421,16 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }
 
         setFinishing(true);
+
+        // Se declara FUERA del try para que el catch pueda encolarlo si no hay
+        // red. Dentro del try no existiria ahi, y encolar el entreno es justo
+        // lo que hay que hacer cuando el envio falla.
+        let logData = null;
+
         try {
             const finalSeconds = Math.floor((Date.now() - startTime) / 1000);
 
-            const logData = {
+            logData = {
                 routineId: routine._id,
                 routineName: routine.name,
                 duration: finalSeconds > 0 ? finalSeconds : 1,
@@ -436,7 +460,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 })).filter(ex => ex.sets.length > 0),
                 // La foto viaja ya comprimida; el servidor la valida y deriva
                 // por su cuenta los músculos trabajados a partir de los ejercicios.
-                photo: photo || undefined
+                photo: photo || undefined,
+                // Para que reintentarlo no lo guarde dos veces
+                clienteId
             };
 
             const res = await api.post('/gym/log', logData);
@@ -477,7 +503,35 @@ export default function ActiveWorkout({ routine, onFinish }) {
             if (onFinish) onFinish(res.data);
         } catch (error) {
             console.error(error);
-            setToast({ message: 'Error al guardar', type: 'error' });
+
+            // ⚠️ NO ES LO MISMO QUE NO HAYA RED A QUE EL ENTRENO ESTE MAL.
+            //
+            // Antes las dos cosas daban "Error al guardar" y te dejaban en la
+            // pantalla del entreno. El borrador se salvaba, pero tenias que
+            // acordarte de volver a entrar y darle otra vez al salir del
+            // gimnasio — justo despues de entrenar, que es cuando menos ganas
+            // hay de pelearse con una app.
+            //
+            // Si es de red, se queda en la cola y se manda solo. Si el servidor
+            // lo ha rechazado, eso SI hay que ensenarlo: insistir no lo va a
+            // arreglar.
+            // Si el fallo ocurrio antes de montar el envio (no deberia, pero
+            // un catch no puede dar nada por hecho), no hay nada que encolar.
+            if (logData && esFalloDeRed(error)) {
+                encolar(logData);
+                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(REST_KEY);
+                setToast({
+                    message: 'Sin conexión: se guardará solo en cuanto vuelva',
+                    type: 'success'
+                });
+                // Se cierra igual: el entreno esta a salvo y quedarse aqui solo
+                // hace pensar que se ha perdido.
+                setTimeout(() => { if (onFinish) onFinish(null); }, 1200);
+                return;
+            }
+
+            setToast({ message: error.response?.data?.message || 'Error al guardar', type: 'error' });
             setFinishing(false);
             setShowFinishAlert(false);
         }

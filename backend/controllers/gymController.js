@@ -670,7 +670,36 @@ const seedExercises = async (req, res) => {
 // ==========================================
 const saveWorkoutLog = async (req, res) => {
     try {
-        const { routineId, routineName, duration, exercises, intensity, photo } = req.body;
+        const { routineId, routineName, duration, exercises, intensity, photo, clienteId } = req.body;
+
+        // ⚠️ EL MISMO ENTRENO NO SE GUARDA DOS VECES.
+        //
+        // Esto va lo PRIMERO, antes de tocar nada: el resto de la funcion da
+        // XP, sube rangos, paga monedas y escribe en el registro del dia.
+        // Repetirlo seria regalar todo eso.
+        //
+        // Hace falta porque el movil puede reintentar: si se guarda bien pero
+        // la respuesta se pierde por el camino (cobertura de gimnasio,
+        // ascensor, el servidor durmiendose), la app no tiene forma de saber si
+        // llego. Sin esta comprobacion, la unica salida segura seria no
+        // reintentar nunca y perder el entreno.
+        if (clienteId) {
+            const yaGuardado = await WorkoutLog.findOne({ user: req.user._id, clienteId }).lean();
+            if (yaGuardado) {
+                // Se responde 200 y no 201: no se ha creado nada. Para la app es
+                // un exito igual, que es lo que importa — su entreno esta a salvo.
+                //
+                // No se devuelven rankUps: los premios ya se dieron en el envio
+                // bueno. Volver a mandarlos relanzaria la animacion de subida de
+                // rango por algo que ya paso.
+                return res.status(200).json({
+                    message: 'Este entreno ya estaba guardado',
+                    log: yaGuardado,
+                    duplicado: true,
+                    rankUps: []
+                });
+            }
+        }
 
         // Se usan estas y no `duration`/`exercises` a partir de aqui: lo que
         // llega del movil alimenta las calorias (y de ahi el XP) y el volumen
@@ -799,6 +828,7 @@ const saveWorkoutLog = async (req, res) => {
 
         const log = await WorkoutLog.create({
             user: req.user._id, routine: routineId, routineName: routineName || 'Entrenamiento Libre',
+            clienteId: clienteId || undefined,
             duration: duracionSegura, exercises: ejercicios, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
             photo: fotoFinal,
             musclesWorked: [...principales],
@@ -852,6 +882,19 @@ const saveWorkoutLog = async (req, res) => {
             rankUpCoins: monedas
         });
     } catch (error) {
+        // Dos reintentos que salen a la vez pasan los dos la comprobacion de
+        // arriba antes de que ninguno escriba; el indice unico para al segundo.
+        // No es un error: es la red haciendo su trabajo, y el entreno del
+        // usuario esta guardado.
+        if (error?.code === 11000) {
+            const yaGuardado = await WorkoutLog.findOne({
+                user: req.user._id, clienteId: req.body?.clienteId
+            }).lean();
+            return res.status(200).json({
+                message: 'Este entreno ya estaba guardado',
+                log: yaGuardado, duplicado: true, rankUps: []
+            });
+        }
         console.error(error);
         res.status(500).json({ message: 'Error guardando entrenamiento' });
     }
