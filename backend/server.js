@@ -62,13 +62,39 @@ app.use(express.json({ limit: '1mb' }));
 // Seguridad: Prevenir inyección NoSQL
 app.use(mongoSanitize());
 
+// ⚠️ SIN ESTO, EL LIMITADOR DE ABAJO CUENTA A TODO EL MUNDO COMO UNA PERSONA.
+//
+// En Render la app vive detras de un balanceador, asi que la IP del socket es
+// SIEMPRE la del balanceador. express-rate-limit la usa para identificar a
+// quien limita, de modo que los tres usuarios, el cron de keep-alive y
+// cualquier otra cosa compartian un unico cupo: 600 peticiones cada 15 minutos
+// para la app ENTERA, unas 40 por minuto entre todos.
+//
+// Pasaba de verdad: el 1 de septiembre el keep-alive estuvo cayendo con 429
+// desde las 7:32, cuatro horas seguidas. Y como el ping es lo que impide que
+// Render duerma el servidor, el efecto para el usuario no era un error: era que
+// la app tardaba cuarenta segundos en abrir.
+//
+// El 1 significa "fiate solo del primer salto", que es el balanceador de
+// Render. Poner true seria peor que no ponerlo: cualquiera podria mandar una
+// cabecera X-Forwarded-For inventada y saltarse el limite entero.
+app.set('trust proxy', 1);
+
 // Seguridad: Límite de peticiones global (protege login, apuestas, etc. de fuerza bruta/spam)
 app.use(rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 600,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { message: 'Demasiadas peticiones, inténtalo de nuevo más tarde.' }
+    message: { message: 'Demasiadas peticiones, inténtalo de nuevo más tarde.' },
+
+    // El ping de keep-alive NO se limita nunca.
+    //
+    // Es una peticion cada diez minutos que no toca la base de datos, y es
+    // justo la que no puede fallar: si cae, el servidor se duerme y la
+    // siguiente persona que abra la app espera medio minuto. Ademas fallaba en
+    // silencio — el cron lo reintenta solo y nadie mira su historial.
+    skip: (req) => req.path === '/api/cron/ping'
 }));
 
 // ⚠️ Antes de responder NADA de la API se espera a que termine el castigo

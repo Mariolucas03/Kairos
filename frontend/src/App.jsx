@@ -111,7 +111,32 @@ const swrOptions = {
     // con los datos vacíos (el feed decía "no hay entrenos" con el servidor aún
     // arrancando). Con 6 reintentos y 5 s de base se cubre el arranque en frío.
     errorRetryCount: 6,
-    errorRetryInterval: 5000
+    errorRetryInterval: 5000,
+
+    /**
+     * ⚠️ NO SE REINTENTA LO QUE EL SERVIDOR YA HA RECHAZADO.
+     *
+     * Los 6 reintentos son para el arranque en frio de Render, donde la
+     * peticion no llega a ningun sitio. Pero se aplicaban tambien a los
+     * errores que SI traen respuesta, y ahi hacian dano de verdad con el 429:
+     *
+     *   se agota el limite -> cada pantalla reintenta 6 veces cada consulta
+     *   -> trece consultas por pantalla se convierten en casi ochenta
+     *   -> el limite no se suelta nunca.
+     *
+     * Es decir: la app respondia a "estas haciendo demasiadas peticiones"
+     * haciendo muchas mas. Una vez disparado, no salia solo.
+     *
+     * Un 4xx no se arregla insistiendo: 429 es "espera", 401 es "no eres
+     * quien dices", 404 es "esto no existe". Se reintenta solo lo que puede
+     * cambiar por si mismo: no llegar a hablar con el servidor, o un 5xx.
+     */
+    onErrorRetry: (error, clave, config, revalidar, { retryCount }) => {
+        const codigo = error?.response?.status;
+        if (codigo && codigo >= 400 && codigo < 500) return;
+        if (retryCount >= (config.errorRetryCount ?? 6)) return;
+        setTimeout(() => revalidar({ retryCount }), config.errorRetryInterval ?? 5000);
+    }
 };
 
 function App() {
