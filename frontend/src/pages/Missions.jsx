@@ -216,73 +216,72 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                     {/* Halo suave del color, muy tenue */}
                     {!mission.completed && <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none opacity-[0.11]" style={{ backgroundColor: styles.accent }} />}
                     <div className="relative z-10">
-                        <div className="flex justify-between items-start gap-3 mb-1">
-                            <div className="flex-1 min-w-0 relative">
-                                <div className="pr-20 mb-1">
-                                    <div className="flex items-center gap-2">
-                                        {mission.isCoop && <Users size={16} style={{ color: styles.accent }} />}
-                                        {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                                        <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="flex items-baseline gap-1">
-                                            {/* Número principal en blanco y la unidad con el color
-                                                del widget, la regla del sistema visual */}
-                                            <span className="text-[30px] leading-none font-black tracking-[-0.05em] text-white not-italic">{mission.progress}</span>
-                                            <span className="text-[13px] font-black not-italic" style={{ color: styles.accent }}>/{mission.target}</span>
-                                            {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase">{mission.unit}</span>}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="absolute -top-1 -right-1 flex items-center gap-2">
-                                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                                        {mission.type === 'habit' ? <><Repeat size={10} /> Hábito</> : <><Flag size={10} /> Puntual</>}
-                                    </div>
-                                    <div
-                                        className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider border"
-                                        style={{ color: styles.accent, borderColor: styles.accent + '55', backgroundColor: styles.accent + '15' }}
-                                    >{styles.label}</div>
-                                </div>
+                        {/* Título a todo el ancho. Antes tenía un `pr-20` para
+                            dejar hueco a los chips que iban flotando encima; sin
+                            ellos puede ocupar la línea entera. */}
+                        <div className="flex items-center gap-2">
+                            {mission.isCoop && <Users size={15} style={{ color: styles.accent }} className="shrink-0" />}
+                            {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
+                            <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
+                        </div>
 
-                                {/* Días en los que toca: antes no había forma de saberlo
-                                    sin abrir el modo gestión y editar la misión. */}
-                                {mission.frequency === 'daily' && mission.specificDays?.length > 0 && (
-                                    <div className="flex items-center gap-1 mt-2.5">
-                                        {[1, 2, 3, 4, 5, 6, 0].map(d => (
-                                            <span
-                                                key={d}
-                                                className={`w-[15px] h-[15px] rounded-full flex items-center justify-center text-[8px] font-black not-italic ${mission.specificDays.includes(d) ? 'bg-zinc-700 text-white' : 'bg-[#18181b] text-zinc-700'}`}
-                                            >
-                                                {DAY_LABELS[d]}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                        {/* Ficha de la misión: dificultad, tipo y los días que toca.
+                            Todo del mismo tamaño y en la misma fila, porque son tres
+                            datos del mismo rango. La dificultad es la única con
+                            color: es la que decide cuánta vida te quita. */}
+                        <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                            <span
+                                className="text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-[8px] border not-italic"
+                                style={{
+                                    color: styles.color,
+                                    background: `${styles.color}1f`,
+                                    borderColor: `${styles.color}4d`
+                                }}
+                            >
+                                {styles.label}
+                            </span>
+                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] text-zinc-500 not-italic">
+                                {mission.type === 'habit' ? <><Repeat size={9} /> Hábito</> : <><Flag size={9} /> Puntual</>}
+                            </span>
 
-                            {/* Chip de dificultad + botón de incremento */}
-                            <div className="flex flex-col items-end gap-2 shrink-0">
-                                <span
-                                    className="text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-[8px] border not-italic"
-                                    style={{
-                                        color: styles.color,
-                                        background: `${styles.color}1f`,
-                                        borderColor: `${styles.color}4d`
-                                    }}
-                                >
-                                    {styles.label}
+                            {/* Días en los que toca: antes no había forma de saberlo
+                                sin abrir el modo gestión y editar la misión. */}
+                            {mission.frequency === 'daily' && mission.specificDays?.length > 0 && (
+                                <span className="flex items-center gap-1 px-1.5 py-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03]">
+                                    {[1, 2, 3, 4, 5, 6, 0].map(d => (
+                                        <span
+                                            key={d}
+                                            className={`w-[13px] h-[13px] rounded-full flex items-center justify-center text-[8px] font-black not-italic ${mission.specificDays.includes(d) ? 'bg-zinc-600 text-white' : 'text-zinc-700'}`}
+                                        >
+                                            {DAY_LABELS[d]}
+                                        </span>
+                                    ))}
                                 </span>
-                                {!isBinary && !mission.completed && !isPending && !viewAllMode && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }}
-                                        aria-label="Añadir progreso"
-                                        className="w-8 h-8 rounded-[11px] flex items-center justify-center active:scale-90 transition-transform"
-                                        style={{ background: `${styles.color}1f`, color: styles.color }}
-                                    >
-                                        <Plus size={16} strokeWidth={2.6} />
-                                    </button>
-                                )}
+                            )}
+                        </div>
+
+                        {/* La cifra grande y, a su lado, el botón de sumar. Van
+                            juntos porque son la misma cosa: lo que llevas y cómo
+                            añadirle. Antes el botón estaba arriba del todo, en la
+                            otra esquina de la tarjeta. */}
+                        <div className="flex items-end justify-between gap-3 mt-3">
+                            <div className="flex items-baseline gap-1 min-w-0">
+                                {/* Número principal en blanco y la unidad con el color
+                                    del widget, la regla del sistema visual */}
+                                <span className="text-[30px] leading-none font-black tracking-[-0.05em] text-white not-italic">{mission.progress}</span>
+                                <span className="text-[13px] font-black not-italic" style={{ color: styles.accent }}>/{mission.target}</span>
+                                {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase truncate">{mission.unit}</span>}
                             </div>
+                            {!isBinary && !mission.completed && !isPending && !viewAllMode && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }}
+                                    aria-label="Añadir progreso"
+                                    className="w-9 h-9 shrink-0 rounded-[12px] flex items-center justify-center active:scale-90 transition-transform"
+                                    style={{ background: `${styles.color}1f`, color: styles.color }}
+                                >
+                                    <Plus size={17} strokeWidth={2.6} />
+                                </button>
+                            )}
                         </div>
 
                         {renderProgressBar()}
