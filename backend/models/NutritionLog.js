@@ -9,7 +9,15 @@ const foodEntrySchema = new mongoose.Schema({
     carbs: { type: Number, default: 0 },
     fat: { type: Number, default: 0 },
     fiber: { type: Number, default: 0 },
-    quantity: { type: Number, default: 1 } // Multiplicador (ej: 1.5 raciones)
+    quantity: { type: Number, default: 1 }, // Multiplicador (ej: 1.5 raciones)
+
+    // MARCA QUE PONE EL MOVIL AL APUNTAR EL ALIMENTO.
+    //
+    // Existe para que el mismo alimento no entre dos veces. Sin esto, un
+    // reintento tras una respuesta perdida —el alimento se guardo, la respuesta
+    // no llego— lo duplicaria, y con el sus calorias, porque los totales del dia
+    // se incrementan en la misma escritura.
+    clienteId: { type: String }
 });
 
 // Esquema de "Caja de Comida" (Desayuno, Comida, Cena...)

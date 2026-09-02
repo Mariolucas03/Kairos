@@ -227,12 +227,30 @@ const createMission = asyncHandler(async (req, res) => {
 });
 
 const updateProgress = asyncHandler(async (req, res) => {
-    const { amount, editMode, title, target, frequency, difficulty, unit, specificDays } = req.body;
+    const { amount, editMode, title, target, frequency, difficulty, unit, specificDays, clienteId } = req.body;
     const userId = req.user._id;
+    const marca = String(clienteId || '').trim().slice(0, 80);
 
     // 1. VALIDACIÓN INICIAL
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('Misión no encontrada'); }
+
+    // ⚠️ ESTE AVANCE YA ESTABA SUMADO.
+    //
+    // Pasa cuando el movil reintenta: se guardo bien pero la respuesta se perdio
+    // por el camino. Sin esto, el reintento vuelve a sumar —y como al llegar al
+    // objetivo se paga XP, monedas y fichas, un avance repetido puede completar
+    // y COBRAR una mision que en realidad no esta hecha.
+    //
+    // Se responde 200 y no un error: para la app es un exito, su avance esta
+    // guardado.
+    if (marca && (mission.enviosAplicados || []).includes(marca)) {
+        return res.status(200).json({
+            message: 'Este avance ya estaba apuntado',
+            duplicado: true,
+            mission
+        });
+    }
 
     const isParticipant = mission.participants.map(p => p.toString()).includes(userId.toString());
     const isOwner = mission.user.toString() === userId.toString();
@@ -319,16 +337,30 @@ const updateProgress = asyncHandler(async (req, res) => {
     // Función Helper para progresar y premiar sin Race Conditions
     const processMissionCompletion = async (targetMission, isMain) => {
         // Incrementamos de forma segura
+        // La marca se apunta EN LA MISMA ESCRITURA que suma, y con la condicion
+        // dentro del filtro. Comprobar antes y escribir despues deja pasar a dos
+        // reintentos simultaneos, que es justo lo que manda la cola de
+        // sin-conexion en cuanto vuelve la cobertura.
+        //
+        // Solo en la mision principal: en una coop, el avance del compañero es
+        // otro documento y su marca no tiene por que ser unica ahi.
+        const filtro = { _id: targetMission._id, completed: false };
+        if (isMain && marca) filtro.enviosAplicados = { $ne: marca };
+
         const updated = await Mission.findOneAndUpdate(
-            { _id: targetMission._id, completed: false },
+            filtro,
             {
                 $inc: { progress: addAmount },
-                $set: { lastUpdated: today }
+                $set: { lastUpdated: today },
+                // Se guardan las ultimas cincuenta y las demas se caen solas: de
+                // un habito diario de un año, la lista entera serian cientos de
+                // cadenas dentro del documento sin ninguna utilidad.
+                ...(isMain && marca ? { $push: { enviosAplicados: { $each: [marca], $slice: -50 } } } : {})
             },
             { new: true }
         );
 
-        if (!updated) return null; // Ya estaba completada
+        if (!updated) return null; // Ya estaba completada, o el avance ya contaba
 
         if (updated.progress >= updated.target) {
             // ATÓMICO: Solo el primer hilo que haga coincidir {completed: false} podrá cerrarla y dar el premio

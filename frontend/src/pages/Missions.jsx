@@ -7,6 +7,7 @@ import {
     Trash2, Plus, Check, X, Target, Users, Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
+import { encolar, esFalloDeRed, nuevaMarca } from '../utils/colaEnvios';
 import Toast from '../components/common/Toast';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -438,12 +439,30 @@ export default function Missions() {
             showToast(`+${mission.xpReward} XP`, "success");
         }
 
+        // La marca se pone AQUÍ y no al reintentar: todos los intentos del mismo
+        // avance llevan la misma, que es lo que impide que sume dos veces. Y
+        // sumar dos veces no es cosmético: al llegar al objetivo la misión paga
+        // XP, monedas y fichas.
+        const envio = { amount, clienteId: nuevaMarca() };
+
         try {
-            const res = await api.put(`/missions/${mission._id}/progress`, { amount });
+            const res = await api.put(`/missions/${mission._id}/progress`, envio);
             if (res.data.progressOnly) { mutateMissions(); return; }
             if (res.data.user) setUser(res.data.user);
             mutateMissions();
         } catch (e) {
+            if (esFalloDeRed(e)) {
+                // El avance no se revierte: se manda solo cuando vuelva la red.
+                // Lo pintado ya está bien, es lo que va a acabar guardándose.
+                encolar({
+                    ruta: `/missions/${mission._id}/progress`,
+                    metodo: 'put',
+                    envio,
+                    etiqueta: 'misión'
+                });
+                showToast("Sin conexión: se guardará solo en cuanto vuelva", "success");
+                return;
+            }
             mutateMissions(); // Rollback
             showToast("Error de red. Acción revertida.", "error");
         }

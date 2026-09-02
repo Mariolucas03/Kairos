@@ -286,8 +286,9 @@ const numeroSeguro = (valor, maximo = 100000) => {
 const addFoodToLog = async (req, res) => {
     try {
         const { mealId } = req.params;
-        const { name, calories, protein, carbs, fat, fiber, quantity } = req.body;
+        const { name, calories, protein, carbs, fat, fiber, quantity, clienteId } = req.body;
         const today = getTodayStr();
+        const marca = String(clienteId || '').trim().slice(0, 80);
 
         const nombre = String(name || '').trim().slice(0, 120);
         if (!nombre) return res.status(400).json({ message: 'El alimento necesita un nombre' });
@@ -299,12 +300,26 @@ const addFoodToLog = async (req, res) => {
             carbs: numeroSeguro(carbs, 5000),
             fat: numeroSeguro(fat, 5000),
             fiber: numeroSeguro(fiber, 5000),
-            quantity: numeroSeguro(quantity, 1000) || 1
+            quantity: numeroSeguro(quantity, 1000) || 1,
+            ...(marca ? { clienteId: marca } : {})
         };
+
+        // ⚠️ EL MISMO ALIMENTO NO ENTRA DOS VECES.
+        //
+        // La condicion va DENTRO del filtro, no en una comprobacion previa:
+        // comprobar y despues escribir deja pasar de largo a dos reintentos que
+        // lleguen a la vez, que es justo lo que hace la cola de sin-conexion
+        // cuando vuelve la cobertura.
+        //
+        // Sin marca (peticiones normales de toda la vida) no se filtra nada y
+        // funciona como siempre: apuntar dos manzanas seguidas a mano son dos
+        // manzanas, no un duplicado.
+        const filtro = { user: req.user._id, date: today, "meals._id": mealId };
+        if (marca) filtro['meals.foods.clienteId'] = { $ne: marca };
 
         // Operación atómica de MongoDB: Push al array e incremento de totales matemáticos EN UN SOLO PASO.
         const log = await NutritionLog.findOneAndUpdate(
-            { user: req.user._id, date: today, "meals._id": mealId },
+            filtro,
             {
                 $push: { "meals.$.foods": newFood },
                 $inc: {
@@ -318,7 +333,24 @@ const addFoodToLog = async (req, res) => {
             { new: true }
         );
 
-        if (!log) return res.status(404).json({ message: 'Registro o categoría no encontrada' });
+        if (!log) {
+            // Puede ser que la categoria no exista... o que este alimento ya
+            // estuviera guardado de un envio anterior. Para el movil lo segundo
+            // es un exito: su comida esta a salvo.
+            if (marca) {
+                const yaEstaba = await NutritionLog.findOne({
+                    user: req.user._id, date: today, 'meals.foods.clienteId': marca
+                }).lean();
+                if (yaEstaba) {
+                    return res.status(200).json({
+                        message: 'Este alimento ya estaba guardado',
+                        duplicado: true,
+                        log: yaEstaba
+                    });
+                }
+            }
+            return res.status(404).json({ message: 'Registro o categoría no encontrada' });
+        }
 
         // Sincronizamos el DailyLog también atómicamente
         await DailyLog.findOneAndUpdate(

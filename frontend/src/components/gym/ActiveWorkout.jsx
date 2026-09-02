@@ -14,7 +14,7 @@ import ExerciseSheet from './ExerciseSheet';
 import RankUpModal from './RankUpModal';
 import BodyMap from '../body/BodyMap';
 import { compressImage } from '../../utils/imageCompressor';
-import { encolar, esFalloDeRed } from '../../utils/colaEntrenos';
+import { encolar, esFalloDeRed } from '../../utils/colaEnvios';
 
 // ==========================================
 // SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
@@ -673,7 +673,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
             // Si el fallo ocurrio antes de montar el envio (no deberia, pero
             // un catch no puede dar nada por hecho), no hay nada que encolar.
             if (logData && esFalloDeRed(error)) {
-                encolar(logData);
+                encolar({ ruta: '/gym/log', envio: logData, etiqueta: 'entreno' });
                 localStorage.removeItem(STORAGE_KEY);
                 localStorage.removeItem(REST_KEY);
                 setToast({

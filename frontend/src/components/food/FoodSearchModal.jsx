@@ -4,6 +4,7 @@ import {
     SortAsc, Filter, ArrowRight, BrainCircuit, Save, Flame, Wheat, Droplet, Leaf, Folder
 } from 'lucide-react';
 import api from '../../services/api';
+import { encolar, esFalloDeRed, nuevaMarca } from '../../utils/colaEnvios';
 import ScanAnimation from './ScanAnimation';
 
 // --- COMPONENTE INTERNO: ÍTEM DESLIZABLE ---
@@ -176,7 +177,7 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
 
     // 🔥 FUNCIÓN OPTIMISTA PARA LA LISTA GUARDADA
     const handleAddFood = async (food) => {
-        const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1 };
+        const foodData = { name: food.name, calories: Number(food.calories), protein: Number(food.protein || 0), carbs: Number(food.carbs || 0), fat: Number(food.fat || 0), fiber: Number(food.fiber || 0), quantity: 1, clienteId: nuevaMarca() };
 
         // 1. Avisamos a Food.jsx al instante y cerramos
         onFoodAddedOptimistic(foodData);
@@ -187,6 +188,14 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
             await api.post(`/food/log/${mealId}`, foodData);
             if (onBackgroundSync) onBackgroundSync(); // Recarga silencioca para asentar los IDs de la base de datos
         } catch (error) {
+            // Sin cobertura no se pierde: se manda solo cuando vuelva. Antes
+            // aquí salía "Error de red" y el batido se quedaba sin apuntar, en
+            // el mismo sótano en el que el entreno sí se salvaba.
+            if (esFalloDeRed(error)) {
+                encolar({ ruta: `/food/log/${mealId}`, envio: foodData, etiqueta: 'alimento' });
+                onShowToast("Sin conexión: se guardará solo en cuanto vuelva", "success");
+                return;   // sin recarga: la haría contra un servidor que no contesta
+            }
             onShowToast("Error de red. El alimento no se guardó en la nube.", "error");
             if (onBackgroundSync) onBackgroundSync(); // Rollback silencioso
         }
@@ -277,7 +286,8 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
             protein: porRaciones(manualForm.protein),
             carbs: porRaciones(manualForm.carbs),
             fat: porRaciones(manualForm.fat),
-            fiber: porRaciones(manualForm.fiber)
+            fiber: porRaciones(manualForm.fiber),
+            clienteId: nuevaMarca()
         };
 
         // 1. Avisamos al padre al instante
@@ -289,6 +299,11 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
             await api.post(`/food/log/${mealId}`, foodData);
             if (onBackgroundSync) onBackgroundSync();
         } catch (e) {
+            if (esFalloDeRed(e)) {
+                encolar({ ruta: `/food/log/${mealId}`, envio: foodData, etiqueta: 'alimento' });
+                onShowToast("Sin conexión: se guardará solo en cuanto vuelva", "success");
+                return;
+            }
             onShowToast("Error de conexión al guardar", "error");
             if (onBackgroundSync) onBackgroundSync();
         }

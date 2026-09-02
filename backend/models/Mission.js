@@ -61,6 +61,19 @@ const missionSchema = new mongoose.Schema({
 
     completed: { type: Boolean, default: false },
     lastUpdated: { type: Date, default: Date.now },
+
+    // MARCAS DE LOS AVANCES YA APLICADOS.
+    //
+    // Cada "he hecho 3" que manda el movil lleva la suya, y aqui se apunta cual
+    // se ha sumado ya. Es lo que permite reintentar un avance sin cobertura sin
+    // que cuente dos veces: el progreso se incrementa, asi que un reenvio
+    // duplicaria lo hecho y podria completar y PAGAR una mision que en realidad
+    // no esta.
+    //
+    // Se recorta sola: solo importan los ultimos avances, los de un ciclo. La
+    // lista entera de un habito diario de un ano serian cientos de cadenas
+    // dentro del documento por nada.
+    enviosAplicados: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now }
 });
 
