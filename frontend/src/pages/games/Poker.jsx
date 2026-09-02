@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
@@ -9,6 +9,7 @@ import api from '../../services/api';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import CartaPoker from '../../components/games/CartaPoker';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const fetcher = (url) => api.get(url).then(r => r.data);
 
@@ -59,6 +60,41 @@ export default function Poker() {
         fetcher,
         { refreshInterval: cadaCuanto, dedupingInterval: 500 }
     );
+
+    /**
+     * El contador de fichas de la cabecera, al día con la mano.
+     *
+     * Se juega con el saldo de verdad: cada apuesta lo baja y cada bote lo sube,
+     * en el servidor. Pero la cabecera lee el usuario que hay guardado en la
+     * aplicación, y eso solo se refresca al cambiar de pantalla: durante toda la
+     * partida marcaba el número con el que habías entrado. Ganabas un bote de
+     * 300 y arriba seguía igual, que es exactamente la sensación de que el juego
+     * no cuenta para nada.
+     *
+     * `fichas` del jugador ES su saldo —se carga de él al repartir y baja con
+     * cada apuesta—, así que basta con copiarlo. Solo cuando cambia, para no
+     * reescribir el usuario en cada refresco.
+     *
+     * Se toca en los DOS sitios: la cabecera lee `stats.gameCoins` y cae en
+     * `gameCoins` solo si el primero no está, así que dejar uno sin actualizar
+     * es dejarlo sin actualizar del todo.
+     */
+    const setUser = useAuthStore(state => state.setUser);
+    const misFichas = mesa?.jugadores?.find(j => j.soyYo)?.fichas;
+
+    useEffect(() => {
+        if (typeof misFichas !== 'number') return;
+        setUser(prev => {
+            if (!prev) return prev;
+            const ahora = prev.stats?.gameCoins ?? prev.gameCoins;
+            if (ahora === misFichas) return prev;
+            return {
+                ...prev,
+                gameCoins: misFichas,
+                stats: prev.stats ? { ...prev.stats, gameCoins: misFichas } : prev.stats
+            };
+        });
+    }, [misFichas, setUser]);
 
     const [creando, setCreando] = useState(false);
     const [ciega, setCiega] = useState(20);
@@ -157,9 +193,9 @@ export default function Poker() {
                         Se apuesta en cuatro rondas, y quien no quiera seguir se retira.
                     </p>
                     <p className="text-[12px] text-zinc-400 leading-relaxed mt-2">
-                        Te sientas con <strong className="text-white">20 ciegas grandes</strong>, y cuando te
-                        levantas te llevas lo que te quede. Lo que pierdes lo gana alguien de la mesa:
-                        aquí no hay casa.
+                        Se juega con <strong className="text-white">tus fichas</strong>: cada apuesta sale de tu
+                        saldo en el momento y cada bote que ganas entra en él, así que el contador de arriba se
+                        mueve mientras juegas. Lo que pierdes lo gana alguien de la mesa: aquí no hay casa.
                     </p>
                 </div>
 
@@ -192,7 +228,7 @@ export default function Poker() {
                                 ))}
                             </div>
                             <p className="text-[10px] text-zinc-600 mt-2">
-                                Cada uno se sienta con <strong className="text-zinc-400">{ciega * 20} fichas</strong>. Ciega pequeña: {Math.floor(ciega / 2)}.
+                                Hacen falta <strong className="text-zinc-400">{ciega * 10} fichas</strong> para sentarse. Ciega pequeña: {Math.floor(ciega / 2)}.
                             </p>
                         </div>
                         <button
@@ -281,8 +317,8 @@ export default function Poker() {
                     onClick={() => setConfirmar({
                         title: m.soyLider ? 'Cerrar la mesa' : 'Levantarte',
                         message: m.soyLider
-                            ? 'Se cierra para todos y cada uno recupera sus fichas.'
-                            : 'Te llevas lo que te quede. Lo que hayas puesto en la mano en curso se queda en el bote.',
+                            ? 'Se cierra para todos. Lo que haya en el bote vuelve a quien lo puso.'
+                            : 'Lo que hayas puesto en la mano en curso se queda en el bote, como en una mesa de verdad.',
                         confirmLabel: m.soyLider ? 'Cerrar' : 'Levantarme',
                         accion: () => levantarse(m._id)
                     })}
@@ -292,12 +328,14 @@ export default function Poker() {
                 </button>
             </div>
 
-            {/* Los jugadores */}
+            {/* Quién hay sentado. Solo mientras se llena la mesa: en cuanto se
+                reparte, cada uno está en su sitio del tapete con su cara, sus
+                fichas y lo que ha puesto, y repetirlo aquí en forma de lista
+                sobraba. */}
+            {esSala && (
             <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 mb-4">
                 <div className="flex items-baseline justify-between mb-3">
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                        {esSala ? 'En la mesa' : 'Jugadores'}
-                    </p>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">En la mesa</p>
                     <span className="text-[10px] text-zinc-600 font-bold">
                         {m.jugadores.filter(j => j.sentado).length}/{m.maxJugadores}
                         {m.invitadosPendientes > 0 && ` · ${m.invitadosPendientes} sin contestar`}
@@ -308,9 +346,7 @@ export default function Poker() {
                     {m.jugadores.map(j => (
                         <div
                             key={j.puesto}
-                            className={`flex items-center gap-2.5 p-2 rounded-xl border transition-colors ${!j.sentado ? 'opacity-30 bg-black border-white/[0.03]'
-                                : j.leToca ? 'bg-black' : 'bg-black border-white/[0.06]'}`}
-                            style={j.leToca ? { borderColor: ACENTO } : undefined}
+                            className={`flex items-center gap-2.5 p-2 rounded-xl border bg-black ${j.sentado ? 'border-white/[0.06]' : 'opacity-30 border-white/[0.03]'}`}
                         >
                             <div className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
                                 {j.avatar
@@ -322,27 +358,11 @@ export default function Poker() {
                                 <p className="text-[13px] font-bold text-white truncate flex items-center gap-1.5">
                                     {j.nombre}
                                     {j.esLider && <Crown size={10} style={{ color: ACENTO }} />}
-                                    {j.esBoton && !esSala && <span className="text-[8px] font-black text-black bg-zinc-400 rounded-full w-3.5 h-3.5 flex items-center justify-center">D</span>}
                                 </p>
-                                {!esSala && (
-                                    <p className="text-[10px] text-zinc-600">
-                                        {j.retirado ? 'se retiró' : j.allIn ? 'all-in' : j.leToca ? 'le toca…' : `${j.fichas} fichas`}
-                                        {j.apostadoRonda > 0 && ` · puso ${j.apostadoRonda}`}
-                                    </p>
-                                )}
+                                <p className="text-[10px] text-zinc-600 tabular-nums">{j.fichas} fichas</p>
                             </div>
 
-                            {!esSala && (
-                                <div className="flex gap-1 shrink-0">
-                                    {j.soyYo
-                                        ? j.cartas.map((c, i) => <CartaPoker key={i} carta={c} tamano="xs" />)
-                                        : j.tieneCartas && !j.retirado
-                                            ? <><CartaPoker carta={null} tamano="xs" /><CartaPoker carta={null} tamano="xs" /></>
-                                            : null}
-                                </div>
-                            )}
-
-                            {esSala && m.soyLider && !j.soyYo && (
+                            {m.soyLider && !j.soyYo && (
                                 <button
                                     onClick={() => expulsar(j._id)}
                                     disabled={enVuelo}
@@ -353,7 +373,7 @@ export default function Poker() {
                     ))}
                 </div>
 
-                {esSala && m.soyLider && (
+                {m.soyLider && (
                     <>
                         {invitando ? (
                             <div className="mt-3 space-y-1.5">
@@ -393,33 +413,130 @@ export default function Poker() {
                     </>
                 )}
 
-                {esSala && !m.soyLider && (
+                {!m.soyLider && (
                     <p className="text-[11px] text-zinc-600 mt-3 text-center">Esperando a que el líder reparta.</p>
                 )}
             </div>
+            )}
 
             {!esSala && (
                 <>
-                    {/* La mesa: comunitarias y bote */}
-                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 mb-4">
-                        <div className="flex items-center justify-center gap-1.5 mb-4">
-                            {[0, 1, 2, 3, 4].map(i => (
-                                <CartaPoker key={i} carta={m.comunitarias[i] || null} tamano="md" />
-                            ))}
+                    {/* ── EL TAPETE ──
+                        Un óvalo de fieltro con las comunitarias y el bote en el
+                        centro y a cada jugador sentado en su sitio alrededor, con
+                        su foto. Antes era una lista: un recuadro negro con los
+                        nombres uno debajo de otro y las cartas en otro recuadro
+                        aparte. Funcionaba, pero no se parecía a una partida —y en
+                        una lista no se ve de un vistazo quién está enfrente de
+                        quién, que es la mitad del juego. */}
+                    <div className="relative w-full mt-1 mb-11" style={{ aspectRatio: '1 / 1.04' }}>
+                        {/* El fieltro. El borde marrón es la madera del canto y la
+                            sombra de dentro es lo que le da el hueco: sin ella el
+                            verde parece una pegatina plana. */}
+                        <div
+                            className="absolute inset-x-[14%] inset-y-[19%] rounded-[50%]"
+                            style={{
+                                background: 'radial-gradient(ellipse at 50% 38%, #1e7d53 0%, #14603f 48%, #0b3d28 100%)',
+                                border: '7px solid #3a2517',
+                                boxShadow: 'inset 0 0 55px rgba(0,0,0,0.55), inset 0 3px 0 rgba(255,255,255,0.06), 0 12px 34px rgba(0,0,0,0.65)'
+                            }}
+                        />
+
+                        {/* El centro: cinco cartas y el bote debajo */}
+                        <div className="absolute inset-x-[14%] inset-y-[19%] flex flex-col items-center justify-center gap-2.5 px-2">
+                            <div className="flex items-center justify-center gap-1">
+                                {[0, 1, 2, 3, 4].map(i => (
+                                    <CartaPoker key={i} carta={m.comunitarias[i] || null} tamano="sm" />
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-[2px]">
+                                <Coins size={13} style={{ color: ACENTO }} />
+                                <span className="text-base font-black tabular-nums leading-none" style={{ color: ACENTO }}>{m.bote}</span>
+                            </div>
+
+                            {m.miJugada && !res && (
+                                <p className="text-[10px] text-white/80 font-bold text-center leading-tight px-2">{m.miJugada}</p>
+                            )}
                         </div>
 
-                        <div className="flex items-center justify-center gap-2">
-                            <Coins size={15} style={{ color: ACENTO }} />
-                            <span className="text-lg font-black tabular-nums" style={{ color: ACENTO }}>{m.bote}</span>
-                            <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">en el bote</span>
-                        </div>
+                        {/* Los asientos.
 
-                        {m.miJugada && !res && (
-                            <p className="text-center text-[11px] text-zinc-400 mt-2">
-                                Tienes <strong className="text-white">{m.miJugada}</strong>
-                            </p>
-                        )}
+                            Tú siempre abajo del todo y los demás repartidos a partir
+                            de ahí, girando en el sentido en el que se juega. Es como
+                            se sienta uno en una mesa: desde tu silla. */}
+                        {m.jugadores.map((j, i) => {
+                            const n = m.jugadores.length;
+                            const mio = m.jugadores.findIndex(x => x.soyYo);
+                            const orden = ((i - (mio < 0 ? 0 : mio)) + n) % n;
+                            const ang = (90 + orden * (360 / n)) * Math.PI / 180;
+                            const izq = 50 + 43 * Math.cos(ang);
+                            const arr = 50 + 40 * Math.sin(ang);
+
+                            return (
+                                <div
+                                    key={j.puesto}
+                                    className={`absolute flex flex-col items-center transition-opacity ${j.retirado || !j.sentado ? 'opacity-35' : 'opacity-100'}`}
+                                    style={{ left: `${izq}%`, top: `${arr}%`, transform: 'translate(-50%, -50%)', width: 74 }}
+                                >
+                                    {/* Sus cartas, detrás del avatar y asomando */}
+                                    {j.tieneCartas && !j.retirado && !j.soyYo && (
+                                        <div className="flex -space-x-3 mb-[-16px] relative z-0">
+                                            <CartaPoker carta={null} tamano="xs" className="rotate-[-9deg]" />
+                                            <CartaPoker carta={null} tamano="xs" className="rotate-[9deg]" />
+                                        </div>
+                                    )}
+
+                                    <div className="relative z-10">
+                                        <div
+                                            className="w-11 h-11 rounded-full overflow-hidden bg-zinc-900 flex items-center justify-center"
+                                            style={{
+                                                border: j.leToca ? `2px solid ${ACENTO}` : '2px solid rgba(0,0,0,0.6)',
+                                                boxShadow: j.leToca ? `0 0 0 3px ${ACENTO}33, 0 3px 10px rgba(0,0,0,0.7)` : '0 3px 10px rgba(0,0,0,0.7)'
+                                            }}
+                                        >
+                                            {j.avatar
+                                                ? <img src={j.avatar} alt="" className="w-full h-full object-cover" />
+                                                : <span className="text-sm font-black text-zinc-500">{j.nombre?.charAt(0)}</span>}
+                                        </div>
+
+                                        {j.esLider && (
+                                            <Crown size={12} className="absolute -top-1.5 -right-1" style={{ color: ACENTO }} />
+                                        )}
+                                        {j.esBoton && (
+                                            <span className="absolute -bottom-0.5 -right-1 text-[8px] font-black text-black bg-zinc-300 rounded-full w-4 h-4 flex items-center justify-center border border-black">D</span>
+                                        )}
+                                    </div>
+
+                                    <p className="mt-1 text-[9px] font-black text-white uppercase tracking-tight truncate max-w-full leading-none">
+                                        {j.soyYo ? 'Tú' : j.nombre}
+                                    </p>
+                                    <p className="text-[9px] font-bold tabular-nums leading-tight" style={{ color: j.allIn ? '#f87171' : '#a1a1aa' }}>
+                                        {j.retirado ? 'fuera' : j.allIn ? 'all-in' : j.fichas}
+                                    </p>
+
+                                    {/* Lo que ha puesto en esta ronda, como una ficha
+                                        delante de su sitio */}
+                                    {j.apostadoRonda > 0 && (
+                                        <span
+                                            className="mt-0.5 px-1.5 py-px rounded-full text-[9px] font-black tabular-nums leading-tight"
+                                            style={{ background: ACENTO + '26', color: ACENTO, border: `1px solid ${ACENTO}55` }}
+                                        >
+                                            {j.apostadoRonda}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
+
+                    {/* MIS CARTAS, fuera del tapete y grandes: son las únicas que
+                        hay que leer de verdad. */}
+                    {yo?.cartas?.length > 0 && (
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                            {yo.cartas.map((c, i) => <CartaPoker key={i} carta={c} tamano="md" />)}
+                        </div>
+                    )}
 
                     {/* Resultado de la mano */}
                     {res && (

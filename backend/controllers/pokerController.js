@@ -15,18 +15,46 @@ const { notificarA } = require('./pushController');
  * los rivales aparecen únicamente cuando se enseñan en el showdown, y entonces
  * ya son públicas. Devolver el documento tal cual sería regalar la partida.
  *
- * LAS CUENTAS: se entra con fichas y se sale con lo que quede. Al sentarte se te
- * descuentan del saldo y pasan a tu montón; al levantarte vuelven. Así la suma
- * de los montones más el bote es siempre lo que entró, y se puede comprobar.
+ * LAS CUENTAS: SE JUEGA CON TUS FICHAS. Cada apuesta sale de tu saldo en el
+ * momento y cada bote que ganas entra en él, así que el contador de la cabecera
+ * se mueve mientras juegas. No hay compra de entrada ni montón de mesa.
+ *
+ * Todo lo que mueve saldo va con la condición dentro de la escritura: si entre
+ * medias te has gastado las fichas en otra cosa, la apuesta no entra en vez de
+ * dejarte en negativo.
  */
 
 const CIEGA_MINIMA = 2;
 const CIEGA_MAXIMA = 500;
 const MAX_JUGADORES = 8;
 
-// Se entra con al menos veinte ciegas grandes: con menos, la primera mano ya te
-// deja all-in y no hay juego.
-const CIEGAS_DE_ENTRADA = 20;
+// Para sentarte hacen falta al menos unas cuantas ciegas grandes: con menos, la
+// primera mano ya te deja all-in y no hay juego.
+const CIEGAS_MINIMAS = 10;
+
+/**
+ * Mueve fichas del saldo de alguien, con la condición dentro de la escritura.
+ *
+ * Devuelve lo que se movió de verdad: si no le llegaban, cero. Nunca deja un
+ * saldo en negativo ni a base de restar dos veces por una carrera.
+ */
+const cobrar = async (userId, cantidad) => {
+    const importe = Math.floor(Number(cantidad));
+    if (!Number.isFinite(importe) || importe <= 0) return 0;
+    const r = await User.findOneAndUpdate(
+        { _id: userId, gameCoins: { $gte: importe } },
+        { $inc: { gameCoins: -importe } },
+        { new: true }
+    );
+    return r ? importe : 0;
+};
+
+const pagar = async (userId, cantidad) => {
+    const importe = Math.floor(Number(cantidad));
+    if (!Number.isFinite(importe) || importe <= 0) return 0;
+    await User.findByIdAndUpdate(userId, { $inc: { gameCoins: importe } });
+    return importe;
+};
 
 /** Lo que se le manda al móvil. */
 const vista = (mesa, yoId) => {
@@ -47,7 +75,7 @@ const vista = (mesa, yoId) => {
         fase: mesa.fase,
         ciegaGrande: mesa.ciegaGrande,
         ciegaPequena: Math.floor(mesa.ciegaGrande / 2),
-        entradaMesa: mesa.entradaMesa,
+
         soyLider,
         miPuesto,
         manoNumero: mesa.manoNumero,
@@ -71,7 +99,7 @@ const vista = (mesa, yoId) => {
             soyYo: i === miPuesto,
             esLider: !!(j.user && j.user.toString() === mesa.lider.toString()),
             fichas: j.fichas,
-            ganancia: j.fichas - j.entrada,
+            ganancia: j.ganancia,
             apostadoRonda: j.apostadoRonda,
             retirado: j.retirado,
             allIn: j.allIn,
@@ -111,32 +139,26 @@ const crearMesa = asyncHandler(async (req, res) => {
         throw new Error(`La ciega grande va de ${CIEGA_MINIMA} a ${CIEGA_MAXIMA} fichas`);
     }
 
-    const entrada = ciega * CIEGAS_DE_ENTRADA;
+    // No se cobra nada por sentarse: se juega con las fichas de cada uno. Solo
+    // se comprueba que tenga para unas cuantas manos, o la primera ya le deja
+    // all-in y no hay partida.
+    const minimo = ciega * CIEGAS_MINIMAS;
     const yo = await User.findById(req.user._id).select('username avatar gameCoins').lean();
-    if ((yo.gameCoins || 0) < entrada) {
+    if ((yo.gameCoins || 0) < minimo) {
         res.status(400);
-        throw new Error(`Necesitas ${entrada} fichas para sentarte a esta mesa`);
+        throw new Error(`Con esa ciega necesitas al menos ${minimo} fichas para jugar`);
     }
 
     const abierta = await Poker.findOne({ lider: req.user._id, estado: { $in: ['sala', 'jugando'] } }).lean();
     if (abierta) { res.status(400); throw new Error('Ya tienes una mesa abierta'); }
 
-    // Se cobra la entrada AQUÍ, con la condición de saldo dentro del filtro.
-    const cobrado = await User.findOneAndUpdate(
-        { _id: req.user._id, gameCoins: { $gte: entrada } },
-        { $inc: { gameCoins: -entrada } },
-        { new: true }
-    );
-    if (!cobrado) { res.status(400); throw new Error('No te llegan las fichas'); }
-
     const mesa = await Poker.create({
         lider: req.user._id,
         ciegaGrande: ciega,
-        entradaMesa: entrada,
         estado: 'sala',
         jugadores: [{
             user: yo._id, nombre: yo.username, avatar: yo.avatar || '',
-            fichas: entrada, entrada
+            fichas: yo.gameCoins || 0
         }]
     });
 
@@ -167,9 +189,10 @@ const invitar = asyncHandler(async (req, res) => {
 
     const amigo = await User.findById(amigoId).select('username gameCoins').lean();
     if (!amigo) { res.status(404); throw new Error('Ese usuario ya no existe'); }
-    if ((amigo.gameCoins || 0) < mesa.entradaMesa) {
+    const minimo = mesa.ciegaGrande * CIEGAS_MINIMAS;
+    if ((amigo.gameCoins || 0) < minimo) {
         res.status(400);
-        throw new Error(`A ${amigo.username} no le llegan las ${mesa.entradaMesa} fichas de entrada`);
+        throw new Error(`${amigo.username} no tiene las ${minimo} fichas que pide esta mesa`);
     }
 
     mesa.invitados.push(amigoId);
@@ -177,7 +200,7 @@ const invitar = asyncHandler(async (req, res) => {
 
     notificarA(amigoId, {
         title: '♠️ Te invitan a una mesa de póquer',
-        body: `${yo.username} monta una mesa. Entrada: ${mesa.entradaMesa} fichas.`,
+        body: `${yo.username} monta una mesa. Ciegas ${Math.floor(mesa.ciegaGrande / 2)}/${mesa.ciegaGrande}.`,
         icon: '/assets/icons/icon-192x192.png',
         url: '/games/poker'
     });
@@ -207,25 +230,22 @@ const responderInvitacion = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('La mesa se ha llenado');
     }
 
-    const cobrado = await User.findOneAndUpdate(
-        { _id: req.user._id, gameCoins: { $gte: mesa.entradaMesa } },
-        { $inc: { gameCoins: -mesa.entradaMesa } },
-        { new: true }
-    ).select('username avatar');
-    if (!cobrado) {
+    const yo = await User.findById(req.user._id).select('username avatar gameCoins').lean();
+    const minimo = mesa.ciegaGrande * CIEGAS_MINIMAS;
+    if ((yo.gameCoins || 0) < minimo) {
         await mesa.save();
-        res.status(400); throw new Error(`Necesitas ${mesa.entradaMesa} fichas para sentarte`);
+        res.status(400); throw new Error(`Necesitas ${minimo} fichas para sentarte a esta mesa`);
     }
 
     mesa.jugadores.push({
-        user: cobrado._id, nombre: cobrado.username, avatar: cobrado.avatar || '',
-        fichas: mesa.entradaMesa, entrada: mesa.entradaMesa
+        user: yo._id, nombre: yo.username, avatar: yo.avatar || '',
+        fichas: yo.gameCoins || 0
     });
     await mesa.save();
 
     notificarA(mesa.lider, {
         title: '♠️ Se han sentado',
-        body: `${cobrado.username} entra en tu mesa.`,
+        body: `${yo.username} entra en tu mesa.`,
         icon: '/assets/icons/icon-192x192.png',
         url: '/games/poker'
     });
@@ -247,8 +267,7 @@ const expulsar = asyncHandler(async (req, res) => {
 
     const puesto = puestoDe(mesa, jugadorId);
     if (puesto >= 0) {
-        // Se le devuelve su entrada: no ha llegado a jugar nada.
-        await User.findByIdAndUpdate(jugadorId, { $inc: { gameCoins: mesa.jugadores[puesto].fichas } });
+        // No hay nada que devolver: nadie ha pagado por sentarse.
         mesa.jugadores.splice(puesto, 1);
     } else {
         const antes = mesa.invitados.length;
@@ -274,7 +293,7 @@ const empezar = asyncHandler(async (req, res) => {
     mesa.invitados = [];
     mesa.estado = 'jugando';
     mesa.boton = mesa.jugadores.length - 1;   // la primera mano el botón es el último
-    mesaSvc.repartirMano(mesa, mazoNuevo);
+    await repartir(mesa);
     await mesa.save();
 
     for (const j of mesa.jugadores) {
@@ -291,8 +310,40 @@ const empezar = asyncHandler(async (req, res) => {
     res.json(vista(mesa, req.user._id));
 });
 
+/**
+ * Reparte una mano, con el dinero de verdad.
+ *
+ * Dos pasos, y en este orden:
+ *
+ *  1. Se carga en `fichas` lo que cada uno TIENE ahora mismo en su saldo. Eso es
+ *     lo que puede apostar esta mano: si entre manos se ha gastado fichas en la
+ *     tienda, juega con lo que le queda.
+ *  2. Se reparte —que pone las ciegas sobre esos `fichas`— y se cobran del saldo
+ *     de verdad.
+ */
+const repartir = async (mesa) => {
+    const ids = mesa.jugadores.filter(j => j.user).map(j => j.user);
+    const saldos = await User.find({ _id: { $in: ids } }).select('gameCoins').lean();
+    const porId = new Map(saldos.map(u => [u._id.toString(), u.gameCoins || 0]));
+
+    for (const j of mesa.jugadores) {
+        j.fichas = j.user ? (porId.get(j.user.toString()) || 0) : 0;
+    }
+
+    if (!mesaSvc.repartirMano(mesa, mazoNuevo)) return false;
+
+    // Las ciegas ya están puestas sobre `fichas`; ahora se cobran de verdad.
+    for (const j of mesa.jugadores) {
+        if (j.user && j.apostadoMano > 0) {
+            await cobrar(j.user, j.apostadoMano);
+            j.ganancia -= j.apostadoMano;
+        }
+    }
+    return true;
+};
+
 /** Cierra la mano y paga, ya sea por retirada o por showdown. */
-const cerrarMano = (mesa) => {
+const cerrarMano = async (mesa) => {
     const vivos = mesaSvc.enMano(mesa);
 
     if (vivos.length === 1) {
@@ -300,6 +351,8 @@ const cerrarMano = (mesa) => {
         // sus cartas: nadie pagó por verlas.
         const ganador = mesa.jugadores.indexOf(vivos[0]);
         mesa.jugadores[ganador].fichas += mesa.bote;
+        mesa.jugadores[ganador].ganancia += mesa.bote;
+        if (mesa.jugadores[ganador].user) await pagar(mesa.jugadores[ganador].user, mesa.bote);
         mesa.ultimoResultado = {
             porRetirada: true,
             ganadores: [{ puesto: ganador, nombre: vivos[0].nombre, fichas: mesa.bote, jugada: null }],
@@ -309,6 +362,7 @@ const cerrarMano = (mesa) => {
         mesa.bote = 0;
     } else {
         const pagos = mesaSvc.repartirBote(mesa);
+        const aPagar = [];
 
         // Se junta lo que cobra cada uno. Con botes laterales, el mismo jugador
         // puede llevarse dos o tres, y enseñarlo como "Ana, Ana, Ana" parece un
@@ -318,6 +372,8 @@ const cerrarMano = (mesa) => {
             pago.puestos.forEach((p, i) => {
                 const cantidad = pago.porCabeza + (i === 0 ? (pago.resto || 0) : 0);
                 mesa.jugadores[p].fichas += cantidad;
+                mesa.jugadores[p].ganancia += cantidad;
+                aPagar.push({ user: mesa.jugadores[p].user, cantidad });
                 const previo = porPuesto.get(p);
                 porPuesto.set(p, {
                     puesto: p,
@@ -328,6 +384,12 @@ const cerrarMano = (mesa) => {
             });
         }
         const ganadores = [...porPuesto.values()];
+
+        // El dinero se mueve DESPUÉS de repartirlo en memoria: si algo fallara
+        // al calcular, no se habría pagado nada a medias.
+        for (const { user, cantidad } of aPagar) {
+            if (user) await pagar(user, cantidad);
+        }
         mesa.ultimoResultado = {
             porRetirada: false,
             ganadores,
@@ -355,8 +417,8 @@ const cerrarMano = (mesa) => {
 };
 
 /** Avanza la mano tras una acción: siguiente turno, siguiente calle o final. */
-const avanzar = (mesa) => {
-    if (mesaSvc.enMano(mesa).length <= 1) { cerrarMano(mesa); return; }
+const avanzar = async (mesa) => {
+    if (mesaSvc.enMano(mesa).length <= 1) { await cerrarMano(mesa); return; }
 
     if (!mesaSvc.rondaTerminada(mesa)) {
         mesa.turno = mesaSvc.siguientePuesto(mesa, mesa.turno);
@@ -368,7 +430,7 @@ const avanzar = (mesa) => {
     // Ronda cerrada: se abren cartas hasta el river o hasta el showdown
     while (true) {
         const hay = mesaSvc.abrirCartas(mesa);
-        if (!hay) { cerrarMano(mesa); return; }
+        if (!hay) { await cerrarMano(mesa); return; }
         // Si solo queda uno sin estar all-in, no hay más apuestas: se sigue
         // abriendo hasta el final.
         if (mesaSvc.puedenApostar(mesa).length > 1) return;
@@ -391,6 +453,7 @@ const actuar = asyncHandler(async (req, res) => {
     if (yo.retirado || yo.allIn) { res.status(400); throw new Error('Ya no puedes actuar en esta mano'); }
 
     const porIgualar = Math.max(0, mesa.apuestaActual - yo.apostadoRonda);
+    const puestoAntes = yo.apostadoMano;
 
     if (accion === 'retirarse') {
         yo.retirado = true;
@@ -433,7 +496,17 @@ const actuar = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('Acción no válida');
     }
 
-    avanzar(mesa);
+    // ⚠️ Lo que se acaba de poner sale del SALDO, no de un montón. Con la
+    // condición dentro de la escritura: si entre medias se ha gastado las fichas
+    // en otra cosa, no entra en vez de dejarle en negativo.
+    const puesto = yo.apostadoMano - puestoAntes;
+    if (puesto > 0) {
+        const cobrado = await cobrar(req.user._id, puesto);
+        if (cobrado === 0) { res.status(400); throw new Error('Ya no te llegan las fichas para eso'); }
+        yo.ganancia -= puesto;
+    }
+
+    await avanzar(mesa);
     await mesa.save();
 
     res.json(vista(mesa, req.user._id));
@@ -447,7 +520,7 @@ const siguienteMano = asyncHandler(async (req, res) => {
     if (puestoDe(mesa, req.user._id) < 0) { res.status(403); throw new Error('No juegas en esta mesa'); }
     if (mesa.fase !== 'entremanos') { res.status(400); throw new Error('La mano todavía no ha terminado'); }
 
-    if (!mesaSvc.repartirMano(mesa, mazoNuevo)) {
+    if (!(await repartir(mesa))) {
         mesa.estado = 'terminada';
         mesa.terminadaEn = new Date();
     }
@@ -470,25 +543,23 @@ const levantarse = asyncHandler(async (req, res) => {
     // líder no hay quien reparta la siguiente mano: lo que queda es una mesa
     // muerta con el dinero de la gente dentro.
     if (soyLider) {
-        for (const j of mesa.jugadores) {
-            if (j.user && j.fichas > 0) {
-                await User.findByIdAndUpdate(j.user, { $inc: { gameCoins: j.fichas } });
+        // Nada que devolver: el dinero nunca salió del saldo de cada uno. Lo
+        // único pendiente es el bote de una mano a medias, que vuelve a quien
+        // lo puso.
+        if (mesa.bote > 0) {
+            for (const j of mesa.jugadores) {
+                if (j.user && j.apostadoMano > 0) await pagar(j.user, j.apostadoMano);
             }
+        }
+
+        for (const j of mesa.jugadores) {
             if (j.user && j.user.toString() !== req.user._id.toString()) {
                 notificarA(j.user, {
                     title: '♠️ Mesa cerrada',
-                    body: 'El líder ha cerrado la mesa. Tus fichas han vuelto a tu saldo.',
+                    body: 'El líder ha cerrado la mesa.',
                     icon: '/assets/icons/icon-192x192.png',
                     url: '/games/poker'
                 });
-            }
-        }
-        // El bote de una mano a medias se devuelve a quien lo puso
-        if (mesa.bote > 0) {
-            for (const j of mesa.jugadores) {
-                if (j.user && j.apostadoMano > 0) {
-                    await User.findByIdAndUpdate(j.user, { $inc: { gameCoins: j.apostadoMano } });
-                }
             }
         }
         await Poker.findByIdAndDelete(mesa._id);
@@ -496,15 +567,15 @@ const levantarse = asyncHandler(async (req, res) => {
     }
 
     const yo = mesa.jugadores[miPuesto];
-    // Lo que tenga en el bote de la mano en curso se queda: retirarse a mitad
-    // de una mano no devuelve lo apostado, igual que en una mesa de verdad.
-    if (yo.fichas > 0) await User.findByIdAndUpdate(yo.user, { $inc: { gameCoins: yo.fichas } });
+    // Nada que devolver: las fichas nunca salieron de su saldo. Lo que haya
+    // puesto en la mano en curso se queda en el bote, igual que en una mesa de
+    // verdad: levantarse a mitad de mano no deshace lo apostado.
     yo.fichas = 0;
     yo.sentado = false;
     yo.retirado = true;
 
     if (mesa.estado === 'jugando') {
-        if (mesa.turno === miPuesto) avanzar(mesa);
+        if (mesa.turno === miPuesto) await avanzar(mesa);
         if (mesa.jugadores.filter(j => j.sentado).length < 2) {
             mesa.estado = 'terminada';
             mesa.terminadaEn = new Date();
@@ -558,5 +629,5 @@ const misInvitaciones = asyncHandler(async (req, res) => {
 module.exports = {
     crearMesa, invitar, responderInvitacion, expulsar, empezar,
     actuar, siguienteMano, levantarse, misMesas, verMesa, misInvitaciones,
-    CIEGA_MINIMA, CIEGA_MAXIMA, MAX_JUGADORES, CIEGAS_DE_ENTRADA
+    CIEGA_MINIMA, CIEGA_MAXIMA, MAX_JUGADORES, CIEGAS_MINIMAS
 };

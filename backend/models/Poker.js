@@ -9,12 +9,20 @@ const mongoose = require('mongoose');
  * cada jugador solo ve las suyas; las de los rivales aparecen únicamente al
  * enseñarlas en el showdown. Si viajaran, no habría juego que valga.
  *
- * SE ENTRA CON FICHAS Y SE SALE CON LO QUE QUEDE.
+ * SE JUEGA CON TUS FICHAS, SIN MONTÓN INTERMEDIO.
  *
- * Al sentarte se te descuentan las fichas de tu saldo y pasan a tu montón de la
- * mesa; al levantarte, lo que quede vuelve. Es como funciona una mesa de verdad
- * y, sobre todo, hace que las cuentas se puedan comprobar: la suma de los
- * montones más lo que hay en el bote tiene que ser SIEMPRE lo que entró.
+ * Cada apuesta sale de tu saldo en el momento, y cada bote que ganas entra en
+ * él. No hay compra de entrada ni fichas de mesa.
+ *
+ * Antes sí las había —te descontaban una entrada y jugabas con un montón— y
+ * era peor por una razón muy concreta: durante toda la partida el contador de
+ * fichas de la cabecera no se movía ni un número. Apostabas, ganabas, perdías,
+ * y arriba seguía marcando lo mismo. Solo al levantarte aparecía el resultado.
+ * Funcionaba, pero no se veía, que para el que juega es lo mismo que si no
+ * funcionara.
+ *
+ * `fichas` es lo que tenías al empezar la mano: se carga de tu saldo real al
+ * repartir y baja según apuestas. Es el tope de lo que puedes poner.
  */
 
 const cartaSchema = new mongoose.Schema({
@@ -29,10 +37,12 @@ const jugadorSchema = new mongoose.Schema({
     nombre: { type: String, default: '' },
     avatar: { type: String, default: '' },
 
-    // Su montón en la mesa
+    // Lo que le queda por apostar en esta mano. Se carga de su saldo real al
+    // repartir y baja con cada apuesta: es el tope, no un montón aparte.
     fichas: { type: Number, default: 0 },
-    // Lo que trajo al sentarse, para poder decirle cuánto lleva ganado
-    entrada: { type: Number, default: 0 },
+
+    // Lo ganado o perdido desde que se sentó, solo para el marcador
+    ganancia: { type: Number, default: 0 },
 
     // Sus dos cartas. NUNCA se mandan a otro jugador.
     cartas: { type: [cartaSchema], default: [] },
@@ -55,7 +65,6 @@ const pokerSchema = new mongoose.Schema({
     lider: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
     ciegaGrande: { type: Number, required: true, min: 2 },
-    entradaMesa: { type: Number, required: true, min: 1 },
 
     jugadores: { type: [jugadorSchema], default: [] },
     invitados: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
