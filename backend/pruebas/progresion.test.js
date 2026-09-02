@@ -1,7 +1,7 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
-const { sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso } = require('../services/progresionService');
+const { sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso, SESIONES_PARA_BAJAR } = require('../services/progresionService');
 
 /**
  * QUÉ TOCA HOY
@@ -136,6 +136,59 @@ describe('Que toca hoy: lo que propone para la proxima sesion', () => {
 
         const r = sugerirSiguiente({ reps: '5' }, [{ weight: 87.4, reps: 5 }]);
         assert.strictEqual(r.peso % 0.5, 0, 'Todo peso propuesto debe caer en medios kilos');
+    });
+
+    test('tres sesiones clavado en el mismo peso: se baja un 10%', () => {
+        const a = (...reps) => reps.map(r => ({ weight: 80, reps: r }));
+
+        // Una mala semana la tiene cualquiera: se insiste
+        const primera = sugerirSiguiente({ reps: '8-12' }, a(10, 10, 6), []);
+        assert.strictEqual(primera.peso, 80);
+        assert.strictEqual(primera.descarga, false);
+
+        // Dos tampoco bastan
+        const segunda = sugerirSiguiente({ reps: '8-12' }, a(8, 8, 7), [a(10, 10, 6)]);
+        assert.strictEqual(segunda.peso, 80);
+        assert.strictEqual(segunda.descarga, false);
+
+        // A la tercera ya no es mala suerte: ese peso no es tu peso ahora mismo
+        const tercera = sugerirSiguiente({ reps: '8-12' }, a(8, 7, 7), [a(10, 10, 6), a(8, 8, 7)]);
+        assert.strictEqual(tercera.peso, 72, 'Deberia bajar un 10%');
+        assert.strictEqual(tercera.reps, 8, 'Y volver al minimo del rango');
+        assert.strictEqual(tercera.descarga, true);
+        assert.strictEqual(tercera.sesionesAtascado, SESIONES_PARA_BAJAR);
+    });
+
+    test('sacar una sesion rompe la racha del atasco', () => {
+        const a = (...reps) => reps.map(r => ({ weight: 80, reps: r }));
+
+        // Fallo, fallo... pero en medio hay una que SI sacaste. La pared se
+        // rompio ahi: no llevas tres seguidas contra la misma.
+        const r = sugerirSiguiente({ reps: '8' }, a(7, 7, 7), [a(6, 6, 6), a(8, 8, 8), a(7, 7, 6)]);
+        assert.strictEqual(r.peso, 80, 'No deberia descargar: la racha se corto');
+        assert.strictEqual(r.descarga, false);
+    });
+
+    test('cambiar de peso rompe la racha: no es la misma pared', () => {
+        const en = (kg, ...reps) => reps.map(r => ({ weight: kg, reps: r }));
+
+        // Fallaste tres veces, pero a pesos distintos. Estabas subiendo, no
+        // atascado, y bajar aqui seria castigar a alguien que progresa.
+        const r = sugerirSiguiente({ reps: '8' }, en(80, 7, 7, 6), [en(70, 7, 7, 6), en(75, 7, 6, 6)]);
+        assert.strictEqual(r.peso, 80);
+        assert.strictEqual(r.descarga, false);
+    });
+
+    test('sin las sesiones anteriores todo sigue funcionando igual', () => {
+        // El historial es opcional a proposito: quien llame a esto sin el
+        // —el guardado del entreno, por ejemplo— tiene que seguir teniendo
+        // propuesta, solo que sin descarga.
+        const r = sugerirSiguiente({ reps: '8-12' }, [
+            { weight: 80, reps: 10 }, { weight: 80, reps: 10 }, { weight: 80, reps: 6 }
+        ]);
+        assert.strictEqual(r.peso, 80);
+        assert.strictEqual(r.reps, 8);
+        assert.strictEqual(r.descarga, false);
     });
 
     test('el motivo no lleva numeros dentro', () => {

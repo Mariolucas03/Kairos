@@ -33,6 +33,18 @@
  * completada. Y no baja nunca de lo que ya hiciste en tu peor serie: la
  * propuesta siempre pide algo más que la última vez, aunque sea una repetición.
  *
+ * Y SI TE QUEDAS CLAVADO, SE BAJA EL PESO.
+ *
+ * Mirando solo la última sesión no se distingue fallar una vez —normal, insiste,
+ * la semana que viene sale— de llevar un mes fallando, que quiere decir otra
+ * cosa: que ese peso no es tu peso ahora mismo, y repetirlo no lo va a arreglar.
+ * Sin esto la app te decía "80 kg x 8" un lunes detrás de otro hasta que te
+ * aburrías, y encima te iba bajando el objetivo segun lo hacías peor.
+ *
+ * A las TRES sesiones seguidas sin sacarlas al mismo peso se baja un 10% y se
+ * vuelve a subir desde ahí. Llegas a 80 otra vez en tres semanas, pero llegas,
+ * en vez de pasarte dos meses estrellándote contra la misma pared.
+ *
  * ⚠️ Propone, no impone. Los campos siguen siendo editables: la sugerencia entra
  * como valor de partida y si hoy no era tu día, la cambias. Una app que te
  * obliga a subir peso cuando has dormido cuatro horas se desinstala.
@@ -59,6 +71,13 @@ const rangoDeReps = (texto) => {
     return { min: Math.min(a, b), max: Math.max(a, b) };
 };
 
+// Sesiones seguidas atascado en el mismo peso antes de bajarlo. Dos es
+// agresivo —una mala semana la tiene cualquiera— y cuatro es tarde.
+const SESIONES_PARA_BAJAR = 3;
+
+// Cuanto se baja al descargar. El 10% de toda la vida.
+const BAJADA = 0.9;
+
 /** Redondea a medios kilos: no existen las mancuernas de 41,3 kg. */
 const aDiscoReal = (kg) => Math.max(0, Math.round(kg * 2) / 2);
 
@@ -79,9 +98,13 @@ const escalonDePeso = (peso) => {
 /**
  * Propone la siguiente sesión de un ejercicio.
  *
- * @param {Object} config    lo que dice la rutina: de aquí solo se usa `reps`
- * @param {Array}  ultimas   series de la última vez [{ weight, reps }]
- * @returns {Object|null}    { peso, reps, completada, motivo } o null
+ * @param {Object} config      lo que dice la rutina: de aquí solo se usa `reps`
+ * @param {Array}  ultimas     series de la última vez [{ weight, reps }]
+ * @param {Array}  anteriores  sesiones previas, de la más vieja a la más
+ *                             reciente, sin incluir `ultimas`. Solo se usan para
+ *                             saber si llevas varias atascado; si no se pasan,
+ *                             todo funciona igual que antes menos la descarga.
+ * @returns {Object|null}      { peso, reps, completada, descarga, motivo } o null
  *
  * `motivo` va SIN números a propósito. Lo que devuelve esto lo traduce después
  * el controlador —el peso corporal se resta, los segundos se multiplican, las
@@ -89,7 +112,7 @@ const escalonDePeso = (peso) => {
  * texto contradiría a la de la casilla de al lado. Las cifras las pinta la
  * pantalla, que ya las tiene traducidas.
  */
-const sugerirSiguiente = (config = {}, ultimas = []) => {
+const sugerirSiguiente = (config = {}, ultimas = [], anteriores = []) => {
     // Sin historial no se sugiere nada: la primera vez la decides tú, que es la
     // única forma de saber por dónde andas.
     //
@@ -116,7 +139,36 @@ const sugerirSiguiente = (config = {}, ultimas = []) => {
             peso: aDiscoReal(peso + escalonDePeso(peso)),
             reps: min,
             completada: true,
+            descarga: false,
             motivo: 'Las aguantaste todas, así que toca subir peso y volver a empezar desde abajo.'
+        };
+    }
+
+    // ¿Cuántas sesiones seguidas llevas atascado en este mismo peso?
+    //
+    // Se cuenta hacia atrás y se para en cuanto algo rompe la racha: una sesión
+    // con otro peso (entonces no es la misma pared), o una que sí sacaste. Una
+    // sesión vacía también corta: no dice nada y encadenarla sería inventar.
+    let atascado = 1;   // la de hoy ya cuenta
+    for (let i = anteriores.length - 1; i >= 0; i--) {
+        const previas = (Array.isArray(anteriores[i]) ? anteriores[i] : [])
+            .filter(s => Number(s?.reps) > 0 && Number.isFinite(Number(s?.weight)));
+        if (previas.length === 0) break;
+
+        if (Math.max(...previas.map(s => Number(s.weight) || 0)) !== peso) break;
+        if (Math.min(...previas.map(s => Number(s.reps) || 0)) >= objetivo) break;
+
+        atascado++;
+    }
+
+    if (atascado >= SESIONES_PARA_BAJAR) {
+        return {
+            peso: aDiscoReal(peso * BAJADA),
+            reps: min,
+            completada: false,
+            descarga: true,
+            sesionesAtascado: atascado,
+            motivo: 'Llevas varias sesiones sin sacarlas a ese peso. Se baja para coger carrerilla y volver a subir.'
         };
     }
 
@@ -135,8 +187,9 @@ const sugerirSiguiente = (config = {}, ultimas = []) => {
         peso: aDiscoReal(peso),
         reps: meta,
         completada: false,
+        descarga: false,
         motivo: 'No aguantaste el mismo número en todas: esta es la que sí puedes sostener.'
     };
 };
 
-module.exports = { sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso };
+module.exports = { sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso, SESIONES_PARA_BAJAR };

@@ -684,7 +684,7 @@ const seedExercises = async (req, res) => {
  * Si algo falla, se devuelve un objeto vacío: el entreno YA está guardado y una
  * frase de más no puede tumbar la respuesta que confirma eso.
  */
-const queTocaraLaProximaVez = async (userId, routineId, ejercicios) => {
+const queTocaraLaProximaVez = async (userId, routineId, ejercicios, logGuardado) => {
     try {
         const porNombre = {};
         if (routineId) {
@@ -693,10 +693,42 @@ const queTocaraLaProximaVez = async (userId, routineId, ejercicios) => {
             for (const ex of (rutina?.exercises || [])) porNombre[ex.name] = ex;
         }
 
+        // Las sesiones ANTERIORES de cada ejercicio, para poder decir "llevas
+        // tres semanas clavado, baja el peso". Sin esto, esta pantalla proponia
+        // repetir el mismo peso y al entrar al entreno la app decia otra cosa:
+        // dos numeros distintos para la misma pregunta.
+        //
+        // Una sola consulta para todos los ejercicios, y del reves (de la mas
+        // nueva a la mas vieja) para poder cortar por las que hacen falta. Se le
+        // da la vuelta despues, que es como lo espera la progresion.
+        const nombres = (ejercicios || []).map(e => e.name);
+        const anteriores = {};
+        if (nombres.length > 0) {
+            const previos = await WorkoutLog.find({
+                user: userId,
+                _id: { $ne: logGuardado },        // la de hoy va aparte
+                'exercises.name': { $in: nombres }
+            })
+                .select('date exercises.name exercises.sets')
+                .sort({ date: -1 })
+                .limit(SESIONES_QUE_SE_MIRAN * 3)   // margen: no todos los ejercicios salen en todos
+                .lean();
+
+            for (const log of previos) {
+                for (const ex of (log.exercises || [])) {
+                    if (!nombres.includes(ex.name)) continue;
+                    if (!anteriores[ex.name]) anteriores[ex.name] = [];
+                    if (anteriores[ex.name].length >= SESIONES_QUE_SE_MIRAN) continue;
+                    anteriores[ex.name].push((ex.sets || []).map(x => ({ weight: x.weight, reps: x.reps })));
+                }
+            }
+        }
+
         const salida = {};
         for (const ex of (ejercicios || [])) {
             const config = porNombre[ex.name] || {};
-            const propuesta = sugerirSiguiente({ reps: config.reps }, ex.sets || []);
+            const previas = (anteriores[ex.name] || []).slice().reverse();
+            const propuesta = sugerirSiguiente({ reps: config.reps }, ex.sets || [], previas);
             if (!propuesta) continue;
 
             // Las mismas traducciones que en el historial: lo que se guarda es lo
@@ -720,6 +752,11 @@ const queTocaraLaProximaVez = async (userId, routineId, ejercicios) => {
         return {};
     }
 };
+
+// Sesiones que se guardan de cada ejercicio para decidir si estas atascado. Con
+// tres seguidas se descarga, asi que con cuatro sobra; guardar el historial
+// entero seria mandarle al movil meses de series para mirar tres.
+const SESIONES_QUE_SE_MIRAN = 4;
 
 const saveWorkoutLog = async (req, res) => {
     try {
@@ -934,7 +971,7 @@ const saveWorkoutLog = async (req, res) => {
             rankUps: subidas,
             rankUpCoins: monedas,
             // Y lo que tocara el proximo dia de cada ejercicio
-            proximaVez: await queTocaraLaProximaVez(req.user._id, routineId, ejercicios)
+            proximaVez: await queTocaraLaProximaVez(req.user._id, routineId, ejercicios, log._id)
         });
     } catch (error) {
         // Dos reintentos que salen a la vez pasan los dos la comprobacion de
@@ -1239,6 +1276,16 @@ const getRoutineHistory = async (req, res) => {
                         // En bruto, para que la progresión compare peso real con
                         // peso real y no lastre con lastre.
                         stats[ex.name].brutas = ex.sets.map(s => ({ weight: s.weight, reps: s.reps }));
+
+                        // Y las últimas sesiones, para saber si llevas varias
+                        // clavado en el mismo peso. Los `logs` vienen ordenados
+                        // de más viejo a más nuevo, así que esto se apila solo en
+                        // el orden que espera la progresión.
+                        if (!stats[ex.name].sesiones) stats[ex.name].sesiones = [];
+                        stats[ex.name].sesiones.push(stats[ex.name].brutas);
+                        if (stats[ex.name].sesiones.length > SESIONES_QUE_SE_MIRAN) {
+                            stats[ex.name].sesiones.shift();
+                        }
                     }
 
                     ex.sets.forEach(set => {
@@ -1271,7 +1318,9 @@ const getRoutineHistory = async (req, res) => {
             // La progresión razona sobre lo que de verdad se movió (por eso
             // recibe las series en bruto), pero lo que devuelve va a una casilla,
             // así que se traduce igual que arriba.
-            const sugerencia = sugerirSiguiente(config, stats[nombre].brutas || stats[nombre].lastSets);
+            // Las anteriores son todas menos la de hoy, que va aparte.
+            const previas = (stats[nombre].sesiones || []).slice(0, -1);
+            const sugerencia = sugerirSiguiente(config, stats[nombre].brutas || stats[nombre].lastSets, previas);
             if (!sugerencia) continue;
 
             const flags = banderasPorEjercicio[nombre] || {};
@@ -1286,6 +1335,14 @@ const getRoutineHistory = async (req, res) => {
             }
 
             stats[nombre].sugerencia = sugerencia;
+            delete stats[nombre].brutas;
+        }
+
+        // `sesiones` era material de trabajo para decidir la descarga: no sale de
+        // aquí. Mandarlo serían cuatro sesiones de cada ejercicio viajando al
+        // móvil para que no las use nadie.
+        for (const nombre of Object.keys(stats)) {
+            delete stats[nombre].sesiones;
             delete stats[nombre].brutas;
         }
 

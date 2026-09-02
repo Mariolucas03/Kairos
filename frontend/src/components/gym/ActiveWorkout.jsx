@@ -3,7 +3,7 @@ import usePantallaEncendida from '../../hooks/usePantallaEncendida';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
@@ -143,7 +143,8 @@ const comoSeDice = (ex) => {
         titular: `${peso} × ${cuanto}${series > 1 ? ' en todas las series' : ''}`,
         antes: (ex.ultimasSeries || []).map(x => x.reps).filter(n => n > 0),
         motivo: s.motivo,
-        completada: s.completada
+        completada: s.completada,
+        descarga: !!s.descarga
     };
 };
 
@@ -816,10 +817,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             return (
                                 <div className={`flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border ${hoy.completada
                                     ? 'bg-emerald-500/[0.07] border-emerald-500/25'
-                                    : 'bg-yellow-500/[0.06] border-yellow-500/20'}`}>
-                                    <TrendingUp size={14} className={`mt-px shrink-0 ${hoy.completada ? 'text-emerald-400' : 'text-yellow-500'}`} />
+                                    : hoy.descarga
+                                        ? 'bg-orange-500/[0.07] border-orange-500/30'
+                                        : 'bg-yellow-500/[0.06] border-yellow-500/20'}`}>
+                                    {hoy.descarga
+                                        ? <TrendingDown size={14} className="mt-px shrink-0 text-orange-400" />
+                                        : <TrendingUp size={14} className={`mt-px shrink-0 ${hoy.completada ? 'text-emerald-400' : 'text-yellow-500'}`} />}
                                     <div className="min-w-0">
-                                        <p className={`text-[12px] font-black uppercase tracking-tight leading-tight ${hoy.completada ? 'text-emerald-400' : 'text-yellow-500'}`}>
+                                        <p className={`text-[12px] font-black uppercase tracking-tight leading-tight ${hoy.completada ? 'text-emerald-400' : hoy.descarga ? 'text-orange-400' : 'text-yellow-500'}`}>
                                             Hoy: {hoy.titular}
                                         </p>
                                         <p className="text-[10px] text-zinc-500 leading-snug mt-0.5">
@@ -896,13 +901,16 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                     key={nombre}
                                     className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border ${p.completada
                                         ? 'bg-emerald-500/[0.07] border-emerald-500/25'
-                                        : 'bg-black border-white/[0.07]'}`}
+                                        : p.descarga
+                                            ? 'bg-orange-500/[0.07] border-orange-500/30'
+                                            : 'bg-black border-white/[0.07]'}`}
                                 >
                                     <span className="text-[11px] font-black text-white uppercase truncate flex-1 min-w-0">{nombre}</span>
-                                    <span className={`text-[12px] font-black tabular-nums shrink-0 ${p.completada ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                                    <span className={`text-[12px] font-black tabular-nums shrink-0 ${p.completada ? 'text-emerald-400' : p.descarga ? 'text-orange-400' : 'text-zinc-300'}`}>
                                         {p.peso} × {p.reps}
                                     </span>
                                     {p.completada && <span className="text-[9px] font-black text-emerald-400 shrink-0">SUBE</span>}
+                                    {p.descarga && <span className="text-[9px] font-black text-orange-400 shrink-0">BAJA</span>}
                                 </div>
                             ))}
                         </div>
