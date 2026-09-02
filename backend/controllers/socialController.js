@@ -63,7 +63,9 @@ const shapeFeedItem = (log, viewerId) => {
                 _id: c._id,
                 text: c.text,
                 createdAt: c.createdAt,
-                user: c.user
+                user: c.user,
+                likesCount: (c.likes || []).length,
+                likedByMe: (c.likes || []).some(id => id.toString() === viewerId.toString())
             }))
     };
 };
@@ -295,6 +297,59 @@ const borrarComentarioPropio = async (req, res) => {
     }
 };
 
+/**
+ * Me gusta a un COMENTARIO.
+ *
+ * Mismo gesto que el del entreno, pero un nivel mas abajo. Es la respuesta
+ * corta a un comentario: si alguien te dice "bestia" debajo de un peso muerto,
+ * la contestacion natural es un corazon, no otro comentario. Sin esto, la unica
+ * forma de responder era escribir, y por eso los hilos se llenaban de "jaja".
+ *
+ * No manda aviso a nadie. El buzon ya recibe uno por cada me gusta y cada
+ * comentario del entreno; anadir un tercer tipo por cada corazon suelto en un
+ * hilo lo convierte en ruido. Se ve al abrir los comentarios, que es donde
+ * importa.
+ *
+ * @route   POST /api/social/comment/:workoutId/:commentId/like
+ */
+const toggleLikeComentario = async (req, res) => {
+    try {
+        const { workoutId, commentId } = req.params;
+        const userId = req.user._id;
+
+        const entreno = await WorkoutLog.findById(workoutId).select('user comments');
+        if (!entreno) return res.status(404).json({ message: 'Ese entreno ya no existe' });
+
+        const permitido = await canViewContent(userId, entreno.user);
+        if (!permitido) return res.status(403).json({ message: 'No tienes acceso a este entreno' });
+
+        const comentario = (entreno.comments || []).find(c => c._id.toString() === commentId);
+        if (!comentario) return res.status(404).json({ message: 'Ese comentario ya no existe' });
+
+        const yaEstaba = (comentario.likes || []).some(id => id.toString() === userId.toString());
+
+        // La escritura APUNTA AL COMENTARIO, no al array entero: dos personas
+        // dando me gusta a la vez a comentarios distintos no se pisan.
+        const actualizado = await WorkoutLog.findOneAndUpdate(
+            { _id: workoutId, 'comments._id': commentId },
+            yaEstaba
+                ? { $pull: { 'comments.$.likes': userId } }
+                : { $addToSet: { 'comments.$.likes': userId } },
+            { new: true }
+        ).select('comments');
+
+        const nuevo = (actualizado?.comments || []).find(c => c._id.toString() === commentId);
+
+        res.json({
+            likesCount: (nuevo?.likes || []).length,
+            likedByMe: !yaEstaba
+        });
+    } catch (error) {
+        console.error('Error en toggleLikeComentario:', error);
+        res.status(500).json({ message: 'Error al dar me gusta' });
+    }
+};
+
 // @desc    Comentar un entreno
 // @route   POST /api/social/feed/:workoutId/comment
 const addComment = async (req, res) => {
@@ -342,7 +397,9 @@ const addComment = async (req, res) => {
                 _id: savedComment._id,
                 text: savedComment.text,
                 createdAt: savedComment.createdAt,
-                user: { _id: userId, username: req.user.username, avatar: req.user.avatar }
+                user: { _id: userId, username: req.user.username, avatar: req.user.avatar },
+                likesCount: 0,
+                likedByMe: false
             }
         });
     } catch (error) {
@@ -890,6 +947,6 @@ const getBadge = async (req, res) => {
 
 module.exports = {
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
-    getFeed, toggleLike, addComment, borrarMiEntreno, borrarComentarioPropio, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
+    getFeed, toggleLike, addComment, toggleLikeComentario, borrarMiEntreno, borrarComentarioPropio, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
     removeFriend, getNotifications, markNotificationsRead, getBadge, heartbeat
 };

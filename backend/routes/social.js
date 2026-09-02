@@ -19,7 +19,8 @@ const {
     getBadge,
     heartbeat,
     borrarMiEntreno,
-    borrarComentarioPropio
+    borrarComentarioPropio,
+    toggleLikeComentario
 } = require('../controllers/socialController');
 const protect = require('../middleware/authMiddleware');
 
@@ -41,6 +42,7 @@ router.get('/leaderboard/monthly', protect, getMonthlyLeaderboard);
 router.get('/feed', protect, getFeed);
 router.post('/feed/:workoutId/like', protect, toggleLike);
 router.post('/feed/:workoutId/comment', protect, addComment);
+router.post('/comment/:workoutId/:commentId/like', protect, toggleLikeComentario);
 router.get('/profile/:userId', protect, getFriendProfile);
 router.get('/profile/:userId/items', protect, getProfileItems);
 

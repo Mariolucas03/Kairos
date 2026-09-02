@@ -78,6 +78,37 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
         }
     };
 
+    // Corazón de cada comentario. Guarda el id del que está esperando
+    // respuesta, no un booleano: si no, dar me gusta a uno bloquea los demás.
+    const [likeComentarioBusy, setLikeComentarioBusy] = useState(null);
+
+    /**
+     * Me gusta a un comentario.
+     *
+     * Se pinta antes de que conteste el servidor y se deshace si falla, igual
+     * que el del entreno: el corazón tiene que responder en el mismo momento en
+     * que lo tocas o parece que la app se ha quedado colgada.
+     */
+    const alternarLikeComentario = async (c) => {
+        if (likeComentarioBusy === c._id) return;
+        setLikeComentarioBusy(c._id);
+
+        const daba = !!c.likedByMe;
+        const pintar = (liked, n) => setComments(prev => prev.map(x =>
+            x._id === c._id ? { ...x, likedByMe: liked, likesCount: n } : x
+        ));
+
+        pintar(!daba, Math.max(0, (c.likesCount || 0) + (daba ? -1 : 1)));
+        try {
+            const res = await api.post(`/social/comment/${post._id}/${c._id}/like`);
+            pintar(res.data.likedByMe, res.data.likesCount);
+        } catch (e) {
+            pintar(daba, c.likesCount || 0);
+        } finally {
+            setLikeComentarioBusy(null);
+        }
+    };
+
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState(post.comments || []);
     const [totalComentarios, setTotalComentarios] = useState(post.comentariosTotales ?? (post.comments || []).length);
@@ -409,6 +440,24 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                 <span className="text-[11px] font-black text-white mr-1">{c.user?.username}</span>
                                 <span className="text-[11px] text-zinc-300 break-words">{c.text}</span>
                             </div>
+
+                            {/* El corazón del comentario. Va fuera de la burbuja y a
+                                su derecha, como en Instagram: dentro se confundiría
+                                con el texto, y es la respuesta corta a lo que alguien
+                                ha escrito —antes la única forma de contestar era
+                                escribir otro comentario. */}
+                            <button
+                                onClick={() => alternarLikeComentario(c)}
+                                aria-label={c.likedByMe ? 'Quitar me gusta' : 'Me gusta'}
+                                className="shrink-0 flex flex-col items-center gap-0.5 pt-1.5 w-6 active:scale-90 transition-transform"
+                            >
+                                <Heart size={13} className={c.likedByMe ? 'text-red-500 fill-red-500' : 'text-zinc-600'} />
+                                {c.likesCount > 0 && (
+                                    <span className={`text-[9px] font-black leading-none not-italic ${c.likedByMe ? 'text-red-500' : 'text-zinc-600'}`}>
+                                        {c.likesCount}
+                                    </span>
+                                )}
+                            </button>
 
                             {puedoBorrarComentario(c) && (
                                 <button

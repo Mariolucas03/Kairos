@@ -110,7 +110,11 @@ const workoutLogSchema = mongoose.Schema({
     comments: [{
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         text: { type: String, maxlength: 300 },
-        createdAt: { type: Date, default: Date.now }
+        createdAt: { type: Date, default: Date.now },
+        // Quien le ha dado me gusta AL COMENTARIO. Se guardan los ids y no un
+        // contador porque hace falta saber si TU se lo has dado, para pintar el
+        // corazon relleno; con un numero suelto no se puede.
+        likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
     }]
 }, {
     timestamps: true

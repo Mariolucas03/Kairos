@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
-    Mail, Shield, Users, Search, Trophy, X, Loader2, ChevronDown, Rss, Dumbbell, UserPlus,
+    Mail, Shield, Users, Search, Trophy, X, Loader2, ChevronDown, Dumbbell, UserPlus,
     WifiOff, RefreshCw
 } from 'lucide-react';
 import api from '../services/api';
@@ -192,19 +192,12 @@ export default function Social() {
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* --- CABECERA ---
-                Título arriba y los 5 botones en su propia fila. Antes iban todos
-                en la misma línea, y en un móvil el subtítulo se quedaba sin sitio
-                y se partía en dos renglones contra los botones. */}
+                Los botones y nada más. Antes había encima un "FEED · Entrenos de
+                tus amigos" que ocupaba el primer tercio de la pantalla para
+                contar lo que ya se ve nada más bajar: entrenos de tus amigos.
+                Quitándolo, lo primero que aparece son los cinco sitios a los que
+                se puede ir, que es lo único que se toca aquí arriba. */}
             <div className="mb-5">
-                {!searchOpen && (
-                    <div className="flex items-baseline gap-2 mb-3">
-                        <h1 className="text-3xl font-black text-white uppercase not-italic tracking-tighter flex items-center gap-2 shrink-0">
-                            <Rss size={22} className="text-yellow-500" /> FEED
-                        </h1>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest truncate">Entrenos de tus amigos</p>
-                    </div>
-                )}
-
                 {searchOpen ? (
                     /* La lupa se convierte en un campo a lo ancho */
                     <div className="relative animate-in slide-in-from-right-4 fade-in duration-200">
@@ -222,23 +215,41 @@ export default function Social() {
                         </button>
                     </div>
                 ) : (
-                    <div className="flex items-center justify-between gap-1.5">
-                        {ACTIONS.map(({ key, icon: Icon, label, onClick, badge }) => (
-                            <button
-                                key={key}
-                                onClick={onClick}
-                                title={label}
-                                aria-label={label}
-                                className="flex-1 bg-zinc-900 border border-zinc-800 py-2.5 rounded-2xl text-zinc-300 hover:text-white hover:border-yellow-500/50 active:scale-95 transition-all relative flex items-center justify-center"
-                            >
-                                <Icon size={18} />
-                                {badge > 0 && (
-                                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-[9px] font-bold flex items-center justify-center border border-black animate-bounce">
-                                        {badge}
+                    /* Cinco baldosas iguales. Llevan el nombre debajo del icono:
+                       cinco siluetas grises en fila se parecen demasiado entre
+                       sí, y la del buzón y la del clan se confundían. El que
+                       tiene aviso se enciende en amarillo —línea de arriba,
+                       borde y icono— para que se vea de un vistazo cuál pide
+                       atención sin tener que buscar el número. */
+                    <div className="grid grid-cols-5 gap-1.5">
+                        {ACTIONS.map(({ key, icon: Icon, label, onClick, badge }) => {
+                            const avisa = badge > 0;
+                            return (
+                                <button
+                                    key={key}
+                                    onClick={onClick}
+                                    aria-label={label}
+                                    className={`group relative overflow-hidden flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl border transition-all active:scale-95 ${avisa
+                                        ? 'bg-yellow-500/[0.07] border-yellow-500/40'
+                                        : 'bg-gradient-to-b from-zinc-900 to-[#0a0a0c] border-white/[0.07] hover:border-white/20'}`}
+                                >
+                                    {/* Línea de acento arriba, como las tarjetas del Home */}
+                                    <span
+                                        className={`absolute inset-x-0 top-0 h-0.5 transition-opacity ${avisa ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
+                                        style={{ background: 'linear-gradient(90deg, #eab308, transparent)' }}
+                                    />
+                                    <Icon size={19} className={avisa ? 'text-yellow-500' : 'text-zinc-300 group-hover:text-white transition-colors'} />
+                                    <span className={`text-[8px] font-black uppercase tracking-[0.1em] not-italic ${avisa ? 'text-yellow-500/80' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}`}>
+                                        {label}
                                     </span>
-                                )}
-                            </button>
-                        ))}
+                                    {avisa && (
+                                        <span className="absolute top-1.5 right-1.5 min-w-[15px] h-[15px] px-1 bg-red-500 text-white rounded-full text-[8px] font-black flex items-center justify-center border border-black">
+                                            {badge > 99 ? '99+' : badge}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
             </div>
