@@ -21,17 +21,12 @@ const exerciseSchema = new mongoose.Schema({
     // Segundos objetivo en los ejercicios de tiempo (equivale a `reps`)
     targetSegundos: { type: Number, default: 0 },
 
-    // Cómo progresa este ejercicio. La app mira tu última sesión y propone la
-    // siguiente en vez de dejarte decidir de memoria, que es donde la gente se
-    // estanca meses con el mismo peso sin darse cuenta.
-    progresion: {
-        type: String,
-        enum: ['ninguna', 'lineal', 'doble', 'greyskull'],
-        default: 'ninguna'
-    },
-    // Cuánto sube cada vez. 2,5 kg es el salto habitual con discos de 1,25 por
-    // lado; en ejercicios pequeños (curl, elevaciones) conviene bajarlo a 1.
-    incremento: { type: Number, default: 2.5 }
+    // Aquí vivían `progresion` e `incremento`: el sistema de progresión y el
+    // salto de peso, elegidos ejercicio por ejercicio. Ya no se preguntan. La
+    // app mira tu última sesión y propone la siguiente ella sola, con una única
+    // regla —ver services/progresionService.js—, y el salto sale del propio peso
+    // que mueves. Las rutinas antiguas pueden traer los dos campos guardados;
+    // simplemente no se leen.
 });
 
 const routineSchema = new mongoose.Schema({

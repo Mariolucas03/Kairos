@@ -3,12 +3,13 @@ import usePantallaEncendida from '../../hooks/usePantallaEncendida';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 import ExerciseSelector from './ExerciseSelector';
+import { loQueHasLevantado } from '../../utils/loQueHasLevantado';
 import ExerciseSheet from './ExerciseSheet';
 import RankUpModal from './RankUpModal';
 import BodyMap from '../body/BodyMap';
@@ -44,7 +45,7 @@ const GlobalTimerDisplay = ({ startTime, isMinimized }) => {
 // ==========================================
 // SUB-COMPONENTE: MODAL DE DESCANSO AISLADO
 // ==========================================
-const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaultRest }) => {
+const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaultRest, info }) => {
     const [remaining, setRemaining] = useState(() => Math.max(0, Math.ceil((targetTime - Date.now()) / 1000)));
     const [localRest, setLocalRest] = useState(initialDefaultRest);
 
@@ -73,7 +74,29 @@ const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaul
     };
 
     return (
-        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 flex items-center justify-between ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
+            {/* QUÉ VIENE AHORA.
+
+                Esta pantalla se mira quince o veinte veces por sesión, y hasta
+                ahora solo tenía un número bajando. Los dos minutos de descanso
+                son justo el rato en el que quieres saber qué te toca y cómo fue
+                la serie anterior, así que van aquí y no en otro sitio. */}
+            {info && (
+                <div className="flex items-center justify-between gap-3 pb-2.5 mb-3 border-b border-white/10">
+                    <p className="text-[11px] font-black text-white uppercase tracking-tight truncate min-w-0">
+                        {info.proximo}
+                    </p>
+                    {info.hecho && (
+                        <span className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded-lg border tabular-nums ${info.cumplida
+                            ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                            : 'text-zinc-400 border-white/10 bg-white/5'}`}>
+                            {info.cumplida ? '✓ ' : ''}{info.hecho}
+                        </span>
+                    )}
+                </div>
+            )}
+
+            <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 pl-2">
                 <div className="flex flex-col items-center min-w-[60px]">
                     <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{remaining}</span>
@@ -86,6 +109,7 @@ const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaul
                 </div>
             </div>
             <button onClick={onSkip} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} /></button>
+            </div>
         </div>
     );
 };
@@ -93,6 +117,36 @@ const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaul
 // ==========================================
 // COMPONENTE PRINCIPAL (RUTINA)
 // ==========================================
+/**
+ * La propuesta de hoy, escrita como se la dirías a alguien.
+ *
+ * El servidor manda dos números y un motivo sin cifras dentro; las unidades las
+ * pone aquí, que es quien sabe cómo se mide este ejercicio: en un plancha son
+ * segundos, en unas dominadas lastradas es el lastre, y en un ejercicio por lado
+ * las repeticiones son de cada lado.
+ */
+const comoSeDice = (ex) => {
+    const s = ex.sugerencia;
+    if (!s) return null;
+
+    const peso = ex.esPesoCorporal
+        ? (s.peso > 0 ? `${s.peso} kg de lastre` : 'sin lastre')
+        : `${s.peso} kg`;
+
+    const cuanto = ex.esPorTiempo
+        ? `${s.reps} seg`
+        : `${s.reps} ${ex.porLado ? 'por lado' : 'reps'}`;
+
+    const series = (ex.setsData || []).length;
+
+    return {
+        titular: `${peso} × ${cuanto}${series > 1 ? ' en todas las series' : ''}`,
+        antes: (ex.ultimasSeries || []).map(x => x.reps).filter(n => n > 0),
+        motivo: s.motivo,
+        completada: s.completada
+    };
+};
+
 export default function ActiveWorkout({ routine, onFinish }) {
     const { isMinimized, minimizeWorkout, maximizeWorkout, endWorkout } = useWorkout();
 
@@ -102,6 +156,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     const STORAGE_KEY = `workout_active_${routine._id}`;
     const REST_KEY = `workout_rest_target_${routine._id}`;
+    // Qué serie acabas de terminar. Va aparte y también guardado, porque el
+    // descanso sobrevive a cerrar la app: si solo estuviera en memoria, volver
+    // a abrirla a mitad del descanso dejaría el cronómetro sin saber de qué.
+    const RESTCTX_KEY = `workout_rest_ctx_${routine._id}`;
 
     // --- ESTADOS INICIALES ---
     const [startTime] = useState(() => {
@@ -148,6 +206,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
     // cerrara primero, el aviso se perdería con el desmontaje.
     const [subidasRango, setSubidasRango] = useState(null);
 
+    const [restContexto, setRestContexto] = useState(() => {
+        try { return JSON.parse(localStorage.getItem(RESTCTX_KEY)) || null; } catch { return null; }
+    });
     const [restTargetTime, setRestTargetTime] = useState(() => {
         const saved = localStorage.getItem(REST_KEY);
         return saved ? parseInt(saved) : null;
@@ -202,8 +263,43 @@ export default function ActiveWorkout({ routine, onFinish }) {
         // Un músculo principal no debe salir además como secundario
         musculos.forEach(m => secundarios.delete(m));
 
-        return { totalSets, volumen: Math.round(volumen), musculos: [...musculos], secundarios: [...secundarios] };
+        // Cómo fue cada ejercicio CONTRA lo que la app había propuesto.
+        //
+        // El resumen daba series, volumen y músculos: cifras que solas no dicen
+        // nada. ¿24.000 kg de volumen es bueno? No hay forma de saberlo. Pero al
+        // empezar la sesión la app te dijo "80 × 8 en las tres", así que puede
+        // decirte si lo hiciste, que es la única pregunta que importa.
+        //
+        // Solo entran los ejercicios que llevaban propuesta: la primera vez que
+        // haces uno no había nada que cumplir.
+        const objetivos = exercises.map(ex => {
+            const obj = ex.sugerencia;
+            const hechas = ex.setsData.filter(s => s.completed);
+            if (!obj || hechas.length === 0) return null;
+
+            const numero = (v) => parseFloat(String(v).replace(',', '.')) || 0;
+            const cumplida = hechas.every(s => numero(s.reps) >= obj.reps && numero(s.kg) >= obj.peso);
+
+            return {
+                name: ex.name,
+                pedido: `${obj.peso} × ${obj.reps}`,
+                hecho: hechas.map(s => numero(s.reps)).join(' · '),
+                cumplida
+            };
+        }).filter(Boolean);
+
+        return { totalSets, volumen: Math.round(volumen), musculos: [...musculos], secundarios: [...secundarios], objetivos };
     }, [exercises]);
+    // Lo que tocará el próximo día, que lo calcula el servidor al guardar.
+    // Se enseña DESPUÉS de guardar porque hasta entonces no existe: sale de la
+    // sesión que se acaba de escribir.
+    const [proximaVez, setProximaVez] = useState(null);
+
+    // El dato del final ("has levantado un mamut"). Se congela al abrir el
+    // resumen: lleva un azar dentro, y si se recalculara en cada repintado la
+    // frase iría cambiando sola delante de ti.
+    const [comparacion, setComparacion] = useState(null);
+
     const [swapIndex, setSwapIndex] = useState(null);
     const [showSelector, setShowSelector] = useState(false);
 
@@ -242,7 +338,17 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         });
                     }
 
-                    return { ...ex, setsData: newSetsData, pr: stats.bestSet };
+                    // La propuesta se guarda entera, no solo se vuelca en las
+                    // casillas: hace falta para poder DECIRLA. Rellenar los
+                    // huecos y callarse es lo que hacía antes, y así nadie se
+                    // enteraba de que la app estaba proponiendo nada.
+                    return {
+                        ...ex,
+                        setsData: newSetsData,
+                        pr: stats.bestSet,
+                        sugerencia: stats.sugerencia || null,
+                        ultimasSeries: stats.lastSets || []
+                    };
                 }));
             } catch (e) { console.error("Error cargando historial", e); }
         };
@@ -272,7 +378,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
      * se ignoraba: todos los ejercicios descansaban lo mismo pasara lo que
      * pasara, así que configurarlo no servía de nada.
      */
-    const startRest = (segundosDelEjercicio) => {
+    const startRest = (segundosDelEjercicio, exIdx = null, setIdx = null) => {
         const espera = Number(segundosDelEjercicio) > 0
             ? Number(segundosDelEjercicio)
             : defaultRest;
@@ -281,6 +387,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
             const targetTime = Date.now() + (espera * 1000);
             localStorage.setItem(REST_KEY, targetTime.toString());
             setRestTargetTime(targetTime);
+
+            const ctx = exIdx === null ? null : { exIdx, setIdx };
+            setRestContexto(ctx);
+            if (ctx) localStorage.setItem(RESTCTX_KEY, JSON.stringify(ctx));
+            else localStorage.removeItem(RESTCTX_KEY);
         }
     };
 
@@ -330,7 +441,13 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         const lastSet = history.lastSets[setIdx] || history.lastSets[history.lastSets.length - 1];
                         return lastSet ? { ...set, kg: lastSet.weight, reps: lastSet.reps } : set;
                     });
-                    return { ...ex, pr: history.bestSet, setsData: updatedSets };
+                    return {
+                        ...ex,
+                        pr: history.bestSet,
+                        setsData: updatedSets,
+                        sugerencia: history.sugerencia || null,
+                        ultimasSeries: history.lastSets || []
+                    };
                 }));
                 setToast({ message: 'Ejercicio cambiado', type: 'success' });
             }
@@ -350,6 +467,44 @@ export default function ActiveWorkout({ routine, onFinish }) {
         if (type === 'F') return { label: normalCount, style: 'bg-red-900/20 text-red-500 border border-red-500/50 rounded-lg', containerClass: 'justify-center' };
         return { label: normalCount, style: 'bg-zinc-900 text-zinc-500 border border-zinc-800 rounded-lg', containerClass: 'justify-center' };
     };
+
+    /**
+     * Lo que se enseña durante el descanso: cómo fue la serie que acabas de
+     * hacer y cuál viene ahora.
+     *
+     * Sale de la serie recién marcada, no del ejercicio "actual": en una
+     * superserie o cambiando de orden a mano, "el actual" no es lo que acabas de
+     * levantar. El objetivo de comparación es el que la app propuso al empezar.
+     */
+    const infoDescanso = useMemo(() => {
+        if (!restContexto) return null;
+        const ex = exercises[restContexto.exIdx];
+        const hecha = ex?.setsData?.[restContexto.setIdx];
+        if (!ex || !hecha) return null;
+
+        const unidad = ex.esPorTiempo ? 'seg' : 'reps';
+        const numero = (v) => parseFloat(String(v).replace(',', '.')) || 0;
+        const obj = ex.sugerencia;
+
+        const hecho = `${numero(hecha.kg)} × ${numero(hecha.reps)}`;
+        const cumplida = obj
+            ? numero(hecha.reps) >= obj.reps && numero(hecha.kg) >= obj.peso
+            : false;
+
+        // La siguiente serie sin marcar de este mismo ejercicio
+        const iProx = ex.setsData.findIndex((x, i) => i > restContexto.setIdx && !x.completed);
+        if (iProx >= 0) {
+            const { label } = getSetDisplayInfo(ex.setsData, iProx);
+            const meta = obj ? `${obj.peso} kg × ${obj.reps} ${unidad}` : `${numero(hecha.kg)} kg`;
+            return { proximo: `Ahora: serie ${label} · ${meta}`, hecho, cumplida };
+        }
+
+        // Se acabó el ejercicio: lo que viene es el siguiente que quede a medias
+        const iEx = exercises.findIndex((x, i) => i > restContexto.exIdx && x.setsData.some(y => !y.completed));
+        if (iEx >= 0) return { proximo: `Ahora: ${exercises[iEx].name}`, hecho, cumplida };
+
+        return { proximo: 'Última serie. A terminar.', hecho, cumplida };
+    }, [restContexto, exercises]);
 
     const cycleSetType = (exIdx, setIdx) => {
         const types = ['N', 'W', 'F', 'D'];
@@ -384,7 +539,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }));
 
         if (!currentSet.completed && currentSet.type !== 'D') {
-            startRest(exercises[exIdx]?.rest);
+            startRest(exercises[exIdx]?.rest, exIdx, setIdx);
         }
     };
 
@@ -479,7 +634,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
             // Lo unico que tiene sentido actualizar aqui es cuantas series
             // hiciste de verdad. Todo lo demas se conserva tal cual, quitando
             // solo lo que vive en la pantalla y no en la rutina.
-            const updatedStructure = exercises.map(({ setsData, pr, lastWeights, ...ex }) => ({
+            const updatedStructure = exercises.map(({ setsData, pr, lastWeights, sugerencia, ultimasSeries, ...ex }) => ({
                 ...ex,
                 sets: setsData.length
             }));
@@ -500,7 +655,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 return;
             }
 
-            if (onFinish) onFinish(res.data);
+            cerrarSesion(res.data);
         } catch (error) {
             console.error(error);
 
@@ -535,6 +690,19 @@ export default function ActiveWorkout({ routine, onFinish }) {
             setFinishing(false);
             setShowFinishAlert(false);
         }
+    };
+
+    /** Cierra la sesión, enseñando antes lo que toca la próxima vez si lo hay. */
+    const cerrarSesion = (datos) => {
+        const lista = Object.entries(datos?.proximaVez || {});
+        if (lista.length > 0) {
+            // El resumen se cierra: si no, se queda debajo con el boton en
+            // 'Guardando...' para siempre, y asoma por los bordes.
+            setShowFinishAlert(false);
+            setProximaVez({ lista, datos });
+            return;
+        }
+        if (onFinish) onFinish(datos);
     };
 
     const confirmExit = () => {
@@ -601,7 +769,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     onClose={() => {
                         const datos = subidasRango.datos;
                         setSubidasRango(null);
-                        if (onFinish) onFinish(datos);
+                        cerrarSesion(datos);
                     }}
                 />
             )}
@@ -633,6 +801,37 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 <button onClick={() => handleOpenSwap(exIdx)} className="p-1.5 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 active:scale-95"><RefreshCw size={16} /></button>
                             </div>
                         </div>
+
+                        {/* QUÉ TOCA HOY.
+
+                            La app ya calculaba esto y lo metía en las casillas sin
+                            decir nada: veías un 80 y un 8 puestos solos y no sabías
+                            si eran de la última vez, un valor por defecto o algo
+                            pensado. Dicho en una línea —y con lo que hiciste el otro
+                            día al lado— se entiende de qué va y se puede discutir
+                            con ello, que para eso es una propuesta y no una orden. */}
+                        {(() => {
+                            const hoy = comoSeDice(ex);
+                            if (!hoy) return null;
+                            return (
+                                <div className={`flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border ${hoy.completada
+                                    ? 'bg-emerald-500/[0.07] border-emerald-500/25'
+                                    : 'bg-yellow-500/[0.06] border-yellow-500/20'}`}>
+                                    <TrendingUp size={14} className={`mt-px shrink-0 ${hoy.completada ? 'text-emerald-400' : 'text-yellow-500'}`} />
+                                    <div className="min-w-0">
+                                        <p className={`text-[12px] font-black uppercase tracking-tight leading-tight ${hoy.completada ? 'text-emerald-400' : 'text-yellow-500'}`}>
+                                            Hoy: {hoy.titular}
+                                        </p>
+                                        <p className="text-[10px] text-zinc-500 leading-snug mt-0.5">
+                                            {hoy.antes.length > 0 && (
+                                                <span className="text-zinc-400">La última vez: {hoy.antes.join(' · ')}. </span>
+                                            )}
+                                            {hoy.motivo}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
                             <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
@@ -676,9 +875,52 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 </div>
             </div>
 
+            {/* LA PRÓXIMA VEZ.
+
+                El final del círculo. La app te dijo qué tocaba al empezar, te lo
+                recordó entre series y en el resumen te dijo si lo cumpliste; esto
+                es la consecuencia: qué pasa el lunes que viene. Sin esto el
+                entreno se acaba en un "guardado" y no queda nada a lo que volver. */}
+            {proximaVez && (
+                <div className="fixed inset-0 z-[10001] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-zinc-950 border border-yellow-500/30 p-5 rounded-3xl w-full max-w-sm shadow-2xl">
+                        <div className="text-center mb-4">
+                            <div className="bg-yellow-500/10 p-3 rounded-full text-yellow-500 inline-block mb-2"><TrendingUp size={26} /></div>
+                            <h3 className="text-white font-black text-lg uppercase not-italic leading-tight">La próxima vez</h3>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Con lo que acabas de hacer</p>
+                        </div>
+
+                        <div className="space-y-1.5 max-h-[45vh] overflow-y-auto custom-scrollbar">
+                            {proximaVez.lista.map(([nombre, p]) => (
+                                <div
+                                    key={nombre}
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border ${p.completada
+                                        ? 'bg-emerald-500/[0.07] border-emerald-500/25'
+                                        : 'bg-black border-white/[0.07]'}`}
+                                >
+                                    <span className="text-[11px] font-black text-white uppercase truncate flex-1 min-w-0">{nombre}</span>
+                                    <span className={`text-[12px] font-black tabular-nums shrink-0 ${p.completada ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                                        {p.peso} × {p.reps}
+                                    </span>
+                                    {p.completada && <span className="text-[9px] font-black text-emerald-400 shrink-0">SUBE</span>}
+                                </div>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => { const d = proximaVez.datos; setProximaVez(null); if (onFinish) onFinish(d); }}
+                            className="w-full mt-4 bg-yellow-500 text-black font-black py-3.5 rounded-2xl uppercase tracking-widest text-xs active:scale-95 transition-transform"
+                        >
+                            Listo
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL DESCANSO AISLADO */}
             {restTargetTime && (
                 <RestTimerModal
+                    info={infoDescanso}
                     targetTime={restTargetTime}
                     initialDefaultRest={defaultRest}
                     onSkip={handleSkipRest}
@@ -688,7 +930,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             {/* FOOTER */}
             <div className="absolute bottom-0 left-0 right-0 p-6 bg-black border-t border-zinc-900 safe-bottom z-30">
-                <button onClick={() => setShowFinishAlert(true)} disabled={finishing} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all text-lg uppercase tracking-widest border-b-4 border-yellow-600">
+                <button onClick={() => { setComparacion(loQueHasLevantado(resumen.volumen)); setShowFinishAlert(true); }} disabled={finishing} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all text-lg uppercase tracking-widest border-b-4 border-yellow-600">
                     {finishing ? <Loader2 className="animate-spin" /> : <Save size={24} />}
                     {finishing ? 'GUARDANDO...' : 'TERMINAR SESIÓN'}
                 </button>
@@ -730,6 +972,44 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 </div>
                             ))}
                         </div>
+
+                        {/* EL DATO.
+
+                            Arriba pone "2,2 t de volumen", que es correcto y no
+                            significa nada: nadie sabe si dos toneladas es mucho,
+                            porque nadie ha levantado nunca dos toneladas de nada.
+                            Traducido a un rinoceronte sí se entiende, y encima se
+                            cuenta. */}
+                        {comparacion && (
+                            <div className="bg-black border border-white/5 rounded-2xl p-3.5 mb-4 text-center">
+                                <div className="text-[26px] leading-none mb-1.5">{comparacion.emoji}</div>
+                                <p className="text-[13px] font-black text-white uppercase tracking-tight leading-tight">
+                                    {comparacion.frase}
+                                </p>
+                                <p className="text-[9px] text-zinc-500 mt-1 leading-snug">{comparacion.detalle}</p>
+                            </div>
+                        )}
+
+                        {/* CÓMO HA IDO CONTRA LO QUE TOCABA */}
+                        {resumen.objetivos.length > 0 && (
+                            <div className="bg-black border border-white/5 rounded-2xl p-3 mb-4">
+                                <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Lo que tocaba</p>
+                                <div className="space-y-1.5">
+                                    {resumen.objetivos.map(o => (
+                                        <div key={o.name} className="flex items-center gap-2">
+                                            <span className={`shrink-0 w-4 h-4 rounded-md flex items-center justify-center text-[9px] font-black ${o.cumplida ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-600'}`}>
+                                                {o.cumplida ? '✓' : '·'}
+                                            </span>
+                                            <span className="text-[11px] font-bold text-white uppercase truncate flex-1 min-w-0">{o.name}</span>
+                                            <span className={`text-[10px] font-black tabular-nums shrink-0 ${o.cumplida ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                                                {o.hecho}
+                                            </span>
+                                            <span className="text-[9px] text-zinc-600 tabular-nums shrink-0">de {o.pedido}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Músculos trabajados sobre el cuerpo */}
                         {resumen.musculos.length > 0 && (

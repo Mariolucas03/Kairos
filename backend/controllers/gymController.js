@@ -668,6 +668,59 @@ const seedExercises = async (req, res) => {
 // ==========================================
 // 7. GUARDAR LOG DE GYM (IA OPTIMIZADA)
 // ==========================================
+/**
+ * Qué tocará el próximo día, calculado con la sesión que se acaba de guardar.
+ *
+ * Se manda en la respuesta del guardado, no en una petición aparte, por dos
+ * razones. La primera es que es el único momento en que hace falta: es lo que
+ * cierra el resumen del entreno. La segunda es el servidor gratuito, que tarda
+ * en despertar: pedirlo por separado justo al terminar significaría una pantalla
+ * de resumen esperando medio minuto a una frase.
+ *
+ * La regla vive en el servidor y solo en el servidor —ver progresionService—.
+ * La pantalla podría calcularla sola, pero entonces habría dos copias de la
+ * misma regla, y el día que cambie una se quedaría la otra diciendo otra cosa.
+ *
+ * Si algo falla, se devuelve un objeto vacío: el entreno YA está guardado y una
+ * frase de más no puede tumbar la respuesta que confirma eso.
+ */
+const queTocaraLaProximaVez = async (userId, routineId, ejercicios) => {
+    try {
+        const porNombre = {};
+        if (routineId) {
+            const rutina = await Routine.findOne({ _id: routineId, user: userId })
+                .select('exercises').lean();
+            for (const ex of (rutina?.exercises || [])) porNombre[ex.name] = ex;
+        }
+
+        const salida = {};
+        for (const ex of (ejercicios || [])) {
+            const config = porNombre[ex.name] || {};
+            const propuesta = sugerirSiguiente({ reps: config.reps }, ex.sets || []);
+            if (!propuesta) continue;
+
+            // Las mismas traducciones que en el historial: lo que se guarda es lo
+            // que de verdad se movió, y lo que se enseña es lo que se escribe.
+            if (config.esPesoCorporal) {
+                const pesado = await DailyLog.findOne({ user: userId, weight: { $gt: 0 } })
+                    .sort({ date: -1 }).lean();
+                propuesta.peso = Math.max(0, Math.round((propuesta.peso - (pesado?.weight || 75)) * 2) / 2);
+            }
+            if (config.esPorTiempo) {
+                propuesta.reps = Math.round(propuesta.reps * SEGUNDOS_POR_REPETICION);
+            } else if ((ex.sets || []).some(x => x.porLado)) {
+                propuesta.reps = Math.round(propuesta.reps / 2);
+            }
+
+            salida[ex.name] = propuesta;
+        }
+        return salida;
+    } catch (e) {
+        console.error('No se pudo calcular la proxima sesion:', e.message);
+        return {};
+    }
+};
+
 const saveWorkoutLog = async (req, res) => {
     try {
         const { routineId, routineName, duration, exercises, intensity, photo, clienteId } = req.body;
@@ -879,7 +932,9 @@ const saveWorkoutLog = async (req, res) => {
             leveledUp: result.leveledUp,
             // El frontend usa esto para lanzar el aviso de subida de rango
             rankUps: subidas,
-            rankUpCoins: monedas
+            rankUpCoins: monedas,
+            // Y lo que tocara el proximo dia de cada ejercicio
+            proximaVez: await queTocaraLaProximaVez(req.user._id, routineId, ejercicios)
         });
     } catch (error) {
         // Dos reintentos que salen a la vez pasan los dos la comprobacion de
@@ -1128,19 +1183,16 @@ const getRoutineHistory = async (req, res) => {
             .sort({ date: 1 })
             .lean();
 
-        // Si se manda la rutina, se puede ademas PROPONER la siguiente sesion de
-        // cada ejercicio: sin ella solo sabemos que hiciste, no que toca hoy.
-        let configPorEjercicio = {};
+        // Si se manda la rutina, sabemos ademas cuantas repeticiones pide en
+        // cada ejercicio, que es lo que marca cuando esta completada una sesion.
+        // Sin rutina se propone igual, con el rango de siempre (8-12).
+        const configPorEjercicio = {};
         const banderasPorEjercicio = {};
         if (req.body?.routineId) {
             const rutina = await Routine.findOne({ _id: req.body.routineId, user: userId })
                 .select('exercises').lean();
             for (const ex of (rutina?.exercises || [])) {
-                configPorEjercicio[ex.name] = {
-                    progresion: ex.progresion,
-                    incremento: ex.incremento,
-                    reps: ex.reps
-                };
+                configPorEjercicio[ex.name] = { reps: ex.reps };
             }
         }
 
@@ -1210,8 +1262,11 @@ const getRoutineHistory = async (req, res) => {
         const pesoUsuario = pesoRegistrado ? pesoRegistrado.weight : 75;
 
         for (const nombre of Object.keys(stats)) {
-            const config = configPorEjercicio[nombre];
-            if (!config) continue;
+            // Un ejercicio que no esta en la rutina —uno cambiado sobre la marcha,
+            // o el historial pedido sin rutina— se propone igual con el rango por
+            // defecto. Antes se saltaba, y cambiar un ejercicio a mitad de entreno
+            // te dejaba sin propuesta el resto de la sesion.
+            const config = configPorEjercicio[nombre] || {};
 
             // La progresión razona sobre lo que de verdad se movió (por eso
             // recibe las series en bruto), pero lo que devuelve va a una casilla,
