@@ -6,6 +6,7 @@ import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
+import RuedaRuleta, { RADIO_PISTA, RADIO_CASILLA } from '../../components/games/RuedaRuleta';
 
 // --- CONSTANTES ---
 const WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -84,7 +85,8 @@ export default function Roulette() {
     const [spinning, setSpinning] = useState(false);
     const [wheelRotation, setWheelRotation] = useState(0);
     const [ballRotation, setBallRotation] = useState(0);
-    const [ballDistance, setBallDistance] = useState(100);
+    // En tanto por ciento del radio: la pista por fuera, la casilla al parar.
+    const [ballDistance, setBallDistance] = useState(RADIO_PISTA);
 
     const [resultModal, setResultModal] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
@@ -147,7 +149,7 @@ export default function Roulette() {
         setErrorMsg(null);
         setShowRain(false);
         setIsRainFading(false);
-        setBallDistance(100);
+        setBallDistance(RADIO_PISTA);
 
         const apuestaDeEstaRonda = bets;
 
@@ -172,7 +174,7 @@ export default function Roulette() {
 
             setWheelRotation(newWheelRotation);
             setBallRotation(ballRotation + (8 * 360));
-            setTimeout(() => setBallDistance(54), SPIN_DURATION - 800);
+            setTimeout(() => setBallDistance(RADIO_CASILLA), SPIN_DURATION - 800);
 
             // 3. Finalizar y mostrar premios
             setTimeout(() => {
@@ -257,20 +259,28 @@ export default function Roulette() {
 
             {/* RUEDA */}
             <div className="flex-1 w-full flex flex-col items-center justify-center pb-32 relative z-10 transition-all duration-500" style={{ opacity: isTableOpen ? 0.3 : 1, transform: isTableOpen ? 'scale(0.9) translateY(-20px)' : 'scale(1) translateY(0)' }}>
-                <div className="relative w-72 h-72 md:w-80 md:h-80">
-                    <div className="w-full h-full rounded-full border-[6px] border-zinc-800 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden" style={{ transform: `rotate(-${wheelRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.25, 0.1, 0.25, 1)` : 'none' }}>
-                        <div className="absolute inset-0" style={{ background: `conic-gradient(${WHEEL_NUMBERS.map((n, i) => { const color = n === 0 ? '#15803d' : [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n) ? '#b91c1c' : '#18181b'; return `${color} ${i * SEGMENT_ANGLE}deg ${(i + 1) * SEGMENT_ANGLE}deg`; }).join(', ')})` }}></div>
-                        {WHEEL_NUMBERS.map((num, i) => (
-                            <div key={i} className="absolute top-0 left-1/2 -ml-[1px] w-[2px] h-[50%] flex flex-col items-center pt-2 origin-bottom" style={{ transform: `rotate(${i * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2)}deg)` }}>
-                                <span className="text-[9px] font-black text-white drop-shadow-md transform rotate-180 w-6 text-center">{num}</span>
-                            </div>
-                        ))}
-                        <div className="absolute inset-20 rounded-full border-[6px] border-zinc-800 bg-black flex items-center justify-center z-10 shadow-2xl">
-                            <div className="w-2 h-2 bg-yellow-600/50 rounded-full animate-pulse"></div>
-                        </div>
-                    </div>
+                <div className="relative w-[86vw] h-[86vw] max-w-[340px] max-h-[340px] drop-shadow-[0_18px_40px_rgba(0,0,0,0.9)]">
+                    <RuedaRuleta
+                        numeros={WHEEL_NUMBERS}
+                        anguloSegmento={SEGMENT_ANGLE}
+                        rotacion={wheelRotation}
+                        girando={spinning}
+                        duracion={SPIN_DURATION}
+                    />
+
+                    {/* LA BOLA. Va fuera del SVG y en su propia capa porque gira
+                        a otro ritmo que la rueda: es lo que hace que parezca que
+                        rueda de verdad y no que esté pegada a una casilla. */}
                     <div className="absolute inset-0 z-20 pointer-events-none" style={{ transform: `rotate(-${ballRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.1, 0, 0.1, 1)` : 'none' }}>
-                        <div className="absolute top-0 left-1/2 -ml-1 w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_8px_white]" style={{ marginTop: `${(100 - ballDistance) / 2}%`, transition: spinning ? `margin-top 1s ease-in-out ${SPIN_DURATION - 1000}ms` : 'none' }}></div>
+                        <div
+                            className="absolute top-0 left-1/2 -ml-[7px] w-3.5 h-3.5 rounded-full"
+                            style={{
+                                marginTop: `${(100 - ballDistance) / 2}%`,
+                                transition: spinning ? `margin-top 1s ease-in-out ${SPIN_DURATION - 1000}ms` : 'none',
+                                background: 'radial-gradient(circle at 32% 28%, #ffffff 0%, #e9ecf0 45%, #9aa1a8 100%)',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.85), inset 0 -1px 2px rgba(0,0,0,0.35)'
+                            }}
+                        />
                     </div>
 
                     {/* Marcador fijo: deja claro qué casilla es la ganadora */}

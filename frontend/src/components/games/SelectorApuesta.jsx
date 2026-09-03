@@ -81,9 +81,16 @@ export default function SelectorApuesta({
 
     const alSalir = () => fijar(parseInt(texto, 10) || minimo);
 
-    // Atajos: los de siempre, pero solo los que caben en tu saldo. Enseñar
-    // "500" a alguien con 60 fichas es enseñarle un botón que no puede pulsar.
-    const rapidos = [10, 50, 100, 500, 1000, 5000].filter(v => v >= minimo && v <= tope);
+    // ⚠️ CUATRO ATAJOS. NI UNO MÁS.
+    //
+    // La primera versión traía seis cantidades más la mitad, el doble y el todo:
+    // nueve botones debajo de una casilla en la que ya puedes escribir cualquier
+    // número. Eso no es dar opciones, es tapar la que importa. Si vas a apostar
+    // 250 lo escribes; los atajos son para los toques de siempre.
+    //
+    // Solo los que caben en tu saldo: enseñar "100" a quien tiene 60 fichas es
+    // enseñarle un botón que no puede pulsar.
+    const rapidos = [10, 25, 50, 100].filter(v => v >= minimo && v <= tope);
 
     const noLlega = saldo < minimo;
 
@@ -128,28 +135,19 @@ export default function SelectorApuesta({
                 </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <div className="grid grid-cols-4 gap-1.5 mt-2">
                 {rapidos.map(v => (
                     <button
                         key={v}
                         type="button"
                         onClick={() => fijar(v)}
-                        className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-black tabular-nums transition-colors ${valor === v
+                        className={`py-2 rounded-xl border text-xs font-black tabular-nums transition-colors ${valor === v
                             ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-500'
                             : 'bg-zinc-900 border-white/[0.06] text-zinc-400 hover:text-white'}`}
                     >
-                        {v >= 1000 ? `${v / 1000}k` : v}
+                        {v}
                     </button>
                 ))}
-
-                <span className="flex-1" />
-
-                <button type="button" onClick={() => fijar((parseInt(texto, 10) || minimo) / 2)}
-                    className="px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.06] text-[11px] font-black text-zinc-400 hover:text-white transition-colors">½</button>
-                <button type="button" onClick={() => fijar((parseInt(texto, 10) || minimo) * 2)}
-                    className="px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.06] text-[11px] font-black text-zinc-400 hover:text-white transition-colors">×2</button>
-                <button type="button" onClick={() => fijar(tope)}
-                    className="px-2.5 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-[11px] font-black text-yellow-500 hover:bg-yellow-500/20 transition-colors">TODO</button>
             </div>
 
             {noLlega && (
