@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
+import SelectorApuesta from '../../components/games/SelectorApuesta';
 
 /**
  * LA TORRE
@@ -14,7 +15,6 @@ import { useAuthStore } from '../../store/useAuthStore';
  * El servidor guarda dónde están las trampas (estado cifrado): aquí no hay nada
  * que se pueda mirar ni tocar para hacer trampas.
  */
-const BET_OPTIONS = [10, 50, 100, 500];
 const TILES = 3;
 
 export default function TowerGame() {
@@ -214,18 +214,8 @@ export default function TowerGame() {
                             </div>
                         )}
 
-                        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Apuesta</p>
-                        <div className="flex gap-2 mb-3">
-                            {BET_OPTIONS.map(v => (
-                                <button
-                                    key={v}
-                                    onClick={() => setBet(v)}
-                                    disabled={v > fichas}
-                                    className={`flex-1 py-2.5 rounded-xl text-xs font-black border transition-all disabled:opacity-25 ${bet === v ? 'bg-white text-black border-white' : 'bg-black text-zinc-400 border-zinc-700'}`}
-                                >
-                                    {v}
-                                </button>
-                            ))}
+                        <div className="mb-3">
+                            <SelectorApuesta valor={bet} onChange={setBet} saldo={fichas} minimo={10} deshabilitado={busy} />
                         </div>
                         <button
                             onClick={empezar}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake } from 'lucide-react';
+import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake, Pencil, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
@@ -43,6 +43,25 @@ export default function Roulette() {
 
     // Estados Juego
     const [selectedChip, setSelectedChip] = useState(10);
+
+    // LA FICHA DE CANTIDAD LIBRE.
+    //
+    // Habia cinco valores y ninguno mas: 10, 20, 50, 100 y 500. Con mil fichas
+    // en el bolsillo, apostar 250 a un color significaba colocar cinco fichas de
+    // 50 una encima de otra, y deshacerlo eran cinco toques en la flecha. Ahora
+    // se escribe la cantidad y la ficha vale eso.
+    const [fichaLibre, setFichaLibre] = useState(null);
+    const [editandoFicha, setEditandoFicha] = useState(false);
+    const [textoFicha, setTextoFicha] = useState('');
+
+    const confirmarFichaLibre = () => {
+        const n = Math.floor(Number(textoFicha));
+        if (Number.isFinite(n) && n > 0) {
+            setFichaLibre(n);
+            setSelectedChip(n);
+        }
+        setEditandoFicha(false);
+    };
     const [bets, setBets] = useState([]);
     const [lastBets, setLastBets] = useState([]);   // para "repetir apuesta"
     const [errorMsg, setErrorMsg] = useState(null);
@@ -237,7 +256,7 @@ export default function Roulette() {
             </div>
 
             {/* RUEDA */}
-            <div className="flex-1 w-full flex flex-col items-center justify-start py-6 relative z-10 transition-all duration-500" style={{ opacity: isTableOpen ? 0.3 : 1, transform: isTableOpen ? 'scale(0.9) translateY(-20px)' : 'scale(1) translateY(0)' }}>
+            <div className="flex-1 w-full flex flex-col items-center justify-center pb-32 relative z-10 transition-all duration-500" style={{ opacity: isTableOpen ? 0.3 : 1, transform: isTableOpen ? 'scale(0.9) translateY(-20px)' : 'scale(1) translateY(0)' }}>
                 <div className="relative w-72 h-72 md:w-80 md:h-80">
                     <div className="w-full h-full rounded-full border-[6px] border-zinc-800 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden" style={{ transform: `rotate(-${wheelRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.25, 0.1, 0.25, 1)` : 'none' }}>
                         <div className="absolute inset-0" style={{ background: `conic-gradient(${WHEEL_NUMBERS.map((n, i) => { const color = n === 0 ? '#15803d' : [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n) ? '#b91c1c' : '#18181b'; return `${color} ${i * SEGMENT_ANGLE}deg ${(i + 1) * SEGMENT_ANGLE}deg`; }).join(', ')})` }}></div>
@@ -270,18 +289,69 @@ export default function Roulette() {
 
             {/* PANEL DESLIZANTE MESA */}
             <div className={`fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_60px_rgba(0,0,0,0.9)] z-30 flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)`} style={{ height: isTableOpen ? '65%' : '140px' }}>
-                <div className="px-3 pt-3 pb-2 flex items-center justify-between gap-2 border-b border-white/5 bg-zinc-900 rounded-t-[2rem]">
-                    <button onClick={() => setPaintMode(!paintMode)} disabled={spinning} className={`p-2 rounded-xl border transition-all ${paintMode ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-zinc-800 border-zinc-600 text-zinc-400'}`}>
+                <div className="px-3 pt-3 pb-2 border-b border-white/5 bg-zinc-900 rounded-t-[2rem]">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <button onClick={() => setPaintMode(!paintMode)} disabled={spinning} aria-label="Pintar apuestas arrastrando" className={`p-2 rounded-xl border transition-all ${paintMode ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-zinc-800 border-zinc-600 text-zinc-400'}`}>
                         <Paintbrush size={18} />
                     </button>
-                    <div className="flex-1 flex items-center justify-center gap-2 overflow-x-auto no-scrollbar">
-                        {CHIP_VALUES.map((val) => (
-                            <button key={val} onClick={() => setSelectedChip(val)} disabled={spinning || visualBalance < val} className={`w-8 h-8 rounded-full border shadow-md flex items-center justify-center font-bold text-[8px] shrink-0 transition-all ${getChipColorStyle(val)} ${selectedChip === val ? 'scale-110 ring-2 ring-white z-10' : 'opacity-70'} ${visualBalance < val ? 'opacity-20 grayscale' : ''}`}>{val}</button>
-                        ))}
+
+                    {/* Lo puesto y lo que queda. Estaba solo dentro del botón de
+                        girar, en letra pequeña. */}
+                    <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.08em] not-italic">
+                        <span className="text-zinc-500">Mesa <span className="text-yellow-500 tabular-nums text-xs">{currentBetTotal.toLocaleString('es-ES')}</span></span>
+                        <span className="text-zinc-700">·</span>
+                        <span className="text-zinc-500">Quedan <span className="text-zinc-200 tabular-nums text-xs">{visualBalance.toLocaleString('es-ES')}</span></span>
                     </div>
-                    <button onClick={() => setIsTableOpen(!isTableOpen)} disabled={spinning} className="p-2 text-zinc-400 hover:text-white">
+
+                    <button onClick={() => setIsTableOpen(!isTableOpen)} disabled={spinning} aria-label={isTableOpen ? 'Cerrar la mesa' : 'Abrir la mesa'} className="p-2 text-zinc-400 hover:text-white">
                         {isTableOpen ? <ChevronDown size={24} /> : <ChevronUp size={24} className="animate-bounce" />}
                     </button>
+                  </div>
+                    {editandoFicha ? (
+                        /* Escribiendo la cantidad: ocupa toda la fila, que en una
+                           barra de 375 px no caben un campo y seis fichas. */
+                        <div className="flex-1 flex items-center gap-2">
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                autoFocus
+                                value={textoFicha}
+                                onChange={(e) => setTextoFicha(e.target.value.replace(/[^\d]/g, '').slice(0, 7))}
+                                onKeyDown={(e) => e.key === 'Enter' && confirmarFichaLibre()}
+                                placeholder="Cantidad"
+                                className="flex-1 min-w-0 bg-black border border-yellow-500/50 rounded-xl px-3 py-2 text-center text-lg font-black text-yellow-500 tabular-nums outline-none placeholder:text-zinc-700 placeholder:text-sm"
+                            />
+                            <button onClick={confirmarFichaLibre} className="p-2 rounded-xl bg-yellow-500 text-black active:scale-90 transition-transform"><Check size={18} /></button>
+                            <button onClick={() => setEditandoFicha(false)} className="p-2 rounded-xl bg-zinc-800 border border-zinc-600 text-zinc-400"><X size={18} /></button>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex items-center justify-center gap-1.5 overflow-x-auto no-scrollbar">
+                            {CHIP_VALUES.map((val) => (
+                                <button
+                                    key={val}
+                                    onClick={() => setSelectedChip(val)}
+                                    disabled={spinning || visualBalance < val}
+                                    aria-label={`Ficha de ${val}`}
+                                    className={`w-11 h-11 rounded-full border-2 shadow-md flex items-center justify-center font-black text-[11px] shrink-0 transition-all ${getChipColorStyle(val)} ${selectedChip === val ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-zinc-900 z-10' : 'opacity-60'} ${visualBalance < val ? 'opacity-20 grayscale' : ''}`}
+                                >{val}</button>
+                            ))}
+
+                            {/* La de cantidad libre. Enseña su valor cuando ya lo
+                                tiene, para no perder de vista con cuánto juegas. */}
+                            <button
+                                onClick={() => { setTextoFicha(fichaLibre ? String(fichaLibre) : ''); setEditandoFicha(true); }}
+                                disabled={spinning}
+                                aria-label="Ficha de cantidad libre"
+                                className={`w-11 h-11 rounded-full border-2 border-dashed shadow-md flex items-center justify-center shrink-0 transition-all ${fichaLibre && selectedChip === fichaLibre
+                                    ? 'bg-yellow-500 border-yellow-200 text-black scale-110 ring-2 ring-white ring-offset-2 ring-offset-zinc-900 z-10'
+                                    : 'bg-zinc-800 border-zinc-500 text-zinc-300 opacity-70'}`}
+                            >
+                                {fichaLibre
+                                    ? <span className="font-black text-[10px] tabular-nums leading-none px-0.5">{fichaLibre >= 1000 ? `${Math.round(fichaLibre / 100) / 10}k` : fichaLibre}</span>
+                                    : <Pencil size={15} />}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className={`flex-1 overflow-hidden relative flex items-center justify-center bg-zinc-950/50 transition-opacity duration-300 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -327,7 +397,8 @@ export default function Roulette() {
                     </div>
                 </div>
 
-                <div className="px-4 pb-6 pt-2 flex gap-3 items-center border-t border-white/5 bg-zinc-900 mt-auto">
+
+                <div className="px-4 pb-6 pt-2 flex gap-3 items-center bg-zinc-900 mt-auto">
                     <div className="flex gap-1">
                         <button onClick={undoLastBet} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-zinc-400 disabled:opacity-30"><Undo2 size={20} /></button>
                         <button onClick={clearBets} disabled={spinning || bets.length === 0} className="p-3 bg-zinc-800 rounded-xl border border-zinc-600 text-red-400 disabled:opacity-30"><Trash2 size={20} /></button>

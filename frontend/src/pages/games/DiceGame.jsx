@@ -5,6 +5,7 @@ import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
+import SelectorApuesta from '../../components/games/SelectorApuesta';
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const ChipRain = ({ isFading }) => { /* Mantén tu ChipRain original aquí (lo abrevio por espacio) */
@@ -78,14 +79,41 @@ export default function Dice() {
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-8 z-10">
                 <div className="relative w-full flex justify-center gap-6"><DigitalDie value={dices[0]} rolling={rolling} /><DigitalDie value={dices[1]} rolling={rolling} /></div>
                 <div className="bg-black/60 px-8 py-3 rounded-full border border-white/10"><span className="text-5xl font-black text-white">{rolling ? '?' : dices[0] + dices[1]}</span></div>
-                <div className="w-full grid grid-cols-3 gap-3">
-                    <button onClick={() => setSelectedOption('under')} className={`py-4 rounded-2xl border-b-4 ${selectedOption === 'under' ? 'bg-cyan-600 border-cyan-800 text-white' : 'bg-zinc-800 border-zinc-900 text-zinc-400'}`}><span className="font-black text-lg">2 - 6</span></button>
-                    <button onClick={() => setSelectedOption('seven')} className={`py-4 rounded-2xl border-b-4 ${selectedOption === 'seven' ? 'bg-purple-600 border-purple-800 text-white' : 'bg-zinc-800 border-zinc-900 text-zinc-400'}`}><span className="font-black text-2xl">7</span></button>
-                    <button onClick={() => setSelectedOption('over')} className={`py-4 rounded-2xl border-b-4 ${selectedOption === 'over' ? 'bg-pink-600 border-pink-800 text-white' : 'bg-zinc-800 border-zinc-900 text-zinc-400'}`}><span className="font-black text-lg">8-12</span></button>
+                <div className="w-full grid grid-cols-3 gap-2.5">
+                    {[
+                        { id: 'under', texto: '2 - 6', paga: 2, activo: 'bg-cyan-500 border-cyan-800 text-black', color: 'text-cyan-400' },
+                        { id: 'seven', texto: '7', paga: 5, activo: 'bg-purple-500 border-purple-800 text-black', color: 'text-purple-400' },
+                        { id: 'over', texto: '8 - 12', paga: 2, activo: 'bg-pink-500 border-pink-800 text-black', color: 'text-pink-400' }
+                    ].map(o => {
+                        const puesto = selectedOption === o.id;
+                        return (
+                            <button
+                                key={o.id}
+                                onClick={() => setSelectedOption(o.id)}
+                                disabled={rolling}
+                                className={`py-3 rounded-2xl border-b-4 flex flex-col items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 ${puesto ? o.activo + ' scale-[1.03]' : 'bg-zinc-800 border-zinc-900 text-zinc-400'}`}
+                            >
+                                <span className="font-black text-lg leading-none">{o.texto}</span>
+                                <span className={`text-[10px] font-black tabular-nums ${puesto ? 'opacity-70' : o.color}`}>×{o.paga}</span>
+                            </button>
+                        );
+                    })}
                 </div>
-                <div className="w-full bg-zinc-900/90 rounded-[2rem] p-4 flex items-center gap-3">
-                    <div className="bg-black rounded-xl flex items-center p-1"><button onClick={() => setBet(Math.max(10, bet - 10))} className="w-12 h-12 bg-zinc-800 text-white font-bold">-</button><div className="min-w-[80px] text-center font-black text-yellow-500 text-xl">{bet}</div><button onClick={() => setBet(bet + 10)} className="w-12 h-12 bg-zinc-800 text-white font-bold">+</button></div>
-                    <button onClick={handleRoll} disabled={rolling || !selectedOption} className="flex-1 h-14 rounded-xl font-black text-xl bg-cyan-600 text-white">TIRAR</button>
+                <div className="w-full bg-zinc-900/90 rounded-[2rem] p-4 space-y-3">
+                    <SelectorApuesta valor={bet} onChange={setBet} saldo={fichas} minimo={10} deshabilitado={rolling} />
+                    <button
+                        onClick={handleRoll}
+                        disabled={rolling || !selectedOption || bet > fichas}
+                        className="w-full h-14 rounded-2xl font-black text-lg uppercase tracking-widest bg-cyan-500 text-black border-b-4 border-cyan-800 active:scale-95 transition-transform disabled:opacity-40 disabled:grayscale flex items-center justify-center gap-2"
+                    >
+                        {rolling ? 'Rodando…' : !selectedOption ? 'Elige una opción' : (
+                            <>Tirar
+                                <span className="text-[11px] font-black bg-black/20 px-2 py-0.5 rounded-lg tabular-nums">
+                                    ganas {(bet * (selectedOption === 'seven' ? 5 : 2)).toLocaleString('es-ES')}
+                                </span>
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
             {resultModal && (

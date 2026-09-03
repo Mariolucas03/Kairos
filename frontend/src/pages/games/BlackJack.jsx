@@ -5,6 +5,7 @@ import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
+import SelectorApuesta from '../../components/games/SelectorApuesta';
 
 // --- COMPONENTE CARTA ---
 const Card = ({ card, hidden, small }) => (
@@ -191,20 +192,13 @@ export default function BlackJack() {
                             <button onClick={() => handleAction('double')} disabled={isProcessing || visualBalance < gameState.pHands[gameState.activeHand].bet || gameState.pHands[gameState.activeHand].cards.length !== 2} className="col-span-2 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-2xl font-bold text-sm shadow-[0_3px_0_#1e3a8a] active:shadow-none active:translate-y-1 transition-all uppercase disabled:opacity-50 disabled:grayscale">DOBLAR APUESTA</button>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-3">
-                            <div className="bg-black rounded-2xl flex items-center p-1 border border-zinc-800 shrink-0 shadow-inner">
-                                <button onClick={() => setBet(Math.max(10, bet - 10))} className="w-12 h-12 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 active:scale-95 transition-transform">-</button>
-                                <div className="min-w-[80px] flex items-center justify-center gap-1 font-black text-yellow-500 text-xl">
-                                    {bet}
-                                    <img src="/assets/icons/ficha.png" className="w-6 h-6 object-contain drop-shadow-md" alt="c" />
-                                </div>
-                                <button onClick={() => setBet(Math.min(visualBalance, bet + 10))} className="w-12 h-12 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 active:scale-95 transition-transform">+</button>
-                            </div>
+                        <div className="space-y-3">
+                            <SelectorApuesta valor={bet} onChange={setBet} saldo={visualBalance} minimo={10} />
 
                             <button
                                 onClick={() => handleAction('deal')}
                                 disabled={visualBalance < bet || isProcessing}
-                                className="flex-1 h-14 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl rounded-2xl shadow-[0_4px_0_#b45309] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+                                className="w-full h-14 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xl rounded-2xl shadow-[0_4px_0_#b45309] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
                             >
                                 REPARTIR
                             </button>

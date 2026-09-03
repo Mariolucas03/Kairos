@@ -9,6 +9,8 @@ import api from '../../services/api';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import CartaEspanola, { NOMBRES } from '../../components/games/CartaEspanola';
+import SelectorApuesta from '../../components/games/SelectorApuesta';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const fetcher = (url) => api.get(url).then(r => r.data);
 
@@ -30,6 +32,12 @@ const ESCALERA = [2, 4, 5, 6, 7, 10, 11, 12, 3, 1];
  * propósito, que sería jugar en tu lugar.
  */
 export default function CartaAlta() {
+    // Las fichas que tienes. Hacian falta para el selector de apuesta: sin
+    // saberlas, la caja no puede impedirte montar una sala de 500 cuando llevas
+    // 80 y que te la rechace el servidor al crearla.
+    const usuario = useAuthStore(state => state.user);
+    const fichas = usuario?.stats?.gameCoins ?? usuario?.gameCoins ?? 0;
+
     const navigate = useNavigate();
 
     const { data: salas, mutate: recargar } = useSWR('/carta-alta', fetcher, { refreshInterval: 15000 });
@@ -167,21 +175,14 @@ export default function CartaAlta() {
                             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nueva sala</p>
                             <button onClick={() => setCreando(false)} className="text-zinc-600 hover:text-white"><X size={16} /></button>
                         </div>
-                        <div>
-                            <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Fichas por mano</label>
-                            <div className="flex gap-2 mt-2">
-                                {[10, 50, 100, 250].map(v => (
-                                    <button
-                                        key={v}
-                                        onClick={() => setApuesta(v)}
-                                        className="flex-1 min-w-0 py-2.5 rounded-xl border text-xs font-black transition-colors"
-                                        style={apuesta === v
-                                            ? { background: ACENTO + '22', borderColor: ACENTO, color: ACENTO }
-                                            : { background: '#000', borderColor: 'rgba(255,255,255,0.09)', color: '#71717a' }}
-                                    >{v}</button>
-                                ))}
-                            </div>
-                        </div>
+                        <SelectorApuesta
+                            valor={apuesta}
+                            onChange={setApuesta}
+                            saldo={fichas}
+                            minimo={10}
+                            maximo={5000}
+                            etiqueta="Fichas por mano"
+                        />
                         <button
                             onClick={crear}
                             disabled={enVuelo}

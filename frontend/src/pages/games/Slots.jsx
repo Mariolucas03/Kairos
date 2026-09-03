@@ -6,6 +6,7 @@ import api from '../../services/api';
 
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
+import SelectorApuesta from '../../components/games/SelectorApuesta';
 
 // --- IMAGEN DE PORTADA ---
 const SLOT_COVER_IMG = '/assets/images/neon-cover.png';
@@ -250,20 +251,13 @@ export default function Slots() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="bg-black rounded-2xl flex items-center p-1 border border-zinc-800 shrink-0 shadow-inner">
-                            <button onClick={() => setBet(Math.max(10, bet - 10))} disabled={isGameActive} className="w-12 h-12 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 disabled:opacity-50 active:scale-95 transition-transform">-</button>
-                            <div className="min-w-[80px] flex items-center justify-center gap-1 font-black text-yellow-500 text-xl">
-                                {bet}
-                                <img src="/assets/icons/ficha.png" className="w-7 h-7 object-contain drop-shadow-md" alt="c" />
-                            </div>
-                            <button onClick={() => setBet(Math.min(visualBalance, bet + 10))} disabled={isGameActive} className="w-12 h-12 bg-zinc-800 rounded-xl text-white font-bold hover:bg-zinc-700 disabled:opacity-50 active:scale-95 transition-transform">+</button>
-                        </div>
+                    <div className="space-y-3">
+                        <SelectorApuesta valor={bet} onChange={setBet} saldo={visualBalance} minimo={10} deshabilitado={isGameActive} />
 
                         <button
                             onClick={handleSpin}
                             disabled={isGameActive || (gameStarted && visualBalance < bet)}
-                            className={`flex-1 h-14 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg active:scale-95 transition-all border-b-4 
+                            className={`w-full h-14 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg active:scale-95 transition-all border-b-4 
                                 ${isGameActive
                                     ? 'bg-zinc-800 border-zinc-900 text-zinc-600'
                                     : 'bg-fuchsia-600 border-fuchsia-800 text-white hover:brightness-110'
