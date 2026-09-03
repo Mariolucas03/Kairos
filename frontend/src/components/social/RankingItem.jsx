@@ -1,5 +1,6 @@
 import { Crown, Medal } from 'lucide-react';
 import { getLevelStyle } from '../../utils/socialHelpers';
+import MarcoPerfil from '../common/MarcoPerfil';
 
 export default function RankingItem({ player, index, isMe, isViewable, onViewProfile, metricLabel = 'XP' }) {
     let rankIcon = <span className="font-bold text-sm text-zinc-500">#{index + 1}</span>;
@@ -39,7 +40,7 @@ export default function RankingItem({ player, index, isMe, isViewable, onViewPro
                     <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
                         {player.avatar ? <img src={player.avatar} className="w-full h-full object-cover" alt="avatar" /> : player.username?.charAt(0)}
                     </div>
-                    {player.frame && <img src={player.frame} className="absolute -top-1.5 -left-1.5 w-[60px] h-[60px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
+                    <MarcoPerfil marco={player.frame} tamano={60} />
                 </div>
                 <div className="flex flex-col min-w-0 pr-2">
                     <span className={`text-base font-black truncate uppercase tracking-tight ${textStyle}`}>

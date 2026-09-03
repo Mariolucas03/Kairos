@@ -1,5 +1,6 @@
 import { Crown, ChevronDown, Trash2, Shield } from 'lucide-react';
 import { getLevelStyle, RANK_CONFIG } from '../../utils/socialHelpers';
+import MarcoPerfil from '../common/MarcoPerfil';
 
 /**
  * Tarjeta de miembro del clan.
@@ -63,7 +64,7 @@ export default function ClanMemberCard({
                                 ? <img src={member.avatar} className="w-full h-full object-cover" alt="av" />
                                 : member.username?.charAt(0)}
                         </div>
-                        {member.frame && <img src={member.frame} className="absolute -top-1.5 -left-1.5 w-[56px] h-[56px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
+                        <MarcoPerfil marco={member.frame} tamano={56} />
                     </div>
 
                     <div className="flex flex-col min-w-0 flex-1">

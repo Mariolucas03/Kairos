@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Gift, ChevronUp, ChevronDown, Check, Lock } from 'lucide-react';
 import { cardBaseStyle, EVENT_CONFIG } from '../../utils/socialHelpers';
+import MarcoPerfil from '../common/MarcoPerfil';
 
 export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -84,7 +85,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                                             <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-xs font-black text-zinc-500 border border-white/5 overflow-hidden">
                                                 {member.avatar ? <img src={member.avatar} className="w-full h-full object-cover" alt="av" /> : member.username?.charAt(0)}
                                             </div>
-                                            {member.frame && <img src={member.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
+                                            <MarcoPerfil marco={member.frame} tamano={52} />
                                         </div>
                                         <div className="flex flex-col min-w-0 pr-2">
                                             <span className={`text-sm font-black truncate ${index === 0 ? 'text-yellow-200' : 'text-white'}`}>{member.username}</span>

@@ -10,6 +10,7 @@ import BackButton from '../components/common/BackButton';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useAuthStore } from '../store/useAuthStore';
 import { Z } from '../utils/zLayers';
+import MarcoPerfil from '../components/common/MarcoPerfil';
 
 const BIO_MAX = 150;
 
@@ -141,7 +142,7 @@ export default function Settings() {
                                 ? <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" />
                                 : (user?.username || 'U').charAt(0).toUpperCase()}
                         </div>
-                        {user?.frame && <img src={user.frame} className="absolute -top-2 -left-2 w-[72px] h-[72px] max-w-none pointer-events-none z-20" />}
+                        <MarcoPerfil marco={user?.frame} tamano={72} desborde={8} />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                         <p className="text-white font-black uppercase truncate">{user?.username}</p>

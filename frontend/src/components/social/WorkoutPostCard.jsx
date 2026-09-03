@@ -7,6 +7,7 @@ import api from '../../services/api';
 import { getLevelStyle } from '../../utils/socialHelpers';
 import { useAuthStore } from '../../store/useAuthStore';
 import ConfirmDialog from '../common/ConfirmDialog';
+import MarcoPerfil from '../common/MarcoPerfil';
 
 // --- HELPER: TIEMPO RELATIVO ---
 // Hasta una semana se cuenta en relativo ("hace 3 h"); a partir de ahí se pone
@@ -235,7 +236,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                     <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
                         {author.avatar ? <img src={author.avatar} className="w-full h-full object-cover" alt="av" /> : author.username?.charAt(0)}
                     </div>
-                    {author.frame && <img src={author.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
+                    <MarcoPerfil marco={author.frame} tamano={52} />
                 </button>
 
                 <div className="flex-1 min-w-0">

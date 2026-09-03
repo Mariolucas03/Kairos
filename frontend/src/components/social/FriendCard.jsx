@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Trash2, Target, Construction, Heart } from 'lucide-react';
 import { getLevelStyle, cardBaseStyle } from '../../utils/socialHelpers';
+import MarcoPerfil from '../common/MarcoPerfil';
 
 export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView, onViewProfile }) {
     const [dragX, setDragX] = useState(0);
@@ -44,7 +45,7 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
                         <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
                             {friend.avatar ? <img src={friend.avatar} className="w-full h-full object-cover" alt="av" /> : friend.username.charAt(0)}
                         </div>
-                        {friend.frame && <img src={friend.frame} className="absolute -top-1.5 -left-1.5 w-[60px] h-[60px] max-w-none pointer-events-none z-20" />}
+                        <MarcoPerfil marco={friend.frame} tamano={60} />
                         {/* 🟢 Indicador de conexión (ventana de 10 min en el backend) */}
                         <div
                             title={friend.online ? 'En línea' : 'Desconectado'}

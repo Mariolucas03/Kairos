@@ -10,6 +10,7 @@ import BackButton from '../../components/common/BackButton';
 import WorkoutPostCard from '../../components/social/WorkoutPostCard';
 import BodyMap from '../../components/body/BodyMap';
 import { getLevelStyle, customAnimationsStyle } from '../../utils/socialHelpers';
+import MarcoPerfil from '../../components/common/MarcoPerfil';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -405,7 +406,7 @@ export default function UserProfilePage() {
                             ? <img src={profile.avatar} className="w-full h-full object-cover" alt="avatar" />
                             : profile.username?.charAt(0).toUpperCase()}
                     </div>
-                    {profile.frame && <img src={profile.frame} className="absolute -top-3 -left-3 w-[104px] h-[104px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
+                    <MarcoPerfil marco={profile.frame} tamano={104} desborde={12} />
                     {profile.pet && <img src={profile.pet} className="absolute -bottom-1 -right-1 w-7 h-7 object-contain z-30 drop-shadow-md" />}
                 </div>
 

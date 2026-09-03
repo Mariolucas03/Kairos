@@ -223,7 +223,23 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                         <div className="flex items-center gap-2">
                             {mission.isCoop && <Users size={15} style={{ color: styles.accent }} className="shrink-0" />}
                             {viewAllMode && <Edit size={14} className="text-yellow-500 shrink-0" />}
-                            <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
+                            <h3 className={`text-base font-black leading-tight uppercase tracking-tighter break-words flex-1 min-w-0 ${mission.completed ? 'text-zinc-500 line-through decoration-2' : 'text-white'}`}>{mission.title}</h3>
+
+                            {/* Borrar, en la pantalla que existe para ordenar.
+                                Se podía borrar deslizando a la izquierda, pero en
+                                modo gestión el deslizamiento está desactivado: o
+                                sea que justo aquí era donde NO se podía borrar
+                                nada. Había que salir del modo, deslizar, y volver
+                                a entrar. */}
+                            {viewAllMode && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onRequestDelete(mission); }}
+                                    aria-label={`Borrar ${mission.title}`}
+                                    className="shrink-0 p-1.5 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 active:scale-90 transition-all"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            )}
                         </div>
 
                         {/* Ficha de la misión: dificultad, tipo y los días que toca.
@@ -549,7 +565,7 @@ export default function Missions() {
 
                 {viewAllMode && (
                     <div className="bg-blue-950/20 border border-blue-500/30 p-3 rounded-[18px] text-center mt-[18px]">
-                        <p className="text-[10px] text-blue-300 font-black uppercase tracking-[0.1em] not-italic">Toca una misión para editarla</p>
+                        <p className="text-[10px] text-blue-300 font-black uppercase tracking-[0.1em] not-italic">Toca una misión para editarla · la papelera la borra</p>
                     </div>
                 )}
             </div>

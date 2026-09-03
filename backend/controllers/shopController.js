@@ -30,8 +30,8 @@ const SEED_ITEMS = [
     { name: 'Marco de Hierro', price: 80, category: 'frame', icon: '⬛', rarity: 'comun', description: 'Sencillo y sólido.' },
     { name: 'Marco de Bronce', price: 150, category: 'frame', icon: '🟫', rarity: 'comun', description: 'El primer escalón.' },
     { name: 'Marco de Plata', price: 350, category: 'frame', icon: '⬜', rarity: 'raro', description: 'Brillo discreto.' },
-    { name: 'Marco de Rayos', price: 500, category: 'frame', icon: '🌩️', rarity: 'raro', description: 'Energía pura.' },
-    { name: 'Marco de Oro', price: 800, category: 'frame', icon: '🟨', rarity: 'epico', description: 'Brillante.' },
+    { name: 'Marco de Rayos', price: 500, category: 'frame', icon: '🌩️', sprite: '/frames/rayos.png', rarity: 'raro', description: 'Energía pura.' },
+    { name: 'Marco de Oro', price: 800, category: 'frame', icon: '🟨', sprite: '/frames/marco_oro.png', rarity: 'epico', description: 'Brillante.' },
     { name: 'Marco de Hielo', price: 900, category: 'frame', icon: '🧊', rarity: 'epico', description: 'Sangre fría.' },
     { name: 'Marco Infernal', price: 1600, category: 'frame', icon: '😈', rarity: 'legendario', description: 'Forjado en llamas.' },
     { name: 'Marco Cósmico', price: 2500, category: 'frame', icon: '🌌', rarity: 'legendario', description: 'Más allá del gimnasio.' },
@@ -396,7 +396,18 @@ const useItem = async (req, res) => {
 
         // EQUIPAR (sin problema de concurrencia real: no se gasta nada, solo se asigna)
         if (item.category === 'avatar') { user.avatar = item.icon; msg = `Avatar equipado`; }
-        else if (item.category === 'frame') { user.frame = item.icon; msg = `Marco equipado`; }
+        // ⚠️ El DIBUJO si lo tiene, y el emoji si no.
+        //
+        // Antes guardaba siempre `icon`, que es el emoji del escaparate, y las
+        // pantallas lo metian en un <img src>. Un emoji no es una URL: el
+        // navegador buscaba un fichero llamado "🌩️", no existia, y alrededor de
+        // la cara salia el icono de imagen rota. Comprar un marco te dejaba el
+        // perfil peor que antes.
+        //
+        // Solo dos de los ocho marcos tienen dibujo. Los otros seis se quedan en
+        // emoji a proposito, y MarcoPerfil los pinta como texto: es eso o dejar
+        // seis productos de la tienda rotos hasta que existan seis imagenes.
+        else if (item.category === 'frame') { user.frame = item.sprite || item.icon; msg = `Marco equipado`; }
         else if (item.category === 'pet') { user.pet = item.icon; msg = `Mascota equipada`; }
         else if (item.category === 'title') { user.title = item.name; msg = `Título equipado`; }
         else if (item.category === 'theme') { user.theme = item.effectType || 'dark'; msg = `Tema aplicado`; }

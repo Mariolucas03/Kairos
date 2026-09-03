@@ -13,6 +13,7 @@ import WorkoutPostCard from '../components/social/WorkoutPostCard';
 import InboxModal from '../components/social/InboxModal';
 import useSocialBadge from '../hooks/useSocialBadge';
 import { customAnimationsStyle } from '../utils/socialHelpers';
+import MarcoPerfil from '../components/common/MarcoPerfil';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -267,7 +268,7 @@ export default function Social() {
                                 <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-zinc-500 border border-zinc-800 overflow-hidden relative z-10 shrink-0">
                                     {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" alt="av" /> : u.username.charAt(0)}
                                 </div>
-                                {u.frame && <img src={u.frame} className="absolute -top-1.5 -left-1.5 w-[52px] h-[52px] max-w-none pointer-events-none z-20 drop-shadow-md" />}
+                                <MarcoPerfil marco={u.frame} tamano={52} />
                                 <span className="text-white font-bold text-sm ml-2 truncate">{u.username}</span>
                             </div>
                             <button onClick={() => handleSendRequest(u._id)} className="bg-yellow-500 text-black px-3 py-1.5 rounded-lg text-xs font-black hover:bg-yellow-400 shrink-0 active:scale-95 transition-transform">

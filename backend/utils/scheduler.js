@@ -545,9 +545,21 @@ async function processCycle(frequency) {
     );
     if (habitsResult.modifiedCount > 0) console.log(`🔄 [${frequency}] ${habitsResult.modifiedCount} Hábitos reiniciados.`);
 
+    // ⚠️ ESTO BUSCABA 'temporal', UN TIPO QUE NO EXISTE.
+    //
+    // Las misiones puntuales se crean con type 'quest' —lo pone el boton
+    // "Puntual" de la pantalla de misiones—, asi que este deleteMany no
+    // encontraba NUNCA nada: cero documentos con type 'temporal' en toda la base
+    // de datos. Resultado: una mision puntual completada no se iba jamas. Se
+    // quedaba en la lista, tachada, apareciendo cada semana el dia que le
+    // tocaba, sin forma de que se limpiara sola. Eso son las "misiones
+    // fantasma".
+    //
+    // Se dejan los dos nombres: 'temporal' por si quedara alguna vieja de cuando
+    // se llamaban asi.
     const tempResult = await Mission.deleteMany({
         frequency: frequency,
-        type: 'temporal',
+        type: { $in: ['quest', 'temporal'] },
         $or: [{ specificDays: { $size: 0 } }, { specificDays: yesterdayDayNum }]
     });
     if (tempResult.deletedCount > 0) console.log(`🗑️ [${frequency}] ${tempResult.deletedCount} Temporales borradas.`);

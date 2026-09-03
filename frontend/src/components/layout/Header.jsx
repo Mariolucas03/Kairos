@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import HealthWidget from './HealthWidget';
 import { useAuthStore } from '../../store/useAuthStore';
+import MarcoPerfil from '../common/MarcoPerfil';
 
 const customAnimationsStyle = `
   @keyframes smoothGradient {
@@ -77,7 +78,7 @@ export default function Header() {
                                 <span className="text-lg font-bold text-gold-400">{username.charAt(0).toUpperCase()}</span>
                             )}
                         </div>
-                        {userFrame && <img src={userFrame} className="absolute -top-2.5 -left-2.5 sm:-top-3 sm:-left-3 w-[68px] h-[68px] sm:w-[80px] sm:h-[80px] max-w-none pointer-events-none z-10" />}
+                        <MarcoPerfil marco={userFrame} tamano={68} desborde={10} className="sm:!w-[80px] sm:!h-[80px] sm:!-top-3 sm:!-left-3" />
                         {userPet && <img src={userPet} className="absolute -bottom-1 -right-2 w-6 h-6 sm:w-7 sm:h-7 object-contain z-30 drop-shadow-md filter" />}
                     </Link>
 
