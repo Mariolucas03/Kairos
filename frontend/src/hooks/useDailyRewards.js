@@ -37,13 +37,47 @@ export function useDailyRewards(user, setUser) {
         });
     };
 
+    /**
+     * En que dia del ciclo estas.
+     *
+     * ⚠️ SE CUENTA POR CALENDARIO, NO POR PREMIOS COBRADOS.
+     *
+     * Antes era `(claimedDays.length % 7) + 1`: el numero de premios que habias
+     * recogido. El servidor, en cambio, lo cuenta por dias transcurridos desde
+     * que empezo el ciclo. Mientras no fallas ningun dia las dos cuentas dan lo
+     * mismo, asi que parecia correcto — pero en cuanto te saltas un dia se
+     * separan para siempre:
+     *
+     *     ciclo empieza el lunes, hoy es jueves, cobraste lunes y martes
+     *     servidor: dia 4 (han pasado tres dias)
+     *     pantalla: dia 3 (has cobrado dos premios)
+     *
+     * Y a partir de ahi la ventana marcaba como "hoy" un dia que no era, los
+     * huecos rojos caian donde no tocaba, y el premio que veias no era el que
+     * te iban a dar. Se copia la cuenta del servidor, que es quien manda.
+     *
+     * Sin ciclo empezado —recien instalada, o ciclo terminado— es el dia 1.
+     */
+    const diaDelCiclo = () => {
+        const inicio = user?.dailyRewards?.cycleStartDay;
+        if (!inicio) return 1;
+        const transcurridos = Math.round(
+            (new Date(getTodayString() + 'T00:00:00Z') - new Date(inicio + 'T00:00:00Z')) / 86400000
+        );
+        return (transcurridos >= 0 && transcurridos < 7) ? transcurridos + 1 : 1;
+    };
+
     const buildRewardData = (overrides = {}) => {
-        const streakLength = user?.dailyRewards?.claimedDays?.length || 0;
-        const currentDayVisual = (streakLength % 7) + 1;
+        const dia = diaDelCiclo();
+        // Si el ciclo ya ha caducado, los premios cobrados eran del anterior:
+        // ensenarlos marcaria en verde dias de esta semana que no has cobrado.
+        const delCicloActual = diaDelCiclo() === 1 && !(user?.dailyRewards?.claimedDays || []).includes(1)
+            ? []
+            : (user?.dailyRewards?.claimedDays || []);
         return {
-            currentDay: currentDayVisual,
-            claimedDays: user?.dailyRewards?.claimedDays || [],
-            rewardOfDay: getRewardForDay(currentDayVisual),
+            currentDay: dia,
+            claimedDays: delCicloActual,
+            rewardOfDay: getRewardForDay(dia),
             ...overrides
         };
     };

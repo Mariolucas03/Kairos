@@ -95,8 +95,14 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
                 containerStyle = "bg-green-900/60 border border-green-500/50 scale-95 opacity-90";
                 textColors = "text-green-100";
             } else {
-                containerStyle = "bg-red-900/40 border border-red-500/30 scale-95 opacity-60 grayscale-[0.5]";
-                textColors = "text-red-200";
+                // ⚠️ Un dia perdido tiene que DOLER un poco.
+                //
+                // Estaba en rojo, si, pero con opacity-60 y medio en gris: se
+                // confundia con los dias futuros bloqueados y no se leia como
+                // "esto lo has perdido". Ahora el rojo es rojo, lleva una equis
+                // y lo dice con todas las letras.
+                containerStyle = "bg-red-950/70 border-2 border-red-500/60 scale-95";
+                textColors = "text-red-300";
             }
         } else {
             containerStyle = "bg-gray-800/60 border border-gray-700 scale-90 opacity-50";
@@ -158,6 +164,16 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
                 </div>
 
                 {isFuture && <div className="absolute top-1 right-1 text-gray-500"><Lock size={12} /></div>}
+
+                {/* El dia que dejaste pasar */}
+                {isPast && !isClaimed && (
+                    <>
+                        <div className="absolute top-1 right-1 text-red-400"><X size={12} strokeWidth={3} /></div>
+                        <div className="absolute inset-x-0 bottom-0 bg-red-500/25 py-0.5">
+                            <span className="block text-[7px] font-black uppercase tracking-[0.15em] text-red-300 text-center not-italic">Perdido</span>
+                        </div>
+                    </>
+                )}
             </div>
         );
     };

@@ -117,31 +117,54 @@ const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaul
 // ==========================================
 // COMPONENTE PRINCIPAL (RUTINA)
 // ==========================================
+/** La unidad de las repeticiones de este ejercicio: seg, por lado o reps. */
+const unidadDe = (ex) => (ex.esPorTiempo ? 'seg' : ex.porLado ? '/lado' : 'reps');
+
 /**
- * La propuesta de hoy, escrita como se la dirías a alguien.
+ * Lo que hiciste la ÚLTIMA VEZ en una serie concreta.
  *
- * El servidor manda dos números y un motivo sin cifras dentro; las unidades las
- * pone aquí, que es quien sabe cómo se mide este ejercicio: en un plancha son
- * segundos, en unas dominadas lastradas es el lastre, y en un ejercicio por lado
- * las repeticiones son de cada lado.
+ * Se enseña en su propia fila, al lado de las casillas vacías. Antes solo
+ * aparecía resumido en el cuadro de arriba ("La última vez: 10 · 10 · 6") y
+ * había que contar con el dedo para saber cuál era la de la serie 2.
+ *
+ * Si la última vez hiciste menos series que hoy, las de más no tienen con qué
+ * compararse y se quedan en blanco. Inventarles la última serie sería mentir.
+ */
+const loQueHiciste = (ex, i) => {
+    const s = (ex.ultimasSeries || [])[i];
+    if (!s || !(Number(s.reps) > 0)) return null;
+    const kg = Number(s.weight) || 0;
+    return kg > 0 ? `${kg} × ${s.reps}` : `${s.reps}`;
+};
+
+/**
+ * La propuesta de hoy, SERIE A SERIE.
+ *
+ * Antes era una frase: "80 kg × 8 reps en todas las series". Correcta, pero hay
+ * que leerla y traducirla mientras tienes la barra cargada delante. Ahora es una
+ * lista, "Serie 1 · 80 × 8", que es como se apunta un entreno en un papel y como
+ * se mira entre serie y serie: buscas tu número y ya.
+ *
+ * El servidor manda dos cifras y un motivo sin números dentro; las unidades las
+ * pone aquí, que es quien sabe cómo se mide este ejercicio.
  */
 const comoSeDice = (ex) => {
     const s = ex.sugerencia;
     if (!s) return null;
 
     const peso = ex.esPesoCorporal
-        ? (s.peso > 0 ? `${s.peso} kg de lastre` : 'sin lastre')
+        ? (s.peso > 0 ? `${s.peso} kg` : 'sin lastre')
         : `${s.peso} kg`;
 
-    const cuanto = ex.esPorTiempo
-        ? `${s.reps} seg`
-        : `${s.reps} ${ex.porLado ? 'por lado' : 'reps'}`;
-
-    const series = (ex.setsData || []).length;
+    const series = Math.max(1, (ex.setsData || []).length);
 
     return {
-        titular: `${peso} × ${cuanto}${series > 1 ? ' en todas las series' : ''}`,
-        antes: (ex.ultimasSeries || []).map(x => x.reps).filter(n => n > 0),
+        // Una fila por serie. Todas piden lo mismo —la regla busca el número que
+        // aguantas en TODAS— pero verlo numerado es lo que lo hace seguible.
+        filas: Array.from({ length: series }, (_, i) => ({
+            n: i + 1,
+            objetivo: `${peso} × ${s.reps} ${unidadDe(ex)}`
+        })),
         motivo: s.motivo,
         completada: s.completada,
         descarga: !!s.descarga
@@ -291,10 +314,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
         return { totalSets, volumen: Math.round(volumen), musculos: [...musculos], secundarios: [...secundarios], objetivos };
     }, [exercises]);
-    // Lo que tocará el próximo día, que lo calcula el servidor al guardar.
-    // Se enseña DESPUÉS de guardar porque hasta entonces no existe: sale de la
-    // sesión que se acaba de escribir.
-    const [proximaVez, setProximaVez] = useState(null);
 
     // El dato del final ("has levantado un mamut"). Se congela al abrir el
     // resumen: lleva un azar dentro, y si se recalculara en cada repintado la
@@ -693,16 +712,19 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }
     };
 
-    /** Cierra la sesión, enseñando antes lo que toca la próxima vez si lo hay. */
+    /**
+     * Cierra la sesión.
+     *
+     * ⚠️ Aquí había una tarjeta de "LA PRÓXIMA VEZ" con los pesos del próximo
+     * día. La idea era cerrar el círculo, pero acabar un entreno con una lista
+     * de deberes es lo contrario de lo que uno quiere leer justo después de
+     * entrenar: ya te has ganado el rato, no te lo estropees recordándote lo que
+     * falta. Lo que toca el próximo día se sigue calculando y sale donde tiene
+     * sentido —al empezar ESE entreno, en el cuadro de arriba.
+     *
+     * El final se queda en el resumen, con el dato de lo que has levantado.
+     */
     const cerrarSesion = (datos) => {
-        const lista = Object.entries(datos?.proximaVez || {});
-        if (lista.length > 0) {
-            // El resumen se cierra: si no, se queda debajo con el boton en
-            // 'Guardando...' para siempre, y asoma por los bordes.
-            setShowFinishAlert(false);
-            setProximaVez({ lista, datos });
-            return;
-        }
         if (onFinish) onFinish(datos);
     };
 
@@ -814,26 +836,38 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         {(() => {
                             const hoy = comoSeDice(ex);
                             if (!hoy) return null;
+                            const tono = hoy.completada ? 'emerald' : hoy.descarga ? 'orange' : 'yellow';
+                            const texto = { emerald: 'text-emerald-400', orange: 'text-orange-400', yellow: 'text-yellow-500' }[tono];
+                            const caja = {
+                                emerald: 'bg-emerald-500/[0.07] border-emerald-500/25',
+                                orange: 'bg-orange-500/[0.07] border-orange-500/30',
+                                yellow: 'bg-yellow-500/[0.06] border-yellow-500/20'
+                            }[tono];
                             return (
-                                <div className={`flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border ${hoy.completada
-                                    ? 'bg-emerald-500/[0.07] border-emerald-500/25'
-                                    : hoy.descarga
-                                        ? 'bg-orange-500/[0.07] border-orange-500/30'
-                                        : 'bg-yellow-500/[0.06] border-yellow-500/20'}`}>
-                                    {hoy.descarga
-                                        ? <TrendingDown size={14} className="mt-px shrink-0 text-orange-400" />
-                                        : <TrendingUp size={14} className={`mt-px shrink-0 ${hoy.completada ? 'text-emerald-400' : 'text-yellow-500'}`} />}
-                                    <div className="min-w-0">
-                                        <p className={`text-[12px] font-black uppercase tracking-tight leading-tight ${hoy.completada ? 'text-emerald-400' : hoy.descarga ? 'text-orange-400' : 'text-yellow-500'}`}>
-                                            Hoy: {hoy.titular}
-                                        </p>
-                                        <p className="text-[10px] text-zinc-500 leading-snug mt-0.5">
-                                            {hoy.antes.length > 0 && (
-                                                <span className="text-zinc-400">La última vez: {hoy.antes.join(' · ')}. </span>
-                                            )}
-                                            {hoy.motivo}
+                                <div className={`px-3.5 py-3 rounded-2xl border ${caja}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        {hoy.descarga
+                                            ? <TrendingDown size={13} className="shrink-0 text-orange-400" />
+                                            : <TrendingUp size={13} className={`shrink-0 ${texto}`} />}
+                                        <p className={`text-[11px] font-black uppercase tracking-[0.1em] leading-none not-italic ${texto}`}>
+                                            Hoy toca
                                         </p>
                                     </div>
+
+                                    <div className="space-y-1">
+                                        {hoy.filas.map(f => (
+                                            <div key={f.n} className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 w-[52px] shrink-0 not-italic">
+                                                    Serie {f.n}
+                                                </span>
+                                                <span className={`text-[13px] font-black tabular-nums not-italic ${texto}`}>
+                                                    {f.objetivo}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <p className="text-[10px] text-zinc-500 leading-snug mt-2">{hoy.motivo}</p>
                                 </div>
                             );
                         })()}
@@ -851,10 +885,20 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             <div className="space-y-1">
                                 {ex.setsData.map((set, sIdx) => {
                                     const { label, style, containerClass } = getSetDisplayInfo(ex.setsData, sIdx);
+                                    const antes = loQueHiciste(ex, sIdx);
                                     return (
                                         <div key={sIdx} className={`grid grid-cols-12 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
-                                            <div className={`col-span-2 flex ${containerClass}`}>
+                                            <div className={`col-span-2 flex flex-col items-center justify-center ${containerClass}`}>
                                                 <button onClick={() => cycleSetType(exIdx, sIdx)} className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}>{label}</button>
+                                                {/* Lo que hiciste la ULTIMA VEZ en esta misma
+                                                    serie. Antes solo estaba resumido arriba
+                                                    ("10 · 10 · 6") y habia que contar con el
+                                                    dedo para saber cual era la tuya. */}
+                                                {antes && (
+                                                    <span className="text-[8px] font-bold text-zinc-600 tabular-nums leading-none mt-0.5 whitespace-nowrap">
+                                                        {antes}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="col-span-4"><input type="number" inputMode="decimal" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" /></div>
                                             <div className="col-span-3"><input type="number" inputMode="decimal" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" /></div>
@@ -879,51 +923,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     </div>
                 </div>
             </div>
-
-            {/* LA PRÓXIMA VEZ.
-
-                El final del círculo. La app te dijo qué tocaba al empezar, te lo
-                recordó entre series y en el resumen te dijo si lo cumpliste; esto
-                es la consecuencia: qué pasa el lunes que viene. Sin esto el
-                entreno se acaba en un "guardado" y no queda nada a lo que volver. */}
-            {proximaVez && (
-                <div className="fixed inset-0 z-[10001] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-zinc-950 border border-yellow-500/30 p-5 rounded-3xl w-full max-w-sm shadow-2xl">
-                        <div className="text-center mb-4">
-                            <div className="bg-yellow-500/10 p-3 rounded-full text-yellow-500 inline-block mb-2"><TrendingUp size={26} /></div>
-                            <h3 className="text-white font-black text-lg uppercase not-italic leading-tight">La próxima vez</h3>
-                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Con lo que acabas de hacer</p>
-                        </div>
-
-                        <div className="space-y-1.5 max-h-[45vh] overflow-y-auto custom-scrollbar">
-                            {proximaVez.lista.map(([nombre, p]) => (
-                                <div
-                                    key={nombre}
-                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border ${p.completada
-                                        ? 'bg-emerald-500/[0.07] border-emerald-500/25'
-                                        : p.descarga
-                                            ? 'bg-orange-500/[0.07] border-orange-500/30'
-                                            : 'bg-black border-white/[0.07]'}`}
-                                >
-                                    <span className="text-[11px] font-black text-white uppercase truncate flex-1 min-w-0">{nombre}</span>
-                                    <span className={`text-[12px] font-black tabular-nums shrink-0 ${p.completada ? 'text-emerald-400' : p.descarga ? 'text-orange-400' : 'text-zinc-300'}`}>
-                                        {p.peso} × {p.reps}
-                                    </span>
-                                    {p.completada && <span className="text-[9px] font-black text-emerald-400 shrink-0">SUBE</span>}
-                                    {p.descarga && <span className="text-[9px] font-black text-orange-400 shrink-0">BAJA</span>}
-                                </div>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => { const d = proximaVez.datos; setProximaVez(null); if (onFinish) onFinish(d); }}
-                            className="w-full mt-4 bg-yellow-500 text-black font-black py-3.5 rounded-2xl uppercase tracking-widest text-xs active:scale-95 transition-transform"
-                        >
-                            Listo
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {/* MODAL DESCANSO AISLADO */}
             {restTargetTime && (
