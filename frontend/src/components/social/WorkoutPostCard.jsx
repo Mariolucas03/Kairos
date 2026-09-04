@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BodyMap from '../body/BodyMap';
 import ZoomableImage from './ZoomableImage';
@@ -8,6 +8,7 @@ import { getLevelStyle } from '../../utils/socialHelpers';
 import { useAuthStore } from '../../store/useAuthStore';
 import ConfirmDialog from '../common/ConfirmDialog';
 import MarcoPerfil from '../common/MarcoPerfil';
+import { loQueHasLevantado } from '../../utils/loQueHasLevantado';
 
 // --- HELPER: TIEMPO RELATIVO ---
 // Hasta una semana se cuenta en relativo ("hace 3 h"); a partir de ahí se pone
@@ -115,6 +116,30 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
     const [totalComentarios, setTotalComentarios] = useState(post.comentariosTotales ?? (post.comments || []).length);
     const [commentText, setCommentText] = useState('');
     const [posting, setPosting] = useState(false);
+
+    // Lo que se puede decir de un entreno ajeno mirando sus numeros.
+    //
+    // La diapositiva de ejercicios era una lista de chips grises con el peso y
+    // las repeticiones de cada serie. Correcto y sin ninguna gracia: no se sabia
+    // cuanto habia movido en total, ni cual habia sido su serie mas dura, ni si
+    // el press banca fue el plato fuerte o el relleno del final.
+    const resumenEjercicios = useMemo(() => {
+        const lista = (post.exercises || []).map(ex => {
+            const sets = ex.sets || [];
+            const volumen = sets.reduce((a, x) => a + (Number(x.weight) || 0) * (Number(x.reps) || 0), 0);
+            // La serie mas dura: la de mas peso, y a igualdad de peso la de mas
+            // repeticiones. Es la que uno cuenta cuando le preguntas que hizo.
+            const top = sets.reduce((mejor, x) => {
+                if (!mejor) return x;
+                const pa = Number(x.weight) || 0, pb = Number(mejor.weight) || 0;
+                if (pa !== pb) return pa > pb ? x : mejor;
+                return (Number(x.reps) || 0) > (Number(mejor.reps) || 0) ? x : mejor;
+            }, null);
+            return { ...ex, sets, volumen, top };
+        });
+        const total = lista.reduce((a, e) => a + e.volumen, 0);
+        return { lista, total, comparacion: loQueHasLevantado(total) };
+    }, [post.exercises]);
 
     const author = post.user || {};
     const levelClass = getLevelStyle(author.level || 1);
@@ -320,10 +345,33 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                 {slide === 'exercises' && (
                                     // La única diapositiva que se desplaza en vertical
                                     <div className="w-full h-full bg-black px-4 py-3 overflow-y-auto custom-scrollbar">
-                                        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Ejercicios</p>
+                                        {/* Lo que ha movido, y traducido a algo
+                                            que se entienda. El numero solo no dice
+                                            nada; "una jirafa" se cuenta. */}
+                                        <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                                            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest shrink-0">Ejercicios</p>
+                                            {resumenEjercicios.total > 0 && (
+                                                <p className="text-[10px] font-black text-zinc-300 tabular-nums truncate">
+                                                    {resumenEjercicios.total.toLocaleString('es-ES')} kg movidos
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {resumenEjercicios.comparacion && (
+                                            <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                                <span className="text-lg leading-none">{resumenEjercicios.comparacion.emoji}</span>
+                                                <span className="text-[11px] font-black text-white uppercase tracking-tight leading-tight not-italic">
+                                                    {soyElAutor ? 'Has levantado' : 'Ha levantado'} {resumenEjercicios.comparacion.cosa}
+                                                </span>
+                                            </div>
+                                        )}
+
                                         <div className="space-y-1.5">
-                                            {(post.exercises || []).map((ex, idx) => {
+                                            {resumenEjercicios.lista.map((ex, idx) => {
                                                 const record = records.find(r => r.name === ex.name);
+                                                const cuota = resumenEjercicios.total > 0
+                                                    ? Math.round((ex.volumen / resumenEjercicios.total) * 100)
+                                                    : 0;
                                                 return (
                                                     // El ejercicio con récord va en ORO y se nota: borde dorado,
                                                     // fondo cálido y halo alrededor del recuadro.
@@ -334,22 +382,54 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                                             : 'border border-white/5 bg-zinc-900/60'}`}
                                                     >
                                                         <div className="flex items-center justify-between mb-1 gap-2">
-                                                            <span className={`text-[11px] font-black uppercase truncate ${record ? 'text-yellow-400' : 'text-white'}`}>{ex.name}</span>
+                                                            <span className={`text-[12px] font-black uppercase truncate ${record ? 'text-yellow-400' : 'text-white'}`}>{ex.name}</span>
                                                             <div className="flex items-center gap-1.5 shrink-0">
                                                                 {record && (
                                                                     <span className="flex items-center gap-0.5 text-[8px] font-black text-black bg-yellow-500 px-1.5 py-0.5 rounded uppercase">
                                                                         <Trophy size={8} /> PR
                                                                     </span>
                                                                 )}
-                                                                <span className="text-[9px] font-bold text-zinc-500">{(ex.sets || []).length} {(ex.sets || []).length === 1 ? 'serie' : 'series'}</span>
+                                                                <span className="text-[9px] font-bold text-zinc-500">{ex.sets.length} {ex.sets.length === 1 ? 'serie' : 'series'}</span>
                                                             </div>
                                                         </div>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {(ex.sets || []).map((s, j) => (
-                                                                <span key={j} className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${s.type === 'D' ? 'text-purple-300 bg-purple-500/10 border-purple-500/30' : 'text-zinc-400 bg-black border-white/5'}`}>
-                                                                    {s.weight > 0 ? `${s.weight}kg × ${s.reps}` : `${s.reps} reps`}
+
+                                                        {/* La serie mas dura y lo que pesa este
+                                                            ejercicio dentro de la sesion. Es lo que
+                                                            uno pregunta —"¿cuanto le metiste?"— y no
+                                                            estaba por ningun lado. */}
+                                                        {ex.volumen > 0 && (
+                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                {ex.top && Number(ex.top.weight) > 0 && (
+                                                                    <span className="text-[11px] font-black text-white tabular-nums shrink-0">
+                                                                        {ex.top.weight}<span className="text-zinc-500 text-[9px]">kg</span>
+                                                                        <span className="text-zinc-600 mx-0.5">×</span>{ex.top.reps}
+                                                                    </span>
+                                                                )}
+                                                                <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden min-w-0">
+                                                                    <div
+                                                                        className={`h-full rounded-full ${record ? 'bg-yellow-500' : 'bg-zinc-500'}`}
+                                                                        style={{ width: `${Math.max(4, cuota)}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className="text-[9px] font-bold text-zinc-500 tabular-nums shrink-0">
+                                                                    {ex.volumen.toLocaleString('es-ES')} kg
                                                                 </span>
-                                                            ))}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {ex.sets.map((s, j) => {
+                                                                const esTop = ex.top === s;
+                                                                return (
+                                                                    <span key={j} className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${s.type === 'D'
+                                                                        ? 'text-purple-300 bg-purple-500/10 border-purple-500/30'
+                                                                        : esTop
+                                                                            ? 'text-white bg-white/10 border-white/20'
+                                                                            : 'text-zinc-400 bg-black border-white/5'}`}>
+                                                                        {s.weight > 0 ? `${s.weight}kg × ${s.reps}` : `${s.reps} reps`}
+                                                                    </span>
+                                                                );
+                                                            })}
                                                         </div>
                                                         {record && (
                                                             <p className="text-[9px] font-bold text-yellow-500 mt-1.5">

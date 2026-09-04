@@ -59,9 +59,15 @@ export function loQueHasLevantado(volumen) {
 
     const c = posibles[Math.floor(Math.random() * posibles.length)];
 
+    // `cosa` va suelto a proposito: en el feed el entreno es de OTRO, y ahi
+    // "Has levantado un helicoptero" es directamente falso. Quien lo usa pone el
+    // sujeto que le toca.
+    const cosa = c.veces === 1 ? c.uno : `${c.veces} ${c.varios}`;
+
     return {
         emoji: c.emoji,
-        frase: c.veces === 1 ? `Has levantado ${c.uno}` : `Has levantado ${c.veces} ${c.varios}`,
+        cosa,
+        frase: `Has levantado ${cosa}`,
         detalle: `${kilos.toLocaleString('es-ES')} kg en total · ${c.uno} pesa unos ${c.kg.toLocaleString('es-ES')} kg`
     };
 }

@@ -41,7 +41,10 @@ const QUE_ES_CADA_COLOR = [
     'Día completo: entreno, misiones y comida'
 ];
 
-const DIAS_SEMANA = ['L', '', 'X', '', 'V', '', 'D'];
+// Los siete. Antes eran ['L','','X','','V','','D']: cuatro letras salteadas
+// que no se leen como una semana, sino como un error de alineacion —sobre todo
+// con la primera columna a medias, que ya deja el borde izquierdo en escalera.
+const DIAS_SEMANA = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 // Amarillo, el mismo de los cuadraditos: el acento de la tarjeta tiene que
 // ser el color de lo que hay dentro.
@@ -176,37 +179,61 @@ export default function MapaActividad({ semanas = 26 }) {
                 className="h-full"
                 onClick={isLoading ? undefined : () => setAbierto(true)}
             >
-                <div className="relative z-10 flex items-center justify-between mb-4">
-                    <h2 className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] flex items-center gap-2">
-                        <Flame size={13} className="text-yellow-500" /> Constancia
-                    </h2>
+                <div className="relative z-10 flex items-start justify-between mb-3">
+                    <div className="min-w-0">
+                        <h2 className="text-[11px] font-black text-zinc-300 uppercase tracking-[0.16em] flex items-center gap-2">
+                            <Flame size={13} className="text-yellow-500" /> Constancia
+                        </h2>
+                        {/* ⚠️ Sin esta linea, esto es una rejilla de cuadrados de
+                            colores y ya. Nadie puede adivinar que un dia se
+                            enciende por entrenar, comer o cumplir misiones, ni que
+                            el periodo son seis meses. Decirlo cuesta una frase. */}
+                        <p className="text-[9px] text-zinc-600 font-bold mt-0.5 leading-tight">
+                            Un cuadro por día. Se enciende si entrenas, comes o cumples misiones.
+                        </p>
+                    </div>
                     {/* Si la peticion fallo NO se dice "0 dias activos": eso es una
                         mentira, y encima desanima justo a quien si ha entrenado.
                         La cache guardada puede traer un cero de un intento fallido
                         anterior, asi que se mira el error y no solo el dato. */}
                     {!isLoading && (
-                        <span className="text-[10px] text-zinc-500 font-bold">
-                            {error ? 'sin conexión' : totalActivos + ' días activos'}
+                        <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap shrink-0 ml-2">
+                            {error ? 'sin conexión' : totalActivos + ' días'}
                         </span>
                     )}
                 </div>
 
                 {isLoading
                     ? <div className="h-[110px] rounded-xl bg-zinc-900/50 animate-pulse" />
-                    : <div className="relative z-10">{rejilla(carril, 12)}</div>}
+                    : (
+                        <div className="relative z-10">
+                            {rejilla(carril, 12)}
+                            {/* Una rejilla entera en gris no dice "aun no has
+                                empezado": dice "esto esta roto". */}
+                            {!error && totalActivos === 0 && (
+                                <p className="text-[10px] text-zinc-500 font-bold text-center mt-2.5 leading-snug">
+                                    Todavía no hay nada que pintar. Entrena, apunta una comida o
+                                    cumple una misión y el cuadro de hoy se enciende.
+                                </p>
+                            )}
+                        </div>
+                    )}
 
-                <div className="relative z-10 flex items-center justify-between mt-4">
-                    <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-wide">
-                        Toca para ver más
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-[8px] text-zinc-600 font-bold uppercase mr-1">Menos</span>
-                        {COLORES.map((c, i) => (
-                            <div key={i} className="w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: c }} />
-                        ))}
-                        <span className="text-[8px] text-zinc-600 font-bold uppercase ml-1">Más</span>
-                    </div>
+                {/* La leyenda en su propia linea. Compartiendo fila con "Toca
+                    para ver mas" no cabia en un movil de 375: las dos etiquetas
+                    salian cortadas ("N..." y "DIA COMP..."), que es peor que no
+                    ponerlas. */}
+                <div className="relative z-10 flex items-center justify-center gap-1.5 mt-3">
+                    <span className="text-[8px] text-zinc-600 font-bold uppercase mr-0.5">Nada</span>
+                    {COLORES.map((c, i) => (
+                        <div key={i} className="w-[10px] h-[10px] rounded-[2px] shrink-0" style={{ backgroundColor: c }} />
+                    ))}
+                    <span className="text-[8px] text-zinc-600 font-bold uppercase ml-0.5">Día completo</span>
                 </div>
+
+                <p className="relative z-10 text-[9px] text-zinc-700 font-bold uppercase tracking-wide text-center mt-1.5">
+                    Toca para ver más
+                </p>
             </WidgetCard>
 
             {/* ── EL DETALLE ─────────────────────────────────────────────── */}
