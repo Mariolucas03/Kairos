@@ -204,15 +204,17 @@ export default function Slots() {
                 <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
             </div>
 
-            {/* TÍTULO */}
-            <div className="absolute top-28 w-full text-center z-10 pointer-events-none">
-                <h1 className="text-4xl font-black text-fuchsia-400 tracking-[-0.045em] leading-normal pb-1 pr-2 not-italic">
-                    NEON SLOTS
-                </h1>
-            </div>
-
             {/* MÁQUINA */}
             <div className="w-full max-w-sm px-4 relative z-10 flex flex-col items-center gap-4">
+
+                {/* ⚠️ El titulo iba en `absolute top-28` mientras la maquina va
+                    en el flujo y centrada. En cuanto la pantalla no era lo
+                    bastante alta, la maquina subia y le pasaba por encima: se
+                    veia "NEON SLOTS" cortado por la mitad. En el flujo, encima de
+                    la maquina, no puede pisarlo nada. */}
+                <h1 className="text-4xl font-black text-fuchsia-400 tracking-[-0.045em] leading-none pb-1 not-italic text-center">
+                    NEON SLOTS
+                </h1>
                 <div className="w-full aspect-[4/3.5] bg-zinc-900 rounded-[2rem] border-[6px] border-zinc-800 shadow-2xl relative overflow-hidden ring-4 ring-purple-900/20">
 
                     {/* PORTADA LIMPIA */}

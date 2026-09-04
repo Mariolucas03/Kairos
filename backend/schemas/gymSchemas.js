@@ -48,7 +48,15 @@ const workoutLogSchema = Joi.object({
                     completed: Joi.boolean().optional(),
                     // 'N' = serie normal, 'D' = dropset. El frontend ya lo enviaba,
                     // pero al no estar declarado aquí stripUnknown lo borraba.
-                    type: Joi.string().valid('N', 'D').optional(),
+                    // ⚠️ LOS CUATRO, no dos.
+                    //
+                    // La pantalla del entreno deja marcar cada serie como normal,
+                    // Calentamiento, al Fallo o Descendente —cycleSetType gira
+                    // entre ['N','W','F','D']— pero aqui solo entraban N y D. Asi
+                    // que marcar una serie de calentamiento y darle a guardar
+                    // devolvia un error de validacion y el entreno ENTERO no se
+                    // guardaba, sin decir por que.
+                    type: Joi.string().valid('N', 'W', 'F', 'D').optional(),
 
                     // Peso añadido en los de peso corporal (cinturón, chaleco).
                     // Va aparte de `weight` porque el peso efectivo lo calcula

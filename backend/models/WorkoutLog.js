@@ -72,7 +72,10 @@ const workoutLogSchema = mongoose.Schema({
             tipoEsfuerzo: { type: String, enum: ['RIR', 'RPE', ''], default: '' },
 
             // 'N' = serie normal, 'D' = dropset, para poder distinguirlas en el post
-            type: { type: String, enum: ['N', 'D'], default: 'N' }
+            // N normal, W calentamiento, F al fallo, D descendente. Son los
+            // cuatro por los que gira la pantalla del entreno; con solo N y D,
+            // guardar una serie de calentamiento reventaba el entreno entero.
+            type: { type: String, enum: ['N', 'W', 'F', 'D'], default: 'N' }
         }]
     }],
     // --- POST DEL ENTRENO (estilo Instagram) ---

@@ -442,15 +442,56 @@ const updateProgress = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * Borrar una mision.
+ *
+ * ⚠️ ANTES SOLO PODIA EL CREADOR, Y EN UNA COOP ESO DEJA ATRAPADO AL OTRO.
+ *
+ * Una mision cooperativa es UN documento con los dos dentro. Si te invitan a
+ * una y luego no te interesa, no habia forma de quitartela de la lista: el
+ * borrado devolvia 403 y no hay ninguna otra salida en la pantalla. Te quedaba
+ * ahi para siempre, contando para tu tope de misiones y quitandote vida cada
+ * noche que no la cumplieras.
+ *
+ * Ahora la borra cualquiera de los dos y desaparece para los dos, que es lo
+ * unico coherente con que sea una sola mision compartida: no hay dos copias que
+ * puedan quedar en estados distintos.
+ *
+ * Al otro se le avisa. Que una mision compartida desaparezca sin explicacion es
+ * peor que no poder borrarla.
+ */
 const deleteMission = asyncHandler(async (req, res) => {
     const mission = await Mission.findById(req.params.id);
     if (!mission) { res.status(404); throw new Error('No encontrada'); }
-    if (mission.user.toString() !== req.user._id.toString()) { res.status(403); throw new Error('Solo el creador puede cancelar'); }
-    if (mission.invitationStatus === 'pending') {
-        const friendId = mission.participants.find(p => p.toString() !== req.user._id.toString());
-        if (friendId) await User.findByIdAndUpdate(friendId, { $pull: { missionRequests: mission._id } });
+
+    const yo = req.user._id.toString();
+    const participa = (mission.participants || []).some(p => p.toString() === yo);
+    const esMia = mission.user.toString() === yo;
+    if (!esMia && !participa) { res.status(403); throw new Error('Esta mision no es tuya'); }
+
+    // La invitacion pendiente vive en el buzon del invitado: se quita tambien,
+    // o le queda un aviso que lleva a una mision que ya no existe.
+    const otros = (mission.participants || [])
+        .map(p => p.toString())
+        .filter(p => p !== yo);
+
+    for (const id of otros) {
+        await User.findByIdAndUpdate(id, { $pull: { missionRequests: mission._id } });
     }
+
     await mission.deleteOne();
+
+    // Uno por uno: notificarA recibe UN id, no una lista.
+    if (mission.isCoop) {
+        for (const id of otros) {
+            notificarA(id, {
+                title: '🎯 Misión compartida cancelada',
+                body: `${req.user.username} ha borrado "${mission.title}".`,
+                url: '/missions'
+            });
+        }
+    }
+
     res.status(200).json({ id: req.params.id, message: "Eliminada" });
 });
 

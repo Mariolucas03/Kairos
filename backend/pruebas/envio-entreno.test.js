@@ -136,4 +136,28 @@ describe('El validador no puede tirar lo que el servidor necesita', () => {
         assert.strictEqual(limpio.regaloDeMonedas, undefined);
         assert.strictEqual(limpio.xp, undefined);
     });
+
+    test('los CUATRO tipos de serie entran: normal, calentamiento, fallo y descendente', () => {
+        // La pantalla del entreno gira entre estos cuatro al tocar el numero de
+        // la serie (cycleSetType). El esquema solo aceptaba N y D, asi que
+        // marcar una serie como calentamiento o al fallo hacia que el entreno
+        // ENTERO fuera rechazado: no se guardaba nada, y el aviso solo decia
+        // "Error al guardar".
+        for (const tipo of ['N', 'W', 'F', 'D']) {
+            const limpio = porLaPuerta(entrenoBase([{
+                name: 'Press banca',
+                sets: [{ weight: 80, reps: 8, type: tipo }]
+            }]));
+            assert.strictEqual(limpio.exercises[0].sets[0].type, tipo,
+                `El tipo de serie "${tipo}" no ha pasado el validador`);
+        }
+    });
+
+    test('un tipo de serie inventado se rechaza', () => {
+        const { error } = workoutLogSchema.validate(
+            entrenoBase([{ name: 'Press', sets: [{ weight: 80, reps: 8, type: 'X' }] }]),
+            { abortEarly: false, stripUnknown: true }
+        );
+        assert.ok(error, 'Aceptar los cuatro no puede significar aceptar cualquiera');
+    });
 });

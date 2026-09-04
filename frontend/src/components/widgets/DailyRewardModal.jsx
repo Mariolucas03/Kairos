@@ -104,7 +104,16 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
         }
 
         return (
-            <div key={day} className={`flex flex-col items-center justify-between w-20 h-32 rounded-2xl transition-all duration-300 relative overflow-hidden ${containerStyle}`}>
+            // ⚠️ ALTO SUFICIENTE PARA LO QUE LLEVA DENTRO.
+            //
+            // Era w-20 h-32 con overflow-hidden, y el contenido suma mas: la
+            // cabecera del dia, el icono de 48, el numero grande, la linea de XP
+            // y a veces la de vida. Se pasaba de 128 px, asi que el "+25 XP" se
+            // cortaba por abajo en TODAS las tarjetas: veias media linea y no
+            // sabias que te iban a dar.
+            //
+            // Y mas estrechas, que cinco de 80 px no caben en un movil de 375.
+            <div key={day} className={`flex flex-col items-center justify-between w-[66px] h-[148px] rounded-2xl transition-all duration-300 relative overflow-hidden ${containerStyle}`}>
 
                 <div className={`w-full text-center py-1.5 ${isToday ? 'bg-black/20' : 'bg-black/10'}`}>
                     <span className={`text-[10px] font-black uppercase tracking-widest ${textColors}`}>
@@ -119,14 +128,14 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
                         <img
                             src={reward.image}
                             alt="Premio"
-                            className={`w-12 h-12 object-contain drop-shadow-md mb-1 ${isToday ? 'animate-bounce' : ''}`}
+                            className={`w-9 h-9 object-contain drop-shadow-md ${isToday ? 'animate-bounce' : ''}`}
                             onError={(e) => e.target.style.display = 'none'}
                         />
                     )}
 
                     {/* 2. CANTIDAD DE FICHAS (SOLO EL NÚMERO, SIN ICONO) */}
                     <div className="flex items-center justify-center">
-                        <span className={`text-2xl font-black drop-shadow-sm leading-none tracking-tighter ${isToday ? 'text-white' : textColors}`}>
+                        <span className={`text-xl font-black drop-shadow-sm leading-none tracking-tighter ${isToday ? 'text-white' : textColors}`}>
                             {reward.gameCoins}
                         </span>
                     </div>
@@ -158,7 +167,15 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
     if (!data) return null;
 
     return createPortal(
-        <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+        // ⚠️ POR ENCIMA DE LOS DEMAS MODALES, no al mismo nivel.
+        //
+        // Los veintiun modales de la app viven todos en z-[9999]. Este no es uno
+        // mas: es una puerta que se abre sola al entrar al home. Con el mismo
+        // z-index, abrir un widget mientras estaba puesto dejaba los dos
+        // pintandose entrelazados —el boton "RECLAMAR AHORA" asomando por encima
+        // de la tarjeta de misiones, con el calendario de premios borroso detras—
+        // y parecia que la app se habia roto.
+        <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[10050] flex items-center justify-center p-4 overflow-y-auto">
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}></div>
             <div className="relative z-10 w-full max-w-lg flex flex-col items-center animate-in zoom-in-95 duration-300">
                 <div className="text-center mb-8">
