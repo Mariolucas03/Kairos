@@ -57,6 +57,20 @@ const exerciseSchema = new mongoose.Schema({
         default: 'strength'
     },
 
+    // --- MAQUINAS DE UN GIMNASIO CONCRETO ---
+
+    // En que gimnasios esta esta maquina. Es una LISTA y no un texto: una misma
+    // maquina puede estar en varias cadenas, y con un solo campo habria que
+    // duplicar la entrada para la segunda.
+    //
+    // Vacio = ejercicio generico del catalogo, que es la inmensa mayoria.
+    gimnasios: { type: [String], default: [] },
+
+    // La marca del trasto (Technogym, Gym80, Hammer Strength...). Solo tiene
+    // sentido en las de gimnasio: sirve para reconocerla cuando la tienes
+    // delante, que es justo lo que cuesta con nombres parecidos.
+    marca: { type: String, default: '' },
+
     // Si es un ejercicio creado por el sistema o por el usuario
     isCustom: {
         type: Boolean,
@@ -68,5 +82,7 @@ const exerciseSchema = new mongoose.Schema({
 exerciseSchema.index({ name: 1, user: 1 });
 // El selector pide por grupo y prioriza los del catálogo base
 exerciseSchema.index({ muscle: 1, isCore: -1, name: 1 });
+// Y por gimnasio, para el filtro de "solo lo que hay en el mio"
+exerciseSchema.index({ gimnasios: 1, name: 1 });
 
 module.exports = mongoose.model('Exercise', exerciseSchema);

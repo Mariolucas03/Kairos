@@ -10,6 +10,10 @@ const levelService = require('../services/levelService');
 // 🔥 Toda la IA pasa por el servicio único (una sola cascada de modelos gratis)
 const { askAI } = require('../services/aiService');
 const { sugerirSiguiente } = require('../services/progresionService');
+const {
+    GIMNASIO: GIMNASIO_FITNESSPARK,
+    comoDocumentos: comoDocumentosFitnessPark
+} = require('../utils/maquinasFitnessPark');
 
 /**
  * Techos de cordura para lo que manda el movil.
@@ -402,23 +406,60 @@ const LIMITE_BUSQUEDA = 300;
  *  - `instructions` nunca viaja aquí: son 5 frases por ejercicio y sólo hacen
  *    falta en la ficha, que se pide de una en una.
  */
+/**
+ * Mete las maquinas de FitnessPark si no estan.
+ *
+ * Va con upsert por nombre, asi que es seguro llamarla siempre: si ya estan no
+ * escribe nada, y si mañana se añade una maquina a la lista entra sola sin
+ * tener que lanzar nada a mano. Es el mismo criterio que `syncExerciseCatalog`.
+ */
+let maquinasSembradas = false;
+const sembrarMaquinasDeGimnasio = async () => {
+    if (maquinasSembradas) return;
+    try {
+        const docs = comoDocumentosFitnessPark();
+        const faltan = await Exercise.countDocuments({ gimnasios: GIMNASIO_FITNESSPARK });
+        if (faltan < docs.length) {
+            await Exercise.bulkWrite(docs.map(d => ({
+                updateOne: {
+                    filter: { name: d.name, user: null },
+                    update: { $set: d },
+                    upsert: true
+                }
+            })));
+            console.log('🏋️ Maquinas de ' + GIMNASIO_FITNESSPARK + ' al dia (' + docs.length + ').');
+        }
+        maquinasSembradas = true;
+    } catch (e) {
+        // Que falle esto no puede dejar sin ejercicios a nadie
+        console.error('No se pudieron sembrar las maquinas del gimnasio:', e.message);
+    }
+};
+
 const getAllExercises = async (req, res) => {
     try {
         // Nos aseguramos de que el catálogo base esté al día sin que el usuario
         // tenga que llamar a /seed a mano (solo hace trabajo si falta algo).
         await syncExerciseCatalog();
+        await sembrarMaquinasDeGimnasio();
 
-        const { muscle, q, all } = req.query;
+        const { muscle, q, all, gimnasio } = req.query;
         const busqueda = (q || '').trim();
         const grupo = muscle && muscle !== 'Todos' ? muscle : null;
+        const sede = (gimnasio || '').trim();
 
         // ¿Hay que salir del catálogo base? Sólo si el usuario ha pedido algo.
-        const ampliar = !!busqueda || !!grupo || all === '1';
+        //
+        // El filtro por gimnasio TAMBIEN amplia: las maquinas de una cadena no
+        // son `isCore` —el catalogo de siempre se queda como esta— asi que sin
+        // esto, pedir "FitnessPark" devolveria una lista vacia.
+        const ampliar = !!busqueda || !!grupo || !!sede || all === '1';
 
         const query = {
             $or: [{ user: req.user._id }, { isCustom: false }, { user: null }]
         };
         if (grupo) query.muscle = grupo;
+        if (sede) query.gimnasios = sede;
         if (busqueda) query.name = new RegExp(escaparRegex(busqueda), 'i');
         // Los propios del usuario se ven siempre, estén o no en el catálogo base
         if (!ampliar) query.$and = [{ $or: [{ isCore: true }, { isCustom: true }] }];
@@ -528,7 +569,11 @@ const getMuscleCatalog = async (req, res) => {
         specific: SPECIFIC_MUSCLES,
         // El orden de las secciones de equipamiento lo manda el servidor, para
         // que no haya dos listas que mantener en sitios distintos.
-        equipmentGroups: FAMILIAS
+        equipmentGroups: FAMILIAS,
+        // Los gimnasios de los que hay maquinario cargado. Igual que arriba: si
+        // la lista viviera tambien en el movil, añadir una cadena obligaria a
+        // tocar dos sitios y uno se olvidaria.
+        gimnasios: [GIMNASIO_FITNESSPARK]
     });
 };
 

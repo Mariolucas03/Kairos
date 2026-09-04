@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
-import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Play } from 'lucide-react';
+import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Play, MapPin } from 'lucide-react';
 import api from '../../services/api';
 import ExerciseSheet from './ExerciseSheet';
 import { MUSCLES_OF_GROUP } from '../body/bodyPaths';
@@ -21,6 +21,13 @@ export default function ExerciseSelector({ onSelect, onClose }) {
     const [fichaAbierta, setFichaAbierta] = useState(null);
     // Filtro por familia de equipamiento: 'Todos', 'Pesas', 'Máquina'...
     const [equipoActivo, setEquipoActivo] = useState('Todos');
+
+    // El gimnasio elegido, o null para ver el catálogo entero.
+    //
+    // Va aparte de la familia de equipamiento porque es otra pregunta: "¿con qué
+    // se hace?" y "¿lo tengo en mi gimnasio?" no son lo mismo, y mezclarlas en
+    // la misma fila haría que elegir una desactivara la otra sin motivo.
+    const [gimnasio, setGimnasio] = useState(null);
 
     // El catálogo tiene 1291 ejercicios: la lista ya no se trae entera y se
     // filtra en el móvil. Sin filtros el servidor manda sólo los básicos (los
@@ -70,7 +77,11 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                 const res = await api.get('/gym/exercises', {
                     params: {
                         ...(selectedMuscle !== 'Todos' && { muscle: selectedMuscle }),
-                        ...(busquedaAplicada && { q: busquedaAplicada })
+                        ...(busquedaAplicada && { q: busquedaAplicada }),
+                        // Lo filtra el SERVIDOR: estas máquinas no están en el
+                        // catálogo base que se manda por defecto, así que
+                        // filtrarlas aquí no devolvería ninguna.
+                        ...(gimnasio && { gimnasio })
                     }
                 });
                 if (vivo) setExercises(res.data);
@@ -79,7 +90,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
         };
         fetchExercises();
         return () => { vivo = false; };
-    }, [selectedMuscle, busquedaAplicada]);
+    }, [selectedMuscle, busquedaAplicada, gimnasio]);
 
     // LÓGICA DE SELECCIÓN POR ORDEN (1, 2, 3...)
     const toggleSelection = (exercise) => {
@@ -211,6 +222,26 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                     ))}
                 </div>
 
+                {/* ¿SOLO LO DE MI GIMNASIO?
+                    Un filtro aparte porque responde a otra pregunta que la
+                    familia de equipamiento. Al activarlo, la lista pasa a ser
+                    solo las máquinas que hay de verdad allí, con su marca. */}
+                {(catalog?.gimnasios || []).length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                        {catalog.gimnasios.map(g => (
+                            <button
+                                key={g}
+                                onClick={() => setGimnasio(gimnasio === g ? null : g)}
+                                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase whitespace-nowrap border transition-colors flex items-center gap-1.5 ${gimnasio === g
+                                    ? 'bg-yellow-500 text-black border-yellow-500'
+                                    : 'bg-black text-zinc-500 border-zinc-800'}`}
+                            >
+                                <MapPin size={11} /> {g}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {/* Subfiltro de equipamiento: MISMA pastilla que la fila de
                     músculos —mismo tamaño, mismo radio, mismo borde— para que se
                     lean como el mismo control. Lo único que cambia es el color
@@ -295,7 +326,12 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                                         aquí va el equipamiento concreto (Multipower,
                                                         Barra Z...) y los músculos secundarios. */}
                                                     <p className="text-[10px] text-zinc-600 font-bold uppercase truncate">
-                                                        {ex.equipment || ex.muscle}
+                                                        {/* La MARCA manda cuando la hay: delante de la
+                                                            maquina lo que reconoces es "Technogym", no
+                                                            "Maquina". Solo la llevan las de gimnasio. */}
+                                                        {ex.marca
+                                                            ? <span className="text-yellow-600/90">{ex.marca}</span>
+                                                            : (ex.equipment || ex.muscle)}
                                                         {secundarios.length > 0 && (
                                                             <span className="text-zinc-700 normal-case"> · también {secundarios.join(', ')}</span>
                                                         )}
