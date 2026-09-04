@@ -90,7 +90,7 @@ export default function Home() {
 
     const isSmoothMounted = useSmoothMount();
 
-    const { dailyData: logData, loading: logLoading, updateWidget, calculations } = useDailyLog(user);
+    const { dailyData: logData, loading: logLoading, updateWidget, calculations, refetch: recargarDiario } = useDailyLog(user);
     const { showRewardModal, rewardData, closeModal, claimReward, openCalendar, hasClaimedToday, claiming, toast, clearToast } = useDailyRewards(user, setUser);
     const [showSettings, setShowSettings] = useState(false);
     // Aviso propio de la app para el alta de notificaciones (antes era un alert() del navegador)
@@ -243,7 +243,18 @@ export default function Home() {
                     </div>
                 );
             case 'missions': return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><MissionsWidget completed={data.missionStats?.completed} total={data.missionStats?.total} completedMissions={data.missionStats?.listCompleted} /></SmartWidgetWrapper>);
-            case 'sport': return (<SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}><SportWidget workouts={data.sportWorkouts} /></SmartWidgetWrapper>);
+            case 'sport': return (
+                <SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}>
+                    <SportWidget
+                        workouts={data.sportWorkouts}
+                        showToast={(mensaje, tipo) => setPushMsg({ message: mensaje, type: tipo || 'success' })}
+                        onSaved={(res) => {
+                            if (res?.user) setUser(res.user);
+                            recargarDiario();
+                        }}
+                    />
+                </SmartWidgetWrapper>
+            );
             case 'training': return (
                 <SmartWidgetWrapper isDragEnabled={isDragEnabled} className={wrapperClass}>
                     <TrainingWidget

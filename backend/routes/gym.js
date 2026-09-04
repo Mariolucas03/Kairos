@@ -24,7 +24,8 @@ const {
     getMuscleRanksController,
     getSportCatalog,
     getExerciseProgressController,
-    getTrainedExercises
+    getTrainedExercises,
+    getResumenEntrenos
 } = require('../controllers/gymController');
 
 const protect = require('../middleware/authMiddleware');
@@ -64,6 +65,7 @@ router.get('/sports', protect, getSportCatalog);
 
 // Progreso por ejercicio (gráficas de la pestaña "Cuerpo")
 router.get('/progress', protect, getTrainedExercises);
+router.get('/resumen', protect, getResumenEntrenos);
 router.get('/progress/:name', protect, getExerciseProgressController);
 
 // Generador de rutinas con IA.

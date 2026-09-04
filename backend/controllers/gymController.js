@@ -1098,6 +1098,87 @@ const getExerciseProgressController = async (req, res) => {
 
 // @desc    Ejercicios que el usuario ha hecho alguna vez (para elegir gráfica)
 // @route   GET /api/gym/progress
+/**
+ * Las cifras de siempre: cuanto llevas entrenado desde que empezaste.
+ *
+ * Existe porque la pestaña de Estadisticas necesita numeros que no estaban en
+ * ningun sitio. El historial sabe cada sesion y el semanal sabe los ultimos
+ * siete dias, pero "cuantos entrenos llevas" o "cuantos kilos has movido en
+ * total" no los devolvia nadie, y sacarlos en el movil obligaria a bajarse el
+ * historial entero.
+ *
+ * Todo en UNA agregacion: son cuentas sobre la misma coleccion y hacer cuatro
+ * viajes a Atlas para esto, con el plan gratuito, es tiempo de espera regalado.
+ */
+const getResumenEntrenos = async (req, res) => {
+    try {
+        const [fila] = await WorkoutLog.aggregate([
+            { $match: { user: req.user._id, type: 'gym' } },
+            {
+                $project: {
+                    duration: 1,
+                    date: 1,
+                    volumen: {
+                        $sum: {
+                            $map: {
+                                input: { $ifNull: ['$exercises', []] },
+                                as: 'ex',
+                                in: {
+                                    $sum: {
+                                        $map: {
+                                            input: { $ifNull: ['$$ex.sets', []] },
+                                            as: 's',
+                                            in: { $multiply: [{ $ifNull: ['$$s.weight', 0] }, { $ifNull: ['$$s.reps', 0] }] }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    entrenos: { $sum: 1 },
+                    volumen: { $sum: '$volumen' },
+                    segundos: { $sum: { $ifNull: ['$duration', 0] } },
+                    primero: { $min: '$date' },
+                    ultimo: { $max: '$date' }
+                }
+            }
+        ]);
+
+        // La mejor serie de la historia, para poder enseñarla con su fecha.
+        const [mejor] = await WorkoutLog.aggregate([
+            { $match: { user: req.user._id, type: 'gym' } },
+            { $unwind: '$exercises' },
+            { $unwind: '$exercises.sets' },
+            { $match: { 'exercises.sets.weight': { $gt: 0 } } },
+            { $sort: { 'exercises.sets.weight': -1, 'exercises.sets.reps': -1 } },
+            { $limit: 1 },
+            {
+                $project: {
+                    _id: 0, fecha: '$date', ejercicio: '$exercises.name',
+                    peso: '$exercises.sets.weight', reps: '$exercises.sets.reps'
+                }
+            }
+        ]);
+
+        res.json({
+            entrenos: fila?.entrenos || 0,
+            volumen: Math.round(fila?.volumen || 0),
+            minutos: Math.round((fila?.segundos || 0) / 60),
+            primero: fila?.primero || null,
+            ultimo: fila?.ultimo || null,
+            mejorSerie: mejor || null
+        });
+    } catch (error) {
+        console.error('Error en getResumenEntrenos:', error);
+        res.status(500).json({ message: 'Error cargando el resumen' });
+    }
+};
+
 const getTrainedExercises = async (req, res) => {
     try {
         const filas = await WorkoutLog.aggregate([
@@ -1484,7 +1565,7 @@ module.exports = {
     getRoutines, createRoutine, deleteRoutine, updateRoutine, copyWorkoutToRoutine,
     getAllExercises, getExerciseById, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,
-    getExerciseProgressController, getTrainedExercises,
+    getExerciseProgressController, getTrainedExercises, getResumenEntrenos,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
     chatRoutineGenerator
 };

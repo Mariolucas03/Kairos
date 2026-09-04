@@ -1,17 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Activity, Clock, Flame, MapPin } from 'lucide-react';
+import { X, Activity, Clock, Flame, MapPin, Plus } from 'lucide-react';
 import WidgetCard, { WidgetStat, WIDGET_ACCENTS } from '../common/WidgetCard';
+import SportsTab from '../gym/SportsTab';
 
+/**
+ * EL DEPORTE DEL DIA.
+ *
+ * ⚠️ Y AQUI SE APUNTA, ademas de verse.
+ *
+ * Registrar cualquier deporte estaba en una pestaña "Otros" dentro de la seccion
+ * de gimnasio, entre las rutinas y el mapa muscular. No pintaba nada ahi: nadar
+ * o salir en bici no tiene que ver con las rutinas ni con los rangos de cada
+ * musculo, y encima obligaba a irse al Gym para apuntar algo que ya tenia su
+ * sitio en el home. Ahora se apunta desde aqui, que es donde luego lo miras.
+ */
 export default function SportWidget({
     workouts = [],
     history = [],
     activityName,
     duration,
     distance,
-    calories
+    calories,
+    onSaved,
+    showToast
 }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [apuntando, setApuntando] = useState(false);
     const [activeTabIndex, setActiveTabIndex] = useState(0);
     const accent = WIDGET_ACCENTS.sport;
 
@@ -94,13 +109,26 @@ export default function SportWidget({
 
                         <div className="flex justify-between items-center relative z-10 shrink-0">
                             <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2 pr-2 not-italic">
-                                DETALLE <span style={{ color: accent }}>DEPORTE</span>
+                                {apuntando ? <>APUNTAR <span style={{ color: accent }}>DEPORTE</span></> : <>DETALLE <span style={{ color: accent }}>DEPORTE</span></>}
                             </h2>
                             <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
 
+                        {apuntando ? (
+                            <div className="relative z-10 overflow-y-auto custom-scrollbar pr-1 flex-1">
+                                <SportsTab
+                                    hoy={dataList}
+                                    showToast={showToast}
+                                    onSaved={(data) => {
+                                        setApuntando(false);
+                                        if (onSaved) onSaved(data);
+                                    }}
+                                />
+                            </div>
+                        ) : (
+                        <>
                         {dataList.length > 1 && (
                             <div className="flex gap-2 overflow-x-auto pb-2 border-b border-white/10 shrink-0 z-10 no-scrollbar">
                                 {dataList.map((w, idx) => (
@@ -153,6 +181,17 @@ export default function SportWidget({
                                 <p className="text-zinc-500 text-sm font-bold uppercase">No hay actividad.</p>
                                 <p className="text-zinc-600 text-xs mt-1">¡Sal a moverte y regístralo!</p>
                             </div>
+                        )}
+
+                        {/* Lo que antes obligaba a irse a Gym > Otros */}
+                        <button
+                            onClick={() => setApuntando(true)}
+                            className="relative z-10 w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-black active:scale-95 transition-transform flex items-center justify-center gap-2 shrink-0"
+                            style={{ background: accent }}
+                        >
+                            <Plus size={15} /> Apuntar un deporte
+                        </button>
+                        </>
                         )}
                     </div>
                 </div>,

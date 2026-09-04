@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
 import {
-    Plus, Play, Trash2, Dumbbell, Activity, Edit, PersonStanding, Lock
+    Plus, Play, Trash2, Dumbbell, Activity, Edit, PersonStanding, Lock, BarChart3
 } from 'lucide-react';
 
 import api from '../services/api';
@@ -13,7 +13,7 @@ import LoadingScreen from '../components/common/LoadingScreen';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import CreateRoutineModal from '../components/gym/CreateRoutineModal';
 import BodyTab from '../components/gym/BodyTab';
-import SportsTab from '../components/gym/SportsTab';
+import EstadisticasTab from '../components/gym/EstadisticasTab';
 import { useWorkout } from '../context/WorkoutContext';
 import { useSmoothMount } from '../hooks/useSmoothMount';
 
@@ -29,7 +29,11 @@ const ACENTO = '#eab308'; // oro: el color de la sección de entreno
 const PESTANAS = [
     { id: 'gym', label: 'Gym', icon: Dumbbell },
     { id: 'body', label: 'Cuerpo', icon: PersonStanding },
-    { id: 'otros', label: 'Otros', icon: Activity }
+    // "Otros" (apuntar cualquier deporte) se ha mudado al widget de deporte
+    // del home, que es donde encaja: no tiene que ver con rutinas ni con el
+    // cuerpo. En su hueco van las cifras, que estaban escondidas al final de
+    // "Cuerpo" o directamente no existian.
+    { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 }
 ];
 
 // Un tono por rutina. Se respeta el color que el usuario eligió al crearla y,
@@ -313,17 +317,10 @@ export default function Gym() {
                 </div>
             )}
 
-            {/* --- OTROS: CUALQUIER DEPORTE --- */}
-            {tab === 'otros' && (
+            {/* --- ESTADÍSTICAS --- */}
+            {tab === 'estadisticas' && (
                 <div className="animate-in fade-in duration-200 mt-[18px]">
-                    <SportsTab
-                        hoy={todaySports}
-                        showToast={showToast}
-                        onSaved={(data) => {
-                            if (data.user) setUser(data.user);
-                            mutateDaily();
-                        }}
-                    />
+                    <EstadisticasTab />
                 </div>
             )}
 

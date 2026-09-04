@@ -55,6 +55,9 @@ export function useDailyLog(user) {
     return {
         // Si no hay data pero tampoco error, devolvemos un objeto vacío seguro para que no rompa la UI
         dailyData: dailyData || {},
+        // Para que quien escriba algo de fuera (apuntar un deporte desde su
+        // widget, por ejemplo) pueda pedir que se relea el dia.
+        refetch: mutate,
         loading: isLoading,
         error,
         updateWidget,
