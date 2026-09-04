@@ -12,9 +12,8 @@ import { Minus, Plus } from 'lucide-react';
  * fichas eso no es un ajuste fino, es un peaje: la gente acababa apostando 20
  * porque subir era demasiado trabajo.
  *
- * Aquí se escribe el número y ya. Los botones se quedan —para el toque de
- * ajuste— y debajo hay atajos: las cantidades de siempre, la mitad, el doble y
- * el todo.
+ * Aquí se escribe el número y ya. Los botones de −/+ se quedan para el toque de
+ * ajuste, y debajo hay cuatro atajos con las cantidades de siempre.
  *
  * ⚠️ EL TOPE SE APLICA AL TECLEAR; EL MÍNIMO, AL SALIR.
  *
@@ -46,6 +45,23 @@ export default function SelectorApuesta({
     // Si el valor cambia desde fuera (un atajo, o el juego lo recorta al acabar
     // una partida), el campo tiene que seguirlo.
     useEffect(() => { setTexto(String(valor ?? minimo)); }, [valor, minimo]);
+
+    // ⚠️ Y SI PIERDES, LA APUESTA BAJA CONTIGO.
+    //
+    // El saldo cambia entre manos. Apostabas 500, perdias, te quedaban 200 — y la
+    // casilla seguia marcando 500 con el boton de jugar apagado y sin decir por
+    // que. Parecia que el juego se habia colgado.
+    //
+    // Solo hacia ABAJO: subirla sola cuando ganas seria apostar por ti.
+    //
+    // Y NUNCA con el juego en marcha. Algunos juegos descuentan la apuesta del
+    // saldo que enseñan mientras giran; recortar con ese numero cambiaria la
+    // apuesta a mitad de jugada, que es peor que el problema que esto arregla.
+    useEffect(() => {
+        if (deshabilitado) return;
+        const techo = Math.max(minimo, Math.min(maximo, saldo));
+        if (typeof valor === 'number' && valor > techo) onChange(techo);
+    }, [saldo, maximo, minimo, valor, onChange, deshabilitado]);
 
     const tope = Math.max(minimo, Math.min(maximo, saldo));
     const encajar = (n) => Math.max(minimo, Math.min(tope, Math.floor(n) || minimo));

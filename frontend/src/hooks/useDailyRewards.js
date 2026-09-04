@@ -58,25 +58,34 @@ export function useDailyRewards(user, setUser) {
      *
      * Sin ciclo empezado —recien instalada, o ciclo terminado— es el dia 1.
      */
-    const diaDelCiclo = () => {
+    const estadoDelCiclo = () => {
         const inicio = user?.dailyRewards?.cycleStartDay;
-        if (!inicio) return 1;
+        if (!inicio) return { dia: 1, vivo: false };
+
         const transcurridos = Math.round(
             (new Date(getTodayString() + 'T00:00:00Z') - new Date(inicio + 'T00:00:00Z')) / 86400000
         );
-        return (transcurridos >= 0 && transcurridos < 7) ? transcurridos + 1 : 1;
+        // Fuera de rango = el ciclo se cerro y hoy empieza uno nuevo, igual que
+        // decide el servidor.
+        const vivo = transcurridos >= 0 && transcurridos < 7;
+        return { dia: vivo ? transcurridos + 1 : 1, vivo };
     };
 
     const buildRewardData = (overrides = {}) => {
-        const dia = diaDelCiclo();
-        // Si el ciclo ya ha caducado, los premios cobrados eran del anterior:
-        // ensenarlos marcaria en verde dias de esta semana que no has cobrado.
-        const delCicloActual = diaDelCiclo() === 1 && !(user?.dailyRewards?.claimedDays || []).includes(1)
-            ? []
-            : (user?.dailyRewards?.claimedDays || []);
+        const { dia, vivo } = estadoDelCiclo();
+
+        // ⚠️ Con el ciclo caducado, los premios cobrados eran del ANTERIOR.
+        //
+        // Enseñarlos pintaria en verde dias de esta semana que no has tocado. La
+        // primera version comprobaba "es dia 1 y el 1 no esta cobrado", que falla
+        // justo en el caso que queria cubrir: si el ciclo caduco HABIENDO cobrado
+        // el dia 1, la lista vieja pasaba entera como si fuera de esta semana.
+        // Lo que hay que mirar es si el ciclo sigue vivo, no que dias tiene.
+        const cobrados = vivo ? (user?.dailyRewards?.claimedDays || []) : [];
+
         return {
             currentDay: dia,
-            claimedDays: delCicloActual,
+            claimedDays: cobrados,
             rewardOfDay: getRewardForDay(dia),
             ...overrides
         };

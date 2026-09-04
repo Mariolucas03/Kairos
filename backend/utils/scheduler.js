@@ -314,10 +314,21 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
     }
 
     try {
+        // ⚠️ 'yearly' NO ESTABA, y por eso no pasaba nada con las anuales.
+        //
+        // Una mision anual no se castigaba nunca —da igual que no la cumplieras—
+        // y, lo que es peor, no se reiniciaba nunca: un habito anual completado
+        // se quedaba tachado para siempre y no volvia a poder hacerse. La
+        // frecuencia existe en el selector desde el principio; solo que el
+        // mantenimiento nocturno no la miraba.
+        //
+        // Se evalua el 1 de enero, que es cuando cierra el ciclo anual, igual
+        // que el semanal cierra el domingo y el mensual el dia 1.
         const frequenciesToPunish = ['daily'];
         if (yesterday.getDay() === 0) frequenciesToPunish.push('weekly');
         // El día 1 castigamos el mes que acaba de cerrarse
         if (now.getDate() === 1) frequenciesToPunish.push('monthly');
+        if (now.getMonth() === 0 && now.getDate() === 1) frequenciesToPunish.push('yearly');
 
         console.log(`⚔️ Evaluando ciclos: ${frequenciesToPunish.join(', ')}`);
 

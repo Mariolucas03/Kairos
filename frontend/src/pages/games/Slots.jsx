@@ -254,7 +254,7 @@ export default function Slots() {
                     </div>
 
                     <div className="space-y-3">
-                        <SelectorApuesta valor={bet} onChange={setBet} saldo={visualBalance} minimo={10} deshabilitado={isGameActive} />
+                        <SelectorApuesta valor={bet} onChange={setBet} saldo={currentFichas} minimo={10} deshabilitado={isGameActive} />
 
                         <button
                             onClick={handleSpin}

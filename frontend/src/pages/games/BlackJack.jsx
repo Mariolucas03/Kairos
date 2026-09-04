@@ -193,7 +193,7 @@ export default function BlackJack() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <SelectorApuesta valor={bet} onChange={setBet} saldo={visualBalance} minimo={10} />
+                            <SelectorApuesta valor={bet} onChange={setBet} saldo={currentFichas} minimo={10} />
 
                             <button
                                 onClick={() => handleAction('deal')}

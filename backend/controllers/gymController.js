@@ -420,10 +420,28 @@ const sembrarMaquinasDeGimnasio = async () => {
         const docs = comoDocumentosFitnessPark();
         const faltan = await Exercise.countDocuments({ gimnasios: GIMNASIO_FITNESSPARK });
         if (faltan < docs.length) {
-            await Exercise.bulkWrite(docs.map(d => ({
+            // ⚠️ ANOTAR, NO REDEFINIR.
+            //
+            // Con `$set: d` entero, sembrar una maquina cuyo nombre YA existe en
+            // el catalogo base la sobrescribia. Y existen: "Hack Squat" estaba
+            // ahi desde siempre con su musculo detallado, su reparto de esfuerzo
+            // por musculo y su GIF. La siembra le puso `isCore: false` y
+            // desaparecio de los basicos —de 141 a 140— sin que nada avisara.
+            //
+            // Que una maquina este en un gimnasio es una ETIQUETA sobre el
+            // ejercicio, no una definicion nueva. Asi que:
+            //   - `gimnasios` se anade a lo que hubiera ($addToSet)
+            //   - `marca` se pone siempre: es el dato que aporta esto
+            //   - todo lo demas SOLO al crear ($setOnInsert), para no pisar la
+            //     ficha buena de un ejercicio que ya existia
+            await Exercise.bulkWrite(docs.map(({ name, marca, gimnasios, ...resto }) => ({
                 updateOne: {
-                    filter: { name: d.name, user: null },
-                    update: { $set: d },
+                    filter: { name, user: null },
+                    update: {
+                        $addToSet: { gimnasios: { $each: gimnasios } },
+                        $set: { marca },
+                        $setOnInsert: { name, ...resto }
+                    },
                     upsert: true
                 }
             })));
