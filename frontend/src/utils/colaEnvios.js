@@ -92,8 +92,92 @@ const escribir = (lista) => {
     }
 };
 
+/**
+ * ⚠️ EL NÚMERO SE GUARDA EN MEMORIA, NO SE LEE DEL DISCO CADA VEZ.
+ *
+ * `pendientes()` la llama React en cada pintado a través de `useSyncExternalStore`,
+ * y esa función tiene que ser barata y devolver SIEMPRE lo mismo mientras nada
+ * cambie. Leer `localStorage` ahí sería ir al disco en cada pintado; peor aún,
+ * `leer()` a veces ESCRIBE (la mudanza de la clave vieja), y escribir mientras
+ * React pinta es la receta del bucle infinito.
+ *
+ * Así que el número vive aquí y solo se recalcula cuando la cola se toca de
+ * verdad: al encolar y al vaciar.
+ */
+let resumen = null;
+const oyentes = new Set();
+
+/** El resumen vacío, en una constante para que su identidad no cambie nunca. */
+const NADA = Object.freeze({ total: 0, etiquetas: Object.freeze([]) });
+
+/** Se avisa a quien esté mirando. Un oyente que reviente no puede tumbar al resto. */
+const avisar = () => {
+    for (const fn of oyentes) {
+        try { fn(); } catch { /* el problema es suyo */ }
+    }
+};
+
+/**
+ * Recuenta y, si algo ha cambiado, avisa.
+ *
+ * ⚠️ EL OBJETO SOLO SE SUSTITUYE SI EL CONTENIDO ES OTRO.
+ *
+ * React compara el resultado de `getSnapshot` por identidad. Devolver un objeto
+ * nuevo cada vez —aunque lleve los mismos números dentro— le hace creer que
+ * siempre hay cambios y repinta sin parar. Por eso se compara el contenido y se
+ * conserva el objeto de antes cuando es igual.
+ */
+const recontar = () => {
+    const lista = leer();
+
+    const cuenta = {};
+    for (const e of lista) {
+        const etiqueta = e.etiqueta || 'cambio';
+        cuenta[etiqueta] = (cuenta[etiqueta] || 0) + 1;
+    }
+
+    const nuevo = lista.length === 0 ? NADA : {
+        total: lista.length,
+        // Ordenadas de más a menos para que el aviso empiece por lo gordo.
+        etiquetas: Object.entries(cuenta)
+            .sort((a, b) => b[1] - a[1])
+            .map(([nombre, cuantos]) => ({ nombre, cuantos }))
+    };
+
+    const igual = resumen &&
+        resumen.total === nuevo.total &&
+        JSON.stringify(resumen.etiquetas) === JSON.stringify(nuevo.etiquetas);
+
+    // La primera cuenta no avisa a nadie: puede ocurrir DURANTE un pintado (es
+    // la que hace React al montar) y avisar ahí sería pedirle que repinte a
+    // mitad de pintar.
+    const primeraVez = resumen === null;
+    if (!igual) {
+        resumen = nuevo;
+        if (!primeraVez) avisar();
+    }
+    return resumen;
+};
+
+/**
+ * Qué hay esperando: `{ total, etiquetas: [{ nombre, cuantos }] }`.
+ *
+ * Pensada para `useSyncExternalStore`: barata y con identidad estable.
+ */
+export const resumenCola = () => (resumen === null ? recontar() : resumen);
+
 /** Cuántos envíos están esperando a que vuelva la red. */
-export const pendientes = () => leer().length;
+export const pendientes = () => resumenCola().total;
+
+/**
+ * Avisa cuando cambia el número. Devuelve la función para desengancharse.
+ *
+ * La firma es la que pide `useSyncExternalStore`, que es como lo mira React.
+ */
+export const suscribirse = (fn) => {
+    oyentes.add(fn);
+    return () => oyentes.delete(fn);
+};
 
 /** Una marca por envío. Se pone antes de mandarlo, no al reintentar. */
 export const nuevaMarca = () =>
@@ -116,7 +200,7 @@ export const encolar = ({ ruta, envio, metodo = 'post', etiqueta = 'cambio' }) =
     const lista = leer().filter(e => !clienteId || e.clienteId !== clienteId);
     lista.push({ ruta, metodo, envio, etiqueta, clienteId, guardadoEn: Date.now(), intentos: 0 });
     escribir(lista);
-    return lista.length;
+    return recontar().total;
 };
 
 /** ¿El fallo fue de red, o el servidor ha rechazado el envío? */
@@ -141,9 +225,10 @@ export const esFalloDeRed = (error) => {
  */
 export const vaciarCola = async () => {
     const lista = leer();
-    if (lista.length === 0) return { enviados: 0, quedan: 0, etiquetas: [] };
+    if (lista.length === 0) { recontar(); return { enviados: 0, quedan: 0, etiquetas: [] }; }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         escribir(lista);   // por si venían de la clave vieja
+        recontar();
         return { enviados: 0, quedan: lista.length, etiquetas: [] };
     }
 
@@ -169,6 +254,7 @@ export const vaciarCola = async () => {
     }
 
     escribir(quedan);
+    recontar();
     return { enviados, quedan: quedan.length, etiquetas };
 };
 

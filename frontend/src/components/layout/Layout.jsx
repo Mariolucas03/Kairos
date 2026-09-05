@@ -7,6 +7,7 @@ import api from '../../services/api';
 import RedemptionScreen from './RedemptionScreen';
 import IosInstallPrompt from '../common/IosInstallPrompt';
 import AvisoServidor from '../common/AvisoServidor';
+import AvisoSinEnviar from '../common/AvisoSinEnviar';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -202,6 +203,10 @@ function LayoutContent() {
                     onFinish={handleWorkoutFinish}
                 />
             )}
+
+            {/* Lo que se guardo sin cobertura y sigue esperando. Va abajo, no
+                arriba, para no pelearse con el aviso del servidor. */}
+            <AvisoSinEnviar />
 
             {/* El menú inferior sí se mantiene en el perfil: permite seguir navegando */}
             {!isUiHidden && <Footer />}
