@@ -29,8 +29,16 @@ const ensureDailyLog = async (userId, dateString, userStreak) => {
         ]
     };
 
-    const [activeCount, lastLog, nutritionLog] = await Promise.all([
+    // ⚠️ SOLO EL DIA DE HOY SE PONE AL DIA CON LA REALIDAD.
+    //
+    // Esta funcion tambien se llama con fechas pasadas (el home tiene
+    // calendario). El registro de un dia cerrado es HISTORIA: recalcularlo con
+    // las misiones que tienes hoy reescribiria lo que hiciste aquel dia.
+    const esHoy = dateString === getServerDateString();
+
+    const [activeCount, hechasAhora, lastLog, nutritionLog] = await Promise.all([
         Mission.countDocuments(missionQuery),
+        esHoy ? Mission.countDocuments({ ...missionQuery, completed: true }) : Promise.resolve(null),
         DailyLog.findOne({ user: userId }).sort({ date: -1 }).select('weight').lean(),
         NutritionLog.findOne({ user: userId, date: dateString }).lean()
     ]);
@@ -44,7 +52,9 @@ const ensureDailyLog = async (userId, dateString, userStreak) => {
             $setOnInsert: {
                 user: userId, date: dateString, weight: persistentWeight, streakCurrent: userStreak,
                 nutrition: { totalKcal: currentKcal },
-                missionStats: { completed: 0, total: activeCount, listCompleted: [] },
+                // Un dia pasado que no tenia registro se crea VACIO: ponerle
+                // las misiones que tienes hoy seria inventarse su historia.
+                missionStats: { completed: 0, total: esHoy ? activeCount : 0, listCompleted: [] },
                 gains: { coins: 0, xp: 0, lives: 0 }
             }
         },
@@ -53,9 +63,39 @@ const ensureDailyLog = async (userId, dateString, userStreak) => {
 
     let needsSave = false;
 
-    if (log.missionStats.total !== activeCount) {
+    // ⚠️ El total tambien SOLO PARA HOY.
+    //
+    // Esto se recalculaba para cualquier fecha, asi que abrir un dia pasado en
+    // el calendario le reescribia el total con las misiones que tienes AHORA. Un
+    // dia en el que hiciste 7 de 9 pasaba a decir "7 de 1" en cuanto hoy tienes
+    // una sola mision. El fallo estaba desde siempre; se veia poco porque
+    // `completed` tambien estaba mal y los dos numeros eran igual de falsos.
+    if (esHoy && log.missionStats.total !== activeCount) {
         log.missionStats.total = activeCount;
-        if (log.missionStats.completed > activeCount) log.missionStats.completed = activeCount;
+        needsSave = true;
+    }
+
+    // ⚠️ `completed` SE DERIVA, igual que `total`.
+    //
+    // Antes era un contador: `$inc` de uno cada vez que completabas una mision,
+    // y nada mas lo tocaba salvo un recorte de emergencia si se pasaba del total.
+    // O sea que las dos mitades del "3/5" del widget se calculaban de formas
+    // distintas, y en cuanto pasaba cualquier cosa dejaban de contar lo mismo:
+    //
+    //   - completas una mision y la borras -> el contador se quedaba arriba y el
+    //     total bajaba, asi que se recortaba a la fuerza y perdias el numero
+    //   - editas una mision diaria a semanal -> sale del total, el contador no
+    //   - una coop que el otro cancela -> igual
+    //
+    // Ahora se cuentan las dos igual: mirando las misiones que hay. Si una deja
+    // de ser de hoy, sale de los dos lados a la vez y el widget nunca miente.
+    //
+    // El `$inc` de missionController se queda: pinta el numero al instante sin
+    // esperar a recargar, y esto lo corrige en la siguiente lectura. Lo que
+    // escribe en `listCompleted` es otra cosa —el registro de lo que cobraste
+    // ese dia— y ese si es historia, aunque despues borres la mision.
+    if (esHoy && hechasAhora !== null && log.missionStats.completed !== hechasAhora) {
+        log.missionStats.completed = hechasAhora;
         needsSave = true;
     }
 
