@@ -6,7 +6,7 @@ const Notification = require('../models/Notification');
 const { enviarNotificacionManual } = require('./pushController');
 const SystemState = require('../models/SystemState');
 const DailyLog = require('../models/DailyLog');
-const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder } = require('../utils/scheduler');
+const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder, runMorningReminder } = require('../utils/scheduler');
 const { getMadridDateString } = require('../utils/dateHelpers');
 const mongoose = require('mongoose');
 const AdminLog = require('../models/AdminLog');
@@ -359,6 +359,10 @@ const estadoDelSistema = asyncHandler(async (req, res) => {
             avisoDeLas20: {
                 ultimoDia: porClave['evening-reminder']?.value || null,
                 enviadoHoy: porClave['evening-reminder']?.value === hoy
+            },
+            avisoDeEntreno: {
+                ultimoDia: porClave['morning-routine-reminder']?.value || null,
+                enviadoHoy: porClave['morning-routine-reminder']?.value === hoy
             }
         }
     });
@@ -400,8 +404,14 @@ const lanzarMantenimiento = asyncHandler(async (req, res) => {
         return res.json({ message: 'Aviso enviado a ' + total + ' personas', detalle: r });
     }
 
+    if (tarea === 'entreno') {
+        const r = await runMorningReminder({ forzar: true });
+        await anotar(req, 'tarea-entreno', { resumen: 'lanzo el aviso de "hoy toca" a mano', detalle: r });
+        return res.json({ message: 'Aviso de entreno enviado a ' + (r.avisados || 0) + ' personas', detalle: r });
+    }
+
     res.status(400);
-    throw new Error('Tarea no válida: usa castigo, premios o aviso');
+    throw new Error('Tarea no válida: usa castigo, premios, aviso o entreno');
 });
 
 /**

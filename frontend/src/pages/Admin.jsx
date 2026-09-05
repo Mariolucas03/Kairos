@@ -38,10 +38,11 @@ const cuando = (f) => f
     ? new Date(f).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
     : '—';
 
-// Las tres tareas que dependen de que un cron externo las llame a su hora. Si
-// ese día falló, esto es la forma de arreglarlo sin abrir un ordenador.
+// Las tareas que dependen de que un cron las llame a su hora. Si ese día falló,
+// esto es la forma de arreglarlo sin abrir un ordenador.
 const TAREAS = [
     { key: 'aviso', texto: 'Mandar el aviso de las 20:00', aviso: 'Manda la notificación de misiones pendientes a todo el mundo AHORA.' },
+    { key: 'entreno', texto: 'Mandar el aviso de "hoy toca"', aviso: 'Avisa a quien hoy le toca una rutina y todavía no ha entrenado.' },
     { key: 'castigo', texto: 'Ejecutar el castigo nocturno', aviso: 'Resta vida por las misiones no cumplidas ayer. No castiga dos veces si ya se hizo.' },
     { key: 'premios', texto: 'Repartir premios del ranking', aviso: 'Reparte las fichas del ranking del mes cerrado. No paga dos veces.' }
 ];

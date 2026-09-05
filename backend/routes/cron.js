@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder } = require('../utils/scheduler');
+const { runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder, runMorningReminder } = require('../utils/scheduler');
 const { protectCron } = require('../middleware/cronMiddleware');
 
 // --- 1. RUTA DE MANTENIMIENTO NOCTURNO (PESADA) ---
@@ -46,6 +46,22 @@ router.get('/evening-reminder', protectCron, async (req, res) => {
         res.status(200).json(result);
     } catch (error) {
         console.error("❌ Error en el recordatorio de las 20:00:", error);
+        res.status(500).send('Error');
+    }
+});
+
+// --- 1.d AVISO DE LAS 09:00: QUE TOCA ENTRENAR HOY ---
+// Las rutinas guardan en que dias tocan. Esto lo convierte en un aviso.
+// El cron interno (0 9 * * *) ya se dispara porque el ping mantiene despierta
+// la instancia; esta ruta esta por si algun dia deja de hacerlo. Programar en
+// cron-job.org a las 09:00 (Madrid).
+// Es idempotente: llamarla dos veces el mismo dia NO manda dos avisos.
+router.get('/morning-reminder', protectCron, async (req, res) => {
+    try {
+        const result = await runMorningReminder({ forzar: req.query.forzar === '1' });
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("❌ Error en el aviso de entreno:", error);
         res.status(500).send('Error');
     }
 });

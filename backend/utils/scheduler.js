@@ -8,11 +8,14 @@ const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingServic
 const { getMadridDateString, getMadridMonthString } = require('./dateHelpers');
 const SystemState = require('../models/SystemState');
 const Notification = require('../models/Notification');
+const Routine = require('../models/Routine');
+const WorkoutLog = require('../models/WorkoutLog');
 
 // Clave donde se anota el ULTIMO dia ya castigado, para no castigar dos veces
 const CLAVE_NOCTURNO = 'nightly-maintenance';
 // Lo mismo para el aviso de las 20:00: marca el ultimo dia ya avisado
 const CLAVE_RECORDATORIO = 'evening-reminder';
+const CLAVE_AVISO_ENTRENO = 'morning-routine-reminder';
 
 // Vida que cuesta fallar cada mision. Vive aqui arriba porque la usan los DOS:
 // el castigo de la noche y el aviso de las 20:00, que anuncia exactamente lo
@@ -210,6 +213,194 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         usuarios.length + ' con notificaciones activas).');
 
     return { success: true, dia: hoy, ...informe, ranking, candidatos: usuarios.length };
+};
+
+// --- AVISO DE LA MANANA: QUE TOCA HOY ---
+
+/**
+ * El dia de la semana, en hora de Madrid.
+ *
+ * ⚠️ NO es `new Date().getDay()`.
+ *
+ * Eso da el dia del SERVIDOR, que en Render es UTC. Entre las 00:00 y las 02:00
+ * de Madrid todavia es el dia anterior alli, y un aviso de "hoy toca Pierna"
+ * mandado el dia equivocado es exactamente el tipo de fallo que hace que la
+ * gente apague las notificaciones. Sale de la misma fecha que usa el resto de
+ * la app, que para eso esta `getMadridDateString`.
+ */
+const diaDeLaSemanaEnMadrid = () => {
+    const [anio, mes, dia] = getMadridDateString().split('-').map(Number);
+    return new Date(Date.UTC(anio, mes - 1, dia)).getUTCDay();
+};
+
+/** "ayer", "hace 6 dias", o null si nunca se ha hecho. */
+const desdeCuando = (fecha) => {
+    if (!fecha) return null;
+    const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000);
+    if (dias <= 0) return 'hoy';
+    if (dias === 1) return 'ayer';
+    return `hace ${dias} días`;
+};
+
+/**
+ * El texto del aviso, a partir de las rutinas que tocan hoy.
+ *
+ * Aparte para poder probarlo: es donde estan todos los casos raros —una rutina,
+ * varias, una sin estrenar— y ninguno de ellos necesita base de datos.
+ *
+ * El cuerpo dice CUANTO cuesta y CUANDO fue la ultima vez, que es lo que uno
+ * necesita para decidir en el momento de leerlo. "Hoy toca Pierna" a secas es
+ * un despertador; "Hoy toca Pierna, 5 ejercicios, la ultima fue hace 6 dias" es
+ * una decision.
+ */
+const mensajeDeEntreno = (rutinas) => {
+    if (!rutinas || rutinas.length === 0) return null;
+
+    if (rutinas.length === 1) {
+        const [r] = rutinas;
+        const cuantos = (r.exercises || []).length;
+        const ultima = desdeCuando(r.lastPerformed);
+
+        return {
+            title: `💪 Hoy toca ${r.name}`,
+            // Dos frases, no una lista: van detras de un punto y por tanto
+            // empiezan en mayuscula. "5 ejercicios. la ultima fue ayer" se lee
+            // como un descuido, y una notificacion es de lo poco que TODO el
+            // mundo ve siempre.
+            body: [
+                cuantos === 1 ? '1 ejercicio.' : `${cuantos} ejercicios.`,
+                ultima ? `La última fue ${ultima}.` : 'Aún sin estrenar.'
+            ].join(' '),
+            icon: '/assets/icons/icon-192x192.png',
+            url: '/gym'
+        };
+    }
+
+    // Con varias no se listan todas: en el movil el titulo se corta y el usuario
+    // se queda viendo media palabra. Se nombran dos y se dice cuantas hay.
+    const nombres = rutinas.map(r => r.name);
+    return {
+        title: `💪 Hoy toca ${nombres.slice(0, 2).join(' o ')}`,
+        body: `Tienes ${nombres.length} rutinas para hoy. Elige una y empieza.`,
+        icon: '/assets/icons/icon-192x192.png',
+        url: '/gym'
+    };
+};
+
+/**
+ * AVISO DE LAS 09:00: QUE TOCA ENTRENAR HOY.
+ *
+ * Las rutinas ya guardaban en que dias de la semana tocan (`dias`), pero ese
+ * dato no servia para nada fuera de la propia pantalla del gimnasio: si no
+ * abrias la app, nada te recordaba que hoy tocaba pierna.
+ *
+ * ⚠️ AL QUE YA HA ENTRENADO HOY NO SE LE AVISA.
+ *
+ * Es la parte que hace que esto sea util y no molesto. Un recordatorio de algo
+ * que ya has hecho no es un recordatorio, es ruido, y el ruido se paga apagando
+ * las notificaciones — y con ellas se van tambien las que si importan.
+ *
+ * Idempotente por dia, con la misma reserva que el aviso de las 20:00: el cron
+ * interno y uno externo pueden coincidir, y dos veces "hoy toca Pierna" es
+ * peor que ninguna.
+ */
+const runMorningReminder = async ({ forzar = false } = {}) => {
+    const hoy = getMadridDateString();
+
+    if (!forzar) {
+        const reserva = await SystemState.findOneAndUpdate(
+            { key: CLAVE_AVISO_ENTRENO, value: { $ne: hoy } },
+            { $set: { value: hoy, updatedAt: new Date() } },
+            { upsert: true, new: false }
+        ).catch(err => {
+            if (err.code === 11000) return 'perdida';
+            throw err;
+        });
+
+        if (reserva === 'perdida' || reserva?.value === hoy) {
+            console.log('✅ El aviso de entreno del ' + hoy + ' ya se mando, no se repite.');
+            return { saltado: true, dia: hoy };
+        }
+    }
+
+    const diaSemana = diaDeLaSemanaEnMadrid();
+
+    // Las rutinas de hoy, de todo el mundo, en una consulta. Una rutina sin
+    // ejercicios no se avisa: no hay nada que hacer con ella.
+    const rutinas = await Routine.find({ dias: diaSemana })
+        .select('user name exercises lastPerformed')
+        .lean();
+
+    const conEjercicios = rutinas.filter(r => (r.exercises || []).length > 0);
+
+    if (conEjercicios.length === 0) {
+        console.log('🏋️ Aviso de entreno: hoy no le toca a nadie.');
+        return { success: true, dia: hoy, avisados: 0, candidatos: 0 };
+    }
+
+    const dueños = [...new Set(conEjercicios.map(r => r.user.toString()))];
+
+    const usuarios = await User.find({
+        _id: { $in: dueños },
+        pushSubscriptions: { $exists: true, $not: { $size: 0 } }
+    }).select('username pushSubscriptions').lean();
+
+    if (usuarios.length === 0) {
+        return { success: true, dia: hoy, avisados: 0, candidatos: 0 };
+    }
+
+    // Quien ya ha entrenado hoy. Se piden de las ultimas 36 h y se filtra por
+    // la fecha de Madrid: pedirlos por "principio del dia en Madrid" obligaria
+    // a construir esa hora exacta en UTC, y esta version no puede equivocarse
+    // de dia por un cambio de horario.
+    const desdeAyer = new Date(Date.now() - 36 * 3600 * 1000);
+    const registros = await WorkoutLog.find({
+        user: { $in: usuarios.map(u => u._id) },
+        date: { $gte: desdeAyer }
+    }).select('user date').lean();
+
+    const yaEntrenaron = new Set(
+        registros
+            .filter(l => getMadridDateString(l.date) === hoy)
+            .map(l => l.user.toString())
+    );
+
+    const porUsuario = new Map();
+    for (const r of conEjercicios) {
+        const id = r.user.toString();
+        if (!porUsuario.has(id)) porUsuario.set(id, []);
+        porUsuario.get(id).push(r);
+    }
+
+    let avisados = 0;
+    let saltadosPorHaberEntrenado = 0;
+
+    const envios = usuarios.map(async (user) => {
+        const id = user._id.toString();
+
+        if (yaEntrenaron.has(id)) { saltadosPorHaberEntrenado++; return; }
+
+        const mensaje = mensajeDeEntreno(porUsuario.get(id));
+        if (!mensaje) return;
+
+        await sendPushToUser(user, mensaje);
+        avisados++;
+    });
+
+    await Promise.allSettled(envios);
+
+    if (forzar) {
+        await SystemState.updateOne(
+            { key: CLAVE_AVISO_ENTRENO },
+            { $set: { value: hoy, updatedAt: new Date() } },
+            { upsert: true }
+        );
+    }
+
+    console.log('🏋️ Aviso de entreno: ' + avisados + ' avisados, ' +
+        saltadosPorHaberEntrenado + ' ya habian entrenado (de ' + usuarios.length + ' con rutina hoy).');
+
+    return { success: true, dia: hoy, avisados, yaEntrenados: saltadosPorHaberEntrenado, candidatos: usuarios.length };
 };
 
 // --- PREMIOS MENSUALES RANKING ---
@@ -587,9 +778,22 @@ const initScheduledJobs = () => {
         await runEveningReminder();
     }, { scheduled: true, timezone: "Europe/Madrid" });
 
+    // 09:00: que toca entrenar hoy. Este cron interno SI se dispara, porque el
+    // ping de cada 10 minutos mantiene la instancia de Render despierta; aun
+    // asi la tarea esta expuesta en /api/cron/morning-reminder por si algun dia
+    // el ping falla y se prefiere un cron externo, como con el de las 20:00.
+    cron.schedule('0 9 * * *', async () => {
+        await runMorningReminder();
+    }, { scheduled: true, timezone: "Europe/Madrid" });
+
     cron.schedule('0 0 1 * *', async () => {
         await runMonthlyRankingRewards();
     }, { scheduled: true, timezone: "Europe/Madrid" });
 };
 
-module.exports = { initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder, ponerseAlDia, esperarPuestaAlDia };
+module.exports = {
+    initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder,
+    runMorningReminder, ponerseAlDia, esperarPuestaAlDia,
+    // Para las pruebas
+    mensajeDeEntreno, diaDeLaSemanaEnMadrid
+};
