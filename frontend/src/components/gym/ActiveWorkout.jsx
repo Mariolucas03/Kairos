@@ -3,7 +3,7 @@ import usePantallaEncendida from '../../hooks/usePantallaEncendida';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
@@ -526,6 +526,67 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return { proximo: 'Última serie. A terminar.', hecho, cumplida };
     }, [restContexto, exercises]);
 
+    /**
+     * LAS SUPERSERIES.
+     *
+     * ⚠️ ANTES NO HACÍAN NADA.
+     *
+     * En crear rutina se le pone la misma letra a dos ejercicios para hacerlos
+     * seguidos sin descanso. La letra se guardaba, viajaba al servidor y se
+     * escribía en el registro del entreno... y ahí se acababa. Durante el
+     * entreno no agrupaba nada, no se veía por ningún lado, y entre un ejercicio
+     * y el otro saltaba el descanso completo — que es exactamente lo contrario
+     * de lo que significa una superserie.
+     *
+     * Ahora: los del mismo grupo se pintan enlazados, y al terminar una serie de
+     * uno NO se descansa si queda otro del grupo por hacer. El descanso llega al
+     * cerrar la vuelta entera.
+     */
+    const letraDe = (ex) => (ex?.superserie || '').trim().toUpperCase();
+
+    const grupoDe = (exIdx) => {
+        const letra = letraDe(exercises[exIdx]);
+        if (!letra) return [];
+        const miembros = exercises
+            .map((e, i) => (letraDe(e) === letra ? i : -1))
+            .filter(i => i >= 0);
+        // Una letra puesta a un solo ejercicio no es una superserie: es una letra
+        // suelta, y tratarla como grupo le quitaria el descanso sin motivo.
+        return miembros.length > 1 ? miembros : [];
+    };
+
+    /**
+     * A quién le toca ahora dentro del grupo, o null si la vuelta está cerrada.
+     *
+     * ⚠️ NO es "¿queda algo por hacer?".
+     *
+     * Esa fue la primera versión y estaba mal: mientras no terminas la ÚLTIMA
+     * vuelta siempre queda algo por hacer en el grupo, así que no descansabas
+     * nunca. Una superserie es un círculo —A, B, A, B— y el descanso llega al
+     * cerrar cada vuelta, no al acabarlas todas.
+     *
+     * Lo que hay que mirar es quién va POR DETRÁS en la vuelta: si otro del
+     * grupo lleva menos series hechas que tú, le toca a él y se sigue sin
+     * descansar. Si todos van iguales o por delante, la vuelta está cerrada.
+     *
+     * Se cuenta con la serie que se acaba de marcar sumada a mano: el estado de
+     * React todavía no la tiene cuando esto corre.
+     */
+    const siguienteDelGrupo = (exIdx) => {
+        const grupo = grupoDe(exIdx);
+        if (grupo.length === 0) return null;
+
+        const hechas = (i) => exercises[i].setsData.filter(x => x.completed).length;
+        const misHechas = hechas(exIdx) + 1;
+        const desde = grupo.indexOf(exIdx);
+
+        for (let k = 1; k < grupo.length; k++) {
+            const i = grupo[(desde + k) % grupo.length];
+            if (hechas(i) < misHechas && exercises[i].setsData.some(x => !x.completed)) return i;
+        }
+        return null;
+    };
+
     const cycleSetType = (exIdx, setIdx) => {
         const types = ['N', 'W', 'F', 'D'];
         setExercises(prev => prev.map((ex, i) => {
@@ -559,6 +620,19 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }));
 
         if (!currentSet.completed && currentSet.type !== 'D') {
+            // ⚠️ Si queda otro del grupo, NO se descansa: eso es la superserie.
+            //
+            // Se avisa de a cuál toca ir, porque encadenar dos ejercicios sin
+            // aviso y sin cronómetro parece que la app se ha saltado el descanso
+            // por error.
+            const siguiente = siguienteDelGrupo(exIdx);
+            if (siguiente !== null) {
+                setToast({
+                    message: `Sin descanso · ahora ${exercises[siguiente].name}`,
+                    type: 'success'
+                });
+                return;
+            }
             startRest(exercises[exIdx]?.rest, exIdx, setIdx);
         }
     };
@@ -801,9 +875,32 @@ export default function ActiveWorkout({ routine, onFinish }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar bg-black pb-40">
                 {exercises.map((ex, exIdx) => (
                     <div key={exIdx} className="space-y-3">
+                        {/* La marca de la superserie. Va pegada al borde izquierdo
+                            y solo se cierra en el último del grupo, de modo que
+                            los dos (o tres) se leen como un bloque. */}
+                        {(() => {
+                            const grupo = grupoDe(exIdx);
+                            if (grupo.length === 0) return null;
+                            const primero = grupo[0] === exIdx;
+                            const nombres = grupo.filter(i => i !== exIdx).map(i => exercises[i].name);
+                            return primero ? (
+                                <div className="flex items-center gap-2 px-2 pt-1">
+                                    <Link2 size={13} className="text-purple-400 shrink-0" />
+                                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-[0.14em] not-italic">
+                                        Superserie {letraDe(ex)}
+                                    </span>
+                                    <span className="text-[10px] text-zinc-600 font-bold truncate">
+                                        · seguido con {nombres.join(' y ')}, sin descanso
+                                    </span>
+                                </div>
+                            ) : null;
+                        })()}
+
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-white font-black text-xl uppercase tracking-tight flex items-center gap-2 leading-tight max-w-[65%]">
-                                <span className="text-yellow-500 text-sm shrink-0">#{exIdx + 1}</span> {ex.name}
+                                <span className={`text-sm shrink-0 ${grupoDe(exIdx).length > 0 ? 'text-purple-400' : 'text-yellow-500'}`}>
+                                    #{exIdx + 1}
+                                </span> {ex.name}
                             </h3>
                             <div className="flex items-center gap-2">
                                 {/* Récord: los kilos solos no dicen nada (no es lo mismo
@@ -872,7 +969,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             );
                         })()}
 
-                        <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden p-1">
+                        <div className={`bg-zinc-950 rounded-3xl overflow-hidden p-1 border ${grupoDe(exIdx).length > 0
+                            ? 'border-purple-500/30 border-l-[3px] border-l-purple-500'
+                            : 'border-zinc-800'}`}>
                             <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
                                 {/* Las columnas se llaman distinto segun como se mida el
                                     ejercicio: sin esto, escribir 90 segundos en una casilla
