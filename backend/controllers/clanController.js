@@ -30,6 +30,39 @@ const EVENT_GOALS_PER_MEMBER = {
 // Un clan de una sola persona tampoco debería tenerlo regalado
 const MIN_MEMBERS_FOR_GOAL = 2;
 
+/**
+ * EL PODER DEL CLAN.
+ *
+ * ⚠️ ERA UN CONTADOR, Y SE IBA A NEGATIVO.
+ *
+ * `totalPower` se guardaba y se movía a mano: al entrar se sumaba tu nivel por
+ * cien, al salir se restaba tu nivel por cien. Suena simétrico y no lo es,
+ * porque el nivel de cuando entras NO es el nivel de cuando sales.
+ *
+ *   entras a nivel 3   ->  +300
+ *   entrenas dos meses ->  (nada, el clan no se entera de que subes)
+ *   te vas a nivel 8   ->  -800
+ *
+ * El clan pierde 500 de poder que nunca tuvo. Y eso no es un caso raro: subir
+ * de nivel es para lo que se entra en un clan. Con dos o tres bajas el número
+ * se va por debajo de cero.
+ *
+ * Al revés fallaba igual, sin que nadie se moviera: un clan lleno de gente que
+ * entrena se quedaba con el poder del día que se apuntaron.
+ *
+ * Y ese número ORDENA EL RANKING de clanes, además de salir en tu ficha y en la
+ * de los clanes que miras.
+ *
+ * Ahora no se guarda un contador: se cuenta la gente que hay. Es la misma
+ * decisión que se tomó con el «3 de 5» de las misiones y con los miembros
+ * fantasma — el mismo número calculado de dos formas siempre acaba dando dos
+ * respuestas distintas.
+ */
+const PODER_POR_NIVEL = 100;
+
+const poderDe = (miembros = []) =>
+    miembros.reduce((total, m) => total + (m?.level || 1) * PODER_POR_NIVEL, 0);
+
 const getEventGoal = (eventType, memberCount = 1) => {
     const porMiembro = EVENT_GOALS_PER_MEMBER[eventType] || EVENT_GOALS_PER_MEMBER.volume;
     return porMiembro * Math.max(memberCount, MIN_MEMBERS_FOR_GOAL);
@@ -62,9 +95,18 @@ const buildTiers = (goal) => Object.keys(TIER_FACTORS).map(t => {
 });
 
 /**
- * Un clan sin nadie dentro no debe seguir existiendo: ocupa sitio en el
+ * EL REPASO DE UN CLAN. Devuelve `true` si lo ha borrado.
+ *
+ * Hace dos cosas, y las hace juntas porque cuestan la misma consulta: mirar
+ * quién hay dentro de verdad.
+ *
+ * 1. Un clan sin nadie dentro no debe seguir existiendo: ocupa sitio en el
  * explorador, se puede "entrar" en él y su nombre queda pillado para siempre
  * (el nombre es único). Se llama después de cada salida o expulsión.
+ *
+ * 2. Pone al día el poder. Ya cargaba el nivel de cada miembro para heredar el
+ * liderazgo, así que sumarlo sale gratis; lo que hay que evitar es la escritura
+ * cuando el número ya es correcto, y por eso solo se guarda si ha cambiado.
  *
  * ⚠️ Cuenta PERSONAS QUE EXISTEN, no entradas en la lista.
  *
@@ -81,10 +123,10 @@ const buildTiers = (goal) => Object.keys(TIER_FACTORS).map(t => {
  * miembros y el poder total mentirían para siempre, y el poder ordena el
  * ranking de clanes.
  */
-const borrarClanSiVacio = async (clanId) => {
+const repasarClan = async (clanId) => {
     if (!clanId) return false;
 
-    const clan = await Clan.findById(clanId).select('members leader name').lean();
+    const clan = await Clan.findById(clanId).select('members leader name totalPower').lean();
     if (!clan) return false;
 
     const ids = clan.members || [];
@@ -100,32 +142,38 @@ const borrarClanSiVacio = async (clanId) => {
         return true;
     }
 
+    const cambios = {};
+
+    // El poder, siempre. No es "por si hay fantasmas": es que un miembro que
+    // sube de nivel no avisa a nadie, así que el número guardado envejece solo.
+    const poderReal = poderDe(vivos);
+    if (clan.totalPower !== poderReal) cambios.totalPower = poderReal;
+
+    // Los fantasmas: ids de cuentas que ya no existen.
     if (vivos.length !== ids.length) {
-        const vivosIds = vivos.map(v => v._id);
-        const cambios = {
-            members: vivosIds,
-            // El poder se recalcula desde cero en vez de restar: si ya venía
-            // torcido por un miembro fantasma, restar lo deja torcido igual.
-            totalPower: vivos.reduce((t, v) => t + (v.level || 1) * 100, 0)
-        };
-
-        // Un clan sin líder vivo no se puede administrar ni disolver, así que
-        // hereda el de más rango (y a igualdad, el de más nivel).
-        const lideraAlguienVivo = clan.leader &&
-            vivos.some(v => v._id.toString() === clan.leader.toString());
-
-        if (!lideraAlguienVivo) {
-            const orden = { esclavo: 0, recluta: 1, guerrero: 2, rey: 3, dios: 4 };
-            const heredero = [...vivos].sort((a, b) => {
-                const r = (orden[b.clanRank] || 0) - (orden[a.clanRank] || 0);
-                return r !== 0 ? r : (b.level || 1) - (a.level || 1);
-            })[0];
-            cambios.leader = heredero._id;
-            await User.findByIdAndUpdate(heredero._id, { $set: { clanRank: 'dios' } });
-        }
-
-        await Clan.findByIdAndUpdate(clanId, { $set: cambios });
+        cambios.members = vivos.map(v => v._id);
         console.log(`🏰 Clan ${clan.name || clanId}: ${ids.length - vivos.length} miembro(s) fantasma limpiados`);
+    }
+
+    // El líder. Antes esto solo se miraba si había fantasmas; ahora se mira
+    // siempre, y así también se arregla el clan que se quedó sin líder por
+    // cualquier otro motivo. Si el líder está vivo y dentro, no hace nada.
+    const lideraAlguienVivo = clan.leader &&
+        vivos.some(v => v._id.toString() === clan.leader.toString());
+
+    if (!lideraAlguienVivo) {
+        // Hereda el de más rango, y a igualdad, el de más nivel.
+        const orden = { esclavo: 0, recluta: 1, guerrero: 2, rey: 3, dios: 4 };
+        const heredero = [...vivos].sort((a, b) => {
+            const r = (orden[b.clanRank] || 0) - (orden[a.clanRank] || 0);
+            return r !== 0 ? r : (b.level || 1) - (a.level || 1);
+        })[0];
+        cambios.leader = heredero._id;
+        await User.findByIdAndUpdate(heredero._id, { $set: { clanRank: 'dios' } });
+    }
+
+    if (Object.keys(cambios).length > 0) {
+        await Clan.findByIdAndUpdate(clanId, { $set: cambios });
     }
 
     return false;
@@ -228,6 +276,14 @@ const getMyClan = asyncHandler(async (req, res) => {
         await clan.save();
     }
 
+    // El poder, al día. Los miembros ya vienen con su nivel, así que sale de lo
+    // que ya está cargado; solo se guarda si el número que había era otro.
+    const poderReal = poderDe(clan.members);
+    if (clan.totalPower !== poderReal) {
+        clan.totalPower = poderReal;
+        await clan.save();
+    }
+
     const memberIds = clan.members.map(m => m._id);
     const { memberStats, clanTotal } = await getClanMetrics(memberIds, weekStart, eventType);
 
@@ -314,10 +370,19 @@ const searchClans = asyncHandler(async (req, res) => {
     const candidatos = await Clan.find({}).select('_id').lean();
     let borrados = 0;
     for (const c of candidatos) {
-        if (await borrarClanSiVacio(c._id)) borrados++;
+        if (await repasarClan(c._id)) borrados++;
     }
     if (borrados) console.log(`🏰 ${borrados} clan(es) sin nadie dentro eliminados`);
 
+    // ⚠️ EL ORDEN SE FÍA DEL REPASO DE JUSTO ARRIBA.
+    //
+    // Ordenar por un campo guardado solo vale si el campo está bien, y hasta
+    // ahora no lo estaba: la clasificación de clanes salía ordenada por un
+    // número torcido. Ese bucle acaba de poner al día el poder de TODOS, con
+    // los niveles de este momento, así que aquí ya se puede ordenar por él.
+    //
+    // De paso, esto repara solo los clanes que ya venían mal de antes: la
+    // primera vez que alguien abre el explorador, quedan todos cuadrados.
     const clans = await Clan.find({ 'members.0': { $exists: true } })
         .sort({ totalPower: -1 })
         .limit(20)
@@ -355,7 +420,7 @@ const createClan = asyncHandler(async (req, res) => {
         minLevel: nivelSeguro,
         leader: userId,
         members: [userId],
-        totalPower: (user.level || 1) * 100,
+        totalPower: poderDe([user]),
         weeklyEvent: { startDate: getCurrentWeekStart(), claims: [] }
     });
 
@@ -381,8 +446,6 @@ const joinClan = asyncHandler(async (req, res) => {
         res.status(400); throw new Error(`Nivel insuficiente. Necesitas nivel ${clanData.minLevel}`);
     }
 
-    const powerToAdd = (user.level || 1) * 100;
-
     // 🔥 ATÓMICO: Intenta añadir si el miembro no está y si NO existe el elemento índice 9 (Max 10)
     const clanUpdate = await Clan.findOneAndUpdate(
         {
@@ -390,10 +453,9 @@ const joinClan = asyncHandler(async (req, res) => {
             members: { $ne: userId },
             "members.9": { $exists: false } // Asegura que haya menos de 10 miembros
         },
-        {
-            $addToSet: { members: userId },
-            $inc: { totalPower: powerToAdd }
-        },
+        // El poder NO se toca aquí: se recalcula abajo, con el clan ya cerrado.
+        // Sumarlo dentro de esta escritura es lo que lo rompía.
+        { $addToSet: { members: userId } },
         { new: true }
     );
 
@@ -404,6 +466,14 @@ const joinClan = asyncHandler(async (req, res) => {
     user.clan = clanUpdate._id;
     user.clanRank = 'esclavo';
     await user.save();
+
+    // Con el usuario ya apuntado, el repaso cuenta a todos los de dentro —
+    // incluido el que acaba de entrar— por su nivel de ahora mismo.
+    await repasarClan(clanUpdate._id);
+
+    // La respuesta tiene que llevar el poder YA recalculado: `clanUpdate` se
+    // leyo justo antes del repaso, asi que trae el numero de antes de entrar.
+    const clanAlDia = (await Clan.findById(clanUpdate._id)) || clanUpdate;
 
     // El lider es el unico que puede ascender o expulsar, asi que es el unico
     // al que le sirve de algo enterarse en el momento.
@@ -416,7 +486,7 @@ const joinClan = asyncHandler(async (req, res) => {
         });
     }
 
-    res.json({ message: `Unido a ${clanUpdate.name}`, clan: clanUpdate });
+    res.json({ message: `Unido a ${clanAlDia.name}`, clan: clanAlDia });
 });
 
 // @desc    Salir del clan (🔥 ATÓMICO)
@@ -431,8 +501,9 @@ const leaveClan = asyncHandler(async (req, res) => {
         return res.json({ message: 'Has salido.' });
     }
 
-    const powerToSubtract = (user.level || 1) * 100;
-
+    // Ni aquí ni en expulsar se resta nada: `repasarClan`, al final, vuelve a
+    // contar a los que quedan. Restar era el fallo — restaba tu nivel de HOY, no
+    // el que tenías el día que entraste, que es lo que se había sumado.
     if (clan.leader.toString() === userId.toString()) {
         if (clan.members.length <= 1) {
             await User.updateMany({ clan: clan._id }, { $set: { clan: null, clanRank: null } });
@@ -451,20 +522,16 @@ const leaveClan = asyncHandler(async (req, res) => {
 
             await Clan.findByIdAndUpdate(clan._id, {
                 $set: { leader: newLeader._id },
-                $pull: { members: userId },
-                $inc: { totalPower: -powerToSubtract }
+                $pull: { members: userId }
             });
             newLeader.clanRank = 'dios'; await newLeader.save();
         }
     } else {
-        await Clan.findByIdAndUpdate(clan._id, {
-            $pull: { members: userId },
-            $inc: { totalPower: -powerToSubtract }
-        });
+        await Clan.findByIdAndUpdate(clan._id, { $pull: { members: userId } });
     }
 
     user.clan = null; user.clanRank = null; await user.save();
-    await borrarClanSiVacio(clan._id);
+    await repasarClan(clan._id);
     res.json({ message: 'Has abandonado el clan.' });
 });
 
@@ -490,15 +557,10 @@ const kickMember = asyncHandler(async (req, res) => {
         throw new Error('Rango insuficiente para expulsar');
     }
 
-    const powerToSubtract = (target.level || 1) * 100;
-
-    await Clan.findByIdAndUpdate(requester.clan, {
-        $pull: { members: target._id },
-        $inc: { totalPower: -powerToSubtract }
-    });
+    await Clan.findByIdAndUpdate(requester.clan, { $pull: { members: target._id } });
 
     target.clan = null; target.clanRank = null; await target.save();
-    await borrarClanSiVacio(requester.clan);
+    await repasarClan(requester.clan);
     res.json({ message: 'Miembro expulsado de la alianza.' });
 });
 
@@ -571,6 +633,13 @@ const getClanDetails = asyncHandler(async (req, res) => {
     const weekStart = getCurrentWeekStart();
     const eventType = getCurrentEventType(weekStart);
     const goal = getEventGoal(eventType, clan.members.length);
+
+    const poderReal = poderDe(clan.members);
+    if (clan.totalPower !== poderReal) {
+        clan.totalPower = poderReal;
+        await clan.save();
+    }
+
     const { memberStats, clanTotal } = await getClanMetrics(clan.members.map(m => m._id), weekStart, eventType);
 
     const clanObj = clan.toObject();
@@ -595,5 +664,7 @@ const previewClan = getClanDetails;
 
 module.exports = {
     getMyClan, createClan, searchClans, joinClan, leaveClan, updateMemberRank, kickMember, claimEventReward,
-    getClanDetails, previewClan, updateClan
+    getClanDetails, previewClan, updateClan,
+    // Para las pruebas
+    poderDe, PODER_POR_NIVEL
 };
