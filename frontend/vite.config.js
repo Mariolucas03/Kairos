@@ -16,6 +16,26 @@ export default defineConfig(({ mode }) => {
 
     return {
         plugins: [react()],
+
+        // LAS PRUEBAS DEL FRONTEND.
+        //
+        // Van aqui y no en un vitest.config.js aparte para que hereden los
+        // plugins y los alias de arriba: una prueba que compila el JSX de otra
+        // forma que el build no esta probando lo que se despliega.
+        //
+        // `jsdom` porque casi todo lo que merece prueba aqui toca el navegador:
+        // la cola de envios vive en localStorage y los componentes se pintan.
+        // `globals` evita importar describe/test/expect en cada fichero, que es
+        // como ya funcionan las pruebas del backend con node:test.
+        test: {
+            environment: 'jsdom',
+            globals: true,
+            // Solo lo que este junto al codigo, en src/. Sin esto Vitest se
+            // mete en node_modules y en la copia vieja del proyecto.
+            include: ['src/**/*.{test,prueba}.{js,jsx}'],
+            restoreMocks: true
+        },
+
         // Esto ayuda a que Vite encuentre los archivos en Vercel
         base: '/',
         server: proxyTarget ? {

@@ -34,6 +34,22 @@ for (const nombre of [
     'queueMicrotask', 'globalThis', 'process'
 ]) globalesDelNavegador[nombre] = 'readonly';
 
+/**
+ * Los globales que Vitest inyecta en las pruebas (`globals: true` en
+ * vite.config.js), mas los tipos del DOM que solo se tocan al probar.
+ *
+ * ⚠️ Sin esto el DESPLIEGUE SE CAE. El `build` corre `eslint src` antes de
+ * compilar, `no-undef` esta en 'error' a proposito —es la regla que caza las
+ * pantallas rotas por una variable inexistente— y para ella `describe`, `test`
+ * y `expect` son variables que nadie ha declarado. Ciento cinco errores y
+ * Vercel no publica.
+ */
+const globalesDePruebas = {};
+for (const nombre of [
+    'describe', 'test', 'it', 'expect', 'vi', 'beforeEach', 'afterEach',
+    'beforeAll', 'afterAll', 'Navigator'
+]) globalesDePruebas[nombre] = 'readonly';
+
 export default [
     { ignores: ['dist/**', 'node_modules/**', 'public/**'] },
 
@@ -97,5 +113,11 @@ export default [
             // deliberadas, y una regla que se ignora no sirve para nada.
             'react-hooks/exhaustive-deps': 'warn'
         }
+    },
+
+    // Las pruebas: mismas reglas, mas los globales de Vitest.
+    {
+        files: ['**/*.{test,prueba}.{js,jsx}'],
+        languageOptions: { globals: { ...globalesDelNavegador, ...globalesDePruebas } }
     }
 ];
