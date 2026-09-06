@@ -81,7 +81,6 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             secondary: ex.secondary || [],
             sets: 3, // Valor inicial por defecto
             reps: "10-12",
-            targetWeight: 0,
             rest: 0 // 0 = usa el descanso general de la rutina
         }));
         setAddedExercises([...addedExercises, ...formatted]);

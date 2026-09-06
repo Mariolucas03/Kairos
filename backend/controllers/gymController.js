@@ -354,9 +354,6 @@ const copyWorkoutToRoutine = async (req, res) => {
                 secondary: ficha?.secondary || [],
                 sets: e.sets.length,
                 reps: repsMasFrecuentes(e.sets),
-                // El peso del otro es una referencia, no un objetivo: se deja a 0
-                // para que cada uno ponga el suyo en vez de arrastrar el ajeno.
-                targetWeight: 0,
                 rest: 0
             };
         });

@@ -8,7 +8,22 @@ const exerciseSchema = new mongoose.Schema({
     secondary: { type: [String], default: [] },
     sets: { type: Number, default: 3 },
     reps: { type: String, default: '10-12' },
-    targetWeight: { type: Number, default: 0 },
+
+    // ⚠️ AQUI VIVIAN `targetWeight` y `targetSegundos`, y no los leia nadie.
+    //
+    // Se escribian —siempre a 0, ni siquiera con un valor— al crear una rutina
+    // y al copiar el entreno de un amigo, viajaban al servidor, se guardaban... y
+    // ninguna pantalla ni ningun calculo los miraba jamas. El peso objetivo lo
+    // propone `services/progresionService.js` a partir de lo que levantaste la
+    // ultima vez, que es lo que reemplazo a ponerlo a mano.
+    //
+    // Son la tercera tanda de "ajustes muertos" que se quita: antes fueron el
+    // selector de progresion (greyskull y compania) y el tipo de serie, que
+    // tambien se guardaban sin que nada los usara. Un campo que solo se escribe
+    // hace pensar que la app lo tiene en cuenta, y no es verdad.
+    //
+    // Las rutinas ya guardadas los conservan en la base; simplemente dejan de
+    // devolverse, que es lo que ya pasaba de hecho.
     // Descanso propio de este ejercicio. Si es 0 se usa el general de la rutina.
     rest: { type: Number, default: 0 },
 
@@ -18,8 +33,6 @@ const exerciseSchema = new mongoose.Schema({
     esPesoCorporal: { type: Boolean, default: false },
     porLado: { type: Boolean, default: false },
     superserie: { type: String, default: '' },
-    // Segundos objetivo en los ejercicios de tiempo (equivale a `reps`)
-    targetSegundos: { type: Number, default: 0 },
 
     // Aquí vivían `progresion` e `incremento`: el sistema de progresión y el
     // salto de peso, elegidos ejercicio por ejercicio. Ya no se preguntan. La

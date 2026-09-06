@@ -16,6 +16,7 @@ import BodyMap from '../body/BodyMap';
 import { compressImage } from '../../utils/imageCompressor';
 import { encolar, esFalloDeRed } from '../../utils/colaEnvios';
 import { letraDe, grupoDe, siguienteDelGrupo } from '../../utils/superseries';
+import RestTimerModal from './RestTimerModal';
 
 // ==========================================
 // SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
@@ -46,75 +47,6 @@ const GlobalTimerDisplay = ({ startTime, isMinimized }) => {
 // ==========================================
 // SUB-COMPONENTE: MODAL DE DESCANSO AISLADO
 // ==========================================
-const RestTimerModal = ({ targetTime, initialDefaultRest, onSkip, onUpdateDefaultRest, info }) => {
-    const [remaining, setRemaining] = useState(() => Math.max(0, Math.ceil((targetTime - Date.now()) / 1000)));
-    const [localRest, setLocalRest] = useState(initialDefaultRest);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const diff = Math.ceil((targetTime - Date.now()) / 1000);
-            if (diff <= 0) {
-                clearInterval(interval);
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                onSkip();
-            } else {
-                setRemaining(diff);
-            }
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [targetTime, onSkip]);
-
-    const handleChange = (e) => {
-        const val = e.target.value;
-        if (val === '') { setLocalRest(''); return; }
-        const num = parseInt(val);
-        if (!isNaN(num)) {
-            setLocalRest(num);
-            onUpdateDefaultRest(num);
-        }
-    };
-
-    return (
-        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
-            {/* QUÉ VIENE AHORA.
-
-                Esta pantalla se mira quince o veinte veces por sesión, y hasta
-                ahora solo tenía un número bajando. Los dos minutos de descanso
-                son justo el rato en el que quieres saber qué te toca y cómo fue
-                la serie anterior, así que van aquí y no en otro sitio. */}
-            {info && (
-                <div className="flex items-center justify-between gap-3 pb-2.5 mb-3 border-b border-white/10">
-                    <p className="text-[11px] font-black text-white uppercase tracking-tight truncate min-w-0">
-                        {info.proximo}
-                    </p>
-                    {info.hecho && (
-                        <span className={`shrink-0 text-[10px] font-black px-2 py-0.5 rounded-lg border tabular-nums ${info.cumplida
-                            ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
-                            : 'text-zinc-400 border-white/10 bg-white/5'}`}>
-                            {info.cumplida ? '✓ ' : ''}{info.hecho}
-                        </span>
-                    )}
-                </div>
-            )}
-
-            <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 pl-2">
-                <div className="flex flex-col items-center min-w-[60px]">
-                    <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{remaining}</span>
-                    <span className="text-[8px] text-zinc-500 font-bold uppercase mt-0.5">Segundos</span>
-                </div>
-                <div className="h-8 w-[1px] bg-zinc-700"></div>
-                <div className="flex flex-col">
-                    <span className="text-[9px] text-zinc-400 font-bold uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Tiempo fijo</span>
-                    <input type="number" inputMode="decimal" value={localRest} onChange={handleChange} className="bg-black border border-zinc-700 rounded-lg w-16 text-center text-sm font-bold text-white py-1 outline-none" />
-                </div>
-            </div>
-            <button onClick={onSkip} className="bg-white text-black px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-transform">Saltar <SkipForward size={14} /></button>
-            </div>
-        </div>
-    );
-};
-
 // ==========================================
 // COMPONENTE PRINCIPAL (RUTINA)
 // ==========================================
@@ -594,6 +526,26 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }));
     };
 
+    /**
+     * Apunta el RIR en la serie que se acaba de hacer.
+     *
+     * Va contra `restContexto`, que es quien sabe QUE serie disparo este
+     * descanso. Sin eso habria que arrastrar los indices por media pantalla.
+     */
+    const marcarEsfuerzo = (valor) => {
+        if (!restContexto) return;
+        const { exIdx, setIdx } = restContexto;
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            return {
+                ...ex,
+                setsData: ex.setsData.map((set, j) => (
+                    j === setIdx ? { ...set, esfuerzo: valor } : set
+                ))
+            };
+        }));
+    };
+
     const handleAddSet = (exIdx) => {
         setExercises(prev => prev.map((ex, i) => {
             if (i !== exIdx) return ex;
@@ -647,7 +599,13 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             reps: ex.esPorTiempo ? 0 : numero(s.reps),
                             segundos: ex.esPorTiempo ? numero(s.reps) : 0,
                             porLado: !!ex.porLado,
-                            type: s.type || 'N'
+                            type: s.type || 'N',
+                            // Solo si se contesto: mandar un 0 por defecto seria
+                            // decirle al servidor que TODAS las series fueron al
+                            // fallo, que es justo lo contrario de no saberlo.
+                            ...(typeof s.esfuerzo === 'number'
+                                ? { esfuerzo: s.esfuerzo, tipoEsfuerzo: 'RIR' }
+                                : {})
                         };
                     })
                 })).filter(ex => ex.sets.length > 0),
@@ -975,6 +933,10 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     initialDefaultRest={defaultRest}
                     onSkip={handleSkipRest}
                     onUpdateDefaultRest={handleUpdateDefaultRest}
+                    esfuerzo={restContexto
+                        ? exercises[restContexto.exIdx]?.setsData?.[restContexto.setIdx]?.esfuerzo
+                        : undefined}
+                    onEsfuerzo={restContexto ? marcarEsfuerzo : undefined}
                 />
             )}
 
