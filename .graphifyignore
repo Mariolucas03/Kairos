@@ -1,0 +1,24 @@
+# Lo que graphify NO debe leer.
+#
+# Sin esto el barrido salia de 447 ficheros y 1.682.356 palabras, para un
+# proyecto que tiene unas 30.000 lineas: casi todo el peso lo ponian una copia
+# vieja del propio proyecto y un volcado del codigo en texto plano. El grafo
+# acababa describiendo una foto de agosto en vez del codigo de hoy.
+
+# Copia entera del proyecto congelada el 12 de agosto de 2026, metida como
+# submodulo de git y sin .gitmodules. Es el proyecto otra vez: cada fichero
+# aparecia dos veces en el grafo, con dos versiones distintas del mismo codigo.
+Kairos/
+
+# Volcado del proyecto entero en un solo .txt (1 MB, ~96.000 palabras), y ademas
+# duplicado dentro de la copia de arriba. Es el fichero que dominaba los
+# hiperejes del informe: los nodos `proyecto_completo_*` salen todos de aqui.
+# El codigo de verdad ya se lee de los ficheros, asi que esto solo repite lo
+# mismo en peor.
+PROYECTO_COMPLETO.txt
+
+# La salida de graphify: leerse a si mismo no aporta nada.
+graphify-out/
+
+# Adjuntos sueltos que no son el proyecto
+*.zip

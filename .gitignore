@@ -22,3 +22,7 @@ enviar-notificacion.ps1
 
 # Copias de seguridad de la base de datos (pueden llevar datos de usuarios)
 backups/
+
+# Salida de graphify: son 3,6 MB generados a partir del propio repo.
+# Se rehacen con `graphify update .`, asi que subirlos solo engorda el historial.
+graphify-out/
