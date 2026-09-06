@@ -96,13 +96,55 @@ const playDice = asyncHandler(async (req, res) => {
  * El XP baja de 200 a 75 por lo mismo: el XP decide el ranking mensual, y a 200
  * por tirada el ranking se ganaba dandole al rasca, no entrenando.
  */
+/**
+ * ⚠️ LOS PREMIOS DE FICHAS SON MULTIPLICADORES, NO CANTIDADES.
+ *
+ * El rasca era el ultimo juego con la apuesta clavada en 10 fichas. Para poder
+ * apostar lo que quieras, el premio tiene que salir de lo apostado: si no, con
+ * una apuesta de 500 el diamante seguiria pagando 150 y jugar fuerte seria
+ * tirar el dinero.
+ *
+ * Los multiplos estan puestos para que a 10 fichas —la apuesta de siempre— se
+ * paguen EXACTAMENTE los mismos premios que antes: 15 x 10 = 150, 3 x 10 = 30,
+ * 1,5 x 10 = 15. Asi el cambio no toca la economia, solo la escala.
+ *
+ * ⚠️ EL XP NO ESCALA, Y ES A PROPOSITO.
+ *
+ * Es la unica excepcion y tiene motivo: el XP decide el ranking mensual. Ya se
+ * bajo una vez de 200 a 75 porque a ese ritmo el ranking se ganaba dandole al
+ * rasca en vez de entrenando. Si escalara con la apuesta, apostar 500 daria
+ * 3.750 XP por tirada y volveriamos al mismo sitio, pero peor. El XP se paga
+ * plano: es un premio simpatico, no una via para subir de nivel.
+ *
+ * ⚠️ ESTOS NUMEROS ESTAN TAMBIEN EN EL MOVIL.
+ *
+ * frontend/src/pages/games/ScratchGame.jsx pinta la tabla de premios. Ya se
+ * desincronizo una vez —enseñaba 500/200/100/50 cuando el servidor pagaba
+ * 150/75/30/15, o sea 3,3 veces mas de lo que cobrabas— y nadie se entero.
+ * Ahora enseña MULTIPLOS, que no dependen de la apuesta, y hay una prueba en
+ * pruebas/economia.test.js que fija estos valores para que cambiarlos aqui
+ * obligue a mirar alli.
+ */
 const SCRATCH_SYMBOLS = {
-    DIAMOND: { id: 'd', icon: '💎', prize: 150, type: 'coins', weight: 2 },
+    DIAMOND: { id: 'd', icon: '💎', multiplo: 15, type: 'coins', weight: 2 },
     XP: { id: 'x', icon: '⚡', prize: 75, type: 'xp', weight: 8 },
-    COIN: { id: 'c', icon: '🪙', prize: 30, type: 'coins', weight: 15 },
-    LEMON: { id: 'l', icon: '🍋', prize: 15, type: 'coins', weight: 25 },
-    SKULL: { id: 's', icon: '💀', prize: 0, type: 'none', weight: 25 },
-    POOP: { id: 'p', icon: '💩', prize: 0, type: 'none', weight: 25 }
+    COIN: { id: 'c', icon: '🪙', multiplo: 3, type: 'coins', weight: 15 },
+    LEMON: { id: 'l', icon: '🍋', multiplo: 1.5, type: 'coins', weight: 25 },
+    SKULL: { id: 's', icon: '💀', multiplo: 0, type: 'none', weight: 25 },
+    POOP: { id: 'p', icon: '💩', multiplo: 0, type: 'none', weight: 25 }
+};
+
+/**
+ * Lo que paga un simbolo con una apuesta dada.
+ *
+ * Se redondea hacia ABAJO: un premio de 37,5 fichas no existe, y redondear
+ * hacia arriba en cada tirada mueve el porcentaje que devuelve el juego sin que
+ * nadie lo vea venir.
+ */
+const premioDelRasca = (simbolo, apuesta) => {
+    if (!simbolo || simbolo.type === 'none') return 0;
+    if (simbolo.type === 'xp') return simbolo.prize;
+    return Math.floor(simbolo.multiplo * apuesta);
 };
 
 const getRandomScratchSymbol = () => {
@@ -117,8 +159,12 @@ const getRandomScratchSymbol = () => {
 };
 
 const playScratch = asyncHandler(async (req, res) => {
-    const COST = 10;
-    await chargeAndValidate(req.user._id, COST);
+    // Sin `bet` se apuesta 10, que es lo que costaba siempre: una app antigua
+    // que no mande la apuesta sigue jugando igual en vez de dar un error.
+    const apuesta = normalizarApuesta(req.body?.bet ?? 10);
+    if (apuesta === null) { res.status(400); throw new Error('Apuesta mínima 10'); }
+
+    await chargeAndValidate(req.user._id, apuesta);
 
     const isWin = Math.random() < 0.35; // 35% Win Rate
     let items = [];
@@ -163,7 +209,7 @@ const playScratch = asyncHandler(async (req, res) => {
     let payout = 0;
 
     if (winSymObj) {
-        payout = winSymObj.prize;
+        payout = premioDelRasca(winSymObj, apuesta);
         if (winSymObj.type === 'xp') {
             finalUser = await User.findByIdAndUpdate(req.user._id, { $inc: { currentXP: payout } }, { new: true });
         } else {
@@ -171,7 +217,14 @@ const playScratch = asyncHandler(async (req, res) => {
         }
     }
 
-    res.json({ grid: items, won: !!winSymObj, prize: payout, prizeType: winSymObj?.type || 'none', user: finalUser });
+    res.json({
+        grid: items,
+        won: !!winSymObj,
+        prize: payout,
+        prizeType: winSymObj?.type || 'none',
+        apuesta,
+        user: finalUser
+    });
 });
 
 // ==========================================
@@ -681,5 +734,6 @@ module.exports = {
     playDice, playScratch, playSlots, playRoulette, playFortuneWheel, playBlackjack, playTower,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS,
+    premioDelRasca
 };

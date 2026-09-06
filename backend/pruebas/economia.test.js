@@ -5,6 +5,7 @@ const {
     SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS
 } = require('../controllers/gamesController');
 const { premioDeCofre } = require('../controllers/shopController');
+const { premioDelRasca } = require('../controllers/gamesController');
 
 /**
  * LA ECONOMÍA DEL CASINO
@@ -27,29 +28,89 @@ const SUELO_SANO = 70;   // por debajo, es tan duro que jugar no tiene gracia
 
 describe('Casino: ningun juego puede regalar dinero', () => {
 
-    test('el rasca devuelve entre el 70% y el 100%', () => {
-        const COSTE = 10;
+    // Reparto de premios cuando toca, tal como lo hace playScratch
+    const REPARTO_RASCA = [
+        { simbolo: SCRATCH_SYMBOLS.DIAMOND, probabilidad: 0.05 },
+        { simbolo: SCRATCH_SYMBOLS.XP, probabilidad: 0.15 },
+        { simbolo: SCRATCH_SYMBOLS.COIN, probabilidad: 0.30 },
+        { simbolo: SCRATCH_SYMBOLS.LEMON, probabilidad: 0.50 }
+    ];
+
+    const loQueDevuelveElRasca = (apuesta) => {
         const RITMO_DE_VICTORIA = 0.35;
-
-        // Reparto de premios cuando toca, tal como lo hace playScratch
-        const reparto = [
-            { simbolo: SCRATCH_SYMBOLS.DIAMOND, probabilidad: 0.05 },
-            { simbolo: SCRATCH_SYMBOLS.XP, probabilidad: 0.15 },
-            { simbolo: SCRATCH_SYMBOLS.COIN, probabilidad: 0.30 },
-            { simbolo: SCRATCH_SYMBOLS.LEMON, probabilidad: 0.50 }
-        ];
-
         // El XP no son fichas: no cuenta para lo que devuelve el juego
-        const mediaEnFichas = reparto
+        const mediaEnFichas = REPARTO_RASCA
             .filter(r => r.simbolo.type !== 'xp')
-            .reduce((total, r) => total + r.probabilidad * r.simbolo.prize, 0);
+            .reduce((total, r) => total + r.probabilidad * premioDelRasca(r.simbolo, apuesta), 0);
+        return (RITMO_DE_VICTORIA * mediaEnFichas / apuesta) * 100;
+    };
 
-        const devuelve = (RITMO_DE_VICTORIA * mediaEnFichas / COSTE) * 100;
+    test('el rasca devuelve entre el 70% y el 100%', () => {
+        const devuelve = loQueDevuelveElRasca(10);
 
         assert.ok(devuelve < TOPE_SANO,
             `El rasca devuelve el ${devuelve.toFixed(1)}%: esta REGALANDO dinero`);
         assert.ok(devuelve > SUELO_SANO,
             `El rasca devuelve el ${devuelve.toFixed(1)}%: es tan duro que no merece la pena jugar`);
+    });
+
+    test('y devuelve lo mismo apuestes lo que apuestes', () => {
+        // Desde que la apuesta del rasca es libre, el porcentaje tiene que ser
+        // el mismo a 10 que a 1.000: si escalara mal, apostar fuerte seria una
+        // impresora de dinero o un atraco, y en ninguno de los dos casos daria
+        // error en ningun sitio.
+        for (const apuesta of [10, 25, 50, 100, 500, 1000]) {
+            const devuelve = loQueDevuelveElRasca(apuesta);
+            assert.ok(devuelve < TOPE_SANO && devuelve > SUELO_SANO,
+                `Con ${apuesta} fichas el rasca devuelve el ${devuelve.toFixed(1)}%`);
+        }
+    });
+
+    test('a 10 fichas paga EXACTAMENTE lo de siempre', () => {
+        // La apuesta de 10 era la unica que existia. Que sus premios no se hayan
+        // movido es lo que hace que este cambio sea de escala y no de economia.
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.DIAMOND, 10), 150);
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.COIN, 10), 30);
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.LEMON, 10), 15);
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.XP, 10), 75);
+    });
+
+    test('el XP del rasca NO escala con la apuesta', () => {
+        // El XP decide el ranking mensual. Ya se bajo una vez de 200 a 75 porque
+        // el ranking se ganaba dandole al rasca en vez de entrenando; si
+        // escalara, apostar 500 daria 3.750 XP por tirada.
+        for (const apuesta of [10, 100, 1000]) {
+            assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.XP, apuesta), 75,
+                `Con ${apuesta} fichas el XP deberia seguir siendo 75`);
+        }
+    });
+
+    test('LOS MULTIPLOS ESTAN TAMBIEN EN EL MOVIL', () => {
+        // ⚠️ Esta prueba no mide nada: es un aviso.
+        //
+        // frontend/src/pages/games/ScratchGame.jsx pinta la tabla de premios con
+        // estos mismos numeros. Ya se desincronizaron una vez —la app enseñaba
+        // 500/200/100/50 cuando el servidor pagaba 150/75/30/15, o sea 3,3 veces
+        // mas de lo que cobrabas— y nadie se entero durante meses.
+        //
+        // Si esto falla, cambia tambien la tabla del movil.
+        assert.strictEqual(SCRATCH_SYMBOLS.DIAMOND.multiplo, 15);
+        assert.strictEqual(SCRATCH_SYMBOLS.COIN.multiplo, 3);
+        assert.strictEqual(SCRATCH_SYMBOLS.LEMON.multiplo, 1.5);
+        assert.strictEqual(SCRATCH_SYMBOLS.XP.prize, 75);
+    });
+
+    test('un premio partido se redondea hacia abajo, no hacia arriba', () => {
+        // 1,5 x 25 son 37,5 fichas, y media ficha no existe. Redondear hacia
+        // arriba en cada tirada sube lo que devuelve el juego sin que se vea.
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.LEMON, 25), 37);
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.LEMON, 15), 22);
+    });
+
+    test('una calavera no paga nada, se apueste lo que se apueste', () => {
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.SKULL, 1000), 0);
+        assert.strictEqual(premioDelRasca(SCRATCH_SYMBOLS.POOP, 1000), 0);
+        assert.strictEqual(premioDelRasca(null, 100), 0);
     });
 
     test('las tiradas de pago de la ruleta devuelven entre el 70% y el 100%', () => {

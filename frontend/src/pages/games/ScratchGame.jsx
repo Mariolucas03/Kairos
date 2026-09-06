@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Info, X } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
+import SelectorApuesta from '../../components/games/SelectorApuesta';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
@@ -9,14 +10,30 @@ import { useAuthStore } from '../../store/useAuthStore';
 // --- RUTA DE LA IMAGEN DEL REVERSO ---
 const CARD_BACK_IMG = '/assets/images/reverso-carta.png';
 
-// --- CONFIGURACIÓN VISUAL DE SÍMBOLOS (Para el Frontend) ---
+/**
+ * LA TABLA DE PREMIOS.
+ *
+ * ⚠️ ENSEÑABA 3,3 VECES LO QUE EL SERVIDOR PAGABA.
+ *
+ * Decia 500 / 200 XP / 100 / 50. El servidor pagaba 150 / 75 / 30 / 15: los
+ * premios se bajaron alli porque el rasca regalaba dinero, y esta tabla se
+ * quedo como estaba. Nadie se entero, porque una tabla que miente no da error
+ * —solo hace que el juego decepcione y no sepas por que—.
+ *
+ * Es el mismo fallo de siempre: el mismo numero escrito en dos sitios.
+ *
+ * Ahora se enseñan MULTIPLOS de lo apostado, que es lo que el servidor calcula
+ * de verdad y ademas no depende de cuanto apuestes. Y en el backend hay una
+ * prueba (pruebas/economia.test.js, "LOS MULTIPLOS ESTAN TAMBIEN EN EL MOVIL")
+ * que fija estos valores para que cambiarlos alli obligue a mirar aqui.
+ */
 const SYMBOLS = {
-    DIAMOND: { id: 'd', icon: '💎', prize: 500, type: 'coins', label: '500' },
-    XP: { id: 'x', icon: '⚡', prize: 200, type: 'xp', label: '200 XP' },
-    COIN: { id: 'c', icon: '🪙', prize: 100, type: 'coins', label: '100' },
-    LEMON: { id: 'l', icon: '🍋', prize: 50, type: 'coins', label: '50' },
-    SKULL: { id: 's', icon: '💀', prize: 0, type: 'none', label: '' },
-    POOP: { id: 'p', icon: '💩', prize: 0, type: 'none', label: '' }
+    DIAMOND: { id: 'd', icon: '💎', type: 'coins', label: '×15' },
+    XP: { id: 'x', icon: '⚡', type: 'xp', label: '75 XP' },
+    COIN: { id: 'c', icon: '🪙', type: 'coins', label: '×3' },
+    LEMON: { id: 'l', icon: '🍋', type: 'coins', label: '×1,5' },
+    SKULL: { id: 's', icon: '💀', type: 'none', label: '' },
+    POOP: { id: 'p', icon: '💩', type: 'none', label: '' }
 };
 
 // --- COMPONENTE DE CATARATA DE FICHAS ---
@@ -67,17 +84,23 @@ export default function ScratchGame() {
     const [isRainFading, setIsRainFading] = useState(false);
     const [errorMsg, setErrorMsg] = useState(null);
 
-    const COST = 10;
+    // ⚠️ EL RASCA ERA EL ULTIMO JUEGO CON LA APUESTA CLAVADA.
+    //
+    // Costaba 10 fichas y no habia forma de apostar otra cosa: con saldos de
+    // miles, comprar cartones de 10 en 10 era un peaje. Ahora se elige, y el
+    // premio sale de lo apostado (el servidor multiplica; ver SYMBOLS arriba).
+    const APUESTA_MINIMA = 10;
+    const [apuesta, setApuesta] = useState(APUESTA_MINIMA);
 
     // SALDO DERIVADO: mientras rascas se descuenta el cartón y, al terminar,
     // manda el saldo real que devolvió el servidor. Antes era un estado aparte
     // que había que ir sincronizando a mano en cuatro sitios distintos.
     const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
-    const visualBalance = isPlaying ? Math.max(0, currentFichas - COST) : currentFichas;
+    const visualBalance = isPlaying ? Math.max(0, currentFichas - apuesta) : currentFichas;
 
     // --- JUGAR (CONEXIÓN AL BACKEND) ---
     const play = async () => {
-        if (visualBalance < COST) { setErrorMsg("No te llegan las fichas"); return; }
+        if (currentFichas < apuesta) { setErrorMsg("No te llegan las fichas"); return; }
 
         setErrorMsg(null);
         setIsPlaying(true);
@@ -88,7 +111,7 @@ export default function ScratchGame() {
 
         try {
             // 2. Pedir resultado al backend (Inhackeable)
-            const res = await api.post('/games/scratch');
+            const res = await api.post('/games/scratch', { bet: apuesta });
 
             // 3. Cargar la matriz devuelta por el servidor (oculta hasta rascar)
             setGrid(res.data.grid);
@@ -146,7 +169,7 @@ export default function ScratchGame() {
                     <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                <button onClick={() => setShowInfo(true)} aria-label="Ver la tabla de premios" className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
             </div>
 
             {/* TÍTULO */}
@@ -212,26 +235,50 @@ export default function ScratchGame() {
                                         )}
                                     </div>
 
+                                    <div className="mb-3">
+                                        <SelectorApuesta
+                                            valor={apuesta}
+                                            onChange={setApuesta}
+                                            saldo={currentFichas}
+                                            minimo={APUESTA_MINIMA}
+                                            etiqueta="Tu cartón"
+                                        />
+                                    </div>
+
                                     <button
                                         onClick={play}
-                                        disabled={visualBalance < COST}
+                                        disabled={currentFichas < apuesta}
                                         className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl uppercase transition-all shadow-lg shadow-yellow-900/20 active:scale-95 text-lg border-b-4 border-yellow-700 flex items-center justify-center gap-2 disabled:grayscale disabled:opacity-50"
                                     >
                                         <span>Jugar de nuevo</span>
                                         <div className="flex items-center bg-black/20 px-2 py-0.5 rounded text-sm">
-                                            {COST} <img src="/assets/icons/ficha.png" className="w-4 h-4 ml-1" alt="c" />
+                                            {apuesta} <img src="/assets/icons/ficha.png" className="w-4 h-4 ml-1" alt="c" />
                                         </div>
                                     </button>
                                 </div>
                             ) : (
+                                <>
+                                {/* Mientras rascas NO se puede cambiar: la apuesta
+                                    de este carton ya esta cobrada. */}
+                                <div className={`mb-3 transition-opacity ${isPlaying ? 'opacity-40 pointer-events-none' : ''}`}>
+                                    <SelectorApuesta
+                                        valor={apuesta}
+                                        onChange={setApuesta}
+                                        saldo={currentFichas}
+                                        minimo={APUESTA_MINIMA}
+                                        deshabilitado={isPlaying}
+                                        etiqueta="Tu cartón"
+                                    />
+                                </div>
+
                                 <button
                                     onClick={play}
-                                    disabled={isPlaying || visualBalance < COST}
+                                    disabled={isPlaying || currentFichas < apuesta}
                                     className={`
                                         w-full py-4 rounded-xl font-black text-lg uppercase tracking-widest shadow-lg transition-all active:scale-95 border-b-4
                                         ${isPlaying
                                             ? 'bg-zinc-800 text-zinc-500 border-zinc-900 cursor-default'
-                                            : visualBalance < COST
+                                            : currentFichas < apuesta
                                                 ? 'bg-zinc-800 text-zinc-500 border-zinc-900 cursor-not-allowed'
                                                 : 'bg-yellow-500 hover:bg-yellow-400 text-black border-yellow-700'
                                         }
@@ -241,11 +288,12 @@ export default function ScratchGame() {
                                         <div className="flex items-center justify-center gap-2">
                                             <span>COMPRAR CARTÓN</span>
                                             <div className="flex items-center bg-black/20 px-2 py-0.5 rounded text-sm">
-                                                {COST} <img src="/assets/icons/ficha.png" className="w-4 h-4 ml-1" alt="c" />
+                                                {apuesta} <img src="/assets/icons/ficha.png" className="w-4 h-4 ml-1" alt="c" />
                                             </div>
                                         </div>
                                     )}
                                 </button>
+                                </>
                             )}
                         </div>
 
