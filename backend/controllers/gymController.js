@@ -1578,6 +1578,95 @@ const getBodyStatus = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error estado del cuerpo' }); }
 };
 
+/**
+ * A QUE MUSCULO LE ESTAS DEDICANDO EL TRABAJO.
+ *
+ * `getBodyStatus` ya contaba SERIES por grupo en los ultimos 30 dias, y sirve
+ * para pintar el mapa del cuerpo. Esto es otra pregunta: cuanto TRABAJO se lleva
+ * cada uno, en kilos movidos, sobre el periodo que se pida.
+ *
+ * La diferencia importa. Cuatro series de curl de biceps y cuatro de sentadilla
+ * son las mismas series y no se parecen en nada: contando series, un dia de
+ * brazo pesa igual que uno de pierna. Contando volumen sale la verdad, que es lo
+ * que responde a "¿estoy descuidando la pierna?" — la pregunta que se hace todo
+ * el que entrena solo y que no tenia respuesta en ningun sitio de la app.
+ *
+ * ⚠️ LOS DE PESO CORPORAL TAMBIEN CUENTAN.
+ *
+ * Con kg = 0, multiplicar peso por repeticiones da cero, y entonces una sesion
+ * entera de dominadas y fondos apareceria como que no has trabajado la espalda.
+ * Se les asigna el mismo valor que en el resto de la app (reps x 2), para no
+ * tener dos formas distintas de medir lo mismo.
+ */
+const getRepartoMuscular = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        // El periodo se acota: sin tope, un `?dias=99999` haria un barrido
+        // completo del historial en cada carga de la pantalla.
+        const dias = Math.min(Math.max(parseInt(req.query.dias, 10) || 90, 7), 365);
+        const desde = new Date();
+        desde.setDate(desde.getDate() - dias);
+
+        const logs = await WorkoutLog.find({ user: userId, type: 'gym', date: { $gte: desde } })
+            .select('exercises.name exercises.sets')
+            .lean();
+
+        const catalogo = await Exercise.find({
+            $or: [{ user: userId }, { isCustom: false }, { user: null }]
+        }).select('name muscle').lean();
+
+        const musculoDe = {};
+        catalogo.forEach(ex => { musculoDe[ex.name] = ex.muscle; });
+
+        const porMusculo = MUSCLE_GROUPS.reduce((acc, g) => ({ ...acc, [g]: 0 }), {});
+        let total = 0;
+        let sinClasificar = 0;
+
+        logs.forEach(log => {
+            (log.exercises || []).forEach(ex => {
+                const volumen = (ex.sets || []).reduce((suma, set) => {
+                    const kg = Number(set?.weight) || 0;
+                    const reps = Number(set?.reps) || 0;
+                    // Misma cuenta que en el resto de la app: sin peso, las
+                    // repeticiones valen 2 cada una.
+                    return suma + (kg > 0 ? kg * reps : reps * 2);
+                }, 0);
+
+                if (volumen <= 0) return;
+                total += volumen;
+
+                const musculo = musculoDe[ex.name];
+                if (musculo && porMusculo[musculo] !== undefined) porMusculo[musculo] += volumen;
+                else sinClasificar += volumen;
+            });
+        });
+
+        // Se manda ordenado y con el porcentaje ya hecho: la pantalla solo pinta.
+        // Calcularlo aqui evita que el movil y el servidor redondeen distinto.
+        const reparto = Object.entries(porMusculo)
+            .map(([musculo, volumen]) => ({
+                musculo,
+                volumen: Math.round(volumen),
+                porcentaje: total > 0 ? Math.round((volumen / total) * 100) : 0
+            }))
+            .sort((a, b) => b.volumen - a.volumen);
+
+        res.json({
+            dias,
+            total: Math.round(total),
+            // Lo que no se pudo atribuir a ningun grupo (un ejercicio a medida
+            // que ya no existe en el catalogo). Se dice en vez de esconderlo:
+            // sin esto los porcentajes no sumarian 100 y pareceria un fallo.
+            sinClasificar: Math.round(sinClasificar),
+            reparto
+        });
+    } catch (error) {
+        console.error('Error en getRepartoMuscular:', error);
+        res.status(500).json({ message: 'Error calculando el reparto muscular' });
+    }
+};
+
 const chatRoutineGenerator = async (req, res) => {
     // Lo que escribe el usuario acaba dentro del prompt: sin tope, cada peticion
     // podia arrastrar hasta 1 MB de texto a la cuenta de IA.
@@ -1627,5 +1716,6 @@ module.exports = {
     saveWorkoutLog, saveSportLog, getSportCatalog,
     getExerciseProgressController, getTrainedExercises, getResumenEntrenos,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
+    getRepartoMuscular,
     chatRoutineGenerator
 };

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import useSWR from 'swr';
-import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame } from 'lucide-react';
+import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame, History, PieChart } from 'lucide-react';
 import api from '../../services/api';
 import ProgressChart from './ProgressChart';
 import { loQueHasLevantado } from '../../utils/loQueHasLevantado';
+import { conUnaRepeticion, loQueTienesAbandonado, desdeHace } from '../../utils/estadisticas';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -23,6 +24,7 @@ export default function EstadisticasTab() {
     const { data: resumen, isLoading: cargandoResumen } = useSWR('/gym/resumen', fetcher);
     const { data: entrenados } = useSWR('/gym/progress', fetcher);
     const { data: semana } = useSWR('/gym/weekly', fetcher);
+    const { data: reparto } = useSWR('/gym/reparto?dias=90', fetcher);
 
     const [ejercicio, setEjercicio] = useState(null);
     const [metrica, setMetrica] = useState('bestWeight');
@@ -34,6 +36,12 @@ export default function EstadisticasTab() {
 
     const volumen = resumen?.volumen || 0;
     const comparacion = loQueHasLevantado(volumen);
+
+    const abandonados = loQueTienesAbandonado(entrenados);
+
+    // Solo los grupos con algo dentro: enseñar "Abdomen 0%" en una lista de
+    // ocho llena la pantalla de ceros y esconde lo que si importa.
+    const gruposConTrabajo = (reparto?.reparto || []).filter(g => g.volumen > 0);
 
     const Cifra = ({ icono: Icono, valor, unidad, etiqueta }) => (
         <div className="bg-zinc-950 border border-white/5 rounded-2xl p-3 text-center">
@@ -114,6 +122,93 @@ export default function EstadisticasTab() {
                 )}
             </div>
 
+            {/* --- LO QUE TIENES ABANDONADO ---
+
+                Dejas de hacer un ejercicio porque un dia tenias prisa y no
+                vuelves nunca. La lista de entrenados ya traia la fecha de la
+                ultima vez y no la miraba nadie.
+
+                Solo sale si hay algo: un bloque vacio que dice "no tienes nada
+                abandonado" es ruido en una pantalla que ya esta llena. */}
+            {abandonados.length > 0 && (
+                <div>
+                    <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest mb-3 px-1 flex items-center gap-2">
+                        <History size={13} /> Llevas sin tocar
+                    </h3>
+
+                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-2 space-y-1">
+                        {abandonados.map(e => (
+                            <button
+                                key={e.name}
+                                onClick={() => setEjercicio(e.name)}
+                                className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-2xl hover:bg-white/[0.04] active:scale-[0.99] transition-all text-left"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[12px] font-black text-white uppercase tracking-tight truncate not-italic">
+                                        {e.name}
+                                    </p>
+                                    <p className="text-[9px] text-zinc-600 font-bold">
+                                        {e.sessions} {e.sessions === 1 ? 'sesión' : 'sesiones'} antes de dejarlo
+                                    </p>
+                                </div>
+                                <span className={`shrink-0 text-[10px] font-black px-2.5 py-1 rounded-lg border ${e.dias >= 60
+                                    ? 'text-orange-400 border-orange-500/30 bg-orange-500/10'
+                                    : 'text-zinc-400 border-white/10 bg-white/5'}`}>
+                                    {desdeHace(e.dias)}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* --- A QUE MUSCULO LE DEDICAS EL TRABAJO ---
+
+                No cuenta series, cuenta kilos movidos: cuatro series de curl y
+                cuatro de sentadilla son las mismas series y no se parecen en
+                nada. Contando volumen sale la verdad. */}
+            {gruposConTrabajo.length > 0 && (
+                <div>
+                    <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest mb-3 px-1 flex items-center gap-2">
+                        <PieChart size={13} /> Reparto de los últimos 3 meses
+                    </h3>
+
+                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4 space-y-2.5">
+                        {gruposConTrabajo.map((g, i) => (
+                            <div key={g.musculo}>
+                                <div className="flex items-baseline justify-between mb-1">
+                                    <span className="text-[11px] font-black text-white uppercase tracking-tight not-italic">
+                                        {g.musculo}
+                                    </span>
+                                    <span className="text-[10px] font-black text-zinc-500 tabular-nums">
+                                        {g.porcentaje}%
+                                    </span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full transition-all"
+                                        style={{
+                                            width: `${Math.max(g.porcentaje, 1)}%`,
+                                            // El que mas se lleva en amarillo y el
+                                            // resto en gris: asi se ve de un vistazo
+                                            // el desequilibrio, que es el dato.
+                                            background: i === 0 ? '#eab308' : 'rgba(255,255,255,0.22)'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+
+                        {reparto?.sinClasificar > 0 && (
+                            <p className="text-[9px] text-zinc-600 font-bold pt-1">
+                                Sin clasificar: {reparto.sinClasificar.toLocaleString('es-ES')} kg de ejercicios
+                                que ya no están en el catálogo.
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
         {/* --- PROGRESO POR EJERCICIO --- */}
         <div>
             <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest mb-3 px-1 flex items-center gap-2">
@@ -164,6 +259,7 @@ export default function EstadisticasTab() {
                             <div className="flex bg-black p-1 rounded-xl border border-zinc-800 mb-3">
                                 {[
                                     { id: 'bestWeight', label: 'Peso máx.', unit: 'kg' },
+                                    { id: 'rm1', label: '1RM', unit: 'kg' },
                                     { id: 'volume', label: 'Volumen', unit: 'kg' },
                                     { id: 'reps', label: 'Reps', unit: '' }
                                 ].map(m => (
@@ -177,11 +273,31 @@ export default function EstadisticasTab() {
                                 ))}
                             </div>
 
+                            {/* Que es el 1RM, dicho una vez y en pequeño. Sin esto
+                                es una sigla mas en una fila de botones. */}
+                            {metrica === 'rm1' && (
+                                <p className="text-[9px] text-zinc-600 font-bold mb-2 px-1 leading-snug">
+                                    Lo que moverías a una sola repetición, estimado.
+                                    Sube cuando progresas de verdad, no solo cuando
+                                    cambias repeticiones por peso.
+                                </p>
+                            )}
+
                             <ProgressChart
-                                points={progreso?.points || []}
+                                points={metrica === 'rm1'
+                                    ? conUnaRepeticion(progreso?.points || []).filter(p => p.rm1 !== null)
+                                    : (progreso?.points || [])}
                                 metric={metrica}
                                 unit={metrica === 'reps' ? 'reps' : 'kg'}
                             />
+
+                            {metrica === 'rm1'
+                                && conUnaRepeticion(progreso?.points || []).every(p => p.rm1 === null) && (
+                                <p className="text-[10px] text-zinc-600 font-bold text-center py-2">
+                                    Aquí no se puede estimar: es un ejercicio sin peso,
+                                    o siempre lo haces a más de 12 repeticiones.
+                                </p>
+                            )}
                         </>
                     )}
                 </div>

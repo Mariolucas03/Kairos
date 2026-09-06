@@ -19,6 +19,7 @@ const {
     getRoutineHistory,
     getExerciseHistory,
     getBodyStatus,
+    getRepartoMuscular,
     chatRoutineGenerator,
     getMuscleCatalog,
     getMuscleRanksController,
@@ -85,6 +86,10 @@ router.post('/seed-history', protect, protectCron, seedFakeHistory);
 router.get('/muscle-progress', protect, getMuscleProgress);
 router.post('/history-stats', protect, getRoutineHistory);
 router.get('/body-status', protect, getBodyStatus);
+// Cuanto trabajo se lleva cada musculo, en kilos movidos y en porcentaje.
+// Es otra pregunta que /body-status: ese cuenta SERIES (cuatro de curl pesan
+// igual que cuatro de sentadilla), este cuenta el trabajo de verdad.
+router.get('/reparto', protect, getRepartoMuscular);
 router.get('/exercise-history', protect, getExerciseHistory);
 
 module.exports = router;
