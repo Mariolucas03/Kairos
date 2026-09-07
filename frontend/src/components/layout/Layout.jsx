@@ -8,6 +8,7 @@ import RedemptionScreen from './RedemptionScreen';
 import IosInstallPrompt from '../common/IosInstallPrompt';
 import AvisoServidor from '../common/AvisoServidor';
 import AvisoSinEnviar from '../common/AvisoSinEnviar';
+import SubidaDeNivel from '../common/SubidaDeNivel';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -207,6 +208,11 @@ function LayoutContent() {
             {/* Lo que se guardo sin cobertura y sigue esperando. Va abajo, no
                 arriba, para no pelearse con el aviso del servidor. */}
             <AvisoSinEnviar />
+
+            {/* La subida de nivel. Va por encima de TODO —incluido el entreno a
+                pantalla completa, que es donde mas veces va a saltar— porque es
+                el unico aviso que merece interrumpir lo que estes haciendo. */}
+            <SubidaDeNivel />
 
             {/* El menú inferior sí se mantiene en el perfil: permite seguir navegando */}
             {!isUiHidden && <Footer />}

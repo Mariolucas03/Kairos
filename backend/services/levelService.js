@@ -1,9 +1,34 @@
 const User = require('../models/User');
-const Clan = require('../models/Clan'); // <--- IMPORTANTE: Importar modelo Clan
 const DailyLog = require('../models/DailyLog');
 const { getMadridDateString } = require('../utils/dateHelpers');
 
 const calculateNextLevelXP = (level) => level * 100;
+
+/**
+ * EL PREMIO POR SUBIR DE NIVEL.
+ *
+ * ⚠️ ANTES NO HABIA NINGUNO.
+ *
+ * Subir de nivel te restauraba la vida y nada mas. Ni siquiera se te decia:
+ * `addRewards` devolvia `leveledUp` y en el movil no lo miraba nadie, asi que
+ * el momento mas gordo del juego pasaba en absoluto silencio.
+ *
+ * Crece con el nivel porque cada uno cuesta mas que el anterior (el XP que hace
+ * falta es nivel x 100, o sea que el 20 cuesta el doble que el 10), pero se
+ * TOPA: sin tope, un nivel 200 pagaria mas que un dia entero de misiones y las
+ * fichas del casino dejarian de valer nada. La barrera esta puesta donde un
+ * premio sigue siendo un premio y no una impresora.
+ */
+const TOPE_MONEDAS = 300;
+const TOPE_FICHAS = 600;
+
+const premioPorNivel = (nivel) => {
+    const n = Math.max(1, Math.floor(Number(nivel)) || 1);
+    return {
+        monedas: Math.min(40 + n * 5, TOPE_MONEDAS),
+        fichas: Math.min(80 + n * 10, TOPE_FICHAS)
+    };
+};
 
 // Auto-reparación (Asegura consistencia al cargar perfil)
 const ensureLevelConsistency = async (userId) => {
@@ -32,14 +57,8 @@ const ensureLevelConsistency = async (userId) => {
         changed = true;
     }
 
-    // Si hubo subida de nivel en la reparación, actualizamos el clan también
-    if (levelsGained > 0 && user.clan) {
-        const powerIncrease = levelsGained * 100;
-        await Clan.findByIdAndUpdate(user.clan, {
-            $inc: { totalPower: powerIncrease }
-        });
-        console.log(`🏰 Clan actualizado (Fix): +${powerIncrease} poder`);
-    }
+    // Aqui habia OTRO `$inc: { totalPower }`, el quinto y ultimo. Mismo motivo
+    // que el de `addRewards`: el poder del clan se cuenta, no se acumula.
 
     if (changed) await user.save();
     return user;
@@ -77,14 +96,29 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
         leveledUp = true;
     }
 
-    // --- 🔥 ACTUALIZAR PODER DEL CLAN 🔥 ---
-    // Si el usuario subió de nivel y pertenece a un clan, sumamos poder
-    if (levelsGained > 0 && user.clan) {
-        const powerIncrease = levelsGained * 100; // 1 Nivel = 100 Poder
-        await Clan.findByIdAndUpdate(user.clan, {
-            $inc: { totalPower: powerIncrease }
-        });
-        console.log(`🏰 Clan actualizado: +${powerIncrease} de poder por subida de nivel de ${user.username}`);
+    // ⚠️ AQUI HABIA UN `$inc: { totalPower }` SOBRE EL CLAN. YA NO HACE FALTA.
+    //
+    // Era el cuarto sitio que movia ese contador a mano, y el que se escapo al
+    // limpiar los otros tres porque vive en este servicio y no en
+    // clanController. El poder de un clan ya no se acumula: se cuenta sumando el
+    // nivel de quien esta dentro, cada vez que se lee (ver `poderDe` y
+    // `repasarClan`). Sumar aqui no rompia nada —la derivacion lo corregia en la
+    // siguiente lectura— pero deja escrito que es un contador, que es justo la
+    // idea que llevo al poder a ponerse en negativo.
+
+    // El premio, una sola vez aunque se hayan subido varios niveles de golpe:
+    // se paga por LLEGAR al nivel nuevo, no por cada escalon.
+    let premio = null;
+    if (levelsGained > 0) {
+        premio = premioPorNivel(user.level);
+        user.coins += premio.monedas;
+        user.gameCoins += premio.fichas;
+        user.ultimaSubidaDeNivel = {
+            nivel: user.level,
+            monedas: premio.monedas,
+            fichas: premio.fichas,
+            fecha: new Date()
+        };
     }
 
     const savedUser = await user.save();
@@ -115,8 +149,11 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
     return {
         user: savedUser,
         leveledUp,
+        levelsGained,
+        premioDeNivel: premio,
         rewards: { xp: xpReward, coins: coinReward, gameCoins: gameCoinReward }
     };
 };
 
-module.exports = { addRewards, ensureLevelConsistency };
+module.exports = {
+    premioPorNivel, addRewards, ensureLevelConsistency };

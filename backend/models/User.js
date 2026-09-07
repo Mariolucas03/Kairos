@@ -69,6 +69,20 @@ const userSchema = new mongoose.Schema({
 
     hp: { type: Number, default: 100 },
     maxHp: { type: Number, default: 100 },
+
+    // Lo ultimo que te dieron por subir de nivel. Se guarda para que la
+    // celebracion pueda decir CUANTO fue en vez de "has subido de nivel" a
+    // secas, y para que sobreviva a cerrar la app antes de verla.
+    //
+    // Sale de aqui y no de una formula repetida en el movil: el mismo numero
+    // calculado en dos sitios acaba dando dos respuestas distintas, y el premio
+    // que se enseña tiene que ser el que se ha cobrado.
+    ultimaSubidaDeNivel: {
+        nivel: { type: Number },
+        monedas: { type: Number },
+        fichas: { type: Number },
+        fecha: { type: Date }
+    },
     lives: { type: Number, default: 100 },
 
     // Configuración Nutricional
