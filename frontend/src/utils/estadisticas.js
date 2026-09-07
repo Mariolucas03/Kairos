@@ -108,3 +108,83 @@ export const desdeHace = (dias) => {
     const semanas = Math.floor(dias / 7);
     return semanas === 1 ? 'hace 1 semana' : `hace ${semanas} semanas`;
 };
+
+/**
+ * CUÁNDO LLEGAS AL SIGUIENTE NÚMERO REDONDO.
+ *
+ * La zanahoria. Con los mismos puntos de la gráfica se traza una recta por
+ * mínimos cuadrados y se dice cuánto falta para el próximo múltiplo de 10 por
+ * encima de donde estás.
+ *
+ * ⚠️ Y SOBRE TODO: CUÁNDO NO DECIR NADA.
+ *
+ * Una proyección es la parte más fácil de convertir en mentira de toda la
+ * pantalla, porque siempre da un número. Aquí se calla en cuatro casos:
+ *
+ *   - menos de cuatro sesiones: dos puntos siempre forman una recta perfecta,
+ *     y esa recta no significa nada
+ *   - la tendencia es plana o baja: entonces no llegas nunca, y decirlo así
+ *     —"sin cambios desde junio"— es más útil que una fecha inventada
+ *   - falta más de un año: a ese plazo la extrapolación es humo
+ *   - todo ocurrió el mismo día: no hay tiempo transcurrido del que sacar ritmo
+ */
+const MINIMO_DE_SESIONES = 4;
+const MAXIMO_DE_SEMANAS = 52;
+
+export const cuandoLlegasA = (puntos = [], campo = 'rm1') => {
+    const datos = (puntos || [])
+        .map(p => ({ t: new Date(p.date).getTime(), v: Number(p[campo]) }))
+        .filter(p => Number.isFinite(p.t) && Number.isFinite(p.v) && p.v > 0)
+        .sort((a, b) => a.t - b.t);
+
+    if (datos.length < MINIMO_DE_SESIONES) return null;
+
+    // Recta por mínimos cuadrados, con el tiempo en días para que la pendiente
+    // salga en "kilos por día" y se pueda leer.
+    const DIA = 86400000;
+    const t0 = datos[0].t;
+    const xs = datos.map(p => (p.t - t0) / DIA);
+    const ys = datos.map(p => p.v);
+    const n = datos.length;
+
+    const mediaX = xs.reduce((a, b) => a + b, 0) / n;
+    const mediaY = ys.reduce((a, b) => a + b, 0) / n;
+
+    let arriba = 0, abajo = 0;
+    for (let i = 0; i < n; i++) {
+        arriba += (xs[i] - mediaX) * (ys[i] - mediaY);
+        abajo += (xs[i] - mediaX) ** 2;
+    }
+    if (abajo === 0) return null;   // todo el mismo día
+
+    const porDia = arriba / abajo;
+    const actual = ys[ys.length - 1];
+
+    if (porDia <= 0) return { estancado: true, actual, desde: datos[0].t };
+
+    // El siguiente múltiplo de 10 por encima de donde estás. Si ya estás justo
+    // en uno, el objetivo es el de después: decir "llegarás a 100" cuando ya
+    // haces 100 no es una meta.
+    const objetivo = Math.floor(actual / 10) * 10 + 10;
+    const semanas = Math.ceil((objetivo - actual) / porDia / 7);
+
+    if (!Number.isFinite(semanas) || semanas < 1 || semanas > MAXIMO_DE_SEMANAS) return null;
+
+    return { estancado: false, actual, objetivo, semanas };
+};
+
+/**
+ * El plural de un día de la semana.
+ *
+ * ⚠️ CINCO DE LOS SIETE NO CAMBIAN.
+ *
+ * Lunes, martes, miércoles, jueves y viernes ya acaban en -s y son invariables:
+ * "los viernes", no "los vierness". Solo sábado y domingo llevan -s. Salía
+ * escrito mal en el aviso de la constancia, y una falta así en una frase que la
+ * app repite cada semana se ve enseguida y hace que todo lo demás parezca menos
+ * cuidado.
+ */
+export const enPlural = (dia) => {
+    const d = String(dia || '').toLowerCase();
+    return d.endsWith('s') ? d : `${d}s`;
+};

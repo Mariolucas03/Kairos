@@ -1,4 +1,4 @@
-import { unaRepeticionMaxima, conUnaRepeticion, loQueTienesAbandonado, desdeHace } from './estadisticas';
+import { unaRepeticionMaxima, conUnaRepeticion, loQueTienesAbandonado, desdeHace, cuandoLlegasA, enPlural } from './estadisticas';
 
 /**
  * LAS CUENTAS DE ESTADISTICAS
@@ -163,5 +163,98 @@ describe('desdeHace: cuanto tiempo en palabras', () => {
     test('y a partir del año, en años', () => {
         expect(desdeHace(365)).toBe('hace un año');
         expect(desdeHace(800)).toBe('hace 2 años');
+    });
+});
+
+describe('Cuando llegas al siguiente numero redondo', () => {
+
+    const sesion = (dia, valor) => ({
+        date: new Date(2026, 0, 1 + dia).toISOString(),
+        rm1: valor
+    });
+
+    test('con una subida clara, dice cuantas semanas faltan', () => {
+        // De 100 a 106 en 60 dias: 0,1 kg/dia. Faltan 4 para 110 -> 40 dias -> 6 semanas.
+        const r = cuandoLlegasA([
+            sesion(0, 100), sesion(20, 102), sesion(40, 104), sesion(60, 106)
+        ]);
+
+        expect(r.estancado).toBe(false);
+        expect(r.objetivo).toBe(110);
+        expect(r.semanas).toBe(6);
+    });
+
+    test('el objetivo es el SIGUIENTE redondo, nunca donde ya estas', () => {
+        // Decir "llegaras a 100" cuando ya haces 100 no es una meta.
+        const r = cuandoLlegasA([
+            sesion(0, 94), sesion(10, 96), sesion(20, 98), sesion(30, 100)
+        ]);
+        expect(r.objetivo).toBe(110);
+    });
+
+    test('SI NO SUBES, NO SE INVENTA UNA FECHA', () => {
+        // Es la parte que hace honesto esto: una proyeccion siempre da un
+        // numero, y ahi es donde se convierte en mentira.
+        const r = cuandoLlegasA([
+            sesion(0, 100), sesion(20, 100), sesion(40, 99), sesion(60, 98)
+        ]);
+        expect(r.estancado).toBe(true);
+        expect(r.semanas).toBeUndefined();
+    });
+
+    test('con menos de cuatro sesiones no se proyecta', () => {
+        // Dos puntos SIEMPRE forman una recta perfecta, y esa recta no
+        // significa absolutamente nada.
+        expect(cuandoLlegasA([sesion(0, 80), sesion(10, 100)])).toBeNull();
+        expect(cuandoLlegasA([sesion(0, 80), sesion(5, 90), sesion(10, 100)])).toBeNull();
+    });
+
+    test('si falta mas de un año, mejor callarse', () => {
+        // A ese plazo la extrapolacion es humo.
+        const r = cuandoLlegasA([
+            sesion(0, 100), sesion(100, 100.1), sesion(200, 100.2), sesion(300, 100.3)
+        ]);
+        expect(r).toBeNull();
+    });
+
+    test('todo el mismo dia no da ritmo del que tirar', () => {
+        const mismoDia = [80, 90, 100, 110].map(v => ({ date: '2026-03-01', rm1: v }));
+        expect(cuandoLlegasA(mismoDia)).toBeNull();
+    });
+
+    test('los puntos sin dato se ignoran, no arrastran la recta a cero', () => {
+        // Un ejercicio de peso corporal deja rm1 en null; contarlo como 0
+        // hundiria la pendiente y diria "estancado" sin motivo.
+        const r = cuandoLlegasA([
+            sesion(0, 100), { date: new Date(2026, 0, 11).toISOString(), rm1: null },
+            sesion(20, 102), sesion(40, 104), sesion(60, 106)
+        ]);
+        expect(r.estancado).toBe(false);
+    });
+
+    test('la basura no revienta', () => {
+        expect(cuandoLlegasA([])).toBeNull();
+        expect(cuandoLlegasA(null)).toBeNull();
+        expect(cuandoLlegasA(undefined)).toBeNull();
+    });
+});
+
+describe('El plural de los dias', () => {
+
+    test('los cinco que acaban en -s no cambian', () => {
+        // "Los vierness" salia escrito asi en el aviso de la constancia.
+        for (const d of ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']) {
+            expect(enPlural(d)).toBe(d.toLowerCase());
+        }
+    });
+
+    test('sabado y domingo si', () => {
+        expect(enPlural('Sábado')).toBe('sábados');
+        expect(enPlural('Domingo')).toBe('domingos');
+    });
+
+    test('la basura no revienta', () => {
+        expect(enPlural(null)).toBe('s');
+        expect(enPlural(undefined)).toBe('s');
     });
 });

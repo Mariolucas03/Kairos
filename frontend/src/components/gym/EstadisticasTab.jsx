@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import useSWR from 'swr';
-import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame, History, PieChart } from 'lucide-react';
+import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame, History, PieChart, CalendarCheck, Scale, Target } from 'lucide-react';
 import api from '../../services/api';
 import ProgressChart from './ProgressChart';
 import { loQueHasLevantado } from '../../utils/loQueHasLevantado';
-import { conUnaRepeticion, loQueTienesAbandonado, desdeHace } from '../../utils/estadisticas';
+import { conUnaRepeticion, loQueTienesAbandonado, desdeHace, cuandoLlegasA, enPlural } from '../../utils/estadisticas';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -25,6 +25,8 @@ export default function EstadisticasTab() {
     const { data: entrenados } = useSWR('/gym/progress', fetcher);
     const { data: semana } = useSWR('/gym/weekly', fetcher);
     const { data: reparto } = useSWR('/gym/reparto?dias=90', fetcher);
+    const { data: constancia } = useSWR('/gym/constancia?semanas=8', fetcher);
+    const { data: fuerza } = useSWR('/gym/fuerza-relativa', fetcher);
 
     const [ejercicio, setEjercicio] = useState(null);
     const [metrica, setMetrica] = useState('bestWeight');
@@ -42,6 +44,10 @@ export default function EstadisticasTab() {
     // Solo los grupos con algo dentro: enseñar "Abdomen 0%" en una lista de
     // ocho llena la pantalla de ceros y esconde lo que si importa.
     const gruposConTrabajo = (reparto?.reparto || []).filter(g => g.volumen > 0);
+
+    // Los puntos con 1RM, que sirven para la grafica y para la proyeccion.
+    const puntosConRM = conUnaRepeticion(progreso?.points || []);
+    const proyeccion = metrica === 'rm1' ? cuandoLlegasA(puntosConRM) : null;
 
     const Cifra = ({ icono: Icono, valor, unidad, etiqueta }) => (
         <div className="bg-zinc-950 border border-white/5 rounded-2xl p-3 text-center">
@@ -121,6 +127,97 @@ export default function EstadisticasTab() {
                     </>
                 )}
             </div>
+
+            {/* --- LOS DIAS QUE DICES CONTRA LOS QUE VAS ---
+
+                Los dos datos llevaban meses guardados —los dias de la rutina y
+                las fechas de los entrenos— y nadie los habia cruzado. Es de lo
+                poco de esta pantalla sobre lo que se puede ACTUAR: si los
+                viernes vas una de cada ocho, el problema no es tu constancia,
+                es que ese dia no te viene bien. */}
+            {constancia && !constancia.sinPlan && constancia.dias.length > 0 && (
+                <div>
+                    <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest mb-3 px-1 flex items-center gap-2">
+                        <CalendarCheck size={13} /> Los días que dices que entrenas
+                    </h3>
+
+                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4 space-y-3">
+                        {constancia.dias.map(d => (
+                            <div key={d.dia}>
+                                <div className="flex items-baseline justify-between mb-1.5">
+                                    <span className="text-[11px] font-black text-white uppercase tracking-tight not-italic">
+                                        {d.nombre}
+                                    </span>
+                                    <span className="text-[10px] font-black text-zinc-500 tabular-nums">
+                                        {d.hechos} de {d.posibles}
+                                    </span>
+                                </div>
+                                {/* Puntos y no una barra: con ocho semanas se
+                                    cuentan de un vistazo, y se ve CUANTAS veces
+                                    has fallado, no un porcentaje abstracto. */}
+                                <div className="flex gap-1">
+                                    {Array.from({ length: d.posibles }, (_, i) => (
+                                        <span
+                                            key={i}
+                                            className={`h-2 flex-1 rounded-full ${i < d.hechos
+                                                ? (d.porcentaje >= 60 ? 'bg-emerald-500' : 'bg-yellow-500')
+                                                : 'bg-white/[0.07]'}`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* El aviso solo si de verdad hay un dia flojo. Sin esto
+                            seria un consejo automatico que se lee una vez. */}
+                        {(() => {
+                            const flojo = [...constancia.dias].sort((a, b) => a.porcentaje - b.porcentaje)[0];
+                            const bueno = [...constancia.dias].sort((a, b) => b.porcentaje - a.porcentaje)[0];
+                            if (!flojo || flojo.porcentaje >= 50 || flojo.dia === bueno.dia) return null;
+                            return (
+                                <p className="text-[10px] text-zinc-500 font-bold leading-snug pt-1 border-t border-white/[0.06]">
+                                    Los <span className="text-orange-400">{enPlural(flojo.nombre)}</span> vas
+                                    {' '}{flojo.hechos} de {flojo.posibles}. Quizá ese día te vendría mejor otro.
+                                </p>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
+
+            {/* --- CUÁNTAS VECES TU PESO ---
+
+                El unico dato de la app que relaciona lo que comes con lo que
+                levantas: si adelgazas, sube sin tocar un kilo mas. */}
+            {fuerza && !fuerza.sinPeso && fuerza.ejercicios.length > 0 && (
+                <div>
+                    <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest mb-3 px-1 flex items-center gap-2">
+                        <Scale size={13} /> Cuántas veces tu peso
+                    </h3>
+
+                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-2">
+                        {fuerza.ejercicios.map(e => (
+                            <div key={e.nombre} className="flex items-center gap-3 px-2.5 py-2">
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[12px] font-black text-white uppercase tracking-tight truncate not-italic">
+                                        {e.nombre}
+                                    </p>
+                                    <p className="text-[9px] text-zinc-600 font-bold tabular-nums">
+                                        {e.rm1} kg estimados · mejor serie {e.peso} × {e.reps}
+                                    </p>
+                                </div>
+                                <span className="shrink-0 text-[17px] font-black text-yellow-500 tabular-nums">
+                                    {e.veces.toLocaleString('es-ES')}
+                                    <span className="text-[9px] text-zinc-600 ml-0.5">×</span>
+                                </span>
+                            </div>
+                        ))}
+                        <p className="text-[9px] text-zinc-600 font-bold px-2.5 pt-1.5 pb-1">
+                            Con tu peso de {fuerza.pesoCorporal} kg. Si adelgazas, sube sin levantar más.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* --- LO QUE TIENES ABANDONADO ---
 
@@ -285,18 +382,43 @@ export default function EstadisticasTab() {
 
                             <ProgressChart
                                 points={metrica === 'rm1'
-                                    ? conUnaRepeticion(progreso?.points || []).filter(p => p.rm1 !== null)
+                                    ? puntosConRM.filter(p => p.rm1 !== null)
                                     : (progreso?.points || [])}
                                 metric={metrica}
                                 unit={metrica === 'reps' ? 'reps' : 'kg'}
                             />
 
-                            {metrica === 'rm1'
-                                && conUnaRepeticion(progreso?.points || []).every(p => p.rm1 === null) && (
+                            {metrica === 'rm1' && puntosConRM.every(p => p.rm1 === null) && (
                                 <p className="text-[10px] text-zinc-600 font-bold text-center py-2">
                                     Aquí no se puede estimar: es un ejercicio sin peso,
                                     o siempre lo haces a más de 12 repeticiones.
                                 </p>
+                            )}
+
+                            {/* LA ZANAHORIA. Solo cuando hay tendencia de verdad:
+                                con menos de cuatro sesiones, o si no subes, se
+                                calla en vez de inventar una fecha. */}
+                            {proyeccion && (
+                                <div className={`flex items-center gap-2.5 mt-3 px-3.5 py-2.5 rounded-2xl border ${proyeccion.estancado
+                                    ? 'bg-white/[0.03] border-white/[0.06]'
+                                    : 'bg-emerald-500/[0.07] border-emerald-500/25'}`}>
+                                    <Target size={15} className={proyeccion.estancado ? 'text-zinc-500 shrink-0' : 'text-emerald-400 shrink-0'} />
+                                    {proyeccion.estancado ? (
+                                        <p className="text-[11px] font-bold text-zinc-400 leading-snug">
+                                            Llevas un tiempo sin subir aquí. Prueba a bajar
+                                            las repeticiones y subir el peso.
+                                        </p>
+                                    ) : (
+                                        <p className="text-[11px] font-bold text-zinc-300 leading-snug">
+                                            A este ritmo, los{' '}
+                                            <span className="text-emerald-400 font-black">{proyeccion.objetivo} kg</span>
+                                            {' '}caen en unas{' '}
+                                            <span className="text-emerald-400 font-black">
+                                                {proyeccion.semanas} {proyeccion.semanas === 1 ? 'semana' : 'semanas'}
+                                            </span>.
+                                        </p>
+                                    )}
+                                </div>
                             )}
                         </>
                     )}

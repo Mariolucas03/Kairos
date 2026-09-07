@@ -20,6 +20,8 @@ const {
     getExerciseHistory,
     getBodyStatus,
     getRepartoMuscular,
+    getConstanciaPorDia,
+    getFuerzaRelativa,
     chatRoutineGenerator,
     getMuscleCatalog,
     getMuscleRanksController,
@@ -90,6 +92,11 @@ router.get('/body-status', protect, getBodyStatus);
 // Es otra pregunta que /body-status: ese cuenta SERIES (cuatro de curl pesan
 // igual que cuatro de sentadilla), este cuenta el trabajo de verdad.
 router.get('/reparto', protect, getRepartoMuscular);
+// Los dias que tu rutina dice que entrenas, contra los que entrenas de verdad.
+// Los dos datos llevaban meses guardados y nadie los habia cruzado.
+router.get('/constancia', protect, getConstanciaPorDia);
+// Cuantas veces tu propio peso mueves en cada ejercicio.
+router.get('/fuerza-relativa', protect, getFuerzaRelativa);
 router.get('/exercise-history', protect, getExerciseHistory);
 
 module.exports = router;

@@ -222,7 +222,7 @@ const avisarAmigosDelEntreno = async (autorId, nombreEntreno) => {
 // 🔥 Fecha en hora de Madrid. Este fichero definía su propio
 // `new Date().toISOString().split('T')[0]` (UTC), así que un entreno registrado
 // entre las 00:00 y las 02:00 se guardaba en el día ANTERIOR.
-const { getTodayDateString } = require('../utils/dateHelpers');
+const { getTodayDateString, getMadridDateString } = require('../utils/dateHelpers');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 const { FAMILIAS, familiaDe } = require('../utils/equipment');
 const { canViewSection } = require('../utils/privacidad');
@@ -1667,6 +1667,178 @@ const getRepartoMuscular = async (req, res) => {
     }
 };
 
+/**
+ * LOS DIAS QUE DICES QUE ENTRENAS VS LOS QUE ENTRENAS.
+ *
+ * Las rutinas guardan en que dias de la semana tocan (`dias`) y cada entreno
+ * guarda su fecha. Los dos datos llevan meses ahi y NADIE los habia cruzado.
+ *
+ * Y es de lo poco que se puede arreglar de verdad: si resulta que los viernes
+ * vas una de cada ocho, el problema no es tu fuerza de voluntad, es que ese dia
+ * no te viene bien y hay que mover la rutina al jueves. Sin este dato uno se
+ * echa la culpa; con el, cambia el plan.
+ *
+ * ⚠️ EL DIA SE SACA EN HORA DE MADRID, NO DEL SERVIDOR.
+ *
+ * `getDay()` sobre la fecha guardada da el dia en la zona del proceso, que en
+ * Render es UTC. Un entreno de las 23:30 de un lunes se guarda como martes en
+ * UTC y contaria en la casilla equivocada — justo el fallo que hace que estos
+ * numeros no se parezcan a lo que uno recuerda.
+ */
+const getConstanciaPorDia = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const semanas = Math.min(Math.max(parseInt(req.query.semanas, 10) || 8, 2), 52);
+        const desde = new Date();
+        desde.setDate(desde.getDate() - semanas * 7);
+
+        const [rutinas, logs] = await Promise.all([
+            Routine.find({ user: userId, 'dias.0': { $exists: true } })
+                .select('name dias').lean(),
+            WorkoutLog.find({ user: userId, type: 'gym', date: { $gte: desde } })
+                .select('date').lean()
+        ]);
+
+        // Los dias que TU rutina dice que tocan, sin repetir.
+        const diasPlaneados = [...new Set(rutinas.flatMap(r => r.dias || []))]
+            .filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
+            .sort((a, b) => a - b);
+
+        if (diasPlaneados.length === 0) {
+            // Sin dias en ninguna rutina no hay nada que comparar. Se dice, en
+            // vez de devolver una tabla de ceros que parece que fallas siempre.
+            return res.json({ semanas, sinPlan: true, dias: [] });
+        }
+
+        // Cuantas veces has entrenado en cada dia de la semana.
+        const entrenosPorDia = [0, 0, 0, 0, 0, 0, 0];
+        for (const log of logs) {
+            const diaMadrid = new Date(`${getMadridDateString(log.date)}T12:00:00Z`).getUTCDay();
+            entrenosPorDia[diaMadrid]++;
+        }
+
+        const NOMBRES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+        const dias = diasPlaneados.map(d => {
+            // Cuantas veces ha caido ese dia de la semana en el periodo. No es
+            // siempre `semanas`: hoy puede que ese dia aun no haya llegado.
+            const posibles = vecesQueCae(d, desde, new Date());
+            const hechos = Math.min(entrenosPorDia[d], posibles);
+            return {
+                dia: d,
+                nombre: NOMBRES[d],
+                hechos,
+                posibles,
+                porcentaje: posibles > 0 ? Math.round((hechos / posibles) * 100) : 0
+            };
+        });
+
+        res.json({ semanas, sinPlan: false, dias });
+    } catch (error) {
+        console.error('Error en getConstanciaPorDia:', error);
+        res.status(500).json({ message: 'Error calculando la constancia' });
+    }
+};
+
+/** Cuantas veces cae un dia de la semana entre dos fechas (ambas incluidas). */
+const vecesQueCae = (diaSemana, desde, hasta) => {
+    let veces = 0;
+    const cursor = new Date(desde);
+    cursor.setHours(12, 0, 0, 0);
+    while (cursor <= hasta) {
+        if (new Date(`${getMadridDateString(cursor)}T12:00:00Z`).getUTCDay() === diaSemana) veces++;
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return veces;
+};
+
+/**
+ * FUERZA RELATIVA: cuantas veces tu propio peso mueves.
+ *
+ * Es el numero con el que se mide la gente de verdad. "Hago press banca con 100
+ * kg" no dice nada sin saber cuanto pesas tu; "hago press banca con 1,2 veces mi
+ * peso" se entiende y se compara.
+ *
+ * ⚠️ Y TIENE UNA VIRTUD QUE NINGUN OTRO DATO DE LA APP TIENE: si adelgazas,
+ * sube sin tocar un kilo mas. Es el unico indicador que premia las dos mitades
+ * del trabajo a la vez, y hasta ahora la app no relacionaba en ningun sitio lo
+ * que comes con lo que levantas.
+ *
+ * El 1RM se estima con Epley, la misma formula que usa la grafica del movil, y
+ * con los mismos limites: nada de peso corporal, nada por encima de 12
+ * repeticiones. Un numero inventado aqui seria peor que no enseñar ninguno.
+ */
+const TOPE_REPS_FIABLE = 12;
+
+const unaRepeticionMaxima = (peso, reps) => {
+    const kg = Number(peso) || 0;
+    const r = Number(reps) || 0;
+    if (kg <= 0 || r <= 0 || r > TOPE_REPS_FIABLE) return null;
+    if (r === 1) return kg;
+    return Math.round(kg * (1 + r / 30));
+};
+
+const getFuerzaRelativa = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        // El peso corporal mas reciente que haya apuntado.
+        const [ultimoPeso] = await DailyLog.find({ user: userId, weight: { $gt: 0 } })
+            .sort({ date: -1 }).limit(1).select('weight date').lean();
+
+        if (!ultimoPeso?.weight) {
+            // Sin peso corporal no hay fuerza relativa. Se dice para que la
+            // pantalla pueda invitar a apuntarlo en vez de quedarse en blanco.
+            return res.json({ sinPeso: true, ejercicios: [] });
+        }
+
+        const pesoCorporal = ultimoPeso.weight;
+
+        const desde = new Date();
+        desde.setDate(desde.getDate() - 180);
+
+        const logs = await WorkoutLog.find({ user: userId, type: 'gym', date: { $gte: desde } })
+            .select('exercises.name exercises.sets').lean();
+
+        // El mejor 1RM de cada ejercicio en el periodo.
+        const mejorPorEjercicio = new Map();
+        for (const log of logs) {
+            for (const ex of log.exercises || []) {
+                for (const set of ex.sets || []) {
+                    const rm = unaRepeticionMaxima(set?.weight, set?.reps);
+                    if (rm === null) continue;
+                    if (!mejorPorEjercicio.has(ex.name) || mejorPorEjercicio.get(ex.name).rm1 < rm) {
+                        mejorPorEjercicio.set(ex.name, { rm1: rm, peso: set.weight, reps: set.reps });
+                    }
+                }
+            }
+        }
+
+        const ejercicios = [...mejorPorEjercicio.entries()]
+            .map(([nombre, m]) => ({
+                nombre,
+                rm1: m.rm1,
+                peso: m.peso,
+                reps: m.reps,
+                // Dos decimales: "1,2 veces tu peso" se lee; "1,23456" no.
+                veces: Math.round((m.rm1 / pesoCorporal) * 100) / 100
+            }))
+            .sort((a, b) => b.veces - a.veces)
+            .slice(0, 6);
+
+        res.json({
+            sinPeso: false,
+            pesoCorporal,
+            fechaDelPeso: ultimoPeso.date,
+            ejercicios
+        });
+    } catch (error) {
+        console.error('Error en getFuerzaRelativa:', error);
+        res.status(500).json({ message: 'Error calculando la fuerza relativa' });
+    }
+};
+
 const chatRoutineGenerator = async (req, res) => {
     // Lo que escribe el usuario acaba dentro del prompt: sin tope, cada peticion
     // podia arrastrar hasta 1 MB de texto a la cuenta de IA.
@@ -1716,6 +1888,8 @@ module.exports = {
     saveWorkoutLog, saveSportLog, getSportCatalog,
     getExerciseProgressController, getTrainedExercises, getResumenEntrenos,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
-    getRepartoMuscular,
+    getRepartoMuscular, getConstanciaPorDia, getFuerzaRelativa,
+    // Para las pruebas
+    unaRepeticionMaxima,
     chatRoutineGenerator
 };
