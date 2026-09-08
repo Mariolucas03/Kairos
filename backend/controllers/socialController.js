@@ -119,7 +119,9 @@ const notifyOwner = async ({ ownerId, actorId, type, workout, actor, text = '' }
                     ? `A ${nombre} le gusta tu entreno "${workout.routineName || ''}"`
                     : `${nombre}: ${text.slice(0, 60)}`,
                 icon: '/assets/icons/icon-192x192.png',
-                url: '/social'
+                // Al entreno del que habla, no al feed entero: buscarlo
+                // bajando es justo lo que la notificacion venia a evitar.
+                url: `/social/entreno/${workout._id}`
             });
         }
     } catch (error) {
@@ -854,6 +856,49 @@ const getMonthlyLeaderboard = async (req, res) => {
     }
 };
 
+/**
+ * UNA PUBLICACION SUELTA, LA DEL ENLACE.
+ *
+ * ⚠️ HACIA FALTA PARA QUE UNA NOTIFICACION LLEVE A ALGUN SITIO.
+ *
+ * Pulsar "Fulano ha comentado tu entreno" en el buzon te llevaba al PERFIL DE
+ * FULANO: a la persona, no al comentario. Y el aviso push del movil dejaba en
+ * `/social`, o sea en el feed entero, a buscarlo bajando. La notificacion
+ * guardaba el entreno desde el principio y nadie lo usaba.
+ *
+ * ⚠️ LA PRIVACIDAD SE COMPRUEBA AQUI TAMBIEN, Y NO ES OPCIONAL.
+ *
+ * El feed ya filtra por amistad, pero esto es una URL directa: sin comprobar,
+ * cualquiera con el id de un entreno podria leer el de una cuenta privada
+ * escribiendo la direccion a mano. Se usa el MISMO `canViewSection` que el resto
+ * de la app —una segunda copia de una comprobacion de privacidad es la forma
+ * segura de que un dia una se quede atras—.
+ *
+ * @route   GET /api/social/workout/:workoutId
+ */
+const getPublicacion = async (req, res) => {
+    try {
+        const log = await WorkoutLog.findById(req.params.workoutId)
+            .populate('user', 'username avatar frame title level clanRank pet')
+            .populate('comments.user', 'username avatar frame')
+            .populate('likes', '_id');
+
+        if (!log) return res.status(404).json({ message: 'Esa publicación ya no existe' });
+
+        const dueño = log.user?._id || log.user;
+        if (!(await canViewSection(req.user._id, dueño, 'workouts'))) {
+            // 404 y no 403 a proposito: un 403 confirmaria que ese entreno
+            // existe, que ya es informacion sobre una cuenta privada.
+            return res.status(404).json({ message: 'Esa publicación ya no existe' });
+        }
+
+        res.json(shapeFeedItem(log, req.user._id));
+    } catch (error) {
+        console.error('Error en getPublicacion:', error);
+        res.status(500).json({ message: 'Error cargando la publicación' });
+    }
+};
+
 // @desc    Mis notificaciones de me gusta / comentarios
 // @route   GET /api/social/notifications
 const getNotifications = async (req, res) => {
@@ -951,6 +996,7 @@ const getBadge = async (req, res) => {
 };
 
 module.exports = {
+    getPublicacion,
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
     getFeed, toggleLike, addComment, toggleLikeComentario, borrarMiEntreno, borrarComentarioPropio, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
     removeFriend, getNotifications, markNotificationsRead, getBadge, heartbeat

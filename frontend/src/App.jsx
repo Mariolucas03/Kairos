@@ -33,6 +33,7 @@ const FriendsPage = lazy(() => import('./pages/social/FriendsPage'));
 const ClansPage = lazy(() => import('./pages/social/ClansPage'));
 const RankingPage = lazy(() => import('./pages/social/RankingPage'));
 const UserProfilePage = lazy(() => import('./pages/social/UserProfilePage'));
+const PublicacionPage = lazy(() => import('./pages/social/PublicacionPage'));
 
 const Games = lazy(() => import('./pages/Games'));
 const FortuneWheel = lazy(() => import('./pages/games/FortuneWheel'));
@@ -168,6 +169,8 @@ function App() {
                             <Route path="/social/clans" element={<ClansPage />} />
                             <Route path="/social/ranking" element={<RankingPage />} />
                             <Route path="/social/user/:userId" element={<UserProfilePage />} />
+                            {/* Una publicación suelta: a donde llevan las notificaciones */}
+                            <Route path="/social/entreno/:workoutId" element={<PublicacionPage />} />
                             <Route path="/profile" element={<Profile />} />
                             <Route path="/settings" element={<Settings />} />
                             <Route path="/admin" element={<Admin />} />

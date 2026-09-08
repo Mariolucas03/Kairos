@@ -90,7 +90,20 @@ export default function InboxModal({
                             {notifications.map(n => (
                                 <button
                                     key={n._id}
-                                    onClick={() => { onClose(); if (n.actor?._id) navigate(`/social/user/${n.actor._id}`); }}
+                                    // ⚠️ AL ENTRENO, no al perfil de quien comentó.
+                                    // Llevaba a la persona: veías su perfil y
+                                    // tenías que buscar tú el comentario. El
+                                    // entreno estaba guardado en la notificación
+                                    // desde el principio.
+                                    //
+                                    // Sin entreno (una notificación antigua, o
+                                    // el entreno borrado) se cae al perfil, que
+                                    // es mejor que no hacer nada al pulsar.
+                                    onClick={() => {
+                                        onClose();
+                                        if (n.workout) navigate(`/social/entreno/${n.workout}`);
+                                        else if (n.actor?._id) navigate(`/social/user/${n.actor._id}`);
+                                    }}
                                     className={`w-full text-left p-3 rounded-2xl border flex items-center gap-3 mb-2 transition-colors ${n.read ? 'bg-black border-zinc-800' : 'bg-pink-900/10 border-pink-500/20'}`}
                                 >
                                     <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] font-black text-zinc-500 overflow-hidden shrink-0">

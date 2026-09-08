@@ -15,6 +15,7 @@ const {
     getMonthlyLeaderboard,
     removeFriend,
     getNotifications,
+    getPublicacion,
     markNotificationsRead,
     getBadge,
     heartbeat,
@@ -47,6 +48,10 @@ router.get('/profile/:userId', protect, getFriendProfile);
 router.get('/profile/:userId/items', protect, getProfileItems);
 
 // Notificaciones de me gusta y comentarios
+// Una publicacion suelta: es a donde lleva una notificacion o un enlace
+// compartido. Comprueba la privacidad por su cuenta, ver el controlador.
+router.get('/workout/:workoutId', protect, getPublicacion);
+
 router.get('/notifications', protect, getNotifications);
 router.post('/notifications/read', protect, markNotificationsRead);
 // Contador ligero para el punto rojo del footer
