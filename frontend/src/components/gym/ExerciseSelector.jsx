@@ -7,7 +7,7 @@ import { MUSCLES_OF_GROUP } from '../body/bodyPaths';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
-const GRUPOS_POR_DEFECTO = ['Pecho', 'Espalda', 'Hombro', 'Bíceps', 'Tríceps', 'Pierna', 'Glúteo', 'Abdomen'];
+const GRUPOS_POR_DEFECTO = ['Pecho', 'Espalda', 'Hombro', 'Bíceps', 'Tríceps', 'Antebrazo', 'Pierna', 'Glúteo', 'Abdomen'];
 const FAMILIAS_POR_DEFECTO = ['Pesas', 'Máquina', 'Polea', 'Peso corporal', 'Otros'];
 
 export default function ExerciseSelector({ onSelect, onClose }) {

@@ -161,6 +161,15 @@ const EXERCISE_CATALOG = [
     { name: 'Puente de Glúteo con Banda', muscle: 'Glúteo', muscleDetail: 'Glúteo mayor', secondary: [], equipment: 'Accesorio', shares: { 'Glúteo mayor': 55, 'Glúteo medio': 25, 'Isquiotibiales': 20 } },
 
     // ================= ABDOMEN =================
+    // --- ANTEBRAZO ---
+    // El grupo no tenia ni un ejercicio: se podia elegir y no habia nada que
+    // poner debajo. Estos son los de toda la vida, con su reparto por musculo.
+    { name: 'Curl de Muñeca', muscle: 'Antebrazo', muscleDetail: 'Flexores del antebrazo', secondary: [], equipment: 'Barra', shares: { 'Flexores del antebrazo': 85, 'Extensores del antebrazo': 15 } },
+    { name: 'Curl de Muñeca Invertido', muscle: 'Antebrazo', muscleDetail: 'Extensores del antebrazo', secondary: [], equipment: 'Barra', shares: { 'Extensores del antebrazo': 80, 'Flexores del antebrazo': 20 } },
+    { name: 'Paseo del Granjero', muscle: 'Antebrazo', muscleDetail: 'Flexores del antebrazo', secondary: ['Espalda', 'Pierna'], equipment: 'Mancuernas', shares: { 'Flexores del antebrazo': 45, 'Trapecio superior': 25, 'Recto abdominal (superior)': 15, 'Cuádriceps (recto femoral)': 15 } },
+    { name: 'Rodillo de Muñeca', muscle: 'Antebrazo', muscleDetail: 'Extensores del antebrazo', secondary: [], equipment: 'Accesorio', shares: { 'Extensores del antebrazo': 50, 'Flexores del antebrazo': 50 } },
+    { name: 'Colgarse de la Barra', muscle: 'Antebrazo', muscleDetail: 'Flexores del antebrazo', secondary: ['Espalda'], equipment: 'Peso Corporal', shares: { 'Flexores del antebrazo': 60, 'Dorsal ancho': 25, 'Trapecio superior': 15 } },
+
     { name: 'Plancha', muscle: 'Abdomen', muscleDetail: 'Transverso abdominal', secondary: [], equipment: 'Peso Corporal', shares: { 'Transverso abdominal': 45, 'Recto abdominal (superior)': 25, 'Recto abdominal (inferior)': 20, 'Oblicuos': 10 } },
     { name: 'Crunch Abdominal', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (superior)', secondary: [], equipment: 'Peso Corporal', shares: { 'Recto abdominal (superior)': 75, 'Recto abdominal (inferior)': 15, 'Oblicuos': 10 } },
     { name: 'Elevación de Piernas', muscle: 'Abdomen', muscleDetail: 'Recto abdominal (inferior)', secondary: [], equipment: 'Peso Corporal', shares: { 'Recto abdominal (inferior)': 70, 'Recto abdominal (superior)': 15, 'Oblicuos': 15 } },

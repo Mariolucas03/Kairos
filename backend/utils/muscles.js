@@ -17,6 +17,11 @@ const MUSCLE_GROUPS = [
     'Hombro',
     'Bíceps',
     'Tríceps',
+    // ⚠️ FALTABA. La lámina del cuerpo lo tenía dibujado desde el principio
+    // —es la zona entre el codo y la muñeca— pero no existía como grupo, así
+    // que no se podía elegir al crear una rutina, no salía en el reparto de
+    // estadísticas y su parte del muñeco no se encendía nunca.
+    'Antebrazo',
     'Pierna',
     'Glúteo',
     'Abdomen'
@@ -41,6 +46,15 @@ const SPECIFIC_MUSCLES = {
         'Romboides',
         'Redondo mayor',
         'Lumbar'
+    ],
+    'Antebrazo': [
+        // Los nombres que se usan en un gimnasio, no los de anatomía: nadie
+        // dice "flexor cubital del carpo".
+        // Solo estos dos: el mapa del cuerpo tiene una forma para cada uno, y
+        // un musculo sin dibujo es un nombre que no enciende nada. El
+        // braquiorradial va dentro de los extensores, que es donde se ve.
+        'Flexores del antebrazo',
+        'Extensores del antebrazo'
     ],
     'Hombro': [
         'Deltoides anterior',

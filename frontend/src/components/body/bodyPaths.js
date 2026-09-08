@@ -51,6 +51,28 @@ export const MUSCLE_SHAPES = {
             'M201,304L211,304L212,306L217,323L217,342L212,359L194,391L182,401L174,404L168,397L162,383L160,360L164,339L172,322L182,312L200,305Z',
             'M434,304L424,304L423,306L418,323L418,342L423,359L441,391L453,401L461,404L467,397L473,383L475,360L471,339L463,322L453,312L435,305Z'
         ],
+        // ⚠️ EL ANTEBRAZO ESTABA DIBUJADO Y NO ESTABA ETIQUETADO.
+        //
+        // La lámina lo tiene desde el principio, con sus dos vientres separados
+        // por una línea. Nadie lo había trazado, así que era la única parte del
+        // cuerpo que no se encendía nunca por mucho que la entrenaras.
+        //
+        // Los contornos salen del mismo método que los demás: rellenando la
+        // región que delimitan las líneas blancas y trazando su borde, así que
+        // encajan al píxel con el dibujo.
+        // El vientre de FUERA (lado del pulgar) son los extensores; el de
+        // DENTRO, los flexores. Van con nombre propio y no como un "Antebrazo"
+        // suelto porque el mapa da por hecho que cada nombre tiene su forma:
+        // una etiqueta sin dibujo no enciende nada.
+        'Extensores del antebrazo': [
+            'M128,438L134,406L156,377L161,412L155,430L119,500Z',
+            'M507,438L501,406L479,377L474,412L480,430L516,500Z'
+        ],
+        'Flexores del antebrazo': [
+            'M153,451L170,410L191,406L184,439L170,461L128,505Z',
+            'M482,451L465,410L444,406L451,439L465,461L507,505Z'
+        ],
+
         // Los seis cuadraditos de arriba del recto abdominal
         'Recto abdominal (superior)': [
             'M313,314L317,314L317,345L294,352L273,365L273,341L278,334L291,322L312,315Z',
@@ -118,6 +140,13 @@ export const MUSCLE_SHAPES = {
             'M726,261L730,262L732,268L732,289L725,320L719,331L694,356L685,368L669,380L671,366L686,335L688,314L684,307L681,307L673,314L653,343L655,324L662,301L669,290L690,272L709,264L725,262Z',
             'M985,261L981,262L979,268L979,289L986,320L992,331L1017,356L1026,368L1042,380L1040,366L1025,335L1023,314L1027,307L1030,307L1038,314L1058,343L1056,324L1049,301L1042,290L1021,272L1002,264L986,262Z'
         ],
+        // Por detrás el antebrazo se ve entero, sin la línea que lo parte en
+        // dos por delante. Recortado por arriba en y=371: la punta del tríceps
+        // baja hasta 380 por ese lado y las dos zonas se pisaban en el codo.
+        'Extensores del antebrazo': [
+            'M613,429L620,392L637,371L649,389L664,391L672,386L666,421L618,498L600,496Z',
+            'M1098,429L1091,392L1074,371L1062,389L1047,391L1039,386L1045,421L1093,498L1111,496Z'
+        ],
         'Glúteo mayor': [
             'M804,463L814,465L830,475L843,488L855,505L855,583L834,595L823,598L805,598L797,596L785,589L774,573L772,564L772,537L776,507L786,482L803,464Z',
             'M907,463L897,465L881,475L868,488L856,505L856,583L877,595L888,598L906,598L914,596L926,589L937,573L939,564L939,537L935,507L925,482L908,464Z'
@@ -157,6 +186,8 @@ export const GROUP_OF_MUSCLE = {
     'Pecho': 'Pecho',
     'Bíceps': 'Bíceps',
     'Tríceps': 'Tríceps',
+    'Flexores del antebrazo': 'Antebrazo',
+    'Extensores del antebrazo': 'Antebrazo',
     'Recto abdominal (superior)': 'Abdomen',
     'Recto abdominal (inferior)': 'Abdomen',
     'Oblicuos': 'Abdomen',
@@ -183,6 +214,6 @@ export const MUSCLES_OF_GROUP = Object.entries(GROUP_OF_MUSCLE).reduce((acc, [mu
 
 // Qué grupos se ven en cada cara (para avisar de que hay que girar el cuerpo)
 export const GROUPS_BY_VIEW = {
-    front: ['Pecho', 'Hombro', 'Bíceps', 'Abdomen', 'Pierna'],
-    back: ['Espalda', 'Hombro', 'Tríceps', 'Glúteo', 'Pierna']
+    front: ['Pecho', 'Hombro', 'Bíceps', 'Antebrazo', 'Abdomen', 'Pierna'],
+    back: ['Espalda', 'Hombro', 'Tríceps', 'Antebrazo', 'Glúteo', 'Pierna']
 };

@@ -46,7 +46,7 @@ export function WeeklyHistoryModal({ onClose }) {
     const [selectedMuscle, setSelectedMuscle] = useState('Global');
     const [selectedYear] = useState(new Date().getFullYear());
 
-    const muscles = ['Global', 'Pecho', 'Espalda', 'Pierna', 'Glúteo', 'Hombro', 'Bíceps', 'Tríceps', 'Abdomen'];
+    const muscles = ['Global', 'Pecho', 'Espalda', 'Pierna', 'Glúteo', 'Hombro', 'Bíceps', 'Tríceps', 'Antebrazo', 'Abdomen'];
 
     return createPortal(
         <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={onClose}>
