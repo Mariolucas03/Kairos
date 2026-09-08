@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import ConfirmDialog from '../common/ConfirmDialog';
 import MarcoPerfil from '../common/MarcoPerfil';
 import { loQueHasLevantado } from '../../utils/loQueHasLevantado';
+import CancionDelPost from './CancionDelPost';
 
 // --- HELPER: TIEMPO RELATIVO ---
 // Hasta una semana se cuenta en relativo ("hace 3 h"); a partir de ahí se pone
@@ -288,6 +289,11 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                     {isGym ? <Dumbbell size={16} /> : <Activity size={16} />}
                 </div>
             </div>
+
+            {/* LA CANCION que le puso al entreno. Debajo del nombre y encima de
+                todo lo demas, como en Instagram: es parte de quien publica, no
+                del contenido. */}
+            <CancionDelPost cancion={post.cancion} />
 
             {/* TITULAR DEL ENTRENO: va ENCIMA de la imagen porque no es un pie de
                 foto, es de qué va la publicación; así se sabe qué estás mirando

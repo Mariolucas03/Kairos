@@ -39,8 +39,13 @@ const shapeFeedItem = (log, viewerId) => {
         caloriesBurned: obj.caloriesBurned,
         exercises: obj.exercises,
         date: obj.date,
-        // Contenido del post: foto y músculos trabajados (para el carrusel)
+        // Contenido del post: foto, canción y músculos trabajados
         photo: obj.photo || '',
+        // ⚠️ La lista de campos es BLANCA: lo que no se nombra aquí no llega al
+        // móvil por mucho que esté guardado. Es a propósito —así una foto o un
+        // campo interno no se escapan al feed sin querer— pero significa que
+        // cada campo nuevo hay que añadirlo también aquí.
+        cancion: obj.cancion?.preview ? obj.cancion : null,
         musclesWorked: obj.musclesWorked || [],
         secondaryMuscles: obj.secondaryMuscles || [],
         records: obj.records || [],

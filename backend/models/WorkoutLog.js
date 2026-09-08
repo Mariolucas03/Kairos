@@ -83,6 +83,24 @@ const workoutLogSchema = mongoose.Schema({
     // Se guarda aquí en vez de en un servicio externo para no depender de
     // ninguna cuenta de terceros; el backend limita el tamaño al guardar.
     photo: { type: String, default: '' },
+
+    /**
+     * LA CANCION DEL ENTRENO.
+     *
+     * Se guardan solo los DATOS de la cancion, nunca el audio. El fichero de
+     * 30 segundos vive en los servidores de Apple y es el mismo que suena en
+     * cualquier tienda de musica: reproducirlo desde aqui es legal y no cuesta
+     * ni almacenamiento ni derechos. Subir un mp3 a Render seria pirateria y
+     * ademas llenaria el plan gratuito en una semana.
+     */
+    cancion: {
+        id: { type: String },
+        titulo: { type: String },
+        artista: { type: String },
+        caratula: { type: String },
+        preview: { type: String },
+        enlace: { type: String }
+    },
     // Grupos musculares trabajados, derivados EN EL SERVIDOR a partir de los
     // ejercicios (no se confía en lo que mande el cliente).
     musclesWorked: { type: [String], default: [] },

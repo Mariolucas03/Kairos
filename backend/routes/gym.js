@@ -22,6 +22,7 @@ const {
     getRepartoMuscular,
     getConstanciaPorDia,
     getFuerzaRelativa,
+    buscarMusica,
     chatRoutineGenerator,
     getMuscleCatalog,
     getMuscleRanksController,
@@ -97,6 +98,9 @@ router.get('/reparto', protect, getRepartoMuscular);
 router.get('/constancia', protect, getConstanciaPorDia);
 // Cuantas veces tu propio peso mueves en cada ejercicio.
 router.get('/fuerza-relativa', protect, getFuerzaRelativa);
+// Buscar una cancion para ponerle al entreno. Va por el servidor y no directo
+// desde el movil: ver el comentario del controlador.
+router.get('/musica', protect, buscarMusica);
 router.get('/exercise-history', protect, getExerciseHistory);
 
 module.exports = router;

@@ -17,6 +17,7 @@ import { compressImage } from '../../utils/imageCompressor';
 import { encolar, esFalloDeRed } from '../../utils/colaEnvios';
 import { letraDe, grupoDe, siguienteDelGrupo } from '../../utils/superseries';
 import RestTimerModal from './RestTimerModal';
+import BuscadorCancion from './BuscadorCancion';
 
 // ==========================================
 // SUB-COMPONENTE: CRONÓMETRO GLOBAL AISLADO
@@ -162,6 +163,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
     // Se guardan aparte para poder enseñarlas ANTES de cerrar la pantalla: si se
     // cerrara primero, el aviso se perdería con el desmontaje.
     const [subidasRango, setSubidasRango] = useState(null);
+
+    // La cancion que le pones al entreno, como en las publicaciones de
+    // Instagram. Solo viaja el enlace al fichero de 30 segundos de Apple; el
+    // audio no pasa por Kairos en ningun momento.
+    const [cancion, setCancion] = useState(null);
 
     const [restContexto, setRestContexto] = useState(() => {
         try { return JSON.parse(localStorage.getItem(RESTCTX_KEY)) || null; } catch { return null; }
@@ -639,6 +645,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 // La foto viaja ya comprimida; el servidor la valida y deriva
                 // por su cuenta los músculos trabajados a partir de los ejercicios.
                 photo: photo || undefined,
+                cancion: cancion || undefined,
                 // Para que reintentarlo no lo guarde dos veces
                 clienteId
             };
@@ -1153,6 +1160,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 </div>
                             </div>
                         )}
+
+                        {/* LA CANCION. Va antes de la foto porque es la novedad
+                            y porque se elige en caliente: al acabar te acuerdas
+                            de lo que estabas escuchando. */}
+                        <div className="mb-4">
+                            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Canción (opcional)</p>
+                            <BuscadorCancion cancion={cancion} onElegir={setCancion} />
+                        </div>
 
                         {/* Foto del entreno */}
                         <div className="mb-4">

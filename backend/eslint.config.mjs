@@ -18,6 +18,10 @@ for (const nombre of [
     'require', 'module', 'exports', 'process', '__dirname', '__filename',
     'console', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
     'setImmediate', 'Buffer', 'URL', 'URLSearchParams', 'fetch', 'AbortController',
+    // AbortSignal.timeout() es lo que le pone tope a las llamadas a APIs de
+    // fuera. Faltaba, y sin el `no-undef` para el despliegue por una funcion
+    // que Node trae de serie desde la version 17.
+    'AbortSignal',
     'globalThis', 'structuredClone', 'crypto', 'TextEncoder', 'TextDecoder'
 ]) globalesDeNode[nombre] = 'readonly';
 

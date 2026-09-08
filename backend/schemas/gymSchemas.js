@@ -84,6 +84,17 @@ const workoutLogSchema = Joi.object({
         })
     ).min(1).required(),
 
+    // La cancion, si se ha elegido una. Las URLs se comprueban ADEMAS en el
+    // controlador contra los dominios de Apple: aqui solo se acota el tamaño.
+    cancion: Joi.object({
+        id: Joi.string().max(40).required(),
+        titulo: Joi.string().max(200).required(),
+        artista: Joi.string().max(200).required(),
+        caratula: Joi.string().uri().max(500).required(),
+        preview: Joi.string().uri().max(500).required(),
+        enlace: Joi.string().uri().max(500).allow('').optional()
+    }).optional().allow(null),
+
     // Foto del entreno en base64 (primera diapositiva del post).
     // Aquí solo comprobamos que sea una imagen: del tamaño se encarga el
     // controlador, para poder responder 413 con un mensaje entendible en vez

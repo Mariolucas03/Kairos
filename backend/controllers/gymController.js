@@ -820,7 +820,7 @@ const SESIONES_QUE_SE_MIRAN = 4;
 
 const saveWorkoutLog = async (req, res) => {
     try {
-        const { routineId, routineName, duration, exercises, intensity, photo, clienteId } = req.body;
+        const { routineId, routineName, duration, exercises, intensity, photo, cancion, clienteId } = req.body;
 
         // ⚠️ EL MISMO ENTRENO NO SE GUARDA DOS VECES.
         //
@@ -885,6 +885,23 @@ const saveWorkoutLog = async (req, res) => {
                 return res.status(413).json({ message: 'La foto pesa demasiado. Inténtalo de nuevo.' });
             }
             fotoFinal = photo;
+        }
+
+        // 🎵 La cancion. Se acepta solo si TODAS sus URLs son de Apple: lo que se
+        // guarda aqui se pinta y se reproduce en el movil de otra gente.
+        let cancionFinal = undefined;
+        if (cancion && cancion.id) {
+            if (!esDeApple(cancion.caratula) || !esDeApple(cancion.preview)) {
+                return res.status(400).json({ message: 'La canción no es válida' });
+            }
+            cancionFinal = {
+                id: String(cancion.id).slice(0, 40),
+                titulo: String(cancion.titulo || '').slice(0, 200),
+                artista: String(cancion.artista || '').slice(0, 200),
+                caratula: cancion.caratula,
+                preview: cancion.preview,
+                enlace: esDeApple(cancion.enlace) ? cancion.enlace : ''
+            };
         }
 
         // 💪 Músculos trabajados: se derivan EN EL SERVIDOR desde el catálogo,
@@ -981,6 +998,7 @@ const saveWorkoutLog = async (req, res) => {
             clienteId: clienteId || undefined,
             duration: duracionSegura, exercises: ejercicios, type: 'gym', intensity: intensity || 'Media', caloriesBurned, date: new Date(),
             photo: fotoFinal,
+            ...(cancionFinal ? { cancion: cancionFinal } : {}),
             musclesWorked: [...principales],
             secondaryMuscles: [...secundarios],
             records
@@ -1839,6 +1857,92 @@ const getFuerzaRelativa = async (req, res) => {
     }
 };
 
+/**
+ * BUSCAR UNA CANCION PARA EL ENTRENO.
+ *
+ * Se usa el buscador publico de iTunes: no hace falta clave, ni registrar una
+ * app, ni tarjeta. Devuelve el titulo, el artista, la caratula y un fichero de
+ * 30 segundos ALOJADO POR APPLE, que es el mismo que suena al darle a probar en
+ * cualquier tienda de musica.
+ *
+ * ⚠️ NUNCA SE GUARDA AUDIO EN KAIROS.
+ *
+ * Subir un mp3 de una cancion comercial seria pirateria, y ademas llenaria el
+ * plan gratuito de Render en una semana. Aqui solo viaja el ENLACE al fichero
+ * de Apple; el audio no pasa por nuestro servidor en ningun momento.
+ *
+ * ⚠️ SE HACE DESDE EL SERVIDOR AUNQUE APPLE PERMITA CORS.
+ *
+ * Hoy responde con `Access-Control-Allow-Origin: *` y se podria llamar desde el
+ * movil, pero eso es una politica suya que puede cambiar sin avisar y dejaria el
+ * buscador muerto sin que nadie tocara nada. Ademas asi se recorta la respuesta
+ * —vienen 30 campos por cancion de los que se usan cinco— y se filtra lo que no
+ * tiene preview antes de gastar datos del movil.
+ */
+const HOSTS_DE_APPLE = ['audio-ssl.itunes.apple.com', 'is1-ssl.mzstatic.com',
+    'is2-ssl.mzstatic.com', 'is3-ssl.mzstatic.com', 'is4-ssl.mzstatic.com',
+    'is5-ssl.mzstatic.com', 'music.apple.com', 'itunes.apple.com'];
+
+/**
+ * ⚠️ LAS URLS SE COMPRUEBAN CONTRA LOS DOMINIOS DE APPLE.
+ *
+ * Lo que se guarda aqui acaba PINTADO Y REPRODUCIDO en el movil de tus amigos,
+ * en el feed. Sin esta comprobacion, cualquiera podria mandar en `cancion` la
+ * URL que quisiera y hacer que a otra persona le sonara o le cargara lo que a el
+ * le diera la gana desde su servidor. El buscador solo devuelve enlaces de
+ * Apple; esto es lo que garantiza que lo que se guarda tambien lo sea.
+ */
+const esDeApple = (url) => {
+    try {
+        const u = new URL(String(url));
+        return u.protocol === 'https:' && HOSTS_DE_APPLE.includes(u.hostname);
+    } catch { return false; }
+};
+
+const buscarMusica = async (req, res) => {
+    const texto = String(req.query.q || '').trim().slice(0, 80);
+    if (texto.length < 2) return res.json({ canciones: [] });
+
+    try {
+        // El pais cambia el catalogo y los precios; se fija a España porque es
+        // donde esta la gente que usa esto. Sin `country` Apple asume EE. UU. y
+        // faltan canciones en español.
+        const url = 'https://itunes.apple.com/search?' + new URLSearchParams({
+            term: texto, entity: 'song', limit: '12', country: 'ES'
+        });
+
+        // Con tope de tiempo: si Apple tarda, se contesta vacio en vez de dejar
+        // la peticion colgada y el buscador girando para siempre.
+        const corte = AbortSignal.timeout(6000);
+        const respuesta = await fetch(url, { signal: corte });
+        if (!respuesta.ok) throw new Error('iTunes respondio ' + respuesta.status);
+
+        const datos = await respuesta.json();
+
+        const canciones = (datos.results || [])
+            // Sin preview no hay nada que sonar, y una cancion muda en la lista
+            // es una que eliges y luego no hace nada.
+            .filter(r => r.previewUrl && esDeApple(r.previewUrl))
+            .map(r => ({
+                id: String(r.trackId),
+                titulo: r.trackName,
+                artista: r.artistName,
+                // La caratula viene a 100 px; se pide a 300 cambiando el nombre,
+                // que es como funciona el servidor de imagenes de Apple.
+                caratula: String(r.artworkUrl100 || '').replace('100x100bb', '300x300bb'),
+                preview: r.previewUrl,
+                enlace: r.trackViewUrl || ''
+            }));
+
+        res.json({ canciones });
+    } catch (error) {
+        console.error('Error buscando musica:', error.message);
+        // Que no suene la musica no puede impedir guardar un entreno: se
+        // responde con la lista vacia y la pantalla dice que no se pudo buscar.
+        res.status(200).json({ canciones: [], error: 'No se pudo buscar ahora mismo' });
+    }
+};
+
 const chatRoutineGenerator = async (req, res) => {
     // Lo que escribe el usuario acaba dentro del prompt: sin tope, cada peticion
     // podia arrastrar hasta 1 MB de texto a la cuenta de IA.
@@ -1888,7 +1992,9 @@ module.exports = {
     saveWorkoutLog, saveSportLog, getSportCatalog,
     getExerciseProgressController, getTrainedExercises, getResumenEntrenos,
     getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
-    getRepartoMuscular, getConstanciaPorDia, getFuerzaRelativa,
+    getRepartoMuscular, getConstanciaPorDia, getFuerzaRelativa, buscarMusica,
+    // Para las pruebas
+    esDeApple,
     // Para las pruebas
     unaRepeticionMaxima,
     chatRoutineGenerator
