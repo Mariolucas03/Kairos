@@ -49,9 +49,33 @@ export default function BuscadorCancion({ cancion, onElegir }) {
     const [duracion, setDuracion] = useState(30);
 
     useEffect(() => {
-        // Al desmontarse se corta el sonido. Sin esto, cerrar el resumen del
-        // entreno deja la canción sonando desde ninguna parte.
-        return () => { if (audio.current) { audio.current.pause(); audio.current = null; } };
+        const cortar = () => {
+            if (audio.current) { audio.current.pause(); audio.current = null; }
+            setSonando(null);
+        };
+
+        // ⚠️ Y TAMBIÉN AL SALIR DE LA APP.
+        //
+        // Al desmontarse ya se cortaba —cerrar el resumen del entreno no puede
+        // dejar la canción sonando desde ninguna parte— pero cambiar de app o
+        // bloquear el móvil no desmonta nada: estabas probando canciones, te
+        // salías, y la vista previa seguía sonando sola. Aquí se corta del todo
+        // en vez de pausar: si te has ido a otra app en mitad de una prueba, al
+        // volver no quieres que siga sonando, quieres elegir.
+        // ⚠️ Con nombre, no una flecha suelta: `removeEventListener` compara por
+        // identidad, y una función anónima NO se puede quitar. Cada vez que se
+        // abriera el resumen quedaría un oyente colgado apuntando a un
+        // componente muerto.
+        const alSalirDeLaApp = () => { if (document.hidden) cortar(); };
+
+        document.addEventListener('visibilitychange', alSalirDeLaApp);
+        window.addEventListener('pagehide', cortar);
+
+        return () => {
+            document.removeEventListener('visibilitychange', alSalirDeLaApp);
+            window.removeEventListener('pagehide', cortar);
+            cortar();
+        };
     }, []);
 
     useEffect(() => {

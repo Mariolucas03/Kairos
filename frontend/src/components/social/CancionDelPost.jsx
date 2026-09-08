@@ -45,6 +45,19 @@ export default function CancionDelPost({ cancion }) {
         setSonando(false);
     };
 
+    /**
+     * Pausa PERO NO TIRA el reproductor.
+     *
+     * La diferencia con `parar` es lo que pasa al volver: aquí se conserva el
+     * segundo por el que iba, para retomarla donde estaba en vez de empezar de
+     * cero. `parar` es para cuando la canción ya no pinta nada (te fuiste de la
+     * publicación); esto es para cuando vuelves enseguida.
+     */
+    const pausar = () => {
+        if (audio.current) audio.current.pause();
+        setSonando(false);
+    };
+
     const arrancar = () => {
         if (!cancion?.preview || audio.current) return;
 
@@ -103,6 +116,40 @@ export default function CancionDelPost({ cancion }) {
         // Y al salir de la pantalla se corta: nada peor que una canción sonando
         // desde una tarjeta que ya no está.
         return () => { window.removeEventListener(AVISO, alSonarOtra); parar(); };
+    }, []);
+
+    // --- AL SALIR DE LA APP ---
+    //
+    // ⚠️ NINGUNA DE LAS OTRAS TRES FORMAS DE PARAR SE DISPARA AQUÍ.
+    //
+    // Al cambiar de app, bloquear el móvil o cerrar la pestaña: el componente no
+    // se desmonta, la tarjeta no se sale de la pantalla (no has hecho scroll) y
+    // no arranca ninguna otra. Así que la canción seguía sonando desde una app
+    // que ya no estabas mirando, y solo se callaba matando Kairos a mano.
+    //
+    // Los navegadores dejan seguir sonando a propósito —lo necesitan Spotify y
+    // los pódcast— pero eso vale para una app de música, no para un feed.
+    //
+    // Se PAUSA, no se corta: al volver retoma donde iba, y solo si sigues en la
+    // publicación y con el sonido puesto.
+    useEffect(() => {
+        const alCambiarDeApp = () => {
+            if (document.hidden) { pausar(); return; }
+            if (aLaVista.current && haySonido() && audio.current) {
+                audio.current.play().then(() => setSonando(true)).catch(() => setSonando(false));
+            }
+        };
+
+        document.addEventListener('visibilitychange', alCambiarDeApp);
+        // `pagehide` es la red de seguridad de iOS: al cerrar la pestaña o
+        // navegar fuera no siempre llega a dispararse `visibilitychange`.
+        window.addEventListener('pagehide', pausar);
+
+        return () => {
+            document.removeEventListener('visibilitychange', alCambiarDeApp);
+            window.removeEventListener('pagehide', pausar);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     if (!cancion?.preview) return null;
