@@ -900,7 +900,10 @@ const saveWorkoutLog = async (req, res) => {
                 artista: String(cancion.artista || '').slice(0, 200),
                 caratula: cancion.caratula,
                 preview: cancion.preview,
-                enlace: esDeApple(cancion.enlace) ? cancion.enlace : ''
+                enlace: esDeApple(cancion.enlace) ? cancion.enlace : '',
+                // Acotado aqui tambien: un `desde` de 500 dejaria la cancion
+                // muda para siempre, y el que la escucha no es quien lo mando.
+                desde: Math.min(Math.max(Number(cancion.desde) || 0, 0), 60)
             };
         }
 

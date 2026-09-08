@@ -92,7 +92,10 @@ const workoutLogSchema = Joi.object({
         artista: Joi.string().max(200).required(),
         caratula: Joi.string().uri().max(500).required(),
         preview: Joi.string().uri().max(500).required(),
-        enlace: Joi.string().uri().max(500).allow('').optional()
+        enlace: Joi.string().uri().max(500).allow('').optional(),
+        // El fragmento de Apple dura 30 s; se deja algo de margen por si alguno
+        // viene mas largo.
+        desde: Joi.number().min(0).max(60).optional()
     }).optional().allow(null),
 
     // Foto del entreno en base64 (primera diapositiva del post).

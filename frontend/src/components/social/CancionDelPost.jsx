@@ -1,36 +1,102 @@
-import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Music } from 'lucide-react';
+import { useState, useRef, useEffect, useSyncExternalStore } from 'react';
+import { Volume2, VolumeX, Music } from 'lucide-react';
+import { haySonido, cambiarSonido, suscribirseAlSonido } from '../../utils/sonidoDelFeed';
 
 /**
  * LA CANCIÓN DE UNA PUBLICACIÓN.
  *
- * ⚠️ NO SUENA SOLA AL PASAR POR ENCIMA, COMO EN INSTAGRAM.
+ * Suena sola al llegar a ella, como en Instagram, y se corta al pasar de largo.
+ * El altavoz silencia TODO el feed de una vez, no solo esta.
  *
- * Y no es que no se pueda: es que no se debe. Los navegadores bloquean el audio
- * automático precisamente porque una web que se pone a sonar sola es una web que
- * se cierra — y una app que lo hace en el metro es una app que se desinstala.
- * Hay botón de play, y suena cuando tú lo dices.
+ * ⚠️ EMPIEZA SILENCIADO Y LO PRIMERO QUE HACES ES ENCENDERLO.
  *
- * ⚠️ SOLO PUEDE SONAR UNA A LA VEZ EN TODO EL FEED.
+ * No es un capricho: los navegadores bloquean el sonido hasta que has tocado la
+ * pantalla, y con razón — una app que se pone a sonar sola en el metro es una
+ * app que se desinstala. Pero en cuanto le das al altavoz una vez, esa es la
+ * autorización: a partir de ahí las siguientes suenan solas al pasar por ellas,
+ * sin volver a tocar nada. Exactamente el comportamiento de Instagram.
  *
- * Cada tarjeta tiene su propio reproductor, así que sin coordinación bastaba con
- * bajar y dar a play en dos posts para tener dos canciones solapadas. Se avisan
- * entre ellas con un evento del navegador: al empezar una, las demás se paran.
- * Un `<audio>` compartido en un contexto de React sería más "correcto" y mucho
- * más código para el mismo resultado.
+ * ⚠️ SOLO SUENA LA QUE MÁS SE VE.
+ *
+ * Con IntersectionObserver a secas, tres tarjetas a la vez en pantalla eran tres
+ * canciones sonando encima. Se avisan entre ellas: al arrancar una, las demás
+ * se paran.
  */
 const AVISO = 'kairos:cancion-sonando';
 
+// Cuánto tiene que verse la tarjeta para que arranque. La mitad: con menos, al
+// bajar rápido se disparan y se cortan cinco canciones seguidas, que suena a
+// avería.
+const VISIBLE_MINIMO = 0.55;
+
 export default function CancionDelPost({ cancion }) {
+    const conSonido = useSyncExternalStore(suscribirseAlSonido, haySonido, () => false);
+
     const [sonando, setSonando] = useState(false);
+    const caja = useRef(null);
     const audio = useRef(null);
     const mio = useRef(Symbol('reproductor'));
+    // Si está a la vista ahora mismo. Se guarda en una ref además del estado
+    // porque lo consultan los efectos, y con el estado leerían el valor viejo.
+    const aLaVista = useRef(false);
 
     const parar = () => {
         if (audio.current) { audio.current.pause(); audio.current = null; }
         setSonando(false);
     };
 
+    const arrancar = () => {
+        if (!cancion?.preview || audio.current) return;
+
+        window.dispatchEvent(new CustomEvent(AVISO, { detail: mio.current }));
+
+        const desde = Number(cancion.desde) || 0;
+
+        const a = new Audio(cancion.preview);
+        a.volume = 0.7;
+        a.currentTime = desde;
+
+        // ⚠️ Se repite A MANO, no con `loop`.
+        //
+        // Con `a.loop = true` el navegador vuelve al SEGUNDO CERO, no al trozo
+        // elegido: quien hubiera puesto el estribillo en el segundo 15 lo oiría
+        // una vez y luego la intro para siempre. Se vuelve al punto elegido.
+        a.loop = false;
+        a.onended = () => { a.currentTime = desde; a.play().catch(() => setSonando(false)); };
+        a.onerror = () => setSonando(false);
+        a.play().then(() => setSonando(true)).catch(() => {
+            // El navegador aún no da permiso (no has tocado nada todavía).
+            // No se insiste: en cuanto le des al altavoz, arranca.
+            audio.current = null;
+            setSonando(false);
+        });
+        audio.current = a;
+    };
+
+    // --- QUIÉN ESTÁ A LA VISTA ---
+    useEffect(() => {
+        const nodo = caja.current;
+        if (!nodo || !cancion?.preview) return;
+
+        const vigilante = new IntersectionObserver(([e]) => {
+            aLaVista.current = e.isIntersecting && e.intersectionRatio >= VISIBLE_MINIMO;
+            if (aLaVista.current && haySonido()) arrancar();
+            else if (!aLaVista.current) parar();
+        }, { threshold: [0, VISIBLE_MINIMO, 1] });
+
+        vigilante.observe(nodo);
+        return () => vigilante.disconnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cancion?.preview]);
+
+    // --- EL INTERRUPTOR GENERAL ---
+    useEffect(() => {
+        if (conSonido && aLaVista.current) arrancar();
+        if (!conSonido) parar();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conSonido]);
+
+    // --- QUE NO SUENEN DOS ---
     useEffect(() => {
         const alSonarOtra = (e) => { if (e.detail !== mio.current) parar(); };
         window.addEventListener(AVISO, alSonarOtra);
@@ -41,32 +107,20 @@ export default function CancionDelPost({ cancion }) {
 
     if (!cancion?.preview) return null;
 
-    const alternar = () => {
-        if (sonando) { parar(); return; }
-
-        window.dispatchEvent(new CustomEvent(AVISO, { detail: mio.current }));
-
-        const a = new Audio(cancion.preview);
-        a.volume = 0.7;
-        a.onended = () => setSonando(false);
-        a.play().catch(() => setSonando(false));
-        audio.current = a;
-        setSonando(true);
-    };
-
     return (
-        <div className="flex items-center gap-2.5 px-4 pb-2">
+        <div ref={caja} className="flex items-center gap-2.5 px-4 pb-2">
             <button
                 type="button"
-                onClick={alternar}
-                aria-label={sonando ? `Parar ${cancion.titulo}` : `Escuchar ${cancion.titulo}`}
-                className="relative w-8 h-8 shrink-0 rounded-lg overflow-hidden active:scale-90 transition-transform"
+                onClick={() => cambiarSonido(!conSonido)}
+                aria-label={conSonido ? 'Silenciar el feed' : 'Activar el sonido del feed'}
+                aria-pressed={conSonido}
+                className={`relative w-8 h-8 shrink-0 rounded-lg overflow-hidden active:scale-90 transition-transform ${sonando ? 'ring-1 ring-yellow-500/60' : ''}`}
             >
                 {cancion.caratula
                     ? <img src={cancion.caratula} alt="" className="w-full h-full object-cover" />
                     : <span className="w-full h-full bg-zinc-900 flex items-center justify-center"><Music size={13} className="text-zinc-600" /></span>}
-                <span className="absolute inset-0 bg-black/45 flex items-center justify-center text-white">
-                    {sonando ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                <span className="absolute inset-0 bg-black/50 flex items-center justify-center text-white">
+                    {conSonido ? <Volume2 size={13} /> : <VolumeX size={13} />}
                 </span>
             </button>
 
@@ -75,10 +129,18 @@ export default function CancionDelPost({ cancion }) {
                     {cancion.titulo}
                     <span className="text-zinc-600"> · {cancion.artista}</span>
                 </p>
+                {/* Se dice UNA vez lo que hay que hacer. Sin esto, el altavoz
+                    tachado sobre una carátula no se lee como "toca aquí para
+                    oírla": se lee como un icono decorativo. */}
+                {!conSonido && (
+                    <p className="text-[9px] text-zinc-600 font-bold leading-tight">
+                        Toca para escucharla
+                    </p>
+                )}
             </div>
 
-            {/* Las barritas solo se mueven mientras suena: es el aviso de que el
-                sonido sale de AQUI y no de otra pestaña. */}
+            {/* Las barritas solo se mueven mientras suena de verdad: es el aviso
+                de que el sonido sale de AQUÍ y no de otra pestaña. */}
             {sonando && (
                 <div className="flex items-end gap-[2px] h-3 shrink-0" aria-hidden="true">
                     <style>{`@keyframes kairosOnda { 0%,100% { height: 25%; } 50% { height: 100%; } }`}</style>

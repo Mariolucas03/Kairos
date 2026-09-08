@@ -99,7 +99,11 @@ const workoutLogSchema = mongoose.Schema({
         artista: { type: String },
         caratula: { type: String },
         preview: { type: String },
-        enlace: { type: String }
+        enlace: { type: String },
+        // Desde que segundo del fragmento empieza a sonar. Apple da 30 segundos
+        // fijos y no se puede pedir otro trozo de la cancion, pero dentro de
+        // esos 30 si se elige por donde entra.
+        desde: { type: Number, default: 0 }
     },
     // Grupos musculares trabajados, derivados EN EL SERVIDOR a partir de los
     // ejercicios (no se confía en lo que mande el cliente).

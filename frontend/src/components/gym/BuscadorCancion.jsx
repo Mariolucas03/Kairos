@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, X, Play, Pause, Music } from 'lucide-react';
+import { Search, X, Play, Pause, Music, Scissors } from 'lucide-react';
 import api from '../../services/api';
 
 /**
@@ -24,6 +24,12 @@ import api from '../../services/api';
 // escribir "eye of the tiger" son 17 peticiones y 16 se tiran a la basura.
 const ESPERA_MS = 400;
 
+/** 75 -> "1:15". Los segundos sueltos se leen peor que "0:32". */
+const enMinutos = (s) => {
+    const t = Math.max(0, Math.floor(Number(s) || 0));
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+};
+
 export default function BuscadorCancion({ cancion, onElegir }) {
     const [abierto, setAbierto] = useState(false);
     const [texto, setTexto] = useState('');
@@ -36,6 +42,11 @@ export default function BuscadorCancion({ cancion, onElegir }) {
     // el suyo.
     const [sonando, setSonando] = useState(null);
     const audio = useRef(null);
+
+    // Cuanto dura el fragmento de verdad. Apple manda unos 30 segundos pero no
+    // siempre exactos, y el deslizador tiene que ir hasta donde llegue el audio,
+    // no hasta un 30 supuesto.
+    const [duracion, setDuracion] = useState(30);
 
     useEffect(() => {
         // Al desmontarse se corta el sonido. Sin esto, cerrar el resumen del
@@ -64,13 +75,17 @@ export default function BuscadorCancion({ cancion, onElegir }) {
         return () => clearTimeout(id);
     }, [texto]);
 
-    const probar = (c) => {
+    const probar = (c, desde = c.desde || 0) => {
         if (audio.current) { audio.current.pause(); audio.current = null; }
 
-        if (sonando === c.id) { setSonando(null); return; }
+        if (sonando === c.id && desde === (c.desde || 0)) { setSonando(null); return; }
 
         const a = new Audio(c.preview);
         a.volume = 0.7;
+        a.currentTime = desde;
+        a.onloadedmetadata = () => {
+            if (Number.isFinite(a.duration) && a.duration > 0) setDuracion(a.duration);
+        };
         a.onended = () => setSonando(null);
         // Si el navegador se niega a reproducir (sin gesto, o el fichero no
         // carga) no se deja el botón en "pausa" para siempre.
@@ -97,7 +112,8 @@ export default function BuscadorCancion({ cancion, onElegir }) {
     // --- YA HAY UNA ELEGIDA ---
     if (cancion && !abierto) {
         return (
-            <div className="flex items-center gap-3 bg-black border border-white/[0.08] rounded-2xl p-2.5">
+            <div className="bg-black border border-white/[0.08] rounded-2xl p-2.5">
+                <div className="flex items-center gap-3">
                 {cancion.caratula && (
                     <img src={cancion.caratula} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" />
                 )}
@@ -123,6 +139,47 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                 >
                     <X size={16} />
                 </button>
+                </div>
+
+                {/* ELEGIR EL TROZO.
+
+                    ⚠️ Solo se puede elegir DENTRO de los 30 segundos que da
+                    Apple. No es una limitación nuestra: el fichero que existe es
+                    ese, y no hay forma de pedirle otro pedazo de la canción. Lo
+                    que sí se elige es por dónde entra — normalmente para saltarse
+                    la intro y caer directo en el estribillo. */}
+                <div className="mt-2 pt-2.5 border-t border-white/[0.06]">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.12em] not-italic flex items-center gap-1.5">
+                            <Scissors size={10} /> Por dónde empieza
+                        </span>
+                        <span className="text-[10px] font-black text-yellow-500 tabular-nums">
+                            {enMinutos(cancion.desde || 0)} → {enMinutos(duracion)}
+                        </span>
+                    </div>
+
+                    <input
+                        type="range"
+                        min={0}
+                        max={Math.max(1, Math.floor(duracion) - 5)}
+                        step={1}
+                        value={cancion.desde || 0}
+                        aria-label="Segundo por el que empieza la canción"
+                        onChange={(e) => {
+                            const desde = Number(e.target.value);
+                            onElegir({ ...cancion, desde });
+                            // Se oye al momento desde el punto nuevo: elegir un
+                            // trozo a ciegas y descubrirlo al publicar no sirve.
+                            probar({ ...cancion, desde }, desde);
+                        }}
+                        className="w-full accent-yellow-500"
+                    />
+
+                    <p className="text-[9px] text-zinc-600 font-bold leading-snug mt-1">
+                        Apple solo deja usar 30 segundos de cada canción. Dentro de
+                        esos 30 eliges por dónde entra.
+                    </p>
+                </div>
             </div>
         );
     }
