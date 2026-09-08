@@ -3,7 +3,7 @@ import usePantallaEncendida from '../../hooks/usePantallaEncendida';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell
 } from 'lucide-react';
 import api from '../../services/api';
 import Toast from '../common/Toast';
@@ -555,6 +555,33 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }));
     };
 
+    /**
+     * BORRAR UNA SERIE.
+     *
+     * ⚠️ SE PODIA AÑADIR Y NO SE PODIA QUITAR.
+     *
+     * Habia un boton de "Añadir serie" grande al pie de cada ejercicio y ningun
+     * modo de deshacerlo: un toque de mas dejaba una fila fantasma para el resto
+     * del entreno. Y no es inofensiva — al guardar solo viajan las completadas,
+     * pero mientras entrenas te descuadra la cuenta de series y el aviso de
+     * "hoy toca" habla de una serie que no vas a hacer.
+     *
+     * NUNCA se borra la ultima que queda: un ejercicio con cero series no es un
+     * ejercicio, es una linea vacia que no se puede rellenar ni quitar.
+     */
+    const handleDeleteSet = (exIdx, setIdx) => {
+        setExercises(prev => prev.map((ex, i) => {
+            if (i !== exIdx) return ex;
+            if (ex.setsData.length <= 1) return ex;
+            return { ...ex, setsData: ex.setsData.filter((_, j) => j !== setIdx) };
+        }));
+
+        // Si el descanso en curso venia de una serie de ESTE ejercicio, los
+        // indices que guarda ya no apuntan a lo mismo. Se cierra en vez de
+        // dejarlo señalando a una serie que se ha movido.
+        setRestContexto(prev => (prev?.exIdx === exIdx ? null : prev));
+    };
+
     // --- FINALIZAR ---
     const confirmFinish = async () => {
         if (finishing) return;
@@ -798,30 +825,19 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             ) : null;
                         })()}
 
-                        <div className="flex items-center justify-between px-2">
-                            <h3 className="text-white font-black text-xl uppercase tracking-tight flex items-center gap-2 leading-tight max-w-[65%]">
+                        {/* ⚠️ EL NOMBRE VA SOLO, EN SU LINEA.
+                            Antes compartia fila con el record y dos botones, y se
+                            quedaba con el 65% del ancho: "Press Banca Inclinado con
+                            Mancuernas" salia partido en tres lineas y recortado.
+                            Ahora ocupa todo el ancho, que es lo primero que lees
+                            para saber donde estas. */}
+                        <div className="px-1">
+                            <h3 className="text-white font-black text-xl uppercase tracking-tight flex items-baseline gap-2 leading-tight">
                                 <span className={`text-sm shrink-0 ${grupo(exIdx).length > 0 ? 'text-purple-400' : 'text-yellow-500'}`}>
                                     #{exIdx + 1}
-                                </span> {ex.name}
+                                </span>
+                                <span className="min-w-0">{ex.name}</span>
                             </h3>
-                            <div className="flex items-center gap-2">
-                                {/* Récord: los kilos solos no dicen nada (no es lo mismo
-                                    100 kg a 1 repetición que 100 kg a 8), así que va
-                                    siempre acompañado de las reps con las que se hizo. */}
-                                {ex.pr && ex.pr.value1RM > 0 && (
-                                    <div className="flex items-center gap-1.5 bg-zinc-900/50 px-2 py-1.5 rounded-lg border border-zinc-800" title="Tu mejor serie en este ejercicio">
-                                        <Trophy size={14} className="text-yellow-600 shrink-0" />
-                                        <span className="text-xs font-black text-yellow-500 whitespace-nowrap">
-                                            {ex.pr.weight}<span className="text-[10px] text-zinc-500">kg</span>
-                                            <span className="text-zinc-600 mx-0.5">×</span>
-                                            {ex.pr.reps}
-                                        </span>
-                                    </div>
-                                )}
-                                {/* Ver cómo se hace sin salir del entreno */}
-                                <button onClick={() => setFichaAbierta(ex.name)} className="p-1.5 bg-zinc-900 rounded-lg text-zinc-400 border border-zinc-800 hover:bg-zinc-800 hover:text-white active:scale-95" aria-label={`Ver ejecución de ${ex.name}`}><Play size={16} fill="currentColor" /></button>
-                                <button onClick={() => handleOpenSwap(exIdx)} className="p-1.5 bg-zinc-900 rounded-lg text-blue-400 border border-zinc-800 hover:bg-zinc-800 active:scale-95"><RefreshCw size={16} /></button>
-                            </div>
                         </div>
 
                         {/* QUÉ TOCA HOY.
@@ -832,41 +848,97 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             pensado. Dicho en una línea —y con lo que hiciste el otro
                             día al lado— se entiende de qué va y se puede discutir
                             con ello, que para eso es una propuesta y no una orden. */}
+                        {/* ⚠️ ESTE PANEL SALE SIEMPRE, TENGA O NO PROPUESTA.
+                            Antes solo existia si habia historial, y con el se iban
+                            los botones de "como se hace" y "cambiar ejercicio", que
+                            estaban metidos arriba con el nombre. Justo el dia que
+                            estrenas un ejercicio —cuando mas falta hace ver como se
+                            hace— desaparecian los dos. */}
                         {(() => {
                             const hoy = comoSeDice(ex);
-                            if (!hoy) return null;
-                            const tono = hoy.completada ? 'emerald' : hoy.descarga ? 'orange' : 'yellow';
-                            const texto = { emerald: 'text-emerald-400', orange: 'text-orange-400', yellow: 'text-yellow-500' }[tono];
+                            const tono = !hoy ? 'gris' : hoy.completada ? 'emerald' : hoy.descarga ? 'orange' : 'yellow';
+                            const texto = {
+                                emerald: 'text-emerald-400', orange: 'text-orange-400',
+                                yellow: 'text-yellow-500', gris: 'text-zinc-400'
+                            }[tono];
                             const caja = {
                                 emerald: 'bg-emerald-500/[0.07] border-emerald-500/25',
                                 orange: 'bg-orange-500/[0.07] border-orange-500/30',
-                                yellow: 'bg-yellow-500/[0.06] border-yellow-500/20'
+                                yellow: 'bg-yellow-500/[0.06] border-yellow-500/20',
+                                gris: 'bg-white/[0.03] border-white/[0.07]'
                             }[tono];
+
                             return (
                                 <div className={`px-3.5 py-3 rounded-2xl border ${caja}`}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        {hoy.descarga
-                                            ? <TrendingDown size={13} className="shrink-0 text-orange-400" />
-                                            : <TrendingUp size={13} className={`shrink-0 ${texto}`} />}
-                                        <p className={`text-[11px] font-black uppercase tracking-[0.1em] leading-none not-italic ${texto}`}>
-                                            Hoy toca
-                                        </p>
+                                    {/* Cabecera: que toca, y a la derecha las dos
+                                        acciones del ejercicio. Juntas aqui porque
+                                        se usan en el mismo momento: lees lo que
+                                        hay que hacer y decides si lo miras o lo
+                                        cambias. */}
+                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            {!hoy
+                                                ? <Dumbbell size={13} className="shrink-0 text-zinc-500" />
+                                                : hoy.descarga
+                                                    ? <TrendingDown size={13} className="shrink-0 text-orange-400" />
+                                                    : <TrendingUp size={13} className={`shrink-0 ${texto}`} />}
+                                            <p className={`text-[11px] font-black uppercase tracking-[0.1em] leading-none not-italic ${texto}`}>
+                                                {hoy ? 'Hoy toca' : 'Primera vez'}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {/* El récord: los kilos solos no dicen nada
+                                                —no es lo mismo 100 kg a 1 repetición que
+                                                a 8— así que va con las reps al lado. */}
+                                            {ex.pr && ex.pr.value1RM > 0 && (
+                                                <div className="flex items-center gap-1 bg-black/40 px-2 py-1.5 rounded-lg border border-white/[0.06] mr-0.5" title="Tu mejor serie en este ejercicio">
+                                                    <Trophy size={12} className="text-yellow-600 shrink-0" />
+                                                    <span className="text-[11px] font-black text-yellow-500 whitespace-nowrap tabular-nums">
+                                                        {ex.pr.weight}<span className="text-[9px] text-zinc-500">kg</span>
+                                                        <span className="text-zinc-600 mx-0.5">×</span>{ex.pr.reps}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={() => setFichaAbierta(ex.name)}
+                                                aria-label={`Ver cómo se hace ${ex.name}`}
+                                                className="w-9 h-9 bg-black/40 rounded-xl text-zinc-300 border border-white/[0.06] flex items-center justify-center hover:text-white active:scale-90 transition-transform"
+                                            >
+                                                <Play size={15} fill="currentColor" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenSwap(exIdx)}
+                                                aria-label={`Cambiar ${ex.name} por otro ejercicio`}
+                                                className="w-9 h-9 bg-black/40 rounded-xl text-blue-400 border border-white/[0.06] flex items-center justify-center active:scale-90 transition-transform"
+                                            >
+                                                <RefreshCw size={15} />
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <div className="space-y-1">
-                                        {hoy.filas.map(f => (
-                                            <div key={f.n} className="flex items-baseline gap-2">
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 w-[52px] shrink-0 not-italic">
-                                                    Serie {f.n}
-                                                </span>
-                                                <span className={`text-[13px] font-black tabular-nums not-italic ${texto}`}>
-                                                    {f.objetivo}
-                                                </span>
+                                    {hoy ? (
+                                        <>
+                                            <div className="space-y-1">
+                                                {hoy.filas.map(f => (
+                                                    <div key={f.n} className="flex items-baseline gap-2">
+                                                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 w-[52px] shrink-0 not-italic">
+                                                            Serie {f.n}
+                                                        </span>
+                                                        <span className={`text-[13px] font-black tabular-nums not-italic ${texto}`}>
+                                                            {f.objetivo}
+                                                        </span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-
-                                    <p className="text-[10px] text-zinc-500 leading-snug mt-2">{hoy.motivo}</p>
+                                            <p className="text-[10px] text-zinc-500 leading-snug mt-2">{hoy.motivo}</p>
+                                        </>
+                                    ) : (
+                                        <p className="text-[10px] text-zinc-500 leading-snug">
+                                            No hay con qué compararlo todavía. Anota lo que
+                                            hagas y la próxima vez te propone con qué seguir.
+                                        </p>
+                                    )}
                                 </div>
                             );
                         })()}
@@ -874,22 +946,30 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         <div className={`bg-zinc-950 rounded-3xl overflow-hidden p-1 border ${grupo(exIdx).length > 0
                             ? 'border-purple-500/30 border-l-[3px] border-l-purple-500'
                             : 'border-zinc-800'}`}>
-                            <div className="grid grid-cols-12 gap-2 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
+                            {/* ⚠️ COLUMNAS DE ANCHO FIJO, NO doce doceavos.
+                                Con `grid-cols-12` el ancho de cada boton salia de
+                                dividir la pantalla, asi que en un movil estrecho el
+                                check se quedaba en 30 px y en uno ancho sobraba
+                                sitio. Aqui el numero, el check y el borrar miden lo
+                                que tienen que medir para el dedo, y las dos casillas
+                                se reparten lo que queda. */}
+                            <div className="grid grid-cols-[42px_1fr_1fr_42px_30px] gap-1.5 py-2 px-2 text-[9px] text-zinc-500 font-black uppercase tracking-widest text-center border-b border-zinc-900 mb-2">
                                 {/* Las columnas se llaman distinto segun como se mida el
                                     ejercicio: sin esto, escribir 90 segundos en una casilla
                                     que pone "Reps" no lo entiende nadie. */}
-                                <div className="col-span-2">Set</div>
-                                <div className="col-span-4">{ex.esPesoCorporal ? 'Lastre' : 'Kg'}</div>
-                                <div className="col-span-3">{ex.esPorTiempo ? 'Seg' : (ex.porLado ? 'Reps/lado' : 'Reps')}</div>
-                                <div className="col-span-3">Check</div>
+                                <div>Set</div>
+                                <div>{ex.esPesoCorporal ? 'Lastre' : 'Kg'}</div>
+                                <div>{ex.esPorTiempo ? 'Seg' : (ex.porLado ? 'Reps/lado' : 'Reps')}</div>
+                                <div>Ok</div>
+                                <div />
                             </div>
                             <div className="space-y-1">
                                 {ex.setsData.map((set, sIdx) => {
                                     const { label, style, containerClass } = getSetDisplayInfo(ex.setsData, sIdx);
                                     const antes = loQueHiciste(ex, sIdx);
                                     return (
-                                        <div key={sIdx} className={`grid grid-cols-12 gap-2 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
-                                            <div className={`col-span-2 flex flex-col items-center justify-center ${containerClass}`}>
+                                        <div key={sIdx} className={`grid grid-cols-[42px_1fr_1fr_42px_30px] gap-1.5 items-center p-1 rounded-2xl transition-all ${set.completed ? 'bg-zinc-900/50 opacity-60' : ''}`}>
+                                            <div className={`flex flex-col items-center justify-center ${containerClass}`}>
                                                 <button onClick={() => cycleSetType(exIdx, sIdx)} className={`w-8 h-8 flex items-center justify-center text-xs font-black transition-all active:scale-95 ${style}`}>{label}</button>
                                                 {/* Lo que hiciste la ULTIMA VEZ en esta misma
                                                     serie. Antes solo estaba resumido arriba
@@ -901,9 +981,31 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="col-span-4"><input type="number" inputMode="decimal" placeholder="Kg" value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" /></div>
-                                            <div className="col-span-3"><input type="number" inputMode="decimal" placeholder="-" value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className="w-full bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" /></div>
-                                            <div className="col-span-3 flex justify-center"><button onClick={() => toggleSetComplete(exIdx, sIdx)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}><Check size={20} strokeWidth={4} /></button></div>
+                                            <input type="number" inputMode="decimal" placeholder="Kg" aria-label={`${ex.esPesoCorporal ? 'Lastre' : 'Kilos'} de la serie ${sIdx + 1}`} value={set.kg} onChange={(e) => handleInputChange(exIdx, sIdx, 'kg', e.target.value)} className="w-full min-w-0 bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+                                            <input type="number" inputMode="decimal" placeholder="-" aria-label={`${ex.esPorTiempo ? 'Segundos' : 'Repeticiones'} de la serie ${sIdx + 1}`} value={set.reps} onChange={(e) => handleInputChange(exIdx, sIdx, 'reps', e.target.value)} className="w-full min-w-0 bg-zinc-900 text-white text-center font-bold py-3 rounded-xl outline-none focus:ring-1 focus:ring-yellow-500" />
+
+                                            <button
+                                                onClick={() => toggleSetComplete(exIdx, sIdx)}
+                                                aria-label={`Marcar la serie ${sIdx + 1} como hecha`}
+                                                aria-pressed={!!set.completed}
+                                                className={`w-[42px] h-[42px] rounded-xl flex items-center justify-center transition-all active:scale-95 ${set.completed ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}
+                                            >
+                                                <Check size={20} strokeWidth={4} />
+                                            </button>
+
+                                            {/* BORRAR. Solo cuando queda mas de una:
+                                                un ejercicio sin series no es un
+                                                ejercicio, es una fila que no se puede
+                                                ni rellenar ni quitar. */}
+                                            {ex.setsData.length > 1 ? (
+                                                <button
+                                                    onClick={() => handleDeleteSet(exIdx, sIdx)}
+                                                    aria-label={`Borrar la serie ${sIdx + 1}`}
+                                                    className="w-[30px] h-[42px] rounded-lg flex items-center justify-center bg-white/[0.02] text-zinc-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 active:text-red-400 transition-all"
+                                                >
+                                                    <X size={16} strokeWidth={3} />
+                                                </button>
+                                            ) : <span />}
                                         </div>
                                     );
                                 })}

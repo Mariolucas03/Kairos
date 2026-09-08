@@ -95,6 +95,19 @@ export default [
             'react/jsx-uses-vars': 'error',
             'react/jsx-uses-react': 'error',
 
+            // ⚠️ Y ESTA, QUE ES LA OTRA MITAD.
+            //
+            // `no-undef` NO ve los componentes usados en JSX. Se descubrio
+            // usando <Dumbbell /> en la pantalla del entreno sin haberlo
+            // importado: lint limpio, build correcto, y la pantalla del entreno
+            // en blanco al abrirla. Exactamente el fallo que este fichero dice
+            // en su cabecera que existe para evitar, entrando por la puerta de
+            // al lado.
+            //
+            // `jsx-no-undef` mira los identificadores de JSX. Es la regla que
+            // cierra el hueco.
+            'react/jsx-no-undef': 'error',
+
             // ⚠️ UN HOOK EN EL SITIO EQUIVOCADO NO "HUELE MAL": TUMBA LA PANTALLA.
             //
             // Esta regla ya estaba, pero en 'warn' — y el build corre eslint con
