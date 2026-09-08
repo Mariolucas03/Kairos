@@ -7,9 +7,8 @@ const User = require('../models/User');
 const Routine = require('../models/Routine');
 const WorkoutLog = require('../models/WorkoutLog');
 const DailyLog = require('../models/DailyLog');
-const {
-    getConstanciaPorDia, getFuerzaRelativa, unaRepeticionMaxima
-} = require('../controllers/gymController');
+const { getConstanciaPorDia, getFuerzaRelativa } = require('../controllers/gymController');
+const { unaRepeticionMaxima } = require('../utils/fuerza');
 
 /**
  * LOS DIAS QUE DICES QUE ENTRENAS, Y CUANTAS VECES TU PESO MUEVES
@@ -258,10 +257,16 @@ describe('Fuerza relativa: cuantas veces tu peso mueves', () => {
 describe('El 1RM del servidor cuenta igual que el del movil', () => {
 
     test('mismos numeros y mismos limites', () => {
-        // Estan escritos en los dos sitios (aqui y en utils/estadisticas.js del
-        // frontend) porque cada uno los necesita en su lado. Si dejaran de
-        // coincidir, la lista de fuerza relativa y la grafica de progreso
-        // enseñarian numeros distintos para el mismo levantamiento.
+        // ⚠️ ESTABA ESCRITA TRES VECES Y UNA NO SE PARECIA A LAS OTRAS.
+        //
+        // Vivia copiada en getExerciseHistory (la grafica del perfil), en
+        // getFuerzaRelativa y en el movil. La del perfil NO cortaba por encima
+        // de 12 repeticiones, asi que 40 kg x 15 salia alli como un "PR" de 60
+        // kg mientras estadisticas decia que no se podia estimar.
+        //
+        // Ahora el servidor tiene una sola (utils/fuerza.js). La del movil sigue
+        // aparte porque es otro paquete y no puede importar de aqui; esta prueba
+        // fija las dos a los mismos valores.
         assert.strictEqual(unaRepeticionMaxima(80, 10), 107);
         assert.strictEqual(unaRepeticionMaxima(100, 1), 100);
         assert.strictEqual(unaRepeticionMaxima(60, 12), 84);

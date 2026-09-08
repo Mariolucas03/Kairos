@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+// ⚠️ AQUI SE IMPORTABA RECHARTS: 101 kB COMPRIMIDOS PARA UNA LINEA.
+//
+// Era el unico sitio del proyecto que la usaba de verdad, y para una sola
+// grafica de area con una serie. `ProgressChart` ya dibujaba exactamente eso a
+// mano —su comentario dice "la libreria pesa ~300 KB y aqui solo hace falta una
+// linea con puntos"— asi que se reutiliza y recharts sale del package.json.
+//
+// Se notaba: abrir tu perfil descargaba 101 kB que ya no se descargan.
+import ProgressChart from '../gym/ProgressChart';
 import { TrendingUp, Activity, Search, Dumbbell, X } from 'lucide-react';
 import api from '../../services/api';
 
@@ -30,9 +38,16 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
             try {
                 const res = await api.get(`/gym/exercise-history?exerciseName=${selectedExercise}`);
                 const data = res.data;
-                setChartData(data);
+                // ⚠️ Los dias sin 1RM fiable se saltan.
+                //
+                // El servidor manda `pr: null` cuando ninguna serie de ese dia
+                // se puede estimar (todas por encima de 12 repeticiones, o sin
+                // peso). Pintarlos daria un cero en la grafica, que se lee como
+                // "ese dia no pudiste" cuando en realidad es "ese dia no se
+                // puede calcular".
+                setChartData(data.filter(d => typeof d.pr === 'number'));
                 if (data.length > 0) {
-                    const max = Math.max(...data.map(d => d.pr));
+                    const max = Math.max(...data.filter(d => typeof d.pr === 'number').map(d => d.pr), 0);
                     setBestPR(max);
                 }
             } catch (error) { console.error(error); }
@@ -132,25 +147,7 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
                         <p>Faltan datos para la gráfica</p>
                     </div>
                 ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorPr" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#EAB308" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#EAB308" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                            <XAxis dataKey="date" stroke="#52525b" tick={{ fontSize: 10, fill: '#71717a' }} tickMargin={10} axisLine={false} tickLine={false} />
-                            <YAxis stroke="#52525b" tick={{ fontSize: 10, fill: '#71717a' }} domain={['dataMin - 5', 'dataMax + 5']} unit="kg" axisLine={false} tickLine={false} />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '12px', padding: '12px' }}
-                                itemStyle={{ color: '#EAB308', fontWeight: '900', textTransform: 'uppercase', fontSize: '12px' }}
-                                labelStyle={{ color: '#a1a1aa', marginBottom: '4px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}
-                            />
-                            <Area type="monotone" dataKey="pr" stroke="#EAB308" strokeWidth={3} fillOpacity={1} fill="url(#colorPr)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    <ProgressChart points={chartData} metric="pr" unit="kg" />
                 )}
             </div>
 

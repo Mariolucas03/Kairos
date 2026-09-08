@@ -223,6 +223,7 @@ const avisarAmigosDelEntreno = async (autorId, nombreEntreno) => {
 // `new Date().toISOString().split('T')[0]` (UTC), así que un entreno registrado
 // entre las 00:00 y las 02:00 se guardaba en el día ANTERIOR.
 const { getTodayDateString, getMadridDateString } = require('../utils/dateHelpers');
+const { unaRepeticionMaxima } = require('../utils/fuerza');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 const { FAMILIAS, familiaDe } = require('../utils/equipment');
 const { canViewSection } = require('../utils/privacidad');
@@ -1553,16 +1554,27 @@ const getExerciseHistory = async (req, res) => {
         const data = logs.map(log => {
             const exData = log.exercises.find(e => e.name === exerciseName);
             if (!exData) return null;
-            let max1RM = 0; let maxWeight = 0;
+            // ⚠️ MISMA formula que el resto de la app, con su tope de 12
+            // repeticiones. Antes aqui no habia tope y una serie de 40 kg x 15
+            // salia como un "PR" de 60 kg, mientras la pestaña de estadisticas
+            // decia que no se podia estimar. El mismo levantamiento con dos
+            // respuestas distintas segun la pantalla.
+            let max1RM = null; let maxWeight = 0;
             exData.sets.forEach(s => {
-                const w = s.weight || 0; const r = s.reps || 0;
+                const w = s.weight || 0;
                 if (w > maxWeight) maxWeight = w;
-                const rm = r === 1 ? w : w * (1 + r / 30);
-                if (rm > max1RM) max1RM = rm;
+                const rm = unaRepeticionMaxima(w, s.reps);
+                if (rm !== null && (max1RM === null || rm > max1RM)) max1RM = rm;
             });
             return {
-                date: new Date(log.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }),
-                pr: Math.round(max1RM),
+                // ⚠️ La fecha va SIN formatear. Antes salia de aqui como "14/09"
+                // y el movil no podia hacer nada con ella: ni cambiar el
+                // formato, ni ordenar, ni comparar. Formatear es de quien pinta.
+                date: log.date,
+                // null cuando ninguna serie del dia se puede estimar. La grafica
+                // se salta ese punto en vez de dibujar un cero, que pareceria
+                // que ese dia fallaste.
+                pr: max1RM,
                 weight: maxWeight
             };
         }).filter(item => item !== null);
@@ -1790,15 +1802,6 @@ const vecesQueCae = (diaSemana, desde, hasta) => {
  * con los mismos limites: nada de peso corporal, nada por encima de 12
  * repeticiones. Un numero inventado aqui seria peor que no enseñar ninguno.
  */
-const TOPE_REPS_FIABLE = 12;
-
-const unaRepeticionMaxima = (peso, reps) => {
-    const kg = Number(peso) || 0;
-    const r = Number(reps) || 0;
-    if (kg <= 0 || r <= 0 || r > TOPE_REPS_FIABLE) return null;
-    if (r === 1) return kg;
-    return Math.round(kg * (1 + r / 30));
-};
 
 const getFuerzaRelativa = async (req, res) => {
     try {
@@ -1998,7 +2001,5 @@ module.exports = {
     getRepartoMuscular, getConstanciaPorDia, getFuerzaRelativa, buscarMusica,
     // Para las pruebas
     esDeApple,
-    // Para las pruebas
-    unaRepeticionMaxima,
     chatRoutineGenerator
 };
