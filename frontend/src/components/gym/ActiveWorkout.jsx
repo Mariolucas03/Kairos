@@ -17,6 +17,7 @@ import { compressImage } from '../../utils/imageCompressor';
 import { encolar, esFalloDeRed } from '../../utils/colaEnvios';
 import { letraDe, grupoDe, siguienteDelGrupo } from '../../utils/superseries';
 import RestTimerModal from './RestTimerModal';
+import { descansoInicial } from '../../utils/descanso';
 import BuscadorCancion from './BuscadorCancion';
 
 // ==========================================
@@ -177,9 +178,13 @@ export default function ActiveWorkout({ routine, onFinish }) {
         return saved ? parseInt(saved) : null;
     });
 
+    // ⚠️ Aqui se ignoraba `routine.defaultRest` y se arrancaba con 60 fijos:
+    // el descanso que ponias al crear la rutina se guardaba y no lo leia nadie.
+    // Ver utils/descanso.js.
     const [defaultRest, setDefaultRest] = useState(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved && JSON.parse(saved).defaultRest ? JSON.parse(saved).defaultRest : 60;
+        let guardado = null;
+        try { guardado = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { /* ignorar */ }
+        return descansoInicial(routine, guardado);
     });
 
     const [finishing, setFinishing] = useState(false);
