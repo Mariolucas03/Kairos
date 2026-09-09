@@ -258,9 +258,15 @@ export default function BuscadorCancion({ cancion, onElegir }) {
             )}
 
             {!buscando && !error && texto.trim().length >= 2 && resultados.length === 0 && (
-                <p className="text-[10px] text-zinc-600 font-bold text-center py-4">
-                    Nada con ese nombre.
-                </p>
+                <div className="text-center py-5 px-4">
+                    <p className="text-[11px] text-zinc-500 font-bold leading-snug">
+                        Nada con ese nombre.
+                    </p>
+                    <p className="text-[10px] text-zinc-600 font-bold leading-snug mt-1.5">
+                        Prueba con el título solo, sin el artista. Y ten en cuenta
+                        que no está todo el catálogo.
+                    </p>
+                </div>
             )}
 
             <div className="max-h-64 overflow-y-auto space-y-1">
@@ -299,6 +305,16 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                     </div>
                 ))}
             </div>
+
+            {/* ⚠️ El consejo no es de relleno: está comprobado.
+                Buscar "bad bunny monaco" devuelve sus grandes éxitos y entierra
+                Mónaco en la posición 27, porque iTunes ordena por lo popular que
+                es el artista. Buscar "monaco" a secas la saca la primera. */}
+            {resultados.length > 0 && (
+                <p className="text-[10px] text-zinc-600 font-bold text-center pt-2 leading-snug">
+                    ¿No la ves? Busca solo el título, sin el artista.
+                </p>
+            )}
 
             <p className="text-[9px] text-zinc-600 font-bold text-center pt-2 leading-snug">
                 Sonarán 30 segundos en tu publicación. Música de Apple Music.

@@ -1917,7 +1917,19 @@ const buscarMusica = async (req, res) => {
         // donde esta la gente que usa esto. Sin `country` Apple asume EE. UU. y
         // faltan canciones en español.
         const url = 'https://itunes.apple.com/search?' + new URLSearchParams({
-            term: texto, entity: 'song', limit: '12', country: 'ES'
+            // ⚠️ 24 y no 12.
+            //
+            // iTunes ordena por lo POPULAR QUE ES EL ARTISTA, no por lo que has
+            // escrito. Buscando "bad bunny monaco" te devuelve sus grandes
+            // exitos y Monaco cae a la posicion 27. Con doce resultados no habia
+            // forma de llegar; con veinticuatro y la lista con scroll, al menos
+            // las que caen a media tabla se alcanzan.
+            //
+            // Probado reordenar por parecido con lo escrito: EMPEORA. Sube
+            // karaokes, versiones de piano y covers, porque llevan el titulo y
+            // el artista en el nombre. La popularidad de Apple, con todos sus
+            // defectos, acierta mas que eso.
+            term: texto, entity: 'song', limit: '24', country: 'ES'
         });
 
         // Con tope de tiempo: si Apple tarda, se contesta vacio en vez de dejar
