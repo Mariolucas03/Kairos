@@ -1,7 +1,7 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
-const { sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso, SESIONES_PARA_BAJAR } = require('../services/progresionService');
+const { sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso, seriesDeTrabajo, SESIONES_PARA_BAJAR } = require('../services/progresionService');
 
 /**
  * QUÉ TOCA HOY
@@ -199,5 +199,100 @@ describe('Que toca hoy: lo que propone para la proxima sesion', () => {
             const r = sugerirSiguiente({ reps: '12' }, ultimas);
             assert.ok(!/\d/.test(r.motivo), `El motivo no deberia llevar cifras: "${r.motivo}"`);
         }
+    });
+});
+
+const s = (weight, reps, type) => ({ weight, reps, type: type || 'N' });
+
+describe('Solo cuentan las series de TRABAJO', () => {
+
+    test('EL FALLO: el calentamiento congelaba la progresion', () => {
+        // 40x5 de calentamiento y luego 80x10 tres veces. Hiciste las tres
+        // iguales y perfectas; la app proponia 80x8, o sea MENOS de lo que
+        // acababas de hacer. Y peor: con el calentamiento dentro, la peor serie
+        // nunca llegaba al objetivo, asi que NUNCA subias de peso.
+        const r = sugerirSiguiente({ reps: '8-12' }, [
+            s(40, 5, 'W'), s(80, 10), s(80, 10), s(80, 10)
+        ]);
+
+        assert.strictEqual(r.peso, 80);
+        assert.strictEqual(r.reps, 11, 'hiciste 10 en todas: la propuesta es 11');
+    });
+
+    test('y con el calentamiento sin marcar, tambien', () => {
+        // Mucha gente no marca el tipo. El peso de trabajo se saca por cuantas
+        // veces se repite, asi que el 40 suelto se queda fuera igualmente.
+        const r = sugerirSiguiente({ reps: '8-12' }, [
+            s(40, 5), s(80, 10), s(80, 10), s(80, 10)
+        ]);
+        assert.strictEqual(r.peso, 80);
+        assert.strictEqual(r.reps, 11);
+    });
+
+    test('con calentamiento SI se puede subir de peso', () => {
+        // La consecuencia mas grave del fallo: quien calentara dentro de la app
+        // se quedaba clavado en el mismo peso para siempre.
+        const r = sugerirSiguiente({ reps: '10' }, [
+            s(50, 6, 'W'), s(90, 10), s(90, 10), s(90, 10)
+        ]);
+        assert.strictEqual(r.completada, true, 'las tres a 10 con objetivo 10 es completada');
+        assert.ok(r.peso > 90, 'tiene que subir de peso');
+    });
+
+    test('UN INTENTO DE RECORD no secuestra el peso de trabajo', () => {
+        // 80x10 tres veces y un 100x1 al final. Con "el mas pesado manda", la
+        // app se creia que tu peso era 100 y proponia 100x2 la proxima.
+        const r = sugerirSiguiente({ reps: '8-12' }, [
+            s(80, 10), s(80, 10), s(80, 10), s(100, 1)
+        ]);
+        assert.strictEqual(r.peso, 80);
+        assert.strictEqual(r.reps, 11);
+    });
+
+    test('en piramide manda la serie de arriba, con SUS repeticiones', () => {
+        // 80x10, 85x8, 90x5. Antes promediaba las tres y pedia 90x7, pero a 90
+        // solo hiciste 5.
+        const r = sugerirSiguiente({ reps: '8-12' }, [s(80, 10), s(85, 8), s(90, 5)]);
+        assert.strictEqual(r.peso, 90);
+        assert.strictEqual(r.reps, 6, 'a 90 hiciste 5: se pide una mas');
+    });
+
+    test('el descendente no cuenta: es la bajada de despues', () => {
+        const conDrop = sugerirSiguiente({ reps: '8-12' },
+            [s(80, 10), s(80, 9), s(80, 8), s(50, 15, 'D')]);
+        const sinDrop = sugerirSiguiente({ reps: '8-12' },
+            [s(80, 10), s(80, 9), s(80, 8)]);
+
+        assert.deepStrictEqual(conDrop, sinDrop, 'el dropset no puede cambiar la propuesta');
+    });
+
+    test('la serie al fallo SI cuenta: es de trabajo, y de las duras', () => {
+        const r = sugerirSiguiente({ reps: '8-12' }, [s(80, 10), s(80, 10), s(80, 7, 'F')]);
+        assert.strictEqual(r.peso, 80);
+        assert.strictEqual(r.reps, 9, 'la media de 10, 10 y 7');
+    });
+
+    test('una sesion de solo calentamiento no propone nada', () => {
+        assert.strictEqual(sugerirSiguiente({ reps: '8-12' }, [s(40, 5, 'W')]), null);
+    });
+
+    test('a igualdad de veces manda el mas pesado', () => {
+        // Dos a 80 y dos a 85: la sesion mas exigente de las dos es la de 85.
+        const { peso } = seriesDeTrabajo([s(80, 10), s(80, 10), s(85, 8), s(85, 8)]);
+        assert.strictEqual(peso, 85);
+    });
+
+    test('el atasco se cuenta con el MISMO criterio', () => {
+        // Si aqui contaran todas las series y en la de hoy solo las de trabajo,
+        // una sesion con calentamiento pareceria de otro peso y romperia la
+        // racha sin motivo, asi que la descarga no llegaria nunca.
+        const conCalentamiento = [s(45, 5, 'W'), s(80, 10), s(80, 9), s(80, 7)];
+        const r = sugerirSiguiente({ reps: '12' },
+            [s(45, 5, 'W'), s(80, 10), s(80, 9), s(80, 7)],
+            [conCalentamiento, conCalentamiento]
+        );
+
+        assert.strictEqual(r.descarga, true, 'tres sesiones atascado al mismo peso');
+        assert.ok(r.peso < 80);
     });
 });

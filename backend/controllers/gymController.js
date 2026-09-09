@@ -780,7 +780,7 @@ const queTocaraLaProximaVez = async (userId, routineId, ejercicios, logGuardado)
                     if (!nombres.includes(ex.name)) continue;
                     if (!anteriores[ex.name]) anteriores[ex.name] = [];
                     if (anteriores[ex.name].length >= SESIONES_QUE_SE_MIRAN) continue;
-                    anteriores[ex.name].push((ex.sets || []).map(x => ({ weight: x.weight, reps: x.reps })));
+                    anteriores[ex.name].push((ex.sets || []).map(x => ({ weight: x.weight, reps: x.reps, type: x.type })));
                 }
             }
         }
@@ -1438,7 +1438,10 @@ const getRoutineHistory = async (req, res) => {
                         stats[ex.name].lastSets = validSets;
                         // En bruto, para que la progresión compare peso real con
                         // peso real y no lastre con lastre.
-                        stats[ex.name].brutas = ex.sets.map(s => ({ weight: s.weight, reps: s.reps }));
+                        // El `type` viaja: es lo que distingue una serie de trabajo de un
+                        // calentamiento o un descendente, y sin el la propuesta
+                        // los cuenta como si fueran series de verdad.
+                        stats[ex.name].brutas = ex.sets.map(s => ({ weight: s.weight, reps: s.reps, type: s.type }));
 
                         // Y las últimas sesiones, para saber si llevas varias
                         // clavado en el mismo peso. Los `logs` vienen ordenados

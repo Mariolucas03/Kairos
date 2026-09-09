@@ -78,6 +78,70 @@ const SESIONES_PARA_BAJAR = 3;
 // Cuanto se baja al descargar. El 10% de toda la vida.
 const BAJADA = 0.9;
 
+/**
+ * LAS SERIES QUE CUENTAN, Y A QUÉ PESO.
+ *
+ * ⚠️ ANTES CONTABAN TODAS, Y ESO ROMPÍA LA PROGRESIÓN ENTERA.
+ *
+ * El cálculo daba por hecho que todas las series de un ejercicio eran del mismo
+ * peso. En cuanto no lo son, mezcla repeticiones que no se pueden mezclar:
+ *
+ *   40 × 5 (calentamiento) + 80 × 10 · 80 × 10 · 80 × 10
+ *      -> proponía 80 kg × 8
+ *
+ * O sea MENOS de lo que acababas de hacer tres veces seguidas. Peor todavía: con
+ * el calentamiento dentro, la peor serie nunca llega al objetivo, así que NUNCA
+ * subes de peso. Quien calentara dentro de la app se quedaba clavado para
+ * siempre y la app le iba bajando la meta según lo hacía "peor".
+ *
+ *   80 × 10 · 85 × 8 · 90 × 5   (pirámide)
+ *      -> proponía 90 kg × 7
+ *
+ * Las 7 salen de promediar repeticiones hechas a 80, 85 y 90. A 90 hiciste 5.
+ *
+ * DOS FILTROS, EN ESTE ORDEN:
+ *
+ * 1. Fuera el calentamiento y los descendentes. Están marcados en la pantalla
+ *    del entreno ('W' y 'D') y no son series de trabajo: el calentamiento es
+ *    ligero a propósito y el descendente es la bajada de después. Las de fallo
+ *    ('F') sí cuentan: son series de trabajo, y de las duras.
+ *
+ * 2. De las que quedan, solo las del PESO DE TRABAJO.
+ *
+ * ⚠️ Y el peso de trabajo es el que MÁS VECES repetiste, no el más pesado.
+ *
+ * Con el más pesado, un intento de récord al final —100 × 1 detrás de 80 × 10
+ * tres veces— convertía ese 100 en "tu peso" y la app te proponía 100 × 2 la
+ * próxima. Contando repeticiones, tu peso de trabajo es 80, que es la verdad. Y
+ * de paso arregla el calentamiento aunque se te olvide marcarlo. A igualdad de
+ * veces manda el más pesado, que es la sesión más exigente de las dos.
+ */
+const TIPOS_QUE_NO_SON_TRABAJO = new Set(['W', 'D']);
+
+const seriesDeTrabajo = (sets) => {
+    const validas = (Array.isArray(sets) ? sets : []).filter(x =>
+        Number(x?.reps) > 0 &&
+        Number.isFinite(Number(x?.weight)) &&
+        !TIPOS_QUE_NO_SON_TRABAJO.has(x?.type)
+    );
+
+    if (validas.length === 0) return { peso: 0, series: [] };
+
+    const veces = new Map();
+    for (const x of validas) {
+        const w = Number(x.weight);
+        veces.set(w, (veces.get(w) || 0) + 1);
+    }
+
+    let peso = null;
+    let masVisto = 0;
+    for (const [w, n] of veces) {
+        if (n > masVisto || (n === masVisto && w > peso)) { peso = w; masVisto = n; }
+    }
+
+    return { peso, series: validas.filter(x => Number(x.weight) === peso) };
+};
+
 /** Redondea a medios kilos: no existen las mancuernas de 41,3 kg. */
 const aDiscoReal = (kg) => Math.max(0, Math.round(kg * 2) / 2);
 
@@ -116,19 +180,14 @@ const sugerirSiguiente = (config = {}, ultimas = [], anteriores = []) => {
     // Sin historial no se sugiere nada: la primera vez la decides tú, que es la
     // única forma de saber por dónde andas.
     //
-    // Se descartan las series a cero: una serie apuntada sin repeticiones (o a
-    // medio rellenar) no dice nada de tu fuerza, y colandose en el calculo hacia
-    // que la peor serie fuera siempre esa y la app propusiera repetir peso
-    // eternamente.
-    const validas = (Array.isArray(ultimas) ? ultimas : [])
-        .filter(s => Number(s?.reps) > 0 && Number.isFinite(Number(s?.weight)));
+    // Se descartan las series a cero —una serie a medio rellenar no dice nada de
+    // tu fuerza—, el calentamiento, los descendentes y todo lo que no sea del
+    // peso de trabajo. Ver `seriesDeTrabajo`.
+    const { peso, series: validas } = seriesDeTrabajo(ultimas);
 
-    if (validas.length === 0) return null;
+    if (validas.length === 0 || peso <= 0) return null;
 
     const { min, max: objetivo } = rangoDeReps(config.reps);
-
-    const peso = Math.max(...validas.map(s => Number(s.weight) || 0));
-    if (peso <= 0) return null;
 
     const reps = validas.map(s => Number(s.reps) || 0);
     const peor = Math.min(...reps);
@@ -151,11 +210,13 @@ const sugerirSiguiente = (config = {}, ultimas = [], anteriores = []) => {
     // sesión vacía también corta: no dice nada y encadenarla sería inventar.
     let atascado = 1;   // la de hoy ya cuenta
     for (let i = anteriores.length - 1; i >= 0; i--) {
-        const previas = (Array.isArray(anteriores[i]) ? anteriores[i] : [])
-            .filter(s => Number(s?.reps) > 0 && Number.isFinite(Number(s?.weight)));
+        // Con el MISMO criterio que la de hoy: si aquí se contaran todas las
+        // series y arriba solo las de trabajo, una sesión con calentamiento
+        // parecería de otro peso y rompería la racha sin motivo.
+        const { peso: pesoPrevio, series: previas } = seriesDeTrabajo(anteriores[i]);
         if (previas.length === 0) break;
 
-        if (Math.max(...previas.map(s => Number(s.weight) || 0)) !== peso) break;
+        if (pesoPrevio !== peso) break;
         if (Math.min(...previas.map(s => Number(s.reps) || 0)) >= objetivo) break;
 
         atascado++;
@@ -192,4 +253,7 @@ const sugerirSiguiente = (config = {}, ultimas = [], anteriores = []) => {
     };
 };
 
-module.exports = { sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso, SESIONES_PARA_BAJAR };
+module.exports = {
+    sugerirSiguiente, rangoDeReps, aDiscoReal, escalonDePeso, seriesDeTrabajo,
+    SESIONES_PARA_BAJAR
+};
