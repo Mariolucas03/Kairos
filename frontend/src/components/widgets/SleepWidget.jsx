@@ -41,14 +41,14 @@ export default function SleepWidget({ hours = 0, onUpdate }) {
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={handleSave}>
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
 
-                    <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
 
                         <div className="flex justify-between items-center relative z-10">
                             <h2 className="text-2xl font-black text-white uppercase tracking-tighter not-italic">
                                 REGISTRAR <span style={{ color: accent }}>SUEÑO</span>
                             </h2>
-                            <button onClick={handleSave} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                            <button onClick={handleSave} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -59,7 +59,7 @@ export default function SleepWidget({ hours = 0, onUpdate }) {
                                 <span className="text-2xl font-black uppercase not-italic" style={{ color: accent }}>H</span>
                             </div>
 
-                            <div className="h-3 bg-zinc-900 rounded-full overflow-hidden border border-white/5">
+                            <div className="h-3 bg-zinc-900 rounded-full overflow-hidden border border-white/[0.07]">
                                 <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, background: accent }} />
                             </div>
 

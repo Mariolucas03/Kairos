@@ -49,7 +49,7 @@ function BodyTab({ ranks }) {
     return (
         <div className="pb-4">
             {/* Frente y espalda a la vez, sin tener que girar nada */}
-            <div className="bg-zinc-950 border border-white/5 rounded-[24px] p-4 mb-4">
+            <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4 mb-4">
                 <BodyMap levels={ranks} dual />
             </div>
 
@@ -66,7 +66,7 @@ function BodyTab({ ranks }) {
                     const abierto = grupoAbierto === grupo;
 
                     return (
-                        <div key={grupo} className="bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden">
+                        <div key={grupo} className="bg-zinc-950 border border-white/[0.07] rounded-2xl overflow-hidden">
                             <button
                                 onClick={() => hijos.length > 0 && setGrupoAbierto(abierto ? null : grupo)}
                                 disabled={hijos.length === 0}
@@ -107,7 +107,7 @@ function BodyTab({ ranks }) {
                             </button>
 
                             {abierto && (
-                                <div className="border-t border-white/5 bg-black/40 px-3 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
+                                <div className="border-t border-white/[0.07] bg-black/40 px-3 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
                                     {hijos.map(([musculo, m]) => {
                                         const sinTrabajo = (m.points || 0) === 0;
                                         return (
@@ -118,7 +118,7 @@ function BodyTab({ ranks }) {
                                                         {sinTrabajo ? 'Sin entrenar' : m.rankLabel}
                                                     </span>
                                                 </div>
-                                                <div className="h-1 bg-black rounded-full overflow-hidden border border-white/5">
+                                                <div className="h-1 bg-black rounded-full overflow-hidden border border-white/[0.07]">
                                                     <div
                                                         className="h-full rounded-full transition-all duration-700"
                                                         style={{ width: `${m.progress || 0}%`, backgroundColor: m.rankColor }}
@@ -143,7 +143,7 @@ const formatDate = (dateStr) =>
 // --- TARJETA DE DÍA DE COMIDA ---
 function FoodDayCard({ item }) {
     return (
-        <div className="bg-zinc-950 border border-white/5 rounded-[24px] p-4 mb-3">
+        <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4 mb-3">
             <div className="flex justify-between items-start mb-3">
                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{formatDate(item.date)}</span>
                 <div className="flex items-center gap-1.5">
@@ -159,9 +159,9 @@ function FoodDayCard({ item }) {
                     { label: 'Carbs', value: item.totalCarbs, color: 'text-blue-400' },
                     { label: 'Grasa', value: item.totalFat, color: 'text-yellow-400' }
                 ].map(m => (
-                    <div key={m.label} className="bg-black/50 rounded-xl py-2 text-center border border-white/5">
+                    <div key={m.label} className="bg-black/50 rounded-xl py-2 text-center border border-white/[0.07]">
                         <div className={`text-sm font-black ${m.color}`}>{m.value}g</div>
-                        <div className="text-[8px] font-bold text-zinc-600 uppercase">{m.label}</div>
+                        <div className="text-[9px] font-bold text-zinc-600 uppercase">{m.label}</div>
                     </div>
                 ))}
             </div>
@@ -180,7 +180,7 @@ function FoodDayCard({ item }) {
 // --- TARJETA DE DÍA DE MISIONES ---
 function MissionDayCard({ item }) {
     return (
-        <div className="bg-zinc-950 border border-white/5 rounded-[24px] p-4 mb-3">
+        <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4 mb-3">
             <div className="flex justify-between items-center mb-3">
                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{formatDate(item.date)}</span>
                 <span className="text-xs font-black text-green-400">
@@ -190,7 +190,7 @@ function MissionDayCard({ item }) {
             <div className="space-y-1.5">
                 {item.list.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Sin detalle guardado.</p>}
                 {item.list.map((m, i) => (
-                    <div key={i} className="flex items-center justify-between bg-black/50 rounded-xl px-3 py-2 border border-white/5">
+                    <div key={i} className="flex items-center justify-between bg-black/50 rounded-xl px-3 py-2 border border-white/[0.07]">
                         <span className="text-[11px] font-bold text-zinc-300 truncate pr-2">{m.title}</span>
                         <span className="text-[9px] font-black text-purple-400 shrink-0">+{m.xpReward || 0} XP</span>
                     </div>
@@ -209,7 +209,7 @@ function MissionDayCard({ item }) {
 function CuadroEntreno({ item, onOpen }) {
     const musculos = item.musclesWorked || [];
     return (
-        <button onClick={onOpen} className="relative aspect-square bg-black border border-white/5 overflow-hidden active:opacity-70 transition-opacity">
+        <button onClick={onOpen} className="relative aspect-square bg-black border border-white/[0.07] overflow-hidden active:opacity-70 transition-opacity">
             {/* Sin foto siempre se enseña el cuerpo: aunque el entreno no tenga
                 músculos guardados, la silueta es mejor pista que un cuadro vacío. */}
             {item.photo ? (
@@ -226,7 +226,7 @@ function CuadroEntreno({ item, onOpen }) {
             </div>
 
             {(item.records || []).length > 0 && (
-                <span className="absolute top-1 right-1 bg-yellow-500 text-black text-[7px] font-black px-1 py-0.5 rounded uppercase">PR</span>
+                <span className="absolute top-1 right-1 bg-yellow-500 text-black text-[9px] font-black px-1 py-0.5 rounded uppercase">PR</span>
             )}
         </button>
     );
@@ -234,11 +234,11 @@ function CuadroEntreno({ item, onOpen }) {
 
 function CuadroComida({ item, onOpen }) {
     return (
-        <button onClick={onOpen} className="relative aspect-square bg-zinc-950 border border-white/5 flex flex-col items-center justify-center active:opacity-70 transition-opacity px-1">
+        <button onClick={onOpen} className="relative aspect-square bg-zinc-950 border border-white/[0.07] flex flex-col items-center justify-center active:opacity-70 transition-opacity px-1">
             <Flame size={16} className="text-orange-500 mb-1" />
             <span className="text-xl font-black text-white leading-none">{(item.totalCalories || 0).toLocaleString('es-ES')}</span>
-            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">kcal</span>
-            <span className="absolute bottom-1.5 text-[8px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
+            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">kcal</span>
+            <span className="absolute bottom-1.5 text-[9px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
         </button>
     );
 }
@@ -247,15 +247,15 @@ function CuadroMisiones({ item, onOpen }) {
     const total = Math.max(item.total || 0, item.completed || 0, 1);
     const pct = Math.round(((item.completed || 0) / total) * 100);
     return (
-        <button onClick={onOpen} className="relative aspect-square bg-zinc-950 border border-white/5 flex flex-col items-center justify-center active:opacity-70 transition-opacity px-2">
+        <button onClick={onOpen} className="relative aspect-square bg-zinc-950 border border-white/[0.07] flex flex-col items-center justify-center active:opacity-70 transition-opacity px-2">
             <span className="text-xl font-black text-white leading-none">
                 {item.completed}<span className="text-zinc-600 text-sm">/{total}</span>
             </span>
-            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-0.5">misiones</span>
-            <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/5 mt-2">
+            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-0.5">misiones</span>
+            <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/[0.07] mt-2">
                 <div className="h-full bg-green-500 rounded-full" style={{ width: `${pct}%` }} />
             </div>
-            <span className="absolute bottom-1.5 text-[8px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
+            <span className="absolute bottom-1.5 text-[9px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
         </button>
     );
 }
@@ -501,7 +501,7 @@ export default function UserProfilePage() {
                                 className={`flex-1 py-3.5 flex flex-col items-center gap-1 relative transition-colors ${!canViewContent ? 'text-zinc-800 cursor-default' : active ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}
                             >
                                 <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-                                <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
                                 {active && canViewContent && <div className="absolute top-0 left-0 right-0 h-0.5 bg-yellow-500" />}
                             </button>
                         );

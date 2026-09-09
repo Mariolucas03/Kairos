@@ -59,7 +59,7 @@ export function CampoAuth({
                     maxLength={maxLength}
                     autoComplete={autoComplete}
                     required
-                    className={`w-full bg-black/60 border rounded-[16px] py-[14px] pl-12 text-white font-semibold text-sm outline-none transition-colors duration-200 placeholder:text-zinc-700 ${esClave ? 'pr-12' : 'pr-4'}`}
+                    className={`w-full bg-black/60 border rounded-2xl py-[14px] pl-12 text-white font-semibold text-sm outline-none transition-colors duration-200 placeholder:text-zinc-700 ${esClave ? 'pr-12' : 'pr-4'}`}
                     style={{ borderColor: enfocado ? acento + '73' : 'rgba(255,255,255,0.09)' }}
                 />
 
@@ -100,7 +100,7 @@ export function BotonAuth({ cargando, acento, textoCargando, colorTexto = '#000'
         <button
             type="submit"
             disabled={cargando}
-            className="relative w-full rounded-[18px] py-4 mt-6 font-black uppercase tracking-[0.16em] text-[12px] overflow-hidden active:scale-[0.985] transition-transform flex items-center justify-center gap-2 disabled:cursor-not-allowed not-italic"
+            className="relative w-full rounded-2xl py-4 mt-6 font-black uppercase tracking-[0.16em] text-[12px] overflow-hidden active:scale-[0.985] transition-transform flex items-center justify-center gap-2 disabled:cursor-not-allowed not-italic"
             style={{ background: acento, color: colorTexto, opacity: cargando ? 0.75 : 1 }}
         >
             {!cargando && (

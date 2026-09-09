@@ -20,7 +20,7 @@ export default function RankUpModal({ subidas = [], monedas = 0, onClose }) {
             style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }}
             className="fixed left-0 right-0 z-[10000] flex items-center justify-center p-5 overflow-y-auto bg-black/95 backdrop-blur-md animate-in fade-in duration-200"
         >
-            <div className="relative w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-[32px] p-7 overflow-hidden animate-in zoom-in-95">
+            <div className="relative w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-4xl p-7 overflow-hidden animate-in zoom-in-95">
                 <div
                     className="absolute inset-x-0 top-0 h-[2px] pointer-events-none"
                     style={{ background: `linear-gradient(90deg, ${subidas[0].color}, transparent)` }}
@@ -54,7 +54,7 @@ export default function RankUpModal({ subidas = [], monedas = 0, onClose }) {
                         {subidas.map(s => (
                             <div
                                 key={s.grupo}
-                                className="relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] px-4 py-3 flex items-center justify-between gap-3"
+                                className="relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
                             >
                                 <div
                                     className="absolute inset-x-0 top-0 h-[2px]"

@@ -174,7 +174,7 @@ export default function SubidaDeNivel() {
 
                 {/* LO QUE TE LLEVAS */}
                 <div
-                    className="bg-[#0a0a0c] border border-white/[0.08] rounded-[22px] p-4 space-y-2.5"
+                    className="bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-4 space-y-2.5"
                     style={{ animation: 'kairosEntraAbajo 0.5s ease-out 0.45s both' }}
                 >
                     <div className="flex items-center justify-center gap-2 text-emerald-400">

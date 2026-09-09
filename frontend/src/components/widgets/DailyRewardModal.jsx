@@ -170,7 +170,7 @@ export default function DailyRewardModal({ data, onClose, onClaim, claiming = fa
                     <>
                         <div className="absolute top-1 right-1 text-red-400"><X size={12} strokeWidth={3} /></div>
                         <div className="absolute inset-x-0 bottom-0 bg-red-500/25 py-0.5">
-                            <span className="block text-[7px] font-black uppercase tracking-[0.15em] text-red-300 text-center not-italic">Perdido</span>
+                            <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-red-300 text-center not-italic">Perdido</span>
                         </div>
                     </>
                 )}

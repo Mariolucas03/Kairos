@@ -61,7 +61,7 @@ const fechaCorta = (f) => f ? new Date(f).toLocaleDateString('es-ES', { day: 'nu
 // ─── Piezas comunes ──────────────────────────────────────────────────────────
 
 const Tarjeta = ({ children, className = '' }) => (
-    <div className={`bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] ${className}`}>{children}</div>
+    <div className={`bg-[#0a0a0c] border border-white/[0.07] rounded-3xl ${className}`}>{children}</div>
 );
 
 const Titulo = ({ children }) => (
@@ -269,7 +269,7 @@ export default function Admin() {
             {claveNueva && (
                 <div className="fixed inset-0 flex items-center justify-center p-6" style={{ zIndex: Z.confirm }}>
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setClaveNueva(null)} />
-                    <div className="relative z-10 w-full max-w-xs bg-[#0a0a0c] border border-yellow-500/40 rounded-[24px] p-6 text-center">
+                    <div className="relative z-10 w-full max-w-xs bg-[#0a0a0c] border border-yellow-500/40 rounded-3xl p-6 text-center">
                         <KeyRound size={32} className="text-yellow-500 mx-auto mb-3" />
                         <p className="text-white font-bold text-sm mb-1">Clave nueva de {claveNueva.usuario}</p>
                         <p className="text-[10px] text-zinc-500 mb-4">
@@ -300,7 +300,7 @@ export default function Admin() {
             {ficha && (
                 <div className="fixed inset-0 flex items-end sm:items-center justify-center" style={{ zIndex: Z.modal }}>
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setFicha(null)} />
-                    <div className="relative z-10 w-full max-w-md bg-[#09090b] border-t sm:border border-white/10 rounded-t-[32px] sm:rounded-[32px] max-h-[88vh] overflow-y-auto custom-scrollbar">
+                    <div className="relative z-10 w-full max-w-md bg-[#09090b] border-t sm:border border-white/10 rounded-t-[32px] sm:rounded-4xl max-h-[88vh] overflow-y-auto custom-scrollbar">
 
                         {ficha.cargando || cargandoFicha ? (
                             <div className="flex justify-center py-20 text-zinc-600"><Loader2 className="animate-spin" size={24} /></div>
@@ -340,7 +340,7 @@ export default function Admin() {
                                         <div key={t} className="bg-black border border-white/[0.07] rounded-2xl p-2.5 text-center">
                                             <Icono size={13} className={`${c} mx-auto`} />
                                             <p className="text-sm font-black text-white mt-1 leading-none">{v}</p>
-                                            <p className="text-[8px] text-zinc-600 uppercase tracking-wide mt-1">{t}</p>
+                                            <p className="text-[9px] text-zinc-600 uppercase tracking-wide mt-1">{t}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -542,7 +542,7 @@ export default function Admin() {
                         <button
                             key={key}
                             onClick={() => setPestana(key)}
-                            className={`min-w-0 flex flex-col items-center justify-center gap-1.5 py-3 rounded-[20px] border text-[9px] font-black uppercase tracking-wider transition-colors ${
+                            className={`min-w-0 flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl border text-[9px] font-black uppercase tracking-wider transition-colors ${
                                 pestana === key
                                     ? 'bg-[#0a0a0c] border-yellow-500/40 text-yellow-500'
                                     : 'bg-[#0a0a0c] border-white/[0.07] text-zinc-600'
@@ -569,7 +569,7 @@ export default function Admin() {
                                 value={busqueda}
                                 onChange={e => setBusqueda(e.target.value)}
                                 placeholder={'Buscar entre ' + usuarios.length + ' cuentas...'}
-                                className="w-full min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] pl-11 pr-4 py-3 text-white text-sm outline-none focus:border-yellow-500/40"
+                                className="w-full min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-2xl pl-11 pr-4 py-3 text-white text-sm outline-none focus:border-yellow-500/40"
                             />
                         </div>
 
@@ -579,7 +579,7 @@ export default function Admin() {
                             <button
                                 key={u._id}
                                 onClick={() => abrirFicha(u._id)}
-                                className="w-full text-left bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
+                                className="w-full text-left bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
                             >
                                 <div className="flex-1 min-w-0">
                                     <p className="font-bold text-white text-sm flex items-center gap-2 flex-wrap">
@@ -609,7 +609,7 @@ export default function Admin() {
                                 <button
                                     key={t}
                                     onClick={() => setVerEntrenos(k)}
-                                    className={`flex-1 min-w-0 py-2.5 rounded-[16px] border text-[10px] font-black uppercase tracking-wider transition-colors ${
+                                    className={`flex-1 min-w-0 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-wider transition-colors ${
                                         verEntrenos === k ? 'bg-zinc-900 border-yellow-500/40 text-yellow-500' : 'bg-[#0a0a0c] border-white/[0.07] text-zinc-600'
                                     }`}
                                 >
@@ -814,9 +814,9 @@ export default function Admin() {
                                                 {falloAbierto === f._id ? 'Ocultar detalle' : 'Ver detalle'}
                                             </button>
                                             {falloAbierto === f._id && (
-                                                <div className="mt-2 bg-black border border-white/[0.06] rounded-xl p-3 overflow-x-auto">
+                                                <div className="mt-2 bg-black border border-white/[0.07] rounded-xl p-3 overflow-x-auto">
                                                     <pre className="text-[9px] text-zinc-500 font-mono whitespace-pre-wrap break-words">{f.pila}</pre>
-                                                    <p className="text-[9px] text-zinc-700 mt-2 pt-2 border-t border-white/[0.05]">
+                                                    <p className="text-[9px] text-zinc-700 mt-2 pt-2 border-t border-white/[0.07]">
                                                         Primera vez: {cuando(f.primeraVez)}
                                                         {f.navegador && <><br />{f.navegador}</>}
                                                     </p>
@@ -874,7 +874,7 @@ export default function Admin() {
                                     })}
                                 </div>
 
-                                <div className="mt-4 pt-3 border-t border-white/[0.05]">
+                                <div className="mt-4 pt-3 border-t border-white/[0.07]">
                                     <p className="text-[10px] text-zinc-500">
                                         Tirada gratis: <span className="text-white font-bold">{eco.tiradaGratis.media}</span> fichas
                                         de media, <span className="text-white font-bold">{eco.tiradaGratis.maximo}</span> como mucho.
@@ -910,7 +910,7 @@ export default function Admin() {
                         {fallos?.resumen?.sinResolver > 0 && (
                             <button
                                 onClick={() => setPestana('fallos')}
-                                className="w-full bg-red-950/30 border border-red-500/30 rounded-[24px] p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
+                                className="w-full bg-red-950/30 border border-red-500/30 rounded-3xl p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
                             >
                                 <Bug size={18} className="text-red-400 shrink-0" />
                                 <div className="flex-1 min-w-0 text-left">

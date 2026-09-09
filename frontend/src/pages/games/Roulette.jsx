@@ -237,7 +237,7 @@ export default function Roulette() {
         if (chipsOnSpot.length === 0) return null;
         const totalOnSpot = chipsOnSpot.reduce((acc, bet) => acc + bet.amount, 0);
         return (
-            <div className={`absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full border border-white shadow-lg flex items-center justify-center text-[8px] font-black leading-none ${getConsolidatedChipBgColor(totalOnSpot)} pointer-events-none animate-in zoom-in duration-200`}>
+            <div className={`absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full border border-white shadow-lg flex items-center justify-center text-[9px] font-black leading-none ${getConsolidatedChipBgColor(totalOnSpot)} pointer-events-none animate-in zoom-in duration-200`}>
                 {totalOnSpot}
             </div>
         );
@@ -299,7 +299,7 @@ export default function Roulette() {
 
             {/* PANEL DESLIZANTE MESA */}
             <div className={`fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_60px_rgba(0,0,0,0.9)] z-30 flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)`} style={{ height: isTableOpen ? '65%' : '140px' }}>
-                <div className="px-3 pt-3 pb-2 border-b border-white/5 bg-zinc-900 rounded-t-[2rem]">
+                <div className="px-3 pt-3 pb-2 border-b border-white/[0.07] bg-zinc-900 rounded-t-[2rem]">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <button onClick={() => setPaintMode(!paintMode)} disabled={spinning} aria-label="Pintar apuestas arrastrando" className={`p-2 rounded-xl border transition-all ${paintMode ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-zinc-800 border-zinc-600 text-zinc-400'}`}>
                         <Paintbrush size={18} />
@@ -425,7 +425,7 @@ export default function Roulette() {
             {/* MODAL RESULTADO */}
             {resultModal && (
                 <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
-                    <div className={`w-full max-w-xs rounded-[32px] p-8 text-center border-2 shadow-2xl relative ${resultModal.won ? 'bg-green-900/40 border-green-500' : 'bg-red-900/40 border-red-500'}`}>
+                    <div className={`w-full max-w-xs rounded-4xl p-8 text-center border-2 shadow-2xl relative ${resultModal.won ? 'bg-green-900/40 border-green-500' : 'bg-red-900/40 border-red-500'}`}>
                         <div className="mb-4 flex justify-center">
                             <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl font-black text-white shadow-xl border-4 ${resultModal.color === 'red' ? 'bg-red-600 border-red-400' : resultModal.color === 'black' ? 'bg-black border-zinc-500' : 'bg-green-600 border-green-400'}`}>
                                 {resultModal.num}
@@ -450,9 +450,9 @@ export default function Roulette() {
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
                         <h3 className="text-xl font-black text-white text-center mb-6 uppercase not-italic">Pagos</h3>
                         <div className="space-y-2 text-xs text-zinc-300">
-                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Pleno (1 Núm)</span><span className="text-yellow-400 font-bold">x36</span></div>
-                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Columna / Docena</span><span className="text-yellow-400 font-bold">x3</span></div>
-                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Color / Par / Impar</span><span className="text-yellow-400 font-bold">x2</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/[0.07]"><span>Pleno (1 Núm)</span><span className="text-yellow-400 font-bold">x36</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/[0.07]"><span>Columna / Docena</span><span className="text-yellow-400 font-bold">x3</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/[0.07]"><span>Color / Par / Impar</span><span className="text-yellow-400 font-bold">x2</span></div>
                         </div>
                     </div>
                 </div>

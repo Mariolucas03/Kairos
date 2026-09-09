@@ -240,11 +240,11 @@ export default function Social() {
                                         style={{ background: 'linear-gradient(90deg, #eab308, transparent)' }}
                                     />
                                     <Icon size={19} className={avisa ? 'text-yellow-500' : 'text-zinc-300 group-hover:text-white transition-colors'} />
-                                    <span className={`text-[8px] font-black uppercase tracking-[0.1em] not-italic ${avisa ? 'text-yellow-500/80' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}`}>
+                                    <span className={`text-[9px] font-black uppercase tracking-[0.1em] not-italic ${avisa ? 'text-yellow-500/80' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}`}>
                                         {label}
                                     </span>
                                     {avisa && (
-                                        <span className="absolute top-1.5 right-1.5 min-w-[15px] h-[15px] px-1 bg-red-500 text-white rounded-full text-[8px] font-black flex items-center justify-center border border-black">
+                                        <span className="absolute top-1.5 right-1.5 min-w-[15px] h-[15px] px-1 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center border border-black">
                                             {badge > 99 ? '99+' : badge}
                                         </span>
                                     )}

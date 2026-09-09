@@ -390,9 +390,9 @@ export default function Home() {
             {showSettings && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowSettings(false)}>
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
-                    <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] shadow-2xl flex flex-col h-auto max-h-[70vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl shadow-2xl flex flex-col h-auto max-h-[70vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-zinc-700 to-transparent" />
-                        <div className="flex justify-between items-center p-6 border-b border-white/5 shrink-0 relative z-10">
+                        <div className="flex justify-between items-center p-6 border-b border-white/[0.07] shrink-0 relative z-10">
                             <h2 className="text-xl font-black text-white uppercase tracking-tighter">Ajustes</h2>
                             <button onClick={() => setShowSettings(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white transition-colors border border-white/10 active:scale-95"><X size={20} /></button>
                         </div>
@@ -406,7 +406,7 @@ export default function Home() {
                                     {isDragEnabled ? <Unlock size={18} /> : <Lock size={18} />}
                                 </button>
                             </div>
-                            <div className="p-4 border border-white/5 rounded-3xl bg-zinc-900/50 flex justify-between items-center">
+                            <div className="p-4 border border-white/[0.07] rounded-3xl bg-zinc-900/50 flex justify-between items-center">
                                 <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">🔔 Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
                                 <div className="flex gap-2 shrink-0">
                                     {/* ⚠️ registerPush ya no devuelve true/false sino el MOTIVO:
@@ -428,7 +428,7 @@ export default function Home() {
                                 <h3 className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-3 pl-1">Visibilidad</h3>
                                 <div className="space-y-2">
                                     {Object.keys(DEFAULTS_CONFIG).map(key => (
-                                        <div key={key} onClick={() => toggleWidget(key)} className={`p-3.5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${visibleWidgets[key] ? 'bg-zinc-900 border-yellow-500/30' : 'bg-black border-white/5 opacity-60'}`}>
+                                        <div key={key} onClick={() => toggleWidget(key)} className={`p-3.5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${visibleWidgets[key] ? 'bg-zinc-900 border-yellow-500/30' : 'bg-black border-white/[0.07] opacity-60'}`}>
                                             <span className={`text-xs font-bold ${visibleWidgets[key] ? 'text-white' : 'text-zinc-600'}`}>{widgetNames[key] || key}</span>
                                             {visibleWidgets[key] ? <ToggleRight className="text-yellow-500" size={22} /> : <ToggleLeft className="text-zinc-700" size={22} />}
                                         </div>

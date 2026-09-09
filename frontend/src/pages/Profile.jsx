@@ -42,7 +42,7 @@ const Seccion = ({ titulo, children, className = '' }) => (
 );
 
 const CargandoGrafica = ({ alto = 180 }) => (
-    <div className="w-full rounded-[24px] bg-[#0a0a0c] border border-white/[0.07] animate-pulse" style={{ height: alto }} />
+    <div className="w-full rounded-3xl bg-[#0a0a0c] border border-white/[0.07] animate-pulse" style={{ height: alto }} />
 );
 
 /** Una cifra de la cabecera. */
@@ -50,7 +50,7 @@ const Cifra = ({ icono: Icono, valor, etiqueta, color }) => (
     <div className="flex-1 min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-2xl py-2.5 text-center">
         <Icono size={12} className={`${color} mx-auto`} />
         <p className="text-base font-black text-white mt-1 leading-none truncate px-1">{valor}</p>
-        <p className="text-[8px] text-zinc-600 uppercase tracking-wide mt-1 truncate px-1">{etiqueta}</p>
+        <p className="text-[9px] text-zinc-600 uppercase tracking-wide mt-1 truncate px-1">{etiqueta}</p>
     </div>
 );
 
@@ -58,7 +58,7 @@ const Cifra = ({ icono: Icono, valor, etiqueta, color }) => (
 const Enlace = ({ icono: Icono, titulo, pie, onClick, className = '', tono = 'text-zinc-400' }) => (
     <button
         onClick={onClick}
-        className={`w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform ${className}`}
+        className={`w-full bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 flex items-center gap-4 active:scale-[0.99] transition-transform ${className}`}
     >
         <div className={`p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 ${tono} shrink-0`}>
             <Icono size={18} />
@@ -142,7 +142,7 @@ export default function Profile() {
         }
 
         return (
-            <div className="bg-[#0a0a0c] border border-white/[0.07] p-5 rounded-[24px] relative overflow-hidden">
+            <div className="bg-[#0a0a0c] border border-white/[0.07] p-5 rounded-3xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-12 opacity-5 bg-yellow-500 blur-3xl rounded-full w-40 h-40 -mr-10 -mt-10 pointer-events-none"></div>
                 <div className="flex justify-between items-center mb-4 relative z-10">
                     <button onClick={() => setCalendarViewDate(new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1))} className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><ChevronLeft size={16} /></button>
@@ -216,7 +216,7 @@ export default function Profile() {
                         a mano. Ahora es el botón que te lleva. */}
                     <button
                         onClick={() => navigate('/gym?tab=body')}
-                        className="relative w-full h-[130px] rounded-[24px] overflow-hidden border border-white/[0.07] bg-zinc-950 active:scale-[0.99] transition-transform"
+                        className="relative w-full h-[130px] rounded-3xl overflow-hidden border border-white/[0.07] bg-zinc-950 active:scale-[0.99] transition-transform"
                     >
                         <div className="absolute inset-0 opacity-20 pointer-events-none"><RPGBody mini={true} /></div>
                         <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/30 flex items-center justify-between px-5">

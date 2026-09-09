@@ -62,13 +62,13 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
             <div
                 onClick={onClick}
                 className={`
-                    w-full relative rounded-[32px] overflow-hidden
+                    w-full relative rounded-4xl overflow-hidden
                     group cursor-pointer active:scale-[0.99] transition-all duration-200
                     p-[2px] h-[160px]
                     bg-zinc-300
                 `}
             >
-                <div className="h-full w-full bg-zinc-950 rounded-[30px] flex flex-col justify-between relative overflow-hidden z-10">
+                <div className="h-full w-full bg-zinc-950 rounded-3xl flex flex-col justify-between relative overflow-hidden z-10">
                     <div className="px-5 pt-5 flex justify-between items-start z-10 shrink-0">
                         <h2 className="text-xl font-black text-white not-italic uppercase tracking-tighter leading-none drop-shadow-md flex items-center gap-2">
                             FUERZA 1RM
@@ -98,7 +98,7 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
 
     // --- MODO FULL (MODAL INTERNO) ---
     return (
-        <div className="bg-[#09090b] border border-white/10 w-full rounded-[40px] p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden h-[500px]">
+        <div className="bg-[#09090b] border border-white/10 w-full rounded-4xl p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden h-[500px]">
 
             {/* Decoración Fondo */}
             <div className="absolute top-0 left-0 w-full h-[2px]" style={{ background: 'linear-gradient(90deg, #eab308, transparent)' }}></div>
@@ -139,7 +139,7 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
             </div>
 
             {/* GRÁFICA */}
-            <div className="flex-1 w-full bg-zinc-900/30 rounded-[32px] p-4 border border-white/5 relative z-10">
+            <div className="flex-1 w-full bg-zinc-900/30 rounded-4xl p-4 border border-white/[0.07] relative z-10">
                 {loading ? (
                     <div className="h-full flex items-center justify-center text-zinc-600 animate-pulse font-bold text-xs uppercase"><Activity size={24} className="mr-2" /> Cargando datos...</div>
                 ) : chartData.length < 2 ? (
@@ -153,8 +153,8 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
 
             {/* FOOTER STATS */}
             {chartData.length >= 2 && (
-                <div className="grid grid-cols-3 gap-4 pt-2 border-t border-white/5 relative z-10">
-                    <div className="text-center bg-zinc-900/50 p-2 rounded-xl border border-white/5">
+                <div className="grid grid-cols-3 gap-4 pt-2 border-t border-white/[0.07] relative z-10">
+                    <div className="text-center bg-zinc-900/50 p-2 rounded-xl border border-white/[0.07]">
                         <p className="text-[9px] text-zinc-500 uppercase font-black tracking-wider">Inicio</p>
                         <p className="text-lg font-black text-zinc-400">{chartData[0].pr} <span className="text-[10px]">KG</span></p>
                     </div>
@@ -162,7 +162,7 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
                         <p className="text-[9px] text-yellow-600 uppercase font-black tracking-wider">Actual</p>
                         <p className="text-xl font-black text-white">{chartData[chartData.length - 1].pr} <span className="text-[10px]">KG</span></p>
                     </div>
-                    <div className="text-center bg-zinc-900/50 p-2 rounded-xl border border-white/5">
+                    <div className="text-center bg-zinc-900/50 p-2 rounded-xl border border-white/[0.07]">
                         <p className="text-[9px] text-zinc-500 uppercase font-black tracking-wider">Mejora</p>
                         <p className={`text-lg font-black ${chartData[chartData.length - 1].pr >= chartData[0].pr ? 'text-green-400' : 'text-red-400'}`}>
                             {chartData[chartData.length - 1].pr - chartData[0].pr > 0 ? '+' : ''}

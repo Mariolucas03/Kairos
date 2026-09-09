@@ -50,13 +50,13 @@ export default function EstadisticasTab() {
     const proyeccion = metrica === 'rm1' ? cuandoLlegasA(puntosConRM) : null;
 
     const Cifra = ({ icono: Icono, valor, unidad, etiqueta }) => (
-        <div className="bg-zinc-950 border border-white/5 rounded-2xl p-3 text-center">
+        <div className="bg-zinc-950 border border-white/[0.07] rounded-2xl p-3 text-center">
             <Icono size={14} className="text-yellow-500 mx-auto mb-1.5" />
             <div className="flex items-baseline justify-center gap-0.5">
                 <span className="text-xl font-black text-white tabular-nums leading-none not-italic">{valor}</span>
                 {unidad && <span className="text-[10px] font-black text-zinc-500">{unidad}</span>}
             </div>
-            <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mt-1 not-italic">{etiqueta}</p>
+            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mt-1 not-italic">{etiqueta}</p>
         </div>
     );
 
@@ -84,7 +84,7 @@ export default function EstadisticasTab() {
                         {/* El volumen total en kilos no le dice nada a nadie:
                             traducido a algo que se pueda imaginar, si. */}
                         {comparacion && (
-                            <div className="flex items-center gap-2.5 mt-2 px-3.5 py-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                            <div className="flex items-center gap-2.5 mt-2 px-3.5 py-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
                                 <span className="text-xl leading-none">{comparacion.emoji}</span>
                                 <div className="min-w-0">
                                     <p className="text-[12px] font-black text-white uppercase tracking-tight leading-tight not-italic">
@@ -141,7 +141,7 @@ export default function EstadisticasTab() {
                         <CalendarCheck size={13} /> Los días que dices que entrenas
                     </h3>
 
-                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4 space-y-3">
+                    <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4 space-y-3">
                         {constancia.dias.map(d => (
                             <div key={d.dia}>
                                 <div className="flex items-baseline justify-between mb-1.5">
@@ -175,7 +175,7 @@ export default function EstadisticasTab() {
                             const bueno = [...constancia.dias].sort((a, b) => b.porcentaje - a.porcentaje)[0];
                             if (!flojo || flojo.porcentaje >= 50 || flojo.dia === bueno.dia) return null;
                             return (
-                                <p className="text-[10px] text-zinc-500 font-bold leading-snug pt-1 border-t border-white/[0.06]">
+                                <p className="text-[10px] text-zinc-500 font-bold leading-snug pt-1 border-t border-white/[0.07]">
                                     Los <span className="text-orange-400">{enPlural(flojo.nombre)}</span> vas
                                     {' '}{flojo.hechos} de {flojo.posibles}. Quizá ese día te vendría mejor otro.
                                 </p>
@@ -195,7 +195,7 @@ export default function EstadisticasTab() {
                         <Scale size={13} /> Cuántas veces tu peso
                     </h3>
 
-                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-2">
+                    <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-2">
                         {fuerza.ejercicios.map(e => (
                             <div key={e.nombre} className="flex items-center gap-3 px-2.5 py-2">
                                 <div className="min-w-0 flex-1">
@@ -233,7 +233,7 @@ export default function EstadisticasTab() {
                         <History size={13} /> Llevas sin tocar
                     </h3>
 
-                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-2 space-y-1">
+                    <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-2 space-y-1">
                         {abandonados.map(e => (
                             <button
                                 key={e.name}
@@ -270,7 +270,7 @@ export default function EstadisticasTab() {
                         <PieChart size={13} /> Reparto de los últimos 3 meses
                     </h3>
 
-                    <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4 space-y-2.5">
+                    <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4 space-y-2.5">
                         {gruposConTrabajo.map((g, i) => (
                             <div key={g.musculo}>
                                 <div className="flex items-baseline justify-between mb-1">
@@ -318,7 +318,7 @@ export default function EstadisticasTab() {
                     <p className="text-[11px] text-zinc-600 font-bold">Entrena y aquí verás tu evolución.</p>
                 </div>
             ) : (
-                <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4">
+                <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4">
                     <div className="relative mb-3">
                         <select
                             value={ejercicio || ''}
@@ -400,7 +400,7 @@ export default function EstadisticasTab() {
                                 calla en vez de inventar una fecha. */}
                             {proyeccion && (
                                 <div className={`flex items-center gap-2.5 mt-3 px-3.5 py-2.5 rounded-2xl border ${proyeccion.estancado
-                                    ? 'bg-white/[0.03] border-white/[0.06]'
+                                    ? 'bg-white/[0.03] border-white/[0.07]'
                                     : 'bg-emerald-500/[0.07] border-emerald-500/25'}`}>
                                     <Target size={15} className={proyeccion.estancado ? 'text-zinc-500 shrink-0' : 'text-emerald-400 shrink-0'} />
                                     {proyeccion.estancado ? (

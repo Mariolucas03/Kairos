@@ -134,7 +134,7 @@ export default function Settings() {
 
                 <button
                     onClick={() => user?._id && navigate(`/social/user/${user._id}`)}
-                    className="w-full bg-zinc-950 border border-white/5 rounded-[24px] p-4 flex items-center gap-4 mb-3 active:scale-[0.99] transition-transform hover:border-white/10"
+                    className="w-full bg-zinc-950 border border-white/[0.07] rounded-3xl p-4 flex items-center gap-4 mb-3 active:scale-[0.99] transition-transform hover:border-white/10"
                 >
                     <div className="relative shrink-0">
                         <div className="w-14 h-14 bg-black rounded-full flex items-center justify-center text-lg font-black text-zinc-500 border-2 border-zinc-800 overflow-hidden">
@@ -152,7 +152,7 @@ export default function Settings() {
                 </button>
 
                 {/* Descripción */}
-                <div className="bg-zinc-950 border border-white/5 rounded-[24px] p-4">
+                <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4">
                     <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 mb-2">
                         <UserIcon size={11} /> Descripción
                     </label>
@@ -178,7 +178,7 @@ export default function Settings() {
                 <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">
                     1 · Quién puede ver tu perfil
                 </h2>
-                <div className="bg-zinc-950 border border-white/5 rounded-[24px] overflow-hidden">
+                <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl overflow-hidden">
                     <button
                         onClick={() => setIsPrivate(!isPrivate)}
                         className="w-full p-4 flex items-center gap-4 active:bg-white/5 transition-colors"
@@ -212,7 +212,7 @@ export default function Settings() {
                 <p className="text-[10px] text-zinc-600 mb-3 ml-1 leading-tight">
                     Puedes apagar una sección aunque tengas la cuenta pública. Tú siempre la ves.
                 </p>
-                <div className="bg-zinc-950 border border-white/5 rounded-[24px] overflow-hidden divide-y divide-white/5">
+                <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl overflow-hidden divide-y divide-white/5">
                     {SECCIONES.map(({ key, label, icon: Icon, desc }) => {
                         const visible = visibility[key] !== false;
                         return (
@@ -287,7 +287,7 @@ export default function Settings() {
                 {user?.isAdmin && (
                     <button
                         onClick={() => navigate('/admin')}
-                        className="w-full bg-[#0a0a0c] border border-yellow-500/30 rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
+                        className="w-full bg-[#0a0a0c] border border-yellow-500/30 rounded-3xl p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
                     >
                         <div className="p-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/40 text-yellow-500">
                             <Shield size={18} />
@@ -301,7 +301,7 @@ export default function Settings() {
                 )}
                 <button
                     onClick={() => navigate('/privacidad')}
-                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
+                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
                 >
                     <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
                         <FileText size={18} />
@@ -316,7 +316,7 @@ export default function Settings() {
                 <button
                     onClick={handleDescargarDatos}
                     disabled={descargando}
-                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform disabled:opacity-50"
+                    className="w-full bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 flex items-center gap-4 active:scale-[0.99] transition-transform disabled:opacity-50"
                 >
                     <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
                         <Download size={18} />
@@ -350,7 +350,7 @@ export default function Settings() {
                 {!borrando ? (
                     <button
                         onClick={() => setBorrando(true)}
-                        className="w-full bg-[#0a0a0c] border border-red-500/20 rounded-[24px] p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
+                        className="w-full bg-[#0a0a0c] border border-red-500/20 rounded-3xl p-4 flex items-center gap-4 active:scale-[0.99] transition-transform"
                     >
                         <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
                             <Trash2 size={18} />
@@ -361,7 +361,7 @@ export default function Settings() {
                         </div>
                     </button>
                 ) : (
-                    <div className="bg-[#0a0a0c] border border-red-500/30 rounded-[24px] p-5">
+                    <div className="bg-[#0a0a0c] border border-red-500/30 rounded-3xl p-5">
                         <p className="text-white font-bold text-sm mb-2">¿Seguro del todo?</p>
                         <p className="text-zinc-400 text-xs leading-relaxed mb-4">
                             Se borran tus entrenos, comidas, fotos, rutinas, misiones y amistades.

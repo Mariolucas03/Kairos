@@ -221,11 +221,11 @@ export default function Shop() {
 
                 {/* WIDGET CASA DE CAMBIO (Solo en tienda principal) */}
                 {activeTab === 'shop' && !selectedCategory && (
-                    <div onClick={() => setShowExchange(true)} className="mb-5 relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 flex items-center justify-between cursor-pointer active:scale-[0.985] transition-all">
+                    <div onClick={() => setShowExchange(true)} className="mb-5 relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 flex items-center justify-between cursor-pointer active:scale-[0.985] transition-all">
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
                         <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
                         <div className="flex items-center gap-4 relative z-10">
-                            <div className="w-12 h-12 rounded-[16px] bg-[#18181b] border border-white/[0.07] flex items-center justify-center" style={{ color: ACENTO_FICHAS }}>
+                            <div className="w-12 h-12 rounded-2xl bg-[#18181b] border border-white/[0.07] flex items-center justify-center" style={{ color: ACENTO_FICHAS }}>
                                 <ArrowRightLeft size={22} />
                             </div>
                             <div>
@@ -240,7 +240,7 @@ export default function Shop() {
                 {!selectedCategory ? (
                     <div className="grid grid-cols-2 gap-3 pb-8 animate-in fade-in slide-in-from-bottom-4">
                         {CATEGORIES.map(cat => (
-                            <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="aspect-[4/3] bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] flex flex-col items-center justify-center gap-2.5 transition-all active:scale-[0.985] cursor-pointer group relative overflow-hidden">
+                            <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="aspect-[4/3] bg-[#0a0a0c] border border-white/[0.07] rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all active:scale-[0.985] cursor-pointer group relative overflow-hidden">
                                 <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_TIENDA}, transparent)` }} />
                                 <div className="text-zinc-600 group-hover:text-zinc-300 transition-colors relative z-10">{cat.icon}</div>
                                 <span className="font-black text-[10px] text-zinc-500 group-hover:text-white tracking-[0.16em] relative z-10 uppercase not-italic">{cat.label}</span>
@@ -297,7 +297,7 @@ export default function Shop() {
                                             key={item._id}
                                             onClick={() => { if (!purchased) setSelectedItem(item); }}
                                             className={`
-                                                relative bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 flex flex-col items-center justify-between transition-all min-h-[160px] overflow-hidden
+                                                relative bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 flex flex-col items-center justify-between transition-all min-h-[160px] overflow-hidden
                                                 ${purchased ? 'opacity-40 grayscale cursor-default' : 'cursor-pointer active:scale-[0.985]'}
                                             `}
                                         >
@@ -324,12 +324,12 @@ export default function Shop() {
                                             <div className="text-center w-full relative z-10">
                                                 <h3 className="text-[10px] font-black text-white truncate w-full mb-1 uppercase tracking-wide">{item.name}</h3>
                                                 {item.rarity && item.rarity !== 'comun' && (
-                                                    <p className={`text-[7px] font-black uppercase tracking-[0.15em] mb-2 ${rarity.text}`}>{rarity.label}</p>
+                                                    <p className={`text-[9px] font-black uppercase tracking-[0.15em] mb-2 ${rarity.text}`}>{rarity.label}</p>
                                                 )}
                                                 {(!item.rarity || item.rarity === 'comun') && <div className="mb-2" />}
 
                                                 {purchased ? (
-                                                    <div className="text-[8px] font-black text-green-500 uppercase tracking-widest bg-green-900/10 px-2 py-1 rounded border border-green-500/20">ADQUIRIDO</div>
+                                                    <div className="text-[9px] font-black text-green-500 uppercase tracking-widest bg-green-900/10 px-2 py-1 rounded border border-green-500/20">ADQUIRIDO</div>
                                                 ) : (
                                                     <>
                                                         {activeTab === 'shop' && (
@@ -365,7 +365,7 @@ export default function Shop() {
                 const rarezaSel = RARITIES[selectedItem.rarity] || RARITIES.comun;
                 return (
                 <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
-                    <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-[32px] p-8 relative flex flex-col items-center text-center shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-4xl p-8 relative flex flex-col items-center text-center shadow-2xl overflow-hidden">
                         {/* Acento de 2px + halo al 11%, como las tarjetas */}
                         <div
                             className="absolute inset-x-0 top-0 h-[2px] pointer-events-none"
@@ -378,7 +378,7 @@ export default function Shop() {
 
                         <button onClick={() => setSelectedItem(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full transition-colors border border-zinc-800 z-20"><X size={20} /></button>
 
-                        <div className="w-28 h-28 bg-[#18181b] rounded-[24px] flex items-center justify-center mb-5 border border-white/[0.07] overflow-hidden relative z-10">
+                        <div className="w-28 h-28 bg-[#18181b] rounded-3xl flex items-center justify-center mb-5 border border-white/[0.07] overflow-hidden relative z-10">
                             {(selectedItem.icon?.startsWith('/') || selectedItem.icon?.startsWith('http')) ? <img src={selectedItem.icon} className="w-full h-full object-cover" /> : <div className="text-6xl">{selectedItem.icon}</div>}
                         </div>
 
@@ -421,7 +421,7 @@ export default function Shop() {
             {/* 2. Crear Premio */}
             {showCreator && (
                 <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
-                    <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-[32px] p-6 relative shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-4xl p-6 relative shadow-2xl overflow-hidden">
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_TIENDA}, transparent)` }} />
                         <div className="flex justify-between items-center mb-6 relative z-10">
                             <h3 className="text-[20px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Nuevo premio</h3>
@@ -448,7 +448,7 @@ export default function Shop() {
             {/* 3. Modal Canje */}
             {showExchange && (
                 <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in h-screen w-screen">
-                    <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-white/[0.07] p-6 shadow-2xl relative overflow-hidden">
+                    <div className="bg-[#09090b] w-full max-w-sm rounded-4xl border border-white/[0.07] p-6 shadow-2xl relative overflow-hidden">
                         {/* Acento y halo de la casa de cambio: morado, el color de
                             las fichas, que es lo que entregas aquí. */}
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
@@ -459,7 +459,7 @@ export default function Shop() {
                             <button onClick={() => setShowExchange(false)} className="text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full border border-zinc-800"><X size={20} /></button>
                         </div>
 
-                        <div className="flex items-center justify-between mb-7 bg-[#18181b] p-4 rounded-[24px] border border-white/[0.07] relative z-10">
+                        <div className="flex items-center justify-between mb-7 bg-[#18181b] p-4 rounded-3xl border border-white/[0.07] relative z-10">
                             <div className="text-center flex flex-col items-center">
                                 <span className="block text-2xl font-black text-purple-400 leading-none mb-2">{exchangeAmount}</span>
                                 <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest flex items-center gap-1">

@@ -17,7 +17,7 @@ export default function StreakWidget({ streak = 0, onOpenChest, claimed = false 
             <div className="relative z-10 flex items-center gap-4">
 
                 <div
-                    className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: 'rgba(249,115,22,0.12)', color: accent }}
                 >
                     <Flame size={22} />

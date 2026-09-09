@@ -59,7 +59,7 @@ const SwipeableFoodItem = ({ item, onAdd, onDelete }) => {
                     <div className="flex items-center gap-2">
                         <p className="font-bold text-white text-sm truncate w-48">{item.name}</p>
                         {item.folder && item.folder !== 'General' && (
-                            <span className="text-[8px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded uppercase font-bold border border-zinc-700">{item.folder}</span>
+                            <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded uppercase font-bold border border-zinc-700">{item.folder}</span>
                         )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 text-[10px] font-black uppercase tracking-wide">

@@ -899,7 +899,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                                 —no es lo mismo 100 kg a 1 repetición que
                                                 a 8— así que va con las reps al lado. */}
                                             {ex.pr && ex.pr.value1RM > 0 && (
-                                                <div className="flex items-center gap-1 bg-black/40 px-2 py-1.5 rounded-lg border border-white/[0.06] mr-0.5" title="Tu mejor serie en este ejercicio">
+                                                <div className="flex items-center gap-1 bg-black/40 px-2 py-1.5 rounded-lg border border-white/[0.07] mr-0.5" title="Tu mejor serie en este ejercicio">
                                                     <Trophy size={12} className="text-yellow-600 shrink-0" />
                                                     <span className="text-[11px] font-black text-yellow-500 whitespace-nowrap tabular-nums">
                                                         {ex.pr.weight}<span className="text-[9px] text-zinc-500">kg</span>
@@ -910,14 +910,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                             <button
                                                 onClick={() => setFichaAbierta(ex.name)}
                                                 aria-label={`Ver cómo se hace ${ex.name}`}
-                                                className="w-9 h-9 bg-black/40 rounded-xl text-zinc-300 border border-white/[0.06] flex items-center justify-center hover:text-white active:scale-90 transition-transform"
+                                                className="w-9 h-9 bg-black/40 rounded-xl text-zinc-300 border border-white/[0.07] flex items-center justify-center hover:text-white active:scale-90 transition-transform"
                                             >
                                                 <Play size={15} fill="currentColor" />
                                             </button>
                                             <button
                                                 onClick={() => handleOpenSwap(exIdx)}
                                                 aria-label={`Cambiar ${ex.name} por otro ejercicio`}
-                                                className="w-9 h-9 bg-black/40 rounded-xl text-blue-400 border border-white/[0.06] flex items-center justify-center active:scale-90 transition-transform"
+                                                className="w-9 h-9 bg-black/40 rounded-xl text-blue-400 border border-white/[0.07] flex items-center justify-center active:scale-90 transition-transform"
                                             >
                                                 <RefreshCw size={15} />
                                             </button>
@@ -983,7 +983,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                                     ("10 · 10 · 6") y habia que contar con el
                                                     dedo para saber cual era la tuya. */}
                                                 {antes && (
-                                                    <span className="text-[8px] font-bold text-zinc-600 tabular-nums leading-none mt-0.5 whitespace-nowrap">
+                                                    <span className="text-[9px] font-bold text-zinc-600 tabular-nums leading-none mt-0.5 whitespace-nowrap">
                                                         {antes}
                                                     </span>
                                                 )}
@@ -1087,9 +1087,9 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 { label: 'Series', value: resumen.totalSets },
                                 { label: 'Volumen', value: resumen.volumen >= 1000 ? `${(resumen.volumen / 1000).toFixed(1)}t` : `${resumen.volumen}kg` }
                             ].map(s => (
-                                <div key={s.label} className="bg-black border border-white/5 rounded-2xl py-2.5 text-center">
+                                <div key={s.label} className="bg-black border border-white/[0.07] rounded-2xl py-2.5 text-center">
                                     <div className="text-lg font-black text-white leading-none">{s.value}</div>
-                                    <div className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{s.label}</div>
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{s.label}</div>
                                 </div>
                             ))}
                         </div>
@@ -1102,7 +1102,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                             Traducido a un rinoceronte sí se entiende, y encima se
                             cuenta. */}
                         {comparacion && (
-                            <div className="bg-black border border-white/5 rounded-2xl p-3.5 mb-4 text-center">
+                            <div className="bg-black border border-white/[0.07] rounded-2xl p-3.5 mb-4 text-center">
                                 <div className="text-[26px] leading-none mb-1.5">{comparacion.emoji}</div>
                                 <p className="text-[13px] font-black text-white uppercase tracking-tight leading-tight">
                                     {comparacion.frase}
@@ -1113,12 +1113,12 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
                         {/* CÓMO HA IDO CONTRA LO QUE TOCABA */}
                         {resumen.objetivos.length > 0 && (
-                            <div className="bg-black border border-white/5 rounded-2xl p-3 mb-4">
+                            <div className="bg-black border border-white/[0.07] rounded-2xl p-3 mb-4">
                                 <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Lo que tocaba</p>
                                 <div className="space-y-1.5">
                                     {resumen.objetivos.map(o => (
                                         <div key={o.name} className="flex items-center gap-2">
-                                            <span className={`shrink-0 w-4 h-4 rounded-md flex items-center justify-center text-[9px] font-black ${o.cumplida ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-600'}`}>
+                                            <span className={`shrink-0 w-4 h-4 rounded-lg flex items-center justify-center text-[9px] font-black ${o.cumplida ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-600'}`}>
                                                 {o.cumplida ? '✓' : '·'}
                                             </span>
                                             <span className="text-[11px] font-bold text-white uppercase truncate flex-1 min-w-0">{o.name}</span>
@@ -1134,7 +1134,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
                         {/* Músculos trabajados sobre el cuerpo */}
                         {resumen.musculos.length > 0 && (
-                            <div className="bg-black border border-white/5 rounded-2xl p-3 mb-4">
+                            <div className="bg-black border border-white/[0.07] rounded-2xl p-3 mb-4">
                                 <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest text-center mb-1">Músculos trabajados</p>
                                 {/* ⚠️ Antes se pintaba SOLO el frente y con el botón de girar
                                     desactivado: si acababas de entrenar espalda, glúteo o

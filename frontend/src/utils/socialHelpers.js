@@ -17,7 +17,7 @@ export const getLevelStyle = (level) => {
     return "bg-zinc-800 text-zinc-400 border-zinc-700";
 };
 
-export const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-3 rounded-[20px] border border-white/5 mb-2 relative group hover:border-white/10 transition-all shadow-sm";
+export const cardBaseStyle = "flex items-center justify-between bg-zinc-950 p-3 rounded-2xl border border-white/[0.07] mb-2 relative group hover:border-white/10 transition-all shadow-sm";
 
 // `hex` es el mismo tono que las clases de Tailwind de al lado, en un formato
 // que se puede usar en `style` (acentos, halos, bordes calculados).

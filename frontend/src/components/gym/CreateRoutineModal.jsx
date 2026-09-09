@@ -357,7 +357,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                     subdocumentos sin referencia al catálogo. */}
                                                 <button
                                                     onClick={() => setFichaAbierta(ex.name)}
-                                                    className="w-6 h-6 rounded-md bg-black border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:border-zinc-600 active:scale-95 transition-all shrink-0"
+                                                    className="w-6 h-6 rounded-lg bg-black border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:border-zinc-600 active:scale-95 transition-all shrink-0"
                                                     aria-label={`Ver ejecución de ${ex.name}`}
                                                 >
                                                     <Play size={10} fill="currentColor" />
@@ -383,7 +383,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                     <div className="flex items-center gap-3">
                                         {/* Descanso propio. Vacío = hereda el de la rutina */}
                                         <div className="flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
-                                            <label className="text-[8px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
+                                            <label className="text-[9px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
                                                 <Timer size={8} /> SEG
                                             </label>
                                             <input
@@ -400,7 +400,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                         </div>
 
                                         <div className="flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
-                                            <label className="text-[8px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
+                                            <label className="text-[9px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
                                                 <Hash size={8} /> SETS
                                             </label>
                                             <input

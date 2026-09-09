@@ -26,7 +26,7 @@ export default function AvisoServidor() {
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[300] safe-top pointer-events-none">
-            <div className="mx-auto mt-2 w-[calc(100%-2rem)] max-w-sm bg-[#0a0a0c] border border-white/[0.07] rounded-[16px] px-4 py-2.5 flex items-center gap-3 overflow-hidden relative">
+            <div className="mx-auto mt-2 w-[calc(100%-2rem)] max-w-sm bg-[#0a0a0c] border border-white/[0.07] rounded-2xl px-4 py-2.5 flex items-center gap-3 overflow-hidden relative">
                 <div
                     className="absolute inset-x-0 top-0 h-[2px] pointer-events-none"
                     style={{ background: 'linear-gradient(90deg, #eab308, transparent)' }}

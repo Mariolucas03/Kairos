@@ -121,7 +121,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
-                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
+                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -130,7 +130,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                             <h2 className="text-2xl font-black text-white uppercase flex items-center gap-2 tracking-tighter not-italic">
                                 DETALLE <span style={{ color: accent }}>NUTRICIÓN</span>
                             </h2>
-                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -154,10 +154,10 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                                 const mealPercent = safeCurrent > 0 ? Math.min((mealKcal / safeCurrent) * 100, 100) : 0;
 
                                 return (
-                                    <div key={meal.key} className="bg-zinc-900/50 p-3 rounded-2xl border border-white/5 flex flex-col gap-2 hover:bg-zinc-900/80 transition-colors">
+                                    <div key={meal.key} className="bg-zinc-900/50 p-3 rounded-2xl border border-white/[0.07] flex flex-col gap-2 hover:bg-zinc-900/80 transition-colors">
                                         <div className="flex justify-between items-center">
                                             <div className="flex items-center gap-3">
-                                                <div className="bg-black p-2 rounded-xl border border-white/5 shadow-inner">
+                                                <div className="bg-black p-2 rounded-xl border border-white/[0.07] shadow-inner">
                                                     {meal.icon}
                                                 </div>
                                                 <span className="text-xs font-black text-white uppercase tracking-wide">
@@ -169,7 +169,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                                             </span>
                                         </div>
 
-                                        <div className="w-full h-1.5 bg-black rounded-full overflow-hidden border border-white/5">
+                                        <div className="w-full h-1.5 bg-black rounded-full overflow-hidden border border-white/[0.07]">
                                             <div
                                                 className="h-full rounded-full transition-all duration-500"
                                                 style={{ width: `${mealPercent}%`, background: meal.bar }}

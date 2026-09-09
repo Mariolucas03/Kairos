@@ -61,12 +61,12 @@ export default function PantallaAuth({
                     <div className="relative auth-entra" style={{ animationDelay: '0.05s' }}>
                         {/* Halo que late por detrás del emblema */}
                         <div
-                            className="auth-late absolute inset-0 rounded-[20px] blur-xl"
+                            className="auth-late absolute inset-0 rounded-2xl blur-xl"
                             style={{ background: acento }}
                             aria-hidden="true"
                         />
                         <div
-                            className="auth-flota relative w-16 h-16 rounded-[20px] flex items-center justify-center border"
+                            className="auth-flota relative w-16 h-16 rounded-2xl flex items-center justify-center border"
                             style={{ background: 'rgba(255,255,255,0.04)', borderColor: acento + '4d' }}
                         >
                             <Icono size={30} style={{ color: acento }} />
@@ -89,7 +89,7 @@ export default function PantallaAuth({
 
                 {/* ── TARJETA ───────────────────────────────────────────── */}
                 <div
-                    className="auth-entra relative bg-[#0a0a0c]/90 backdrop-blur-xl border border-white/[0.08] rounded-[28px] p-6 overflow-hidden shadow-2xl shadow-black/60"
+                    className="auth-entra relative bg-[#0a0a0c]/90 backdrop-blur-xl border border-white/[0.07] rounded-3xl p-6 overflow-hidden shadow-2xl shadow-black/60"
                     style={{ animationDelay: '0.25s' }}
                 >
                     <div

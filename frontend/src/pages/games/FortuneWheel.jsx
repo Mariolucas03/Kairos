@@ -150,13 +150,13 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                     <div className="absolute inset-0 m-auto w-16 h-16 bg-zinc-900 rounded-full border-4 border-zinc-800 shadow-inner flex items-center justify-center text-zinc-400 z-20">{config.icon}</div>
                 </div>
             </div>
-            <button onClick={handleSpin} disabled={spinning} className={`w-full py-5 rounded-[20px] font-black text-lg uppercase tracking-widest transition-all active:scale-95 shadow-xl ${spinning ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200'}`}>
+            <button onClick={handleSpin} disabled={spinning} className={`w-full py-5 rounded-2xl font-black text-lg uppercase tracking-widest transition-all active:scale-95 shadow-xl ${spinning ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200'}`}>
                 {spinning ? 'Girando...' : `GIRAR (${config.cost === 0 ? 'GRATIS' : config.cost})`}
             </button>
 
             {winData && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-6 animate-in zoom-in-95 duration-200">
-                    <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl">
+                    <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-4xl p-8 text-center shadow-2xl">
                         <div className="mb-6 flex justify-center">
                             {winData.v > 0 ? (
                                 <div className="w-24 h-24 bg-yellow-500/20 rounded-full flex items-center justify-center animate-bounce border border-yellow-500/30">
@@ -218,9 +218,9 @@ export default function FortuneWheel() {
                     {Object.values(WHEEL_CONFIG).map((config) => {
                         const isDisabled = hasSpunToday;
                         return (
-                            <button key={config.id} onClick={() => !isDisabled && setSelectedMode(config.id)} disabled={isDisabled} className={`w-full p-5 rounded-[24px] border flex items-center justify-between group transition-all relative overflow-hidden ${isDisabled ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' : `${config.bg} ${config.border} active:scale-[0.98]`}`}>
+                            <button key={config.id} onClick={() => !isDisabled && setSelectedMode(config.id)} disabled={isDisabled} className={`w-full p-5 rounded-3xl border flex items-center justify-between group transition-all relative overflow-hidden ${isDisabled ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' : `${config.bg} ${config.border} active:scale-[0.98]`}`}>
                                 <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl bg-black border border-white/5 ${config.color} shadow-lg`}>{isDisabled ? <Lock size={24} /> : config.icon}</div>
+                                    <div className={`p-3 rounded-2xl bg-black border border-white/[0.07] ${config.color} shadow-lg`}>{isDisabled ? <Lock size={24} /> : config.icon}</div>
                                     <div className="text-left"><h3 className={`text-lg font-black uppercase leading-none ${isDisabled ? 'text-zinc-500' : config.color}`}>{config.title}</h3><p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-wide">{config.desc}</p></div>
                                 </div>
                                 <div className="flex flex-col items-end"><span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Coste</span><div className="bg-black px-3 py-1.5 rounded-lg border border-zinc-800 flex items-center gap-1.5"><span className={`text-sm font-black ${isDisabled ? 'text-zinc-600' : 'text-white'}`}>{config.cost === 0 ? "GRATIS" : config.cost}</span>{config.cost > 0 && <img src="/assets/icons/ficha.png" className={`w-3.5 h-3.5 ${isDisabled ? 'grayscale opacity-50' : ''}`} alt="F" />}</div></div>

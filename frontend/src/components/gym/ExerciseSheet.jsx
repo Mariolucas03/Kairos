@@ -62,7 +62,7 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
     if (!ficha && !cargando) {
         if (noEncontrado) return createPortal(
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-6" onClick={onClose}>
-                <div className="bg-[#09090b] border border-zinc-800 rounded-[24px] p-6 text-center max-w-xs">
+                <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 text-center max-w-xs">
                     <Dumbbell className="mx-auto text-zinc-700 mb-3" size={28} />
                     <p className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-4">
                         No hay demostración de "{exerciseName || exercise?.name}"
@@ -81,7 +81,7 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-150">
-            <div className="bg-[#09090b] w-full sm:max-w-sm rounded-t-[32px] sm:rounded-[32px] border border-zinc-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
+            <div className="bg-[#09090b] w-full sm:max-w-sm rounded-t-[32px] sm:rounded-4xl border border-zinc-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
 
                 <div className="flex justify-between items-start gap-3 p-5 pb-3 shrink-0">
                     <div className="min-w-0">
@@ -104,7 +104,7 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
                 <div className="overflow-y-auto custom-scrollbar px-5 pb-5 space-y-4">
                     {/* GIF. Fondo blanco a propósito: los del catálogo vienen
                         recortados sobre blanco y en oscuro se ven sucios. */}
-                    <div className="rounded-[24px] overflow-hidden border border-zinc-800 bg-white aspect-square flex items-center justify-center">
+                    <div className="rounded-3xl overflow-hidden border border-zinc-800 bg-white aspect-square flex items-center justify-center">
                         {cargando && !ficha?.gif ? (
                             <Loader2 className="animate-spin text-zinc-400" size={28} />
                         ) : hayGif ? (
@@ -147,7 +147,7 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
                             <ol className="space-y-2">
                                 {ficha.instructions.map((paso, i) => (
                                     <li key={i} className="flex gap-3">
-                                        <span className="shrink-0 w-5 h-5 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-black text-zinc-500 flex items-center justify-center mt-0.5">
+                                        <span className="shrink-0 w-5 h-5 rounded-lg bg-zinc-900 border border-zinc-800 text-[10px] font-black text-zinc-500 flex items-center justify-center mt-0.5">
                                             {i + 1}
                                         </span>
                                         <span className="text-[13px] text-zinc-300 leading-snug">{paso}</span>

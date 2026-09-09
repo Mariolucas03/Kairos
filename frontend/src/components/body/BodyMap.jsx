@@ -185,7 +185,7 @@ export default function BodyMap({
                         <Figura view={v} getFill={getFill} onSelectMuscle={onSelectMuscle} marcado={selected} />
                         {/* En miniatura (la rejilla del perfil) las etiquetas solo estorban */}
                         {labels && (
-                            <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
                                 {v === 'front' ? 'Frente' : 'Espalda'}
                             </span>
                         )}

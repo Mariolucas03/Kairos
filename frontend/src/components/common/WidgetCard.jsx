@@ -24,7 +24,7 @@ export default function WidgetCard({
         <div
             onClick={onClick}
             className={`
-                relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-[24px]
+                relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-3xl
                 transition-all duration-200 ${padding}
                 ${onClick ? 'cursor-pointer active:scale-[0.985]' : ''}
                 ${className}

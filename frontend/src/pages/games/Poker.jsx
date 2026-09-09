@@ -186,7 +186,7 @@ export default function Poker() {
                     </h1>
                 </div>
 
-                <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 mb-5">
+                <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 mb-5">
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Texas Hold'em</p>
                     <p className="text-[12px] text-zinc-400 leading-relaxed">
                         Dos cartas tuyas y cinco en la mesa: la mejor jugada de cinco se lleva el bote.
@@ -202,13 +202,13 @@ export default function Poker() {
                 {!creando ? (
                     <button
                         onClick={() => setCreando(true)}
-                        className="w-full py-4 rounded-[20px] font-black uppercase tracking-widest text-xs text-black active:scale-95 transition-transform flex items-center justify-center gap-2 mb-6"
+                        className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-black active:scale-95 transition-transform flex items-center justify-center gap-2 mb-6"
                         style={{ background: ACENTO }}
                     >
                         <Spade size={16} /> Montar una mesa
                     </button>
                 ) : (
-                    <div className="bg-[#0a0a0c] border rounded-[24px] p-5 mb-6 space-y-4" style={{ borderColor: ACENTO + '55' }}>
+                    <div className="bg-[#0a0a0c] border rounded-3xl p-5 mb-6 space-y-4" style={{ borderColor: ACENTO + '55' }}>
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nueva mesa</p>
                             <button onClick={() => setCreando(false)} className="text-zinc-600 hover:text-white"><X size={16} /></button>
@@ -253,7 +253,7 @@ export default function Poker() {
                                         <button
                                             key={m._id}
                                             onClick={() => setAbiertaId(m._id)}
-                                            className="w-full text-left bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
+                                            className="w-full text-left bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-white font-bold text-sm truncate">
@@ -333,7 +333,7 @@ export default function Poker() {
                 fichas y lo que ha puesto, y repetirlo aquí en forma de lista
                 sobraba. */}
             {esSala && (
-            <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4 mb-4">
+            <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 mb-4">
                 <div className="flex items-baseline justify-between mb-3">
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">En la mesa</p>
                     <span className="text-[10px] text-zinc-600 font-bold">
@@ -346,7 +346,7 @@ export default function Poker() {
                     {m.jugadores.map(j => (
                         <div
                             key={j.puesto}
-                            className={`flex items-center gap-2.5 p-2 rounded-xl border bg-black ${j.sentado ? 'border-white/[0.06]' : 'opacity-30 border-white/[0.03]'}`}
+                            className={`flex items-center gap-2.5 p-2 rounded-xl border bg-black ${j.sentado ? 'border-white/[0.07]' : 'opacity-30 border-white/[0.03]'}`}
                         >
                             <div className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
                                 {j.avatar
@@ -387,7 +387,7 @@ export default function Poker() {
                                         key={a._id}
                                         onClick={() => invitar(a._id)}
                                         disabled={enVuelo || m.plazasLibres <= 0}
-                                        className="w-full flex items-center gap-2.5 p-2 rounded-xl bg-black border border-white/[0.06] active:scale-[0.99] transition-transform disabled:opacity-40"
+                                        className="w-full flex items-center gap-2.5 p-2 rounded-xl bg-black border border-white/[0.07] active:scale-[0.99] transition-transform disabled:opacity-40"
                                     >
                                         <span className="text-[13px] text-white font-bold truncate flex-1 text-left">{a.username}</span>
                                         <UserPlus size={13} style={{ color: ACENTO }} />
@@ -397,7 +397,7 @@ export default function Poker() {
                         ) : (
                             <button
                                 onClick={() => setInvitando(true)}
-                                className="w-full mt-3 py-2.5 rounded-xl bg-black border border-white/[0.08] text-zinc-300 font-black uppercase tracking-widest text-[10px] active:scale-95 transition-transform flex items-center justify-center gap-2"
+                                className="w-full mt-3 py-2.5 rounded-xl bg-black border border-white/[0.07] text-zinc-300 font-black uppercase tracking-widest text-[10px] active:scale-95 transition-transform flex items-center justify-center gap-2"
                             ><UserPlus size={13} /> Invitar amigos</button>
                         )}
 
@@ -504,7 +504,7 @@ export default function Poker() {
                                             <Crown size={12} className="absolute -top-1.5 -right-1" style={{ color: ACENTO }} />
                                         )}
                                         {j.esBoton && (
-                                            <span className="absolute -bottom-0.5 -right-1 text-[8px] font-black text-black bg-zinc-300 rounded-full w-4 h-4 flex items-center justify-center border border-black">D</span>
+                                            <span className="absolute -bottom-0.5 -right-1 text-[9px] font-black text-black bg-zinc-300 rounded-full w-4 h-4 flex items-center justify-center border border-black">D</span>
                                         )}
                                     </div>
 
@@ -540,7 +540,7 @@ export default function Poker() {
 
                     {/* Resultado de la mano */}
                     {res && (
-                        <div className="bg-[#0a0a0c] border rounded-[24px] p-5 mb-4" style={{ borderColor: ACENTO + '55' }}>
+                        <div className="bg-[#0a0a0c] border rounded-3xl p-5 mb-4" style={{ borderColor: ACENTO + '55' }}>
                             <div className="flex items-center gap-2 mb-3">
                                 <Trophy size={16} style={{ color: ACENTO }} />
                                 <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: ACENTO }}>
@@ -581,7 +581,7 @@ export default function Poker() {
 
                     {/* Mis acciones */}
                     {!terminada && !res && (
-                        <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-4">
+                        <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4">
                             {!m.meToca ? (
                                 <p className="text-center text-[12px] text-zinc-500 py-3">
                                     {yo?.retirado ? 'Te retiraste en esta mano.'

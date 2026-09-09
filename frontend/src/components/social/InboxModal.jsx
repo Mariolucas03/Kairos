@@ -26,7 +26,7 @@ export default function InboxModal({
     const navigate = useNavigate();
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-[32px] p-6 shadow-2xl relative flex flex-col max-h-[70vh]">
+            <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-4xl p-6 shadow-2xl relative flex flex-col max-h-[70vh]">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-bold text-white flex items-center gap-2"><Bell className="text-yellow-500" /> Notificaciones</h2>
                     <button onClick={onClose} className="bg-black/50 p-2 rounded-full text-zinc-500 hover:text-white"><X size={20} /></button>

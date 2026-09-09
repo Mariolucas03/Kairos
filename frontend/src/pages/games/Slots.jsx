@@ -245,7 +245,7 @@ export default function Slots() {
 
                 {/* CONTROLES */}
                 <div className="w-full bg-zinc-900/80 backdrop-blur-md rounded-3xl border border-white/10 p-5 flex flex-col gap-4 shadow-xl">
-                    <div className="bg-black/60 rounded-xl py-3 border border-white/5 text-center h-12 flex items-center justify-center">
+                    <div className="bg-black/60 rounded-xl py-3 border border-white/[0.07] text-center h-12 flex items-center justify-center">
                         {result.won ? (
                             <span className="text-green-400 font-black text-xl animate-pulse">+{result.payout} FICHAS</span>
                         ) : (
@@ -279,7 +279,7 @@ export default function Slots() {
                         <h3 className="text-xl font-black text-white text-center mb-6 uppercase not-italic">Tabla de Pagos</h3>
                         <div className="space-y-2 text-xs text-zinc-300">
                             {PAYTABLE.map(s => (
-                                <div key={s.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-white/5">
+                                <div key={s.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-white/[0.07]">
                                     <div className="flex items-center gap-2">{s.icon} <span className="font-bold text-sm text-zinc-300">3x</span></div>
                                     <span className="font-mono font-black text-white text-lg">x{s.val}</span>
                                 </div>

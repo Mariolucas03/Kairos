@@ -13,7 +13,7 @@ import BackButton from '../components/common/BackButton';
  */
 
 const Bloque = ({ titulo, children }) => (
-    <section className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 mb-3">
+    <section className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 mb-3">
         <h2 className="text-yellow-500 text-[11px] font-black uppercase tracking-widest mb-3">{titulo}</h2>
         <div className="text-zinc-400 text-sm leading-relaxed space-y-2">{children}</div>
     </section>

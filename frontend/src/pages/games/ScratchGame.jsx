@@ -187,8 +187,8 @@ export default function ScratchGame() {
             {/* ZONA DE JUEGO */}
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 relative z-10">
 
-                <div className="bg-[#18181b] border border-white/[0.07] p-1 rounded-[24px] w-full transform transition-all">
-                    <div className="bg-black/90 rounded-[1.8rem] p-6 border border-white/5 relative overflow-hidden flex flex-col gap-6">
+                <div className="bg-[#18181b] border border-white/[0.07] p-1 rounded-3xl w-full transform transition-all">
+                    <div className="bg-black/90 rounded-[1.8rem] p-6 border border-white/[0.07] relative overflow-hidden flex flex-col gap-6">
 
                         {/* CUADRÍCULA */}
                         <div className="grid grid-cols-3 gap-3 aspect-square relative z-10 w-full mx-auto">
@@ -199,7 +199,7 @@ export default function ScratchGame() {
                                     disabled={!isPlaying || revealed[i]}
                                     className={`
                                         relative w-full h-full rounded-xl overflow-hidden transition-all cursor-pointer active:scale-95 
-                                        ${revealed[i] ? 'bg-zinc-900 shadow-[inset_0_0_10px_black] border border-white/5' : 'bg-transparent border-0'}
+                                        ${revealed[i] ? 'bg-zinc-900 shadow-[inset_0_0_10px_black] border border-white/[0.07]' : 'bg-transparent border-0'}
                                     `}
                                 >
                                     <div className="absolute inset-0 flex items-center justify-center">
@@ -313,7 +313,7 @@ export default function ScratchGame() {
                         </div>
                         <div className="space-y-2 mb-4">
                             {winningSymbols.map((s) => (
-                                <div key={s.id} className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                                <div key={s.id} className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/[0.07]">
                                     <div className="text-2xl filter drop-shadow-sm">{s.icon}</div>
                                     <div className="flex items-center gap-1">
                                         <span className={`font-black text-lg ${s.type === 'xp' ? 'text-blue-400' : 'text-yellow-400'}`}>{s.label}</span>

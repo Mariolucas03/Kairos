@@ -62,7 +62,7 @@ export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip,
     };
 
     return (
-        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-[24px] shadow-2xl z-50 ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-3xl shadow-2xl z-50 ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
             {/* QUÉ VIENE AHORA.
 
                 Esta pantalla se mira quince o veinte veces por sesión, y hasta
@@ -107,7 +107,7 @@ export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip,
                                 aria-pressed={esfuerzo === o.valor}
                                 className={`py-2 rounded-xl border text-xs font-black tabular-nums transition-colors ${esfuerzo === o.valor
                                     ? 'bg-yellow-500 border-yellow-500 text-black'
-                                    : 'bg-black border-white/[0.08] text-zinc-400 hover:text-white'}`}
+                                    : 'bg-black border-white/[0.07] text-zinc-400 hover:text-white'}`}
                             >
                                 {o.texto}
                             </button>
@@ -120,7 +120,7 @@ export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip,
             <div className="flex items-center gap-4 pl-2">
                 <div className="flex flex-col items-center min-w-[60px]">
                     <span className="text-4xl font-black text-white font-mono leading-none tabular-nums">{remaining}</span>
-                    <span className="text-[8px] text-zinc-500 font-bold uppercase mt-0.5">Segundos</span>
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">Segundos</span>
                 </div>
                 <div className="h-8 w-[1px] bg-zinc-700"></div>
                 <div className="flex flex-col">

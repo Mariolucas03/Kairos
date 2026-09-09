@@ -32,11 +32,11 @@ export default function SortableWidget({ id, children, className = '', isDragEna
             style={style}
             {...(isDragEnabled ? attributes : {})}
             {...(isDragEnabled ? listeners : {})}
-            className={`${className} relative ${isDragging ? 'shadow-2xl ring-4 ring-yellow-500 rounded-[32px] cursor-grabbing' : (isDragEnabled ? 'cursor-grab transform transition-transform ring-2 ring-yellow-500/50 rounded-[32px]' : '')}`}
+            className={`${className} relative ${isDragging ? 'shadow-2xl ring-4 ring-yellow-500 rounded-4xl cursor-grabbing' : (isDragEnabled ? 'cursor-grab transform transition-transform ring-2 ring-yellow-500/50 rounded-4xl' : '')}`}
         >
             {/* CAPA DE SUPERPOSICIÓN: Modo Edición Visual */}
             {isDragEnabled && !isDragging && (
-                <div className="absolute inset-0 bg-black/60 z-[60] flex items-center justify-center rounded-[32px] backdrop-blur-[2px]">
+                <div className="absolute inset-0 bg-black/60 z-[60] flex items-center justify-center rounded-4xl backdrop-blur-[2px]">
                     <div className="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest shadow-[0_0_15px_rgba(234,179,8,0.5)] flex items-center gap-2 animate-pulse">
                         <Move size={14} /> Mover
                     </div>

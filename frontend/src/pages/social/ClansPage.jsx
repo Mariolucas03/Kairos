@@ -149,7 +149,7 @@ export default function ClansPage() {
             />
 
             {myClan ? (
-                <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 relative overflow-hidden mb-6">
+                <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 relative overflow-hidden mb-6">
                     {/* Acento y halo del sistema, en vez del borron morado */}
                     <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${RANK_CONFIG[myRank].hex || '#a855f7'}, transparent)` }} />
                     <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: RANK_CONFIG[myRank].hex || '#a855f7', opacity: 0.11 }} />
@@ -176,7 +176,7 @@ export default function ClansPage() {
 
                         <div className="flex flex-col items-center text-center pt-1">
                             <div
-                                className="text-[38px] w-[72px] h-[72px] rounded-[24px] bg-[#18181b] border flex items-center justify-center"
+                                className="text-[38px] w-[72px] h-[72px] rounded-3xl bg-[#18181b] border flex items-center justify-center"
                                 style={{ borderColor: (RANK_CONFIG[myRank].hex || '#a1a1aa') + '40' }}
                             >
                                 {myClan.icon}
@@ -214,7 +214,7 @@ export default function ClansPage() {
                             la pantalla. Celdas iguales para que no se descuadren
                             aunque el poder pase de 3 a 6 digitos. */}
                         <div className="grid grid-cols-3 gap-2 mt-5">
-                            <div className="bg-[#18181b] border border-white/[0.07] rounded-[18px] py-3 px-1 text-center min-w-0">
+                            <div className="bg-[#18181b] border border-white/[0.07] rounded-2xl py-3 px-1 text-center min-w-0">
                                 <div className="flex items-center justify-center gap-1.5">
                                     <Zap size={14} fill="currentColor" className="text-purple-400 shrink-0" />
                                     <span className="text-[18px] font-black text-white leading-none tracking-[-0.04em] not-italic truncate">
@@ -224,7 +224,7 @@ export default function ClansPage() {
                                 <span className="block mt-1.5 text-[9px] font-black text-zinc-500 uppercase tracking-[0.16em] not-italic">Poder</span>
                             </div>
 
-                            <div className="bg-[#18181b] border border-white/[0.07] rounded-[18px] py-3 px-1 text-center min-w-0">
+                            <div className="bg-[#18181b] border border-white/[0.07] rounded-2xl py-3 px-1 text-center min-w-0">
                                 <div className="flex items-center justify-center gap-1.5">
                                     <Users size={14} className="text-zinc-300 shrink-0" />
                                     <span className="text-[18px] font-black text-white leading-none tracking-[-0.04em] not-italic">
@@ -234,7 +234,7 @@ export default function ClansPage() {
                                 <span className="block mt-1.5 text-[9px] font-black text-zinc-500 uppercase tracking-[0.16em] not-italic">Miembros</span>
                             </div>
 
-                            <div className="bg-[#18181b] border border-white/[0.07] rounded-[18px] py-3 px-1 text-center min-w-0">
+                            <div className="bg-[#18181b] border border-white/[0.07] rounded-2xl py-3 px-1 text-center min-w-0">
                                 <div className="flex items-center justify-center gap-1.5 min-w-0">
                                     <Crown size={14} className="text-yellow-500 shrink-0" />
                                     <span className="text-[13px] font-black text-white leading-none not-italic truncate">
@@ -292,7 +292,7 @@ export default function ClansPage() {
                     </div>
                 </div>
             ) : (
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-[32px] flex items-center justify-between shadow-xl relative overflow-hidden mb-8">
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-4xl flex items-center justify-between shadow-xl relative overflow-hidden mb-8">
                     <div className="relative z-10">
                         <h3 className="text-white font-black text-lg uppercase flex items-center gap-2"><Crown size={20} className="text-yellow-500" /> Crea tu Clan</h3>
                         <p className="text-xs text-zinc-400 mt-1">Lidera y conquista.</p>
@@ -325,7 +325,7 @@ export default function ClansPage() {
                                 placeholder="Buscar alianza..."
                                 value={clanSearchText}
                                 onChange={(e) => setClanSearchText(e.target.value)}
-                                className="w-full bg-zinc-950 border border-zinc-800 rounded-[24px] p-4 pl-12 text-white focus:border-yellow-500/50 outline-none transition-all placeholder:text-zinc-700 font-bold text-sm"
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-3xl p-4 pl-12 text-white focus:border-yellow-500/50 outline-none transition-all placeholder:text-zinc-700 font-bold text-sm"
                             />
                         </div>
 
@@ -362,12 +362,12 @@ export default function ClansPage() {
             {(showCreateClan || showEditClan) && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => { setShowCreateClan(false); setShowEditClan(false); }} />
-                    <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl relative z-10 animate-in zoom-in-95">
+                    <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-4xl overflow-hidden flex flex-col max-h-[90vh] shadow-2xl relative z-10 animate-in zoom-in-95">
                         <div className="p-5 border-b border-white/10 flex justify-between items-center bg-zinc-950">
                             <h3 className="text-xl font-black text-white flex items-center gap-2 uppercase not-italic">
                                 {showEditClan ? <><Edit className="text-blue-500" /> Editar Clan</> : <><Crown className="text-yellow-500" /> Fundar Clan</>}
                             </h3>
-                            <button onClick={() => { setShowCreateClan(false); setShowEditClan(false); }} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white transition-colors border border-white/5"><X size={20} /></button>
+                            <button onClick={() => { setShowCreateClan(false); setShowEditClan(false); }} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white transition-colors border border-white/[0.07]"><X size={20} /></button>
                         </div>
                         <div className="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar bg-black/20">
                             <div>

@@ -210,7 +210,7 @@ export default function BlackJack() {
             {/* MODAL RESULTADO */}
             {resultModal && (
                 <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
-                    <div className={`w-full max-w-xs rounded-[32px] p-8 text-center border-2 shadow-2xl relative ${resultModal.type === 'win' ? 'bg-green-900/40 border-green-500' : resultModal.type === 'lose' ? 'bg-red-900/40 border-red-500' : 'bg-zinc-900 border-zinc-500'}`}>
+                    <div className={`w-full max-w-xs rounded-4xl p-8 text-center border-2 shadow-2xl relative ${resultModal.type === 'win' ? 'bg-green-900/40 border-green-500' : resultModal.type === 'lose' ? 'bg-red-900/40 border-red-500' : 'bg-zinc-900 border-zinc-500'}`}>
                         <div className="mb-6 flex justify-center">
                             <div className={`p-6 rounded-full border-4 shadow-xl ${resultModal.type === 'win' ? 'bg-green-500 border-green-300' : resultModal.type === 'lose' ? 'bg-red-500 border-red-300' : 'bg-zinc-600 border-zinc-400'}`}>
                                 {resultModal.type === 'win' && <Trophy size={48} className="text-white animate-bounce" />}
@@ -244,9 +244,9 @@ export default function BlackJack() {
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
                         <h3 className="text-xl font-black text-white text-center mb-4 uppercase not-italic">Reglas Blackjack</h3>
                         <div className="space-y-2 text-xs text-zinc-300">
-                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Blackjack (A+10/J/Q/K)</span><span className="font-bold text-yellow-400">x2.5</span></div>
-                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Victoria Normal</span><span className="font-bold text-green-400">x2</span></div>
-                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/5"><span>Empate</span><span className="font-bold text-zinc-400">Recuperas</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/[0.07]"><span>Blackjack (A+10/J/Q/K)</span><span className="font-bold text-yellow-400">x2.5</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/[0.07]"><span>Victoria Normal</span><span className="font-bold text-green-400">x2</span></div>
+                            <div className="flex justify-between bg-black/50 p-2 rounded border border-white/[0.07]"><span>Empate</span><span className="font-bold text-zinc-400">Recuperas</span></div>
                         </div>
                         <div className="mt-4 p-3 bg-green-900/20 rounded-xl border border-green-500/20 text-[10px] text-green-200 leading-relaxed text-center">El crupier debe pedir carta hasta sumar <strong>17</strong> o más.</div>
                     </div>

@@ -144,7 +144,7 @@ export default function MapaActividad({ semanas = 26 }) {
         <div className="flex gap-2">
             <div className="flex flex-col gap-[3px] pt-[1px] shrink-0" style={{ width: lado }}>
                 {DIAS_SEMANA.map((d, i) => (
-                    <span key={i} className="text-[8px] text-zinc-700 font-bold" style={{ height: lado, lineHeight: lado + 'px' }}>{d}</span>
+                    <span key={i} className="text-[9px] text-zinc-700 font-bold" style={{ height: lado, lineHeight: lado + 'px' }}>{d}</span>
                 ))}
             </div>
             <div ref={ref} className="flex-1 overflow-x-auto no-scrollbar">
@@ -224,11 +224,11 @@ export default function MapaActividad({ semanas = 26 }) {
                     salian cortadas ("N..." y "DIA COMP..."), que es peor que no
                     ponerlas. */}
                 <div className="relative z-10 flex items-center justify-center gap-1.5 mt-3">
-                    <span className="text-[8px] text-zinc-600 font-bold uppercase mr-0.5">Nada</span>
+                    <span className="text-[9px] text-zinc-600 font-bold uppercase mr-0.5">Nada</span>
                     {COLORES.map((c, i) => (
                         <div key={i} className="w-[10px] h-[10px] rounded-[2px] shrink-0" style={{ backgroundColor: c }} />
                     ))}
-                    <span className="text-[8px] text-zinc-600 font-bold uppercase ml-0.5">Día completo</span>
+                    <span className="text-[9px] text-zinc-600 font-bold uppercase ml-0.5">Día completo</span>
                 </div>
 
                 <p className="relative z-10 text-[9px] text-zinc-700 font-bold uppercase tracking-wide text-center mt-1.5">
@@ -244,7 +244,7 @@ export default function MapaActividad({ semanas = 26 }) {
                 >
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setAbierto(false)} />
 
-                    <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-white/10 rounded-[28px] p-5 shadow-2xl shadow-black/70 max-h-[85vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200">
+                    <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-white/10 rounded-3xl p-5 shadow-2xl shadow-black/70 max-h-[85vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200">
 
                         <div className="flex items-start justify-between mb-4">
                             <div>
@@ -267,7 +267,7 @@ export default function MapaActividad({ semanas = 26 }) {
                             <Cifra icono={Target} color="#f43f5e" valor={resumen.misiones} etiqueta="Misiones" pie="completadas" />
                         </div>
 
-                        <div className="bg-black border border-white/[0.06] rounded-[20px] p-4 mb-5">
+                        <div className="bg-black border border-white/[0.07] rounded-2xl p-4 mb-5">
                             <div className="flex items-baseline justify-between mb-3">
                                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">El mapa</span>
                                 <span className="text-[10px] font-black" style={{ color: ACENTO }}>
@@ -286,7 +286,7 @@ export default function MapaActividad({ semanas = 26 }) {
                             <p className="text-[12px] text-zinc-400 leading-relaxed">
                                 No cuenta solo entrenos. Cada día suma puntos:
                             </p>
-                            <div className="bg-black border border-white/[0.06] rounded-2xl p-3 mt-2 space-y-1.5">
+                            <div className="bg-black border border-white/[0.07] rounded-2xl p-3 mt-2 space-y-1.5">
                                 {[
                                     ['Cada entreno', '2 puntos'],
                                     ['Cada misión completada', '1 punto'],
@@ -329,7 +329,7 @@ export default function MapaActividad({ semanas = 26 }) {
 }
 
 const Cifra = ({ icono: Icono, color, valor, etiqueta, pie }) => (
-    <div className="bg-black border border-white/[0.06] rounded-[18px] p-3">
+    <div className="bg-black border border-white/[0.07] rounded-2xl p-3">
         <Icono size={13} style={{ color }} />
         <p className="text-xl font-black text-white mt-1 leading-none tabular-nums">{valor}</p>
         <p className="text-[9px] font-black text-zinc-400 uppercase tracking-wide mt-1.5">{etiqueta}</p>

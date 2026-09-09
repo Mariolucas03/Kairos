@@ -21,7 +21,7 @@ export default function ConfirmDialog({
     return createPortal(
         <div className="fixed inset-0 flex items-center justify-center p-6 animate-in fade-in duration-200" style={{ zIndex: Z.confirm }}>
             <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={onCancel} />
-            <div className="bg-[#09090b] border border-white/10 w-full max-w-xs rounded-[24px] p-6 shadow-2xl text-center relative z-10 animate-in zoom-in-95">
+            <div className="bg-[#09090b] border border-white/10 w-full max-w-xs rounded-3xl p-6 shadow-2xl text-center relative z-10 animate-in zoom-in-95">
                 <div className="flex justify-center mb-4 text-yellow-500"><AlertTriangle size={40} /></div>
                 <h3 className="text-white font-bold text-lg mb-2">{title}</h3>
                 <p className="text-zinc-400 text-sm mb-6">{message}</p>

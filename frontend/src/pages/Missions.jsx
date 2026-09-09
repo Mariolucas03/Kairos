@@ -165,8 +165,8 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     };
 
     let bgAction = 'bg-transparent';
-    if (dragX > 0) bgAction = 'bg-emerald-900/50 border border-emerald-500/30 rounded-[24px]';
-    else if (dragX < 0) bgAction = 'bg-red-900/50 border border-red-500/30 rounded-[24px]';
+    if (dragX > 0) bgAction = 'bg-emerald-900/50 border border-emerald-500/30 rounded-3xl';
+    else if (dragX < 0) bgAction = 'bg-red-900/50 border border-red-500/30 rounded-3xl';
 
     const progressPercent = mission.target > 0 ? Math.min((mission.progress / mission.target) * 100, 100) : 0;
 
@@ -192,7 +192,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     return (
         <div className="relative w-full mb-4 select-none group" onClick={() => viewAllMode && onEdit(mission)}>
             {canSwipe && (
-                <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-[24px] border ${bgAction}`}>
+                <div className={`absolute inset-0 flex items-center justify-between px-6 transition-colors z-0 rounded-3xl border ${bgAction}`}>
                     {dragX > 0 && <div className="flex items-center gap-2 text-emerald-400 font-black text-sm"><Check size={24} /> COMPLETAR</div>}
                     {dragX < 0 && <div className="flex items-center gap-2 text-red-400 font-black text-sm">ELIMINAR <Trash2 size={24} /></div>}
                 </div>
@@ -200,7 +200,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
 
             <div
                 style={cardStyle}
-                className={`relative rounded-[24px] overflow-hidden z-10 will-change-transform bg-[#0a0a0c] border border-white/[0.07] ${isPending ? 'opacity-70' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.985]' : ''} ${mission.completed ? 'opacity-60' : 'opacity-100'}`}
+                className={`relative rounded-3xl overflow-hidden z-10 will-change-transform bg-[#0a0a0c] border border-white/[0.07] ${isPending ? 'opacity-70' : ''} ${viewAllMode ? 'cursor-pointer active:scale-[0.985]' : ''} ${mission.completed ? 'opacity-60' : 'opacity-100'}`}
                 onTouchStart={(e) => handleStart(e.targetTouches[0].clientX)}
                 onTouchMove={(e) => handleMove(e.targetTouches[0].clientX)}
                 onTouchEnd={handleEnd}
@@ -248,7 +248,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                             color: es la que decide cuánta vida te quita. */}
                         <div className="flex items-center flex-wrap gap-1.5 mt-2">
                             <span
-                                className="text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-[8px] border not-italic"
+                                className="text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-xl border not-italic"
                                 style={{
                                     color: styles.color,
                                     background: `${styles.color}1f`,
@@ -257,18 +257,18 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                             >
                                 {styles.label}
                             </span>
-                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] text-zinc-500 not-italic">
+                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.1em] px-2 py-1 rounded-xl border border-white/[0.07] bg-white/[0.03] text-zinc-500 not-italic">
                                 {mission.type === 'habit' ? <><Repeat size={9} /> Hábito</> : <><Flag size={9} /> Puntual</>}
                             </span>
 
                             {/* Días en los que toca: antes no había forma de saberlo
                                 sin abrir el modo gestión y editar la misión. */}
                             {mission.frequency === 'daily' && mission.specificDays?.length > 0 && (
-                                <span className="flex items-center gap-1 px-1.5 py-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03]">
+                                <span className="flex items-center gap-1 px-1.5 py-1 rounded-xl border border-white/[0.07] bg-white/[0.03]">
                                     {[1, 2, 3, 4, 5, 6, 0].map(d => (
                                         <span
                                             key={d}
-                                            className={`w-[13px] h-[13px] rounded-full flex items-center justify-center text-[8px] font-black not-italic ${mission.specificDays.includes(d) ? 'bg-zinc-600 text-white' : 'text-zinc-700'}`}
+                                            className={`w-[13px] h-[13px] rounded-full flex items-center justify-center text-[9px] font-black not-italic ${mission.specificDays.includes(d) ? 'bg-zinc-600 text-white' : 'text-zinc-700'}`}
                                         >
                                             {DAY_LABELS[d]}
                                         </span>
@@ -293,7 +293,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }}
                                     aria-label="Añadir progreso"
-                                    className="w-9 h-9 shrink-0 rounded-[12px] flex items-center justify-center active:scale-90 transition-transform"
+                                    className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center active:scale-90 transition-transform"
                                     style={{ background: `${styles.color}1f`, color: styles.color }}
                                 >
                                     <Plus size={17} strokeWidth={2.6} />
@@ -318,7 +318,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                         )}
 
                         {/* Pie: recompensas y castigo */}
-                        <div className="flex gap-4 mt-3 pt-3 border-t border-white/[0.05] relative z-10 items-center">
+                        <div className="flex gap-4 mt-3 pt-3 border-t border-white/[0.07] relative z-10 items-center">
                             <div className="flex items-center gap-3">
                                 {mission.xpReward > 0 && (
                                     <div className="flex items-center gap-1"><span className={`text-[12px] font-black not-italic ${mission.completed ? 'text-zinc-600' : 'text-zinc-300'}`}>+{mission.xpReward}</span><img src={ICON_XP} className={`w-5 h-5 object-contain ${mission.completed ? 'grayscale opacity-50' : ''}`} alt="XP" /></div>
@@ -346,7 +346,7 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                     </div>
 
                     {isPending && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-[22px] z-30">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-2xl z-30">
                             <Loader2 className="animate-spin text-zinc-500 mb-2" /><span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Esperando compañero...</span>
                             {/* Llamaba a `onDelete`, que NO es una prop de este
                                 componente: pulsarlo reventaba con ReferenceError.
@@ -564,7 +564,7 @@ export default function Missions() {
                 )}
 
                 {viewAllMode && (
-                    <div className="bg-blue-950/20 border border-blue-500/30 p-3 rounded-[18px] text-center mt-[18px]">
+                    <div className="bg-blue-950/20 border border-blue-500/30 p-3 rounded-2xl text-center mt-[18px]">
                         <p className="text-[10px] text-blue-300 font-black uppercase tracking-[0.1em] not-italic">Toca una misión para editarla · la papelera la borra</p>
                     </div>
                 )}
@@ -594,7 +594,7 @@ export default function Missions() {
 
             {showEditModal && missionToEdit && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in">
-                    <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                    <div className="bg-[#09090b] w-full max-w-sm rounded-4xl border border-zinc-800 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
                         <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2"><Edit size={18} className="text-yellow-500" /> Editar</h2><button onClick={() => setShowEditModal(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><X size={18} /></button></div>
                         <div className="space-y-4">
                             <div><label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label><input type="text" value={missionToEdit.title} onChange={e => setMissionToEdit({ ...missionToEdit, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-white font-bold text-sm outline-none focus:border-yellow-500/50" /></div>
@@ -610,7 +610,7 @@ export default function Missions() {
 
             {showCreator && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="bg-[#09090b] w-full max-w-sm rounded-[32px] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">
+                    <div className="bg-[#09090b] w-full max-w-sm rounded-4xl border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col h-full sm:h-auto max-h-[85vh]">
                         <div className="flex justify-between items-center p-5 border-b border-zinc-800/50 bg-[#09090b] shrink-0 z-10"><h2 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2"><Plus size={18} className="text-yellow-500" /> Nueva Misión</h2><button onClick={handleCloseCreator} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-zinc-800 transition-colors"><X size={18} /></button></div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4 bg-black/20">
                             <div className="mt-2"><label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest pl-1 mb-1 block">Título</label><input type="text" placeholder="Ej: Leer 10 páginas" autoFocus value={newMission.title} onChange={e => setNewMission({ ...newMission, title: e.target.value })} className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-white placeholder-zinc-700 outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 transition-all font-bold text-sm" /></div>

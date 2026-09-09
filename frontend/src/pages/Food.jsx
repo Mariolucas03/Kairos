@@ -277,7 +277,7 @@ export default function Food() {
 
             {/* TARJETA DE MACROS */}
             <div className="px-4">
-                <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-[26px] p-[18px] overflow-hidden">
+                <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-[18px] overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${acentoComida}, transparent)` }} />
                     <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: acentoComida }} />
 
@@ -352,7 +352,7 @@ export default function Food() {
                     return (
                         <div
                             key={meal._id}
-                            className={`relative bg-[#0a0a0c] rounded-[24px] overflow-hidden ${vacia ? 'border-2 border-dashed border-white/[0.12]' : 'border border-white/[0.07]'}`}
+                            className={`relative bg-[#0a0a0c] rounded-3xl overflow-hidden ${vacia ? 'border-2 border-dashed border-white/10' : 'border border-white/[0.07]'}`}
                         >
                             {!vacia && (
                                 <>
@@ -383,7 +383,7 @@ export default function Food() {
                                 <button
                                     onClick={() => handleOpenAdd(meal._id, meal.name)}
                                     aria-label={`Añadir a ${meal.name}`}
-                                    className="w-[38px] h-[38px] rounded-[13px] flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+                                    className="w-[38px] h-[38px] rounded-xl flex items-center justify-center shrink-0 active:scale-90 transition-transform"
                                     style={{ background: `${tono}1f`, color: tono }}
                                 >
                                     <Plus size={19} strokeWidth={2.6} />
@@ -392,7 +392,7 @@ export default function Food() {
 
                             {/* Lista de alimentos */}
                             {!vacia && (
-                                <div className="relative z-10 border-t border-white/[0.05]">
+                                <div className="relative z-10 border-t border-white/[0.07]">
                                     {meal.foods.map((item, idx) => (
                                         <div key={item._id || idx} className="flex justify-between items-center gap-3 px-[18px] py-3 border-b border-white/[0.04] last:border-0">
                                             <div className="flex-1 min-w-0">
@@ -446,7 +446,7 @@ export default function Food() {
             {/* Modal Configuración (IA / Manual) */}
             {configModal.show && createPortal(
                 <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-zinc-950 border border-zinc-800 rounded-[32px] w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-4xl w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
 
                         <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">

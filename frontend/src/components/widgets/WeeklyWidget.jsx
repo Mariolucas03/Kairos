@@ -53,7 +53,7 @@ export function WeeklyHistoryModal({ onClose }) {
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
             <div
-                className="bg-[#09090b] border border-white/10 w-[95%] max-w-4xl rounded-[40px] p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar z-10"
+                className="bg-[#09090b] border border-white/10 w-[95%] max-w-4xl rounded-4xl p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar z-10"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -62,7 +62,7 @@ export function WeeklyHistoryModal({ onClose }) {
                     <h2 className="text-2xl font-black text-white uppercase flex items-center gap-3 tracking-tighter not-italic">
                         HISTÓRICO <span style={{ color: accent }}>VOLUMEN</span>
                     </h2>
-                    <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                    <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                         <X size={20} />
                     </button>
                 </div>
@@ -84,7 +84,7 @@ export function WeeklyHistoryModal({ onClose }) {
                     ))}
                 </div>
 
-                <div className="bg-zinc-900/30 rounded-[32px] p-6 border border-white/5 relative h-64 w-full flex items-center justify-center flex-col gap-4 text-zinc-600 shrink-0">
+                <div className="bg-zinc-900/30 rounded-4xl p-6 border border-white/[0.07] relative h-64 w-full flex items-center justify-center flex-col gap-4 text-zinc-600 shrink-0">
                     <BarChart3 size={64} className="opacity-20" />
                     <span className="uppercase font-black tracking-widest text-sm opacity-50 not-italic">
                         Gráfica de {selectedMuscle} - {selectedYear}

@@ -270,7 +270,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                         {author.username}
                     </button>
                     <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>Lvl {author.level}</span>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>Lvl {author.level}</span>
                         <span className="text-[9px] text-zinc-500 font-bold">{timeAgo(post.date)}</span>
                     </div>
                 </div>
@@ -278,14 +278,14 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                 {soyElAutor && (
                     <button
                         onClick={() => setConfirmarBorrado(true)}
-                        className="p-2 rounded-xl bg-zinc-900 border border-white/5 text-zinc-600 hover:text-red-400 active:scale-95 transition-all"
+                        className="p-2 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-600 hover:text-red-400 active:scale-95 transition-all"
                         title="Borrar publicación"
                     >
                         <Trash2 size={15} />
                     </button>
                 )}
 
-                <div className={`p-2 rounded-xl ${isGym ? 'bg-yellow-500/10 text-yellow-500' : 'bg-lime-500/10 text-lime-400'} border border-white/5`}>
+                <div className={`p-2 rounded-xl ${isGym ? 'bg-yellow-500/10 text-yellow-500' : 'bg-lime-500/10 text-lime-400'} border border-white/[0.07]`}>
                     {isGym ? <Dumbbell size={16} /> : <Activity size={16} />}
                 </div>
             </div>
@@ -364,7 +364,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                         </div>
 
                                         {resumenEjercicios.comparacion && (
-                                            <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                            <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07]">
                                                 <span className="text-lg leading-none">{resumenEjercicios.comparacion.emoji}</span>
                                                 <span className="text-[11px] font-black text-white uppercase tracking-tight leading-tight not-italic">
                                                     {soyElAutor ? 'Has levantado' : 'Ha levantado'} {resumenEjercicios.comparacion.cosa}
@@ -385,13 +385,13 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                                         key={idx}
                                                         className={`rounded-xl px-3 py-2 ${record
                                                             ? 'border-2 border-yellow-500 bg-yellow-500/[0.08]'
-                                                            : 'border border-white/5 bg-zinc-900/60'}`}
+                                                            : 'border border-white/[0.07] bg-zinc-900/60'}`}
                                                     >
                                                         <div className="flex items-center justify-between mb-1 gap-2">
                                                             <span className={`text-[12px] font-black uppercase truncate ${record ? 'text-yellow-400' : 'text-white'}`}>{ex.name}</span>
                                                             <div className="flex items-center gap-1.5 shrink-0">
                                                                 {record && (
-                                                                    <span className="flex items-center gap-0.5 text-[8px] font-black text-black bg-yellow-500 px-1.5 py-0.5 rounded uppercase">
+                                                                    <span className="flex items-center gap-0.5 text-[9px] font-black text-black bg-yellow-500 px-1.5 py-0.5 rounded uppercase">
                                                                         <Trophy size={8} /> PR
                                                                     </span>
                                                                 )}
@@ -431,7 +431,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                                                         ? 'text-purple-300 bg-purple-500/10 border-purple-500/30'
                                                                         : esTop
                                                                             ? 'text-white bg-white/10 border-white/20'
-                                                                            : 'text-zinc-400 bg-black border-white/5'}`}>
+                                                                            : 'text-zinc-400 bg-black border-white/[0.07]'}`}>
                                                                         {s.weight > 0 ? `${s.weight}kg × ${s.reps}` : `${s.reps} reps`}
                                                                     </span>
                                                                 );

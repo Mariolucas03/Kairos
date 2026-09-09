@@ -55,7 +55,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
     const modalContent = (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => setIsOpen(false)} />
-            <div className="bg-zinc-950 w-full max-w-lg h-[80vh] rounded-[32px] border border-white/10 shadow-2xl flex flex-col relative overflow-hidden animate-in zoom-in-95 z-10">
+            <div className="bg-zinc-950 w-full max-w-lg h-[80vh] rounded-4xl border border-white/10 shadow-2xl flex flex-col relative overflow-hidden animate-in zoom-in-95 z-10">
                 <div className="bg-zinc-950 p-5 border-b border-white/10 relative shrink-0 z-30">
                     <button onClick={() => setIsOpen(false)} className="absolute top-4 right-4 bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white"><X size={20} /></button>
                     <div className="text-center mt-1">
@@ -82,7 +82,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                                     <div className={`absolute left-3 top-1/2 -translate-y-1/2 font-black text-lg opacity-30 ${rankColor}`}>#{index + 1}</div>
                                     <div className="flex items-center gap-3 flex-1 min-w-0 pl-8">
                                         <div className="relative flex-shrink-0">
-                                            <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-xs font-black text-zinc-500 border border-white/5 overflow-hidden">
+                                            <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-xs font-black text-zinc-500 border border-white/[0.07] overflow-hidden">
                                                 {member.avatar ? <img src={member.avatar} className="w-full h-full object-cover" alt="av" /> : member.username?.charAt(0)}
                                             </div>
                                             <MarcoPerfil marco={member.frame} tamano={52} />
@@ -94,7 +94,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                                     </div>
                                     <div className="flex flex-col items-end">
                                         <span className="text-xs font-black text-white">{(member.weeklyContribution || 0).toLocaleString()}</span>
-                                        <span className={`text-[8px] font-bold uppercase ${config.color}`}>{config.unit}</span>
+                                        <span className={`text-[9px] font-bold uppercase ${config.color}`}>{config.unit}</span>
                                     </div>
                                 </div>
                             );

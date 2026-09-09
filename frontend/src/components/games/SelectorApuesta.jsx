@@ -119,12 +119,12 @@ export default function SelectorApuesta({
                 </span>
             </div>
 
-            <div className="flex items-center gap-2 bg-black border border-white/[0.08] rounded-2xl p-1.5">
+            <div className="flex items-center gap-2 bg-black border border-white/[0.07] rounded-2xl p-1.5">
                 <button
                     type="button"
                     onClick={() => fijar((parseInt(texto, 10) || minimo) - paso)}
                     aria-label="Bajar la apuesta"
-                    className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.06] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform hover:text-white"
+                    className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform hover:text-white"
                 >
                     <Minus size={18} />
                 </button>
@@ -145,7 +145,7 @@ export default function SelectorApuesta({
                     type="button"
                     onClick={() => fijar((parseInt(texto, 10) || minimo) + paso)}
                     aria-label="Subir la apuesta"
-                    className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.06] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform hover:text-white"
+                    className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform hover:text-white"
                 >
                     <Plus size={18} />
                 </button>
@@ -159,7 +159,7 @@ export default function SelectorApuesta({
                         onClick={() => fijar(v)}
                         className={`py-2 rounded-xl border text-xs font-black tabular-nums transition-colors ${valor === v
                             ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-500'
-                            : 'bg-zinc-900 border-white/[0.06] text-zinc-400 hover:text-white'}`}
+                            : 'bg-zinc-900 border-white/[0.07] text-zinc-400 hover:text-white'}`}
                     >
                         {v}
                     </button>

@@ -42,10 +42,10 @@ export default function ClanMemberCard({
             ? { color: 'text-zinc-300', ring: 'border-zinc-500/30 bg-[#0a0a0c]' }
             : position === 3
                 ? { color: 'text-orange-400', ring: 'border-orange-600/30 bg-[#0a0a0c]' }
-                : { color: 'text-zinc-600', ring: 'border-white/5 bg-zinc-950' };
+                : { color: 'text-zinc-600', ring: 'border-white/[0.07] bg-zinc-950' };
 
     return (
-        <div className={`rounded-[20px] border p-3 mb-2 relative overflow-hidden transition-all ${podio.ring} ${isMe ? 'ring-1 ring-white/15' : ''}`}>
+        <div className={`rounded-2xl border p-3 mb-2 relative overflow-hidden transition-all ${podio.ring} ${isMe ? 'ring-1 ring-white/15' : ''}`}>
             <div className="flex items-center gap-3">
                 {/* Posición */}
                 <div className={`w-6 shrink-0 text-center font-black text-sm ${podio.color}`}>
@@ -72,14 +72,14 @@ export default function ClanMemberCard({
                             <span className={`text-sm font-black truncate uppercase tracking-tight ${member.clanRank === 'dios' ? 'text-yellow-400' : 'text-white'}`}>
                                 {member.username}
                             </span>
-                            {isMe && <span className="text-[7px] bg-white/20 text-white px-1 py-0.5 rounded font-bold shrink-0">TÚ</span>}
+                            {isMe && <span className="text-[9px] bg-white/20 text-white px-1 py-0.5 rounded font-bold shrink-0">TÚ</span>}
                         </div>
 
                         <div className="flex items-center gap-1.5 mt-1">
-                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase ${getLevelStyle(member.level || 1)}`}>
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getLevelStyle(member.level || 1)}`}>
                                 Lvl {member.level}
                             </span>
-                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider flex items-center gap-0.5 ${rankData.color}`}>
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider flex items-center gap-0.5 ${rankData.color}`}>
                                 {member.clanRank === 'dios' ? <Crown size={8} strokeWidth={3} /> : <Shield size={8} />}
                                 {rankData.label}
                             </span>
@@ -92,7 +92,7 @@ export default function ClanMemberCard({
                     <span className="text-sm font-black text-white leading-none">
                         {contribution >= 1000 ? `${(contribution / 1000).toFixed(1)}k` : contribution.toLocaleString()}
                     </span>
-                    <span className="text-[7px] font-bold text-zinc-600 uppercase tracking-wider mt-0.5">{unit || 'aporte'}</span>
+                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider mt-0.5">{unit || 'aporte'}</span>
                     <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/10 mt-1.5">
                         <div
                             className={`h-full rounded-full transition-all duration-700 ${position === 1 ? 'bg-yellow-500' : 'bg-zinc-500'}`}
@@ -104,7 +104,7 @@ export default function ClanMemberCard({
 
             {/* Controles del líder */}
             {canManage && (
-                <div className="flex items-center justify-end gap-2 mt-2.5 pt-2.5 border-t border-white/5">
+                <div className="flex items-center justify-end gap-2 mt-2.5 pt-2.5 border-t border-white/[0.07]">
                     <div className="relative">
                         <select
                             className="bg-zinc-900 text-[9px] text-zinc-300 font-bold py-1 pl-2 pr-5 rounded-lg border border-zinc-700 outline-none appearance-none"

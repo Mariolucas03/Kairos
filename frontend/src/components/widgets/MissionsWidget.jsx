@@ -67,7 +67,7 @@ export default function MissionsWidget({
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
-                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
+                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -76,7 +76,7 @@ export default function MissionsWidget({
                             <h2 className="text-2xl font-black text-white uppercase tracking-[-0.045em] flex items-center gap-2 pr-2 not-italic">
                                 MIS <span style={{ color: accent }}>MISIONES</span>
                             </h2>
-                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -97,7 +97,7 @@ export default function MissionsWidget({
                                             <div
                                                 key={m._id}
                                                 onClick={() => { setIsOpen(false); navigate('/missions'); }}
-                                                className="relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] p-3.5 cursor-pointer active:scale-[0.985] transition-transform"
+                                                className="relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-3.5 cursor-pointer active:scale-[0.985] transition-transform"
                                             >
                                                 <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${tono}, transparent)` }} />
                                                 <div className="flex items-center justify-between gap-2">
@@ -147,7 +147,7 @@ export default function MissionsWidget({
                                             ) : (
                                                 <div className="flex w-full gap-2">
                                                     {m.xpReward > 0 && (
-                                                        <span className="flex-1 text-center bg-zinc-900/50 border border-white/5 rounded py-1 text-[10px] font-bold text-zinc-300 flex items-center justify-center gap-1">
+                                                        <span className="flex-1 text-center bg-zinc-900/50 border border-white/[0.07] rounded py-1 text-[10px] font-bold text-zinc-300 flex items-center justify-center gap-1">
                                                             <Star size={10} className="text-blue-400" /> +{m.xpReward} XP
                                                         </span>
                                                     )}

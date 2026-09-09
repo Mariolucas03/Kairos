@@ -42,7 +42,7 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
 
                     <div
                         onClick={() => setIsOpen(true)}
-                        className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0 cursor-pointer"
+                        className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 cursor-pointer"
                         style={{ background: 'rgba(234,179,8,0.12)', color: accent }}
                     >
                         <Dumbbell size={22} />
@@ -82,7 +82,7 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
-                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
+                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -91,7 +91,7 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
                             <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2 not-italic">
                                 DETALLE <span style={{ color: accent }}>GYM</span>
                             </h2>
-                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -117,19 +117,19 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
 
                         {hasWorkout ? (
                             <div className="flex flex-col gap-4 relative z-10 overflow-y-auto custom-scrollbar pr-1 flex-1">
-                                <div className="bg-zinc-900/50 p-6 rounded-[24px] border border-white/5 text-center relative overflow-hidden shrink-0">
+                                <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/[0.07] text-center relative overflow-hidden shrink-0">
                                     <h3 className="text-2xl font-black text-white uppercase leading-none mb-1 not-italic">{modalName}</h3>
 
                                     <div className="flex justify-center gap-2 mt-4">
-                                        <div className="bg-black/40 px-3 py-2 rounded-xl border border-white/5 flex flex-col min-w-[70px]">
+                                        <div className="bg-black/40 px-3 py-2 rounded-xl border border-white/[0.07] flex flex-col min-w-[70px]">
                                             <span className="text-[9px] text-zinc-500 font-bold uppercase flex items-center justify-center gap-1"><Clock size={10} /> Tiempo</span>
                                             <span className="text-lg font-black text-white">{modalDuration}m</span>
                                         </div>
-                                        <div className="bg-black/40 px-3 py-2 rounded-xl border border-white/5 flex flex-col min-w-[70px]">
+                                        <div className="bg-black/40 px-3 py-2 rounded-xl border border-white/[0.07] flex flex-col min-w-[70px]">
                                             <span className="text-[9px] text-zinc-500 font-bold uppercase flex items-center justify-center gap-1"><Flame size={10} /> Kcal</span>
                                             <span className="text-lg font-black" style={{ color: accent }}>{modalKcal}</span>
                                         </div>
-                                        <div className="bg-black/40 px-3 py-2 rounded-xl border border-white/5 flex flex-col min-w-[70px]">
+                                        <div className="bg-black/40 px-3 py-2 rounded-xl border border-white/[0.07] flex flex-col min-w-[70px]">
                                             <span className="text-[9px] text-zinc-500 font-bold uppercase flex items-center justify-center gap-1"><Activity size={10} /> Vol.</span>
                                             <span className="text-lg font-black text-white">{f(totalVolume)}KG</span>
                                         </div>

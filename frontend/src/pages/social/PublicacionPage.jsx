@@ -52,7 +52,7 @@ export default function PublicacionPage() {
                 <button
                     onClick={() => navigate(-1)}
                     aria-label="Volver"
-                    className="w-10 h-10 rounded-2xl bg-zinc-900 border border-white/[0.06] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform"
+                    className="w-10 h-10 rounded-2xl bg-zinc-900 border border-white/[0.07] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform"
                 >
                     <ArrowLeft size={18} />
                 </button>

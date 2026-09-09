@@ -75,7 +75,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                     <h3 className="text-lime-500 text-xs font-black uppercase tracking-widest mb-3 px-1">Hoy</h3>
                     <div className="space-y-2">
                         {hoy.map((s, i) => (
-                            <div key={i} className="bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] p-3 flex items-center justify-between gap-3">
+                            <div key={i} className="bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-3 flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className="w-10 h-10 rounded-xl bg-lime-500/10 flex items-center justify-center text-lime-400 border border-lime-500/20 shrink-0">
                                         <Activity size={18} />
@@ -89,7 +89,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                                 </div>
                                 <div className="text-right shrink-0">
                                     <p className="text-base font-black text-white leading-none">{Math.round(s.caloriesBurned)}</p>
-                                    <p className="text-[8px] font-bold text-orange-500 uppercase">kcal</p>
+                                    <p className="text-[9px] font-bold text-orange-500 uppercase">kcal</p>
                                 </div>
                             </div>
                         ))}
@@ -105,7 +105,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar deporte..."
-                    className="w-full min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] py-3 pl-11 pr-4 text-white text-sm font-bold outline-none focus:border-lime-500/40 transition-colors placeholder:text-zinc-700"
+                    className="w-full min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-2xl py-3 pl-11 pr-4 text-white text-sm font-bold outline-none focus:border-lime-500/40 transition-colors placeholder:text-zinc-700"
                 />
             </div>
 
@@ -127,7 +127,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                                        tarjeta quedaba 12 px más alta que la de al lado: la
                                        fila entera salía torcida. Medido en pantalla: había
                                        tarjetas de 77 px y de 89 conviviendo. */
-                                    className="h-[84px] bg-[#0a0a0c] border border-white/[0.07] rounded-[18px] px-1.5 flex flex-col items-center justify-center gap-1.5 hover:border-lime-500/40 active:scale-95 transition-all"
+                                    className="h-[84px] bg-[#0a0a0c] border border-white/[0.07] rounded-2xl px-1.5 flex flex-col items-center justify-center gap-1.5 hover:border-lime-500/40 active:scale-95 transition-all"
                                 >
                                     {/* El emoji también con caja fija: los hay más altos que
                                         otros y sin esto empujan el nombre hacia abajo. */}
@@ -159,7 +159,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                    cuadra en cualquier alto de pantalla. */
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[200] flex items-center justify-center p-4 animate-in fade-in">
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setElegido(null)} />
-                    <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-lime-500/20 rounded-[28px] p-5 shadow-2xl shadow-black/70 animate-in zoom-in-95 fade-in duration-200 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                    <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-lime-500/20 rounded-3xl p-5 shadow-2xl shadow-black/70 animate-in zoom-in-95 fade-in duration-200 max-h-[85vh] overflow-y-auto custom-scrollbar">
 
                         <div className="flex items-center justify-between mb-5">
                             <div className="flex items-center gap-3 min-w-0">

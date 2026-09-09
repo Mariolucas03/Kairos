@@ -4,7 +4,7 @@ import MarcoPerfil from '../common/MarcoPerfil';
 
 export default function RankingItem({ player, index, isMe, isViewable, onViewProfile, metricLabel = 'XP' }) {
     let rankIcon = <span className="font-bold text-sm text-zinc-500">#{index + 1}</span>;
-    let rankStyles = "border-white/5 bg-zinc-950";
+    let rankStyles = "border-white/[0.07] bg-zinc-950";
     let textStyle = "text-white";
 
     if (index === 0) {
@@ -28,7 +28,7 @@ export default function RankingItem({ player, index, isMe, isViewable, onViewPro
     const clickable = isViewable && !isMe;
 
     return (
-        <div className={`flex items-center justify-between p-4 rounded-[24px] border mb-2 relative overflow-hidden group ${rankStyles} ${isMe ? 'ring-1 ring-white/20' : ''}`}>
+        <div className={`flex items-center justify-between p-4 rounded-3xl border mb-2 relative overflow-hidden group ${rankStyles} ${isMe ? 'ring-1 ring-white/20' : ''}`}>
             <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors"></div>
             <button
                 onClick={() => clickable && onViewProfile?.(player._id)}
@@ -45,14 +45,14 @@ export default function RankingItem({ player, index, isMe, isViewable, onViewPro
                 <div className="flex flex-col min-w-0 pr-2">
                     <span className={`text-base font-black truncate uppercase tracking-tight ${textStyle}`}>
                         {player.username}
-                        {isMe && <span className="text-[8px] bg-white/20 text-white px-1.5 py-0.5 rounded ml-2 align-middle font-bold">YO</span>}
+                        {isMe && <span className="text-[9px] bg-white/20 text-white px-1.5 py-0.5 rounded ml-2 align-middle font-bold">YO</span>}
                     </span>
                     <span className="text-[10px] text-zinc-500 font-bold uppercase truncate tracking-wider">{player.title || 'Novato'}</span>
                 </div>
             </button>
 
             <div className="flex flex-col items-end relative z-10 pl-2">
-                <div className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wide mb-1 ${levelClass}`}>
+                <div className={`px-2 py-0.5 rounded-lg border text-[10px] font-black uppercase tracking-wide mb-1 ${levelClass}`}>
                     LVL {player.level || 1}
                 </div>
                 <span className="text-[9px] text-zinc-600 font-mono tracking-tight">

@@ -118,7 +118,7 @@ export default function Dice() {
             </div>
             {resultModal && (
                 <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-6" onClick={() => setResultModal(null)}>
-                    <div className="bg-zinc-900 w-full max-w-xs rounded-[32px] p-8 text-center border-2 border-zinc-700">
+                    <div className="bg-zinc-900 w-full max-w-xs rounded-4xl p-8 text-center border-2 border-zinc-700">
                         <h2 className="text-3xl font-black text-white mb-4">{resultModal.won ? '¡GANASTE!' : 'PIERDES'}</h2>
                         {resultModal.won && <div className="text-green-400 text-4xl font-black">+{resultModal.amount}</div>}
                     </div>

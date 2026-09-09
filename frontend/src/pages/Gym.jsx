@@ -85,9 +85,9 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLock
     const initial = routine.name.charAt(0).toUpperCase();
 
     return (
-        <div className="relative w-full mb-3 select-none touch-pan-y overflow-hidden rounded-[24px]">
+        <div className="relative w-full mb-3 select-none touch-pan-y overflow-hidden rounded-3xl">
             {/* Acciones que asoman al deslizar */}
-            <div className="absolute inset-0 flex justify-between items-center px-6 bg-[#0a0a0c] border border-white/[0.07] rounded-[24px]">
+            <div className="absolute inset-0 flex justify-between items-center px-6 bg-[#0a0a0c] border border-white/[0.07] rounded-3xl">
                 <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-600' : 'text-blue-400'} font-black uppercase text-[10px] tracking-[0.1em] transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
                     {isLocked ? <><Lock size={18} /> Bloqueado</> : <><Edit size={18} /> Editar</>}
                 </div>
@@ -106,7 +106,7 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLock
                     // La rutina en curso se distingue por el borde, no por un glow
                     borderColor: isLocked ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.07)'
                 }}
-                className="relative bg-[#0a0a0c] border rounded-[24px] p-[18px] flex justify-between items-center z-10 will-change-transform overflow-hidden"
+                className="relative bg-[#0a0a0c] border rounded-3xl p-[18px] flex justify-between items-center z-10 will-change-transform overflow-hidden"
             >
                 {/* Línea de acento arriba */}
                 <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${acento}, transparent)` }} />
@@ -115,7 +115,7 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLock
 
                 <div className="flex items-center gap-4 pointer-events-none relative z-10 min-w-0">
                     <div
-                        className="w-12 h-12 rounded-[16px] flex items-center justify-center font-black text-xl shrink-0 not-italic"
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shrink-0 not-italic"
                         style={{ background: `${acento}24`, color: acento }}
                     >
                         {initial}
@@ -135,7 +135,7 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLock
                 </div>
 
                 {isLocked ? (
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center bg-[#18181b] text-zinc-500 border border-white/[0.06] z-20 shrink-0">
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center bg-[#18181b] text-zinc-500 border border-white/[0.07] z-20 shrink-0">
                         <Activity size={19} className="animate-pulse" />
                     </div>
                 ) : (
@@ -252,14 +252,14 @@ export default function Gym() {
             </div>
 
             {/* PESTAÑAS: Gym · Cuerpo · Otros */}
-            <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-[18px] p-1 sticky top-0 z-30">
+            <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-1 sticky top-0 z-30">
                 {PESTANAS.map(({ id, label, icon: Icon }) => {
                     const activa = tab === id;
                     return (
                         <button
                             key={id}
                             onClick={() => setTab(id)}
-                            className={`flex-1 py-2.5 rounded-[14px] flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-[0.1em] transition-colors not-italic ${activa ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-[0.1em] transition-colors not-italic ${activa ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}
                             style={activa ? { background: ACENTO } : undefined}
                         >
                             <Icon size={14} strokeWidth={activa ? 2.6 : 2} /> {label}
@@ -273,7 +273,7 @@ export default function Gym() {
                 <div className="animate-in fade-in duration-200 mt-[18px]">
                     <button
                         onClick={() => openCreateRoutine(null)}
-                        className="w-full rounded-[20px] py-4 flex items-center justify-center gap-2 font-black uppercase tracking-[0.14em] text-[11px] active:scale-[0.985] transition-transform mb-5 not-italic"
+                        className="w-full rounded-2xl py-4 flex items-center justify-center gap-2 font-black uppercase tracking-[0.14em] text-[11px] active:scale-[0.985] transition-transform mb-5 not-italic"
                         style={{ background: ACENTO, color: '#000' }}
                     >
                         <Plus size={18} strokeWidth={3} /> Nueva rutina
@@ -288,7 +288,7 @@ export default function Gym() {
 
                     <div className="pb-24">
                         {routines.length === 0 ? (
-                            <div onClick={() => openCreateRoutine(null)} className="text-center py-14 border-2 border-dashed border-white/[0.12] rounded-[24px] cursor-pointer hover:border-yellow-500/30 transition-colors group">
+                            <div onClick={() => openCreateRoutine(null)} className="text-center py-14 border-2 border-dashed border-white/10 rounded-3xl cursor-pointer hover:border-yellow-500/30 transition-colors group">
                                 <Dumbbell className="mx-auto text-zinc-700 mb-3 group-hover:text-yellow-500 transition-colors" size={32} />
                                 <p className="text-zinc-500 text-[11px] font-black uppercase tracking-[0.1em] not-italic">Todavía no tienes rutinas</p>
                                 <p className="text-zinc-600 text-[9px] font-black uppercase tracking-[0.08em] mt-2 not-italic">Toca aquí para crear la primera</p>

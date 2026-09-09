@@ -30,7 +30,7 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
     const levelClass = getLevelStyle(friend.level || 1);
 
     return (
-        <div className="relative w-full h-[82px] mb-2 select-none isolate overflow-hidden rounded-[24px]">
+        <div className="relative w-full h-[82px] mb-2 select-none isolate overflow-hidden rounded-3xl">
             <div className={`absolute inset-0 flex items-center ${bgAction} -z-10 font-bold px-6 justify-between transition-colors`}>
                 <span className={`flex items-center gap-2 text-xs font-black ${dragX > 0 ? 'opacity-100' : 'opacity-0'}`}><Construction size={18} /> DUELO</span>
                 <span className={`flex items-center gap-2 text-xs font-black ${dragX < 0 ? 'opacity-100' : 'opacity-0'}`}>ELIMINAR <Trash2 size={18} /></span>
@@ -58,7 +58,7 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>
                                 LVL {friend.level}
                             </span>
-                            <span className={`text-[8px] font-black uppercase tracking-wider ${friend.online ? 'text-green-500' : 'text-zinc-600'}`}>
+                            <span className={`text-[9px] font-black uppercase tracking-wider ${friend.online ? 'text-green-500' : 'text-zinc-600'}`}>
                                 {friend.online ? 'ONLINE' : 'OFFLINE'}
                             </span>
                         </div>
@@ -67,7 +67,7 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
                 {/* La VIDA, no el progreso de misiones: es lo que dice de un
                     vistazo como le va a alguien. Verde bien, ambar tocado, rojo
                     al borde. */}
-                <div className="flex flex-col items-end gap-1.5 pl-4 border-l border-white/5 h-full justify-center">
+                <div className="flex flex-col items-end gap-1.5 pl-4 border-l border-white/[0.07] h-full justify-center">
                     <div className="flex items-center gap-1.5">
                         <Heart size={14} style={{ color: tonoVida }} fill="currentColor" />
                         <span className="text-xs font-black tracking-wider" style={{ color: tonoVida }}>

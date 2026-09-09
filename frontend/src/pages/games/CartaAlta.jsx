@@ -138,7 +138,7 @@ export default function CartaAlta() {
 
                 <Cabecera onBack={() => navigate('/games')} titulo="Carta Alta" />
 
-                <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 mb-5">
+                <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 mb-5">
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Cómo va</p>
                     <p className="text-[12px] text-zinc-400 leading-relaxed">
                         Montas una sala e invitas a quien quieras. Cuando tú digas, empieza la
@@ -164,13 +164,13 @@ export default function CartaAlta() {
                 {!creando ? (
                     <button
                         onClick={() => setCreando(true)}
-                        className="w-full py-4 rounded-[20px] font-black uppercase tracking-widest text-xs text-black active:scale-95 transition-transform flex items-center justify-center gap-2 mb-6"
+                        className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-black active:scale-95 transition-transform flex items-center justify-center gap-2 mb-6"
                         style={{ background: ACENTO }}
                     >
                         <Swords size={16} /> Montar una sala
                     </button>
                 ) : (
-                    <div className="bg-[#0a0a0c] border rounded-[24px] p-5 mb-6 space-y-4" style={{ borderColor: ACENTO + '55' }}>
+                    <div className="bg-[#0a0a0c] border rounded-3xl p-5 mb-6 space-y-4" style={{ borderColor: ACENTO + '55' }}>
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nueva sala</p>
                             <button onClick={() => setCreando(false)} className="text-zinc-600 hover:text-white"><X size={16} /></button>
@@ -278,7 +278,7 @@ export default function CartaAlta() {
             </div>
 
             {/* ── LOS JUGADORES ────────────────────────────────────────────── */}
-            <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5 mb-5">
+            <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 mb-5">
                 <div className="flex items-baseline justify-between mb-3">
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
                         {esSala ? 'En la sala' : 'Jugadores'}
@@ -293,7 +293,7 @@ export default function CartaAlta() {
                     {s.jugadores.map(j => (
                         <div
                             key={j.puesto}
-                            className={`flex items-center gap-3 p-2.5 rounded-xl border ${j.activo ? 'bg-black border-white/[0.06]' : 'bg-black/40 border-white/[0.03] opacity-40'}`}
+                            className={`flex items-center gap-3 p-2.5 rounded-xl border ${j.activo ? 'bg-black border-white/[0.07]' : 'bg-black/40 border-white/[0.03] opacity-40'}`}
                         >
                             <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
                                 {j.esMaquina
@@ -354,7 +354,7 @@ export default function CartaAlta() {
                                         key={a._id}
                                         onClick={() => invitar(a._id)}
                                         disabled={enVuelo || s.plazasLibres <= 0}
-                                        className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-black border border-white/[0.06] active:scale-[0.99] transition-transform disabled:opacity-40"
+                                        className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-black border border-white/[0.07] active:scale-[0.99] transition-transform disabled:opacity-40"
                                     >
                                         <div className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
                                             {a.avatar ? <img src={a.avatar} alt="" className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-zinc-500">{a.username?.charAt(0)}</span>}
@@ -367,7 +367,7 @@ export default function CartaAlta() {
                         ) : (
                             <button
                                 onClick={() => setInvitando(true)}
-                                className="w-full mt-4 py-3 rounded-xl bg-black border border-white/[0.08] text-zinc-300 font-black uppercase tracking-widest text-[10px] active:scale-95 transition-transform flex items-center justify-center gap-2"
+                                className="w-full mt-4 py-3 rounded-xl bg-black border border-white/[0.07] text-zinc-300 font-black uppercase tracking-widest text-[10px] active:scale-95 transition-transform flex items-center justify-center gap-2"
                             >
                                 <UserPlus size={14} /> Invitar amigos
                             </button>
@@ -401,7 +401,7 @@ export default function CartaAlta() {
                     </div>
 
                     {s.bote > 0 && (
-                        <div className="rounded-[20px] p-4 mb-5 flex items-center gap-3 border animate-in fade-in" style={{ background: ACENTO + '18', borderColor: ACENTO + '66' }}>
+                        <div className="rounded-2xl p-4 mb-5 flex items-center gap-3 border animate-in fade-in" style={{ background: ACENTO + '18', borderColor: ACENTO + '66' }}>
                             <Coins size={20} style={{ color: ACENTO }} className="shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-base font-black" style={{ color: ACENTO }}>{s.bote} fichas en la mesa</p>
@@ -414,7 +414,7 @@ export default function CartaAlta() {
                     )}
 
                     {/* La mesa */}
-                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[28px] p-6 mb-5">
+                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-6 mb-5">
                         {resultado ? (
                             <div className="flex flex-wrap items-end justify-center gap-4">
                                 {resultado.tiradas.map((t, i) => (
@@ -469,7 +469,7 @@ export default function CartaAlta() {
                             <button
                                 onClick={() => { setResultado(null); levantar(); }}
                                 disabled={enVuelo || yaTire || s.cartasRestantes < 1}
-                                className="w-full mt-6 py-4 rounded-[18px] font-black uppercase tracking-widest text-xs text-black active:scale-95 transition-transform disabled:opacity-40 flex items-center justify-center gap-2"
+                                className="w-full mt-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-black active:scale-95 transition-transform disabled:opacity-40 flex items-center justify-center gap-2"
                                 style={{ background: ACENTO }}
                             >
                                 {enVuelo ? <Loader2 size={15} className="animate-spin" />
@@ -492,7 +492,7 @@ export default function CartaAlta() {
                     </div>
 
                     {s.historial.length > 0 && (
-                        <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[24px] p-5">
+                        <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5">
                             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Manos jugadas</p>
                             <div className="space-y-3">
                                 {s.historial.map(m => (
@@ -541,7 +541,7 @@ const FilaSala = ({ sala, onAbrir, apagada = false }) => {
     return (
         <button
             onClick={onAbrir}
-            className={`w-full text-left bg-[#0a0a0c] border border-white/[0.07] rounded-[20px] p-4 flex items-center gap-3 active:scale-[0.99] transition-transform ${apagada ? 'opacity-60' : ''}`}
+            className={`w-full text-left bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-4 flex items-center gap-3 active:scale-[0.99] transition-transform ${apagada ? 'opacity-60' : ''}`}
         >
             <div className="flex-1 min-w-0">
                 <p className="text-white font-bold text-sm truncate">
@@ -564,8 +564,8 @@ const FilaSala = ({ sala, onAbrir, apagada = false }) => {
 };
 
 const Dato = ({ etiqueta, valor, color = '#fff' }) => (
-    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-[18px] p-3 text-center">
-        <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">{etiqueta}</p>
+    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-3 text-center">
+        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">{etiqueta}</p>
         <p className="text-lg font-black mt-0.5 tabular-nums" style={{ color }}>{valor}</p>
     </div>
 );

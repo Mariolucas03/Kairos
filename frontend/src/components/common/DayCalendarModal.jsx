@@ -57,7 +57,7 @@ export default function DayCalendarModal({ selectedDate, onSelect, onClose, acce
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
             <div
-                className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden"
+                className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -66,7 +66,7 @@ export default function DayCalendarModal({ selectedDate, onSelect, onClose, acce
                     <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2 not-italic">
                         <CalendarDays size={22} style={{ color: accent }} /> HISTORIAL
                     </h2>
-                    <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                    <button onClick={onClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                         <X size={20} />
                     </button>
                 </div>
@@ -92,7 +92,7 @@ export default function DayCalendarModal({ selectedDate, onSelect, onClose, acce
 
                 <button
                     onClick={() => onSelect(today)}
-                    className="relative z-10 w-full py-3 rounded-2xl bg-zinc-900 border border-white/5 text-[11px] font-black uppercase tracking-[0.15em] text-zinc-300 hover:text-white active:scale-[0.98] transition-all not-italic"
+                    className="relative z-10 w-full py-3 rounded-2xl bg-zinc-900 border border-white/[0.07] text-[11px] font-black uppercase tracking-[0.15em] text-zinc-300 hover:text-white active:scale-[0.98] transition-all not-italic"
                 >
                     Volver a hoy
                 </button>

@@ -98,7 +98,7 @@ export default function Header() {
                             {/* Un tono, no degradado: el sistema pide color plano por métrica */}
                             <div className="h-full transition-all duration-500 ease-out" style={{ width: `${xpPercent}%`, background: '#3b82f6' }} />
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-[8px] sm:text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+                                <span className="text-[9px] sm:text-[9px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                                     {currentXP}/{nextLevelXP} XP
                                 </span>
                             </div>

@@ -136,7 +136,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
     // --- YA HAY UNA ELEGIDA ---
     if (cancion && !abierto) {
         return (
-            <div className="bg-black border border-white/[0.08] rounded-2xl p-2.5">
+            <div className="bg-black border border-white/[0.07] rounded-2xl p-2.5">
                 <div className="flex items-center gap-3">
                 {cancion.caratula && (
                     <img src={cancion.caratula} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" />
@@ -151,7 +151,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                     type="button"
                     onClick={() => probar(cancion)}
                     aria-label={sonando === cancion.id ? 'Parar' : 'Escuchar'}
-                    className="w-9 h-9 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.06] text-white flex items-center justify-center active:scale-90 transition-transform"
+                    className="w-9 h-9 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.07] text-white flex items-center justify-center active:scale-90 transition-transform"
                 >
                     {sonando === cancion.id ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
                 </button>
@@ -172,7 +172,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                     ese, y no hay forma de pedirle otro pedazo de la canción. Lo
                     que sí se elige es por dónde entra — normalmente para saltarse
                     la intro y caer directo en el estribillo. */}
-                <div className="mt-2 pt-2.5 border-t border-white/[0.06]">
+                <div className="mt-2 pt-2.5 border-t border-white/[0.07]">
                     <div className="flex items-center justify-between mb-1.5">
                         <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.12em] not-italic flex items-center gap-1.5">
                             <Scissors size={10} /> Por dónde empieza
@@ -214,7 +214,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
             <button
                 type="button"
                 onClick={() => setAbierto(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-black border border-dashed border-white/[0.12] rounded-2xl text-zinc-500 hover:text-white hover:border-white/25 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-black border border-dashed border-white/10 rounded-2xl text-zinc-500 hover:text-white hover:border-white/25 transition-colors"
             >
                 <Music size={15} />
                 <span className="text-[11px] font-black uppercase tracking-widest">Elegir canción</span>
@@ -224,7 +224,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
 
     // --- BUSCANDO ---
     return (
-        <div className="bg-black border border-white/[0.08] rounded-2xl p-2.5">
+        <div className="bg-black border border-white/[0.07] rounded-2xl p-2.5">
             <div className="flex items-center gap-2 mb-2">
                 <div className="flex-1 flex items-center gap-2 bg-zinc-900 rounded-xl px-3">
                     <Search size={14} className="text-zinc-500 shrink-0" />
@@ -241,7 +241,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                     type="button"
                     onClick={() => { setAbierto(false); setTexto(''); }}
                     aria-label="Cerrar el buscador"
-                    className="w-9 h-9 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.06] text-zinc-400 flex items-center justify-center active:scale-90"
+                    className="w-9 h-9 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-400 flex items-center justify-center active:scale-90"
                 >
                     <X size={16} />
                 </button>

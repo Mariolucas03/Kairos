@@ -135,7 +135,7 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
-                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
+                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -144,14 +144,14 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                             <h2 className="text-2xl font-black text-white uppercase flex items-center gap-2 tracking-tighter not-italic">
                                 RESUMEN <span style={{ color: accent }}>BALANCE</span>
                             </h2>
-                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
 
                         <div className="flex flex-col gap-4 relative z-10 overflow-y-auto custom-scrollbar pr-1">
 
-                            <div className="flex flex-col items-center justify-center py-4 bg-zinc-900/30 rounded-3xl border border-white/5 relative overflow-hidden shrink-0">
+                            <div className="flex flex-col items-center justify-center py-4 bg-zinc-900/30 rounded-3xl border border-white/[0.07] relative overflow-hidden shrink-0">
                                 <span className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-1">Resultado neto</span>
                                 <div className="flex items-baseline gap-1">
                                     <span
@@ -165,16 +165,16 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 shrink-0">
-                                <div className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex flex-col gap-1 items-center">
-                                    <div className="bg-black p-2 rounded-full border border-white/5 mb-1">
+                                <div className="bg-zinc-900/50 p-4 rounded-2xl border border-white/[0.07] flex flex-col gap-1 items-center">
+                                    <div className="bg-black p-2 rounded-full border border-white/[0.07] mb-1">
                                         <Utensils size={18} className="text-emerald-400" />
                                     </div>
                                     <span className="text-[10px] font-bold text-zinc-500 uppercase">Ingeridas</span>
                                     <span className="text-xl font-black text-white">{f(intake)}</span>
                                 </div>
 
-                                <div className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex flex-col gap-1 items-center relative overflow-hidden">
-                                    <div className="bg-black p-2 rounded-full border border-white/5 mb-1 relative z-10">
+                                <div className="bg-zinc-900/50 p-4 rounded-2xl border border-white/[0.07] flex flex-col gap-1 items-center relative overflow-hidden">
+                                    <div className="bg-black p-2 rounded-full border border-white/[0.07] mb-1 relative z-10">
                                         <Flame size={18} className="text-orange-500" />
                                     </div>
                                     <span className="text-[10px] font-bold text-zinc-500 uppercase relative z-10">Quemadas</span>
@@ -251,7 +251,7 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                                 <div className="flex gap-2">
                                     <div
                                         className={`flex-1 flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
-                                            includeBMR ? 'border-transparent' : 'bg-zinc-900/30 border-white/5 hover:bg-zinc-800/50'
+                                            includeBMR ? 'border-transparent' : 'bg-zinc-900/30 border-white/[0.07] hover:bg-zinc-800/50'
                                         }`}
                                         onClick={toggleBMR}
                                         style={includeBMR ? { background: accent } : undefined}

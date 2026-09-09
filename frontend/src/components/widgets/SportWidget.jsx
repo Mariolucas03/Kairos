@@ -102,7 +102,7 @@ export default function SportWidget({
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
-                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-[40px] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
+                        className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -111,7 +111,7 @@ export default function SportWidget({
                             <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2 pr-2 not-italic">
                                 {apuntando ? <>APUNTAR <span style={{ color: accent }}>DEPORTE</span></> : <>DETALLE <span style={{ color: accent }}>DEPORTE</span></>}
                             </h2>
-                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                            <button onClick={() => setIsOpen(false)} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -150,25 +150,25 @@ export default function SportWidget({
 
                         {hasActivity ? (
                             <div className="flex flex-col gap-4 relative z-10 overflow-y-auto custom-scrollbar pr-1 flex-1">
-                                <div className="bg-zinc-900/50 p-6 rounded-[24px] border border-white/5 text-center relative overflow-hidden shrink-0">
+                                <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/[0.07] text-center relative overflow-hidden shrink-0">
                                     <h3 className="text-3xl font-black text-white uppercase leading-none mb-2 not-italic">{modalName}</h3>
 
                                     <div className="flex justify-center items-center gap-2 mb-4">
-                                        <span className="text-[10px] bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full uppercase font-bold border border-white/5">
+                                        <span className="text-[10px] bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full uppercase font-bold border border-white/[0.07]">
                                             INTENSIDAD: {modalIntensity}
                                         </span>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
-                                        <div className="bg-black/40 px-4 py-3 rounded-xl border border-white/5 flex flex-col justify-center">
+                                        <div className="bg-black/40 px-4 py-3 rounded-xl border border-white/[0.07] flex flex-col justify-center">
                                             <span className="text-[10px] text-zinc-500 font-bold uppercase flex items-center justify-center gap-1 mb-1"><Clock size={10} /> Tiempo</span>
                                             <span className="text-2xl font-black text-white">{modalDuration}<span className="text-sm text-zinc-600 ml-0.5">m</span></span>
                                         </div>
-                                        <div className="bg-black/40 px-4 py-3 rounded-xl border border-white/5 flex flex-col justify-center">
+                                        <div className="bg-black/40 px-4 py-3 rounded-xl border border-white/[0.07] flex flex-col justify-center">
                                             <span className="text-[10px] text-zinc-500 font-bold uppercase flex items-center justify-center gap-1 mb-1"><Flame size={10} /> Kcal</span>
                                             <span className="text-2xl font-black" style={{ color: accent }}>{modalKcal}</span>
                                         </div>
-                                        <div className="col-span-2 bg-black/40 px-4 py-3 rounded-xl border border-white/5 flex flex-col justify-center">
+                                        <div className="col-span-2 bg-black/40 px-4 py-3 rounded-xl border border-white/[0.07] flex flex-col justify-center">
                                             <span className="text-[10px] text-zinc-500 font-bold uppercase flex items-center justify-center gap-1 mb-1"><MapPin size={10} /> Distancia</span>
                                             <span className="text-3xl font-black text-white">{modalDistance > 0 ? modalDistance : '--'} <span className="text-sm text-zinc-600">KM</span></span>
                                         </div>

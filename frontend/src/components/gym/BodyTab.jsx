@@ -54,7 +54,7 @@ export default function BodyTab() {
     return (
         <div className="space-y-6 pb-24">
             {/* --- EL CUERPO --- */}
-            <div className="bg-zinc-950 border border-white/5 rounded-3xl p-4">
+            <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4">
                 <BodyMap levels={ranks} dual selected={muscleSel} onSelectMuscle={(g) => setMuscleSel(g === muscleSel ? null : g)} />
 
                 {/* Mini leyenda de rangos: sin ella los colores del cuerpo no
@@ -113,7 +113,7 @@ export default function BodyTab() {
                 </div>
 
                 {verEscala && (
-                    <div className="bg-zinc-950 border border-white/5 rounded-2xl p-4 mb-3 animate-in fade-in">
+                    <div className="bg-zinc-950 border border-white/[0.07] rounded-2xl p-4 mb-3 animate-in fade-in">
                         <p className="text-[11px] text-zinc-400 leading-relaxed mb-3">
                             Un músculo sube por los <span className="text-white font-bold">kilos que le metes</span>:
                             cada serie suma <span className="text-white font-bold">peso × repeticiones</span>.
@@ -123,7 +123,7 @@ export default function BodyTab() {
                         {escala && (
                             <div className="grid grid-cols-2 gap-1.5">
                                 {escala.map(r => (
-                                    <div key={r.key} className="flex items-center gap-2 bg-black rounded-lg px-2 py-1.5 border border-white/5">
+                                    <div key={r.key} className="flex items-center gap-2 bg-black rounded-lg px-2 py-1.5 border border-white/[0.07]">
                                         <IconoRango rango={r.key} color={r.color} tamano={18} />
                                         <span className="text-[10px] font-black uppercase" style={{ color: r.color }}>{r.label}</span>
                                         <span className="text-[9px] text-zinc-600 ml-auto font-bold">{miles(r.min)}</span>
@@ -140,7 +140,7 @@ export default function BodyTab() {
                         const abierto = grupoAbierto === nombre;
 
                         return (
-                            <div key={nombre} className="bg-zinc-950 border border-white/5 rounded-2xl overflow-hidden">
+                            <div key={nombre} className="bg-zinc-950 border border-white/[0.07] rounded-2xl overflow-hidden">
                                 {/* Cabecera: pulsa para desplegar los músculos del grupo */}
                                 <button
                                     onClick={() => hijos.length > 0 && setGrupoAbierto(abierto ? null : nombre)}
@@ -164,7 +164,7 @@ export default function BodyTab() {
                                         </span>
                                     </div>
 
-                                    <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/5">
+                                    <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/[0.07]">
                                         <div
                                             className="h-full rounded-full transition-all duration-700"
                                             style={{ width: `${info.progress}%`, backgroundColor: info.rankColor }}
@@ -184,7 +184,7 @@ export default function BodyTab() {
                                 {/* Los músculos de dentro. Se ven TODOS, también los
                                     que están a cero: así se nota lo que no entrenas. */}
                                 {abierto && (
-                                    <div className="border-t border-white/5 bg-black/40 px-3 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
+                                    <div className="border-t border-white/[0.07] bg-black/40 px-3 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
                                         {hijos.map(([musculo, r]) => {
                                             const sinTrabajo = (r.points || 0) === 0;
                                             return (
@@ -195,7 +195,7 @@ export default function BodyTab() {
                                                             {sinTrabajo ? 'Sin entrenar' : r.rankLabel}
                                                         </span>
                                                     </div>
-                                                    <div className="h-1 bg-black rounded-full overflow-hidden border border-white/5">
+                                                    <div className="h-1 bg-black rounded-full overflow-hidden border border-white/[0.07]">
                                                         <div
                                                             className="h-full rounded-full transition-all duration-700"
                                                             style={{ width: `${r.progress || 0}%`, backgroundColor: r.rankColor }}

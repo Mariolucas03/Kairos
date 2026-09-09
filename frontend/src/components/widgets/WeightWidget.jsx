@@ -80,7 +80,7 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
 
                     <div
-                        className="bg-[#09090b] border border-white/10 w-[95%] max-w-4xl rounded-[40px] p-6 shadow-2xl relative flex flex-col gap-5 animate-in zoom-in-95 duration-200 overflow-hidden z-10"
+                        className="bg-[#09090b] border border-white/10 w-[95%] max-w-4xl rounded-4xl p-6 shadow-2xl relative flex flex-col gap-5 animate-in zoom-in-95 duration-200 overflow-hidden z-10"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -89,13 +89,13 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
                             <h2 className="text-2xl font-black text-white uppercase flex items-center gap-3 tracking-tighter not-italic">
                                 CONTROL <span style={{ color: accent }}>PESO</span>
                             </h2>
-                            <button onClick={handleClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/5 transition-colors">
+                            <button onClick={handleClose} className="bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
 
                         <div
-                            className="bg-zinc-900/30 rounded-[32px] p-6 border border-white/5 relative h-56 w-full flex items-center justify-center shrink-0 select-none overflow-hidden"
+                            className="bg-zinc-900/30 rounded-4xl p-6 border border-white/[0.07] relative h-56 w-full flex items-center justify-center shrink-0 select-none overflow-hidden"
                             onMouseLeave={() => setHoveredIndex(null)}
                         >
                             <svg className="absolute inset-0 w-full h-full overflow-visible z-0" preserveAspectRatio="none" viewBox={`0 0 ${svgViewW} ${svgViewH}`}>

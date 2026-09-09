@@ -15,7 +15,7 @@ export default function ClanPreviewModal({ clanId, currentUserId, userClanId, on
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={onClose} />
-            <div className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[85vh] shadow-2xl relative z-10 animate-in zoom-in-95 mt-10 sm:mt-0">
+            <div className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-4xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl relative z-10 animate-in zoom-in-95 mt-10 sm:mt-0">
                 <button onClick={onClose} className="absolute top-4 right-4 z-20 bg-black/50 p-2 rounded-full text-zinc-400 hover:text-white border border-white/10"><X size={20} /></button>
 
                 {!clanData && isLoading ? (
@@ -42,7 +42,7 @@ export default function ClanPreviewModal({ clanId, currentUserId, userClanId, on
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-xs font-black text-purple-300 leading-none">{clanData.totalPower}</span>
-                                            <span className="text-[8px] font-bold text-zinc-500 uppercase">Poder</span>
+                                            <span className="text-[9px] font-bold text-zinc-500 uppercase">Poder</span>
                                         </div>
                                     </div>
                                 </div>
