@@ -28,6 +28,21 @@ const devolverFichas = (userId, fichas) =>
     User.updateOne({ _id: userId }, { $inc: { gameCoins: fichas } });
 
 /**
+ * El usuario recien leido, para devolverlo con la respuesta.
+ *
+ * ⚠️ EL SALDO NUEVO LO DICE EL SERVIDOR, NO LO CALCULA LA PANTALLA.
+ *
+ * Aceptar un duelo mueve fichas, asi que la cabecera tiene que enseñar otro
+ * numero al instante. La alternativa —restar la apuesta en el movil— seria
+ * tener la misma cuenta en dos sitios, y bastaria con que el servidor rechazara
+ * el cobro para que la pantalla enseñara un saldo que no es el tuyo.
+ *
+ * Es lo mismo que ya hacen los juegos y el entreno: responden con el usuario
+ * entero y la pantalla llama a `setUser`.
+ */
+const usuarioAlDia = (userId) => User.findById(userId).select('-password');
+
+/**
  * ¿Este reto es tuyo?
  *
  * ⚠️ NINGUNA de las rutas de retos lo comprobaba. Con la sesión normal y un id
@@ -295,7 +310,7 @@ const respondChallenge = asyncHandler(async (req, res) => {
             throw new Error('Quien te retó ya no tiene fichas para su apuesta. El duelo se cancela.');
         }
 
-        res.status(200).json(reclamado);
+        res.status(200).json({ duelo: reclamado, user: await usuarioAlDia(req.user._id) });
     } else if (action === 'reject' || action === 'flee') {
         // ⚠️ AQUI SE BORRABA EL DUELO SIN MIRAR EN QUE ESTADO ESTABA.
         //
@@ -324,7 +339,10 @@ const respondChallenge = asyncHandler(async (req, res) => {
             );
             if (cerrado) await pagarDuelo(cerrado);
 
-            res.status(200).json({ message: 'Te has rendido. El bote es para tu rival.' });
+            res.status(200).json({
+                message: 'Te has rendido. El bote es para tu rival.',
+                user: await usuarioAlDia(req.user._id)
+            });
             return;
         }
 

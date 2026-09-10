@@ -67,7 +67,7 @@ export default function FriendsPage() {
             ) : (
                 <>
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-3 ml-2">
-                        Desliza una tarjeta para eliminar
+                        Desliza: ← eliminar · → retar a un duelo
                     </p>
                     {friends.map(friend => (
                         <FriendCard
@@ -78,7 +78,10 @@ export default function FriendsPage() {
                                 message: `¿Eliminar a ${f.username} de tus amigos?`,
                                 onConfirm: () => handleRemoveFriend(f._id)
                             })}
-                            onChallengeOrView={() => setToast({ message: '⚔️ Duelos: próximamente', type: 'info' })}
+                            // Deslizar hacia la derecha lleva a los duelos con esta
+                            // persona ya elegida. Antes salia un "proximamente":
+                            // el servidor tenia media funcion y no habia pantalla.
+                            onChallengeOrView={(f) => navigate(`/social/duelos?rival=${f._id}`)}
                         />
                     ))}
                 </>

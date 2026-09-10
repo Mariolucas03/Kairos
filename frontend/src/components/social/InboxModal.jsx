@@ -101,7 +101,11 @@ export default function InboxModal({
                                     // es mejor que no hacer nada al pulsar.
                                     onClick={() => {
                                         onClose();
-                                        if (n.workout) navigate(`/social/entreno/${n.workout}`);
+                                        // El duelo manda sobre el entreno: si la
+                                        // notificacion habla de un duelo, lo que
+                                        // quieres ver es el resultado.
+                                        if (n.type === 'duelo') navigate('/social/duelos');
+                                        else if (n.workout) navigate(`/social/entreno/${n.workout}`);
                                         else if (n.actor?._id) navigate(`/social/user/${n.actor._id}`);
                                     }}
                                     className={`w-full text-left p-3 rounded-2xl border flex items-center gap-3 mb-2 transition-colors ${n.read ? 'bg-black border-zinc-800' : 'bg-pink-900/10 border-pink-500/20'}`}
@@ -116,8 +120,16 @@ export default function InboxModal({
                                             <span className="font-black text-white">{n.actor?.username || 'Alguien'}</span>
                                             {n.type === 'like'
                                                 ? ' le ha dado me gusta a tu entreno'
-                                                : ' ha comentado tu entreno'}
-                                            {n.workoutName ? <span className="text-zinc-500"> "{n.workoutName}"</span> : null}
+                                                : n.type === 'duelo'
+                                                    // El texto NO viene del servidor: "has ganado" y
+                                                    // "has perdido" son la MISMA notificacion leida por
+                                                    // dos personas distintas. Aqui se dice lo neutro y el
+                                                    // resultado esta a un toque.
+                                                    ? ' y tú habéis terminado un duelo'
+                                                    : ' ha comentado tu entreno'}
+                                            {n.type !== 'duelo' && n.workoutName
+                                                ? <span className="text-zinc-500"> "{n.workoutName}"</span>
+                                                : null}
                                         </p>
                                         {n.type === 'comment' && n.text && (
                                             <p className="text-[10px] text-zinc-500 not-italic truncate mt-0.5">"{n.text}"</p>
@@ -126,7 +138,9 @@ export default function InboxModal({
                                     <div className="flex flex-col items-end gap-1 shrink-0">
                                         {n.type === 'like'
                                             ? <Heart size={14} className="text-red-500 fill-red-500" />
-                                            : <MessageCircle size={14} className="text-blue-400" />}
+                                            : n.type === 'duelo'
+                                                ? <Swords size={14} className="text-yellow-500" />
+                                                : <MessageCircle size={14} className="text-blue-400" />}
                                         <span className="text-[9px] text-zinc-600 font-bold">{hace(n.createdAt)}</span>
                                     </div>
                                 </button>

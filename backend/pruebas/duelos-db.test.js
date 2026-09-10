@@ -111,6 +111,21 @@ describe('Duelos: la apuesta se cobra de verdad', () => {
         assert.ok(guardado.endDate, 'sin fecha de fin el duelo no termina nunca');
     });
 
+    test('aceptar devuelve el usuario con el saldo ya actualizado', async () => {
+        const [yo, rival] = await dosAmigos();
+        const duelo = (await retar(yo, rival, 100)).enviado;
+
+        const res = await responder(rival, duelo, 'accept');
+
+        // ⚠️ La cabecera de la pantalla enseña las fichas. Si la respuesta no
+        // trae el usuario, el móvil tendría que restar la apuesta por su cuenta:
+        // la misma cuenta en dos sitios, y con que el servidor rechazara el
+        // cobro estaría enseñando un saldo que no es el tuyo.
+        assert.ok(res.enviado.user, 'la respuesta no trae el usuario');
+        assert.strictEqual(res.enviado.user.gameCoins, 900);
+        assert.strictEqual(res.enviado.user.password, undefined, 'la contraseña no sale de aquí');
+    });
+
     test('los siete días empiezan al ACEPTAR, no al retar', async () => {
         const [yo, rival] = await dosAmigos();
         const duelo = (await retar(yo, rival)).enviado;
