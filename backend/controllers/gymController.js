@@ -1340,46 +1340,17 @@ const getWeeklyStats = async (req, res) => {
 // ==========================================
 // 🔥 OPTIMIZACIÓN DE MEMORIA: .lean() y .select()
 // ==========================================
-const getMuscleProgress = async (req, res) => {
-    try {
-        const { muscle } = req.query;
-        const userId = req.user._id;
-
-        const exercises = await Exercise.find({
-            muscle: muscle,
-            $or: [{ user: userId }, { isCustom: false }, { user: null }]
-        }).select('name').lean();
-
-        const exerciseNames = exercises.map(e => e.name);
-
-        // SOLO traemos fecha y los sets de los ejercicios específicos, nada de documentos completos
-        const logs = await WorkoutLog.find({
-            user: userId,
-            'exercises.name': { $in: exerciseNames }
-        })
-            .select('date exercises.name exercises.sets')
-            .sort({ date: 1 })
-            .lean();
-
-        const history = logs.map(log => {
-            let sessionVolume = 0;
-            log.exercises.forEach(ex => {
-                if (exerciseNames.includes(ex.name)) {
-                    ex.sets.forEach(s => {
-                        sessionVolume += (s.weight || 0) * (s.reps || 0);
-                    });
-                }
-            });
-            if (sessionVolume > 0) return { date: log.date, volume: sessionVolume };
-            return null;
-        }).filter(item => item !== null);
-
-        res.json(history.slice(-10));
-
-    } catch (error) {
-        res.status(500).json({ message: 'Error cargando progreso muscular' });
-    }
-};
+/*
+ * AQUI VIVIA `getMuscleProgress`, y AQUI SE QUEDA LA EXPLICACION.
+ *
+ * Devolvia el volumen por sesion de un grupo muscular, las ultimas diez. La
+ * ruta existia, el codigo funcionaba... y NINGUNA pantalla la llamaba jamas.
+ *
+ * La pregunta que responde ya la responde mejor `getRepartoMuscular`: aquel
+ * cuenta el trabajo de verdad y sobre el periodo que se pida, y ese SI se pinta.
+ * Codigo que nadie ejecuta es codigo que nadie arregla el dia que se rompe, y
+ * ademas hace pensar que la app tiene una pantalla que no tiene.
+ */
 
 // 11. OBTENER HISTORIAL (🔥 BLINDADO CONTRA OOM)
 const getRoutineHistory = async (req, res) => {
@@ -1606,40 +1577,25 @@ const getExerciseHistory = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error cargando stats' }); }
 };
 
-const getBodyStatus = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const sinceDate = new Date(); sinceDate.setDate(sinceDate.getDate() - 30);
-
-        const logs = await WorkoutLog.find({ user: userId, type: 'gym', date: { $gte: sinceDate } })
-            .select('exercises.name exercises.sets')
-            .lean();
-
-        const allExercises = await Exercise.find({ $or: [{ user: userId }, { isCustom: false }, { user: null }] }).lean();
-
-        const exerciseToMuscle = {};
-        allExercises.forEach(ex => { exerciseToMuscle[ex.name] = ex.muscle; });
-
-        // Se construye desde el vocabulario único, así que incluye 'Glúteo':
-        // antes estaba fuera de esta lista y esos ejercicios no contaban nunca.
-        const muscleStats = MUSCLE_GROUPS.reduce((acc, g) => ({ ...acc, [g]: 0 }), {});
-
-        logs.forEach(log => {
-            log.exercises.forEach(ex => {
-                const muscle = exerciseToMuscle[ex.name];
-                if (muscle && muscleStats[muscle] !== undefined) { muscleStats[muscle] += ex.sets.length; }
-            });
-        });
-        res.json(muscleStats);
-    } catch (error) { res.status(500).json({ message: 'Error estado del cuerpo' }); }
-};
+/*
+ * AQUI VIVIA `getBodyStatus`.
+ *
+ * Contaba SERIES por grupo muscular en los ultimos 30 dias, para pintar el mapa
+ * del cuerpo. Nunca llego a pintarlo: el mapa se alimenta de `/gym/muscle-ranks`
+ * y esta ruta no la llamaba nadie.
+ *
+ * Y contando series la respuesta era engañosa, que es lo que explica el
+ * comentario de aqui abajo: cuatro series de curl pesan lo mismo que cuatro de
+ * sentadilla. `getRepartoMuscular` hace la misma cuenta bien y esa si se usa.
+ */
 
 /**
  * A QUE MUSCULO LE ESTAS DEDICANDO EL TRABAJO.
  *
- * `getBodyStatus` ya contaba SERIES por grupo en los ultimos 30 dias, y sirve
- * para pintar el mapa del cuerpo. Esto es otra pregunta: cuanto TRABAJO se lleva
- * cada uno, en kilos movidos, sobre el periodo que se pida.
+ * Habia otro endpoint que contaba SERIES por grupo en los ultimos 30 dias. Ya
+ * no esta —no lo llamaba ninguna pantalla—, y ademas esta es la pregunta buena:
+ * cuanto TRABAJO se lleva cada musculo, en kilos movidos, sobre el periodo que
+ * se pida.
  *
  * La diferencia importa. Cuatro series de curl de biceps y cuatro de sentadilla
  * son las mismas series y no se parecen en nada: contando series, un dia de
@@ -2032,7 +1988,7 @@ module.exports = {
     getAllExercises, getExerciseById, createCustomExercise, seedExercises, getMuscleCatalog, getMuscleRanksController,
     saveWorkoutLog, saveSportLog, getSportCatalog,
     getExerciseProgressController, getTrainedExercises, getResumenEntrenos,
-    getWeeklyStats, getMuscleProgress, getRoutineHistory, seedFakeHistory, getExerciseHistory, getBodyStatus,
+    getWeeklyStats, getRoutineHistory, seedFakeHistory, getExerciseHistory,
     getRepartoMuscular, getConstanciaPorDia, getFuerzaRelativa, buscarMusica,
     // Para las pruebas
     esDeApple,

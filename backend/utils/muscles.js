@@ -2,12 +2,13 @@
  * VOCABULARIO ÚNICO DE MÚSCULOS
  *
  * `Exercise.muscle` guarda SIEMPRE un grupo de esta lista: es la clave con la que
- * agregan getBodyStatus y getMuscleProgress. En modo PRO el usuario elige un
- * músculo concreto (`muscleDetail`) y el backend deriva su grupo padre desde
- * aquí, para que las estadísticas sigan funcionando igual en los dos modos.
+ * agregan las estadísticas —`getRepartoMuscular` y el servicio de rangos—. En
+ * modo PRO el usuario elige un músculo concreto (`muscleDetail`) y el backend
+ * deriva su grupo padre desde aquí, para que las estadísticas sigan funcionando
+ * igual en los dos modos.
  *
- * ⚠️ 'Glúteo' se ofrecía en el selector del frontend pero NO estaba en los grupos
- * que contaba getBodyStatus, así que esos ejercicios desaparecían de las
+ * ⚠️ 'Glúteo' se ofrecía en el selector del frontend pero NO estaba en la lista
+ * de grupos que se contaban, así que esos ejercicios desaparecían de las
  * estadísticas. Al centralizar la lista aquí deja de pasar.
  */
 

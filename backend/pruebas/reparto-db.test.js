@@ -16,11 +16,11 @@ const { getRepartoMuscular } = require('../controllers/gymController');
  *
  * ⚠️ CUENTA KILOS MOVIDOS, NO SERIES.
  *
- * Ya habia un endpoint que contaba series por grupo (`/gym/body-status`, para
- * pintar el mapa del cuerpo). Cuatro series de curl de biceps y cuatro de
- * sentadilla son las mismas series y no se parecen en nada: contando series, un
- * dia de brazo pesa igual que uno de pierna y el reparto mentiria justo en lo
- * que se le pregunta.
+ * Hubo un endpoint que contaba series por grupo (`/gym/body-status`). Se quito
+ * porque no lo llamaba nadie, pero la razon de fondo es esta: cuatro series de
+ * curl de biceps y cuatro de sentadilla son las mismas series y no se parecen en
+ * nada. Contando series, un dia de brazo pesa igual que uno de pierna y el
+ * reparto mentiria justo en lo que se le pregunta.
  */
 
 let siguiente = 0;

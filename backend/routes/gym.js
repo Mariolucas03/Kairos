@@ -15,10 +15,8 @@ const {
     seedExercises,
     getWeeklyStats,
     seedFakeHistory,
-    getMuscleProgress,
     getRoutineHistory,
     getExerciseHistory,
-    getBodyStatus,
     getRepartoMuscular,
     getConstanciaPorDia,
     getFuerzaRelativa,
@@ -86,12 +84,12 @@ router.get('/weekly', protect, getWeeklyStats);
 // Este SI necesita saber a quien le crea el historial falso, asi que lleva
 // las dos cosas: sesion para saber quien eres y secreto para poder usarlo.
 router.post('/seed-history', protect, protectCron, seedFakeHistory);
-router.get('/muscle-progress', protect, getMuscleProgress);
 router.post('/history-stats', protect, getRoutineHistory);
-router.get('/body-status', protect, getBodyStatus);
 // Cuanto trabajo se lleva cada musculo, en kilos movidos y en porcentaje.
-// Es otra pregunta que /body-status: ese cuenta SERIES (cuatro de curl pesan
-// igual que cuatro de sentadilla), este cuenta el trabajo de verdad.
+//
+// Aqui al lado estaban /muscle-progress y /body-status, que respondian versiones
+// peores de esta misma pregunta —la segunda contaba SERIES, o sea que cuatro de
+// curl pesaban igual que cuatro de sentadilla— y que no llamaba ninguna pantalla.
 router.get('/reparto', protect, getRepartoMuscular);
 // Los dias que tu rutina dice que entrenas, contra los que entrenas de verdad.
 // Los dos datos llevaban meses guardados y nadie los habia cruzado.
