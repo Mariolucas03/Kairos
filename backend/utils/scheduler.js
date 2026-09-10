@@ -10,7 +10,8 @@ const SystemState = require('../models/SystemState');
 const Notification = require('../models/Notification');
 const Routine = require('../models/Routine');
 const WorkoutLog = require('../models/WorkoutLog');
-const { resolverDuelos } = require('../services/duelosService');
+const Challenge = require('../models/Challenge');
+const { resolverDuelos, marcadorEnVivo } = require('../services/duelosService');
 
 // Clave donde se anota el ULTIMO dia ya castigado, para no castigar dos veces
 const CLAVE_NOCTURNO = 'nightly-maintenance';
@@ -83,6 +84,46 @@ const avisarCierreRanking = async () => {
  * proposito en vez de mandarse los tres: tres notificaciones seguidas a la
  * misma hora es la forma mas rapida de que alguien las apague para siempre.
  */
+/**
+ * EL AVISO DEL ULTIMO DIA DE UN DUELO.
+ *
+ * Aparte y sin base de datos, igual que `mensajeDeEntreno`: aqui es donde estan
+ * todos los casos raros —vas ganando, vas perdiendo, vais empatados, nadie ha
+ * hecho nada— y ninguno necesita mas que cuatro numeros.
+ *
+ * Se avisa igual vayas ganando o perdiendo, porque las dos cosas mueven: una
+ * para remontar y la otra para no dejartelo quitar. Y solo pasa una vez por
+ * duelo, la ultima noche, asi que no se convierte en ruido.
+ */
+const mensajeDeDuelo = ({ mio, suyo, unidad, contra, bote }) => {
+    const rival = contra || 'tu rival';
+    const diferencia = `${Math.abs(mio - suyo).toLocaleString('es-ES')} ${unidad}`;
+
+    // Empate incluye el 0-0, pero no dice lo mismo: "vais empatados" cuando
+    // ninguno ha hecho nada suena a que la cosa esta reñida, y lo que pasa es
+    // que el duelo esta sin empezar.
+    if (mio === suyo) {
+        return {
+            title: mio === 0 ? '⚔️ Ultimo dia y no ha empezado nadie' : '⚔️ Ultimo dia y vais empatados',
+            body: `Lo que hagas hoy decide el duelo contra ${rival}. El bote son ${bote} fichas.`,
+            icon: '/assets/icons/ficha.png',
+            url: '/social/duelos'
+        };
+    }
+
+    const voyGanando = mio > suyo;
+    return {
+        title: voyGanando
+            ? `⚔️ Ultimo dia: ganas por ${diferencia}`
+            : `⚔️ Ultimo dia: pierdes por ${diferencia}`,
+        body: voyGanando
+            ? `El duelo contra ${rival} se cierra esta noche. No te lo dejes quitar.`
+            : `Todavia te da tiempo a remontar a ${rival}. El bote son ${bote} fichas.`,
+        icon: '/assets/icons/ficha.png',
+        url: '/social/duelos'
+    };
+};
+
 const runEveningReminder = async ({ forzar = false } = {}) => {
     const hoy = getMadridDateString();
 
@@ -120,7 +161,26 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
 
     const diaSemana = new Date().getDay();
     const ahora = Date.now();
-    const informe = { vuelve: 0, misiones: 0, diaria: 0 };
+    const informe = { vuelve: 0, duelos: 0, misiones: 0, diaria: 0 };
+
+    // ⚠️ LOS DUELOS QUE SE CIERRAN ESTA NOCHE O MAÑANA.
+    //
+    // Se piden UNA vez, aqui fuera, y no dentro del bucle: con doscientos
+    // usuarios, preguntarlo por cada uno son doscientas consultas para leer
+    // siempre lo mismo.
+    const duelosQueAcaban = await Challenge.find({
+        status: 'active',
+        endDate: { $gt: new Date(ahora), $lte: new Date(ahora + 24 * 3600 * 1000) }
+    })
+        .populate('challenger', 'username')
+        .populate('opponent', 'username')
+        .lean();
+
+    const dueloDe = new Map();
+    for (const d of duelosQueAcaban) {
+        if (d.challenger?._id) dueloDe.set(String(d.challenger._id), d);
+        if (d.opponent?._id) dueloDe.set(String(d.opponent._id), d);
+    }
 
     const envios = usuarios.map(async (user) => {
         // 1. Al que lleva EXACTAMENTE tres dias sin aparecer se le manda esto y
@@ -138,6 +198,30 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
             return;
         }
 
+        // 2. EL ULTIMO DIA DE UN DUELO.
+        //
+        // Va por delante de las misiones a proposito. Un duelo tiene fichas de
+        // los dos dentro y solo queda una noche para darle la vuelta: eso es mas
+        // urgente que una mision, y ademas pasa una vez por duelo, asi que no
+        // hay riesgo de convertirlo en ruido.
+        //
+        // Se avisa igual vayas ganando o perdiendo, porque las dos cosas mueven:
+        // una para remontar y la otra para no dejartelo quitar.
+        const duelo = dueloDe.get(String(user._id));
+        if (duelo) {
+            const m = await marcadorEnVivo(duelo);
+            const soyRetador = String(duelo.challenger._id) === String(user._id);
+            const mio = soyRetador ? m.retador : m.rival;
+            const suyo = soyRetador ? m.rival : m.retador;
+            const contra = (soyRetador ? duelo.opponent : duelo.challenger)?.username;
+
+            await sendPushToUser(user, mensajeDeDuelo({
+                mio, suyo, unidad: m.unidad, contra, bote: duelo.betAmount * 2
+            }));
+            informe.duelos++;
+            return;
+        }
+
         const pendientes = await Mission.find({
             frequency: 'daily',
             completed: false,
@@ -151,7 +235,7 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         const diariaPendiente = (user.dailyRewards?.lastClaimDay || null) !== hoy;
         const racha = user.streak?.current || 0;
 
-        // 2. Misiones sin marcar. El daño REAL, con la misma tabla que aplica el
+        // 3. Misiones sin marcar. El daño REAL, con la misma tabla que aplica el
         //    castigo: "perderas HP" sin decir cuanto no ayuda a decidir si merece
         //    la pena levantarse del sofa; "perderas 50 HP" si.
         //
@@ -183,7 +267,7 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
             return;
         }
 
-        // 3. Todo hecho, pero la diaria sin recoger: es dinero gratis que caduca
+        // 4. Todo hecho, pero la diaria sin recoger: es dinero gratis que caduca
         //    a medianoche.
         if (diariaPendiente) {
             await sendPushToUser(user, {
@@ -815,5 +899,5 @@ module.exports = {
     initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder,
     runMorningReminder, ponerseAlDia, esperarPuestaAlDia,
     // Para las pruebas
-    mensajeDeEntreno, diaDeLaSemanaEnMadrid
+    mensajeDeEntreno, mensajeDeDuelo, diaDeLaSemanaEnMadrid
 };
