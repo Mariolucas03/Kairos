@@ -2,7 +2,10 @@ const asyncHandler = require('express-async-handler');
 const Challenge = require('../models/Challenge');
 const User = require('../models/User');
 const mongoose = require('mongoose');
-const { finDelDuelo, pagarDuelo, DUELO_DIAS } = require('../services/duelosService');
+const Notification = require('../models/Notification');
+const {
+    finDelDuelo, pagarDuelo, marcadorEnVivo, TIPOS, catalogoDeMedidas, DUELO_DIAS
+} = require('../services/duelosService');
 
 /**
  * COBRAR LA APUESTA.
@@ -77,7 +80,25 @@ const getChallenges = asyncHandler(async (req, res) => {
     // ha empezado (todavia no tiene fecha de fin). Escribir ese 7 a mano en el
     // movil seria tener la regla en dos sitios, y el dia que cambie aqui la
     // pantalla seguiria prometiendo una semana.
-    res.status(200).json({ duelos, duracionDias: DUELO_DIAS });
+    // ⚠️ EL MARCADOR DE LOS QUE ESTAN EN MARCHA.
+    //
+    // Solo de esos: los pendientes no han empezado y los terminados ya tienen
+    // sus numeros guardados. Va aqui y no en una peticion aparte porque el
+    // servidor gratuito tarda en despertar, y dos viajes para pintar una
+    // pantalla se notan.
+    const conMarcador = await Promise.all(duelos.map(async (d) => {
+        if (d.status !== 'active') return d;
+        return { ...d.toObject(), marcador: await marcadorEnVivo(d) };
+    }));
+
+    // Las medidas tambien salen del servidor, por lo mismo que la duracion: la
+    // pantalla pinta las etiquetas y las unidades que le den, y asi el dia que
+    // se añada un tipo de duelo no hay que tocar el movil.
+    res.status(200).json({
+        duelos: conMarcador,
+        duracionDias: DUELO_DIAS,
+        medidas: catalogoDeMedidas()
+    });
 });
 
 // @desc    Crear un nuevo desafío
@@ -89,6 +110,14 @@ const createChallenge = asyncHandler(async (req, res) => {
     if (!opponentId || !type || !betAmount) {
         res.status(400);
         throw new Error('Faltan datos para el desafío');
+    }
+
+    // El tipo decide QUE se mide, y de eso depende quien cobra. Se comprueba
+    // aqui y no solo en el esquema para poder decir cual es el problema: un
+    // rechazo de Mongoose llegaria al movil como "Error creando desafio".
+    if (!TIPOS.includes(type)) {
+        res.status(400);
+        throw new Error('Ese tipo de duelo no existe');
     }
 
     if (!mongoose.Types.ObjectId.isValid(opponentId)) {
@@ -156,6 +185,21 @@ const createChallenge = asyncHandler(async (req, res) => {
         status: 'pending'
     });
 
+
+    // ⚠️ SIN ESTO, QUE TE RETEN NO SE NOTA.
+    //
+    // Un reto se queda esperando en una pantalla a la que hay que entrar a
+    // proposito. Sin aviso, el retado no se entera nunca y el duelo se muere
+    // solo: el que reta cree que el otro pasa de el, y el otro ni lo ha visto.
+    //
+    // Va sin `await` y con su catch: el reto YA esta creado y un aviso perdido
+    // no puede convertirse en un error que haga pensar que no se ha enviado.
+    Notification.create({
+        user: opponentId,
+        actor: req.user._id,
+        type: 'reto',
+        challenge: challenge._id
+    }).catch(e => console.error('No se pudo avisar del reto:', e.message));
 
     res.status(201).json(challenge);
 });
@@ -260,6 +304,11 @@ const respondChallenge = asyncHandler(async (req, res) => {
         res.status(403);
         throw new Error('Solo puede aceptar quien recibe el reto');
     }
+
+    // El aviso de "te ha retado" pide que hagas algo, y ya lo has hecho. Dejarlo
+    // en el buzon seria tenerte pidiendo una respuesta que ya diste.
+    Notification.deleteMany({ type: 'reto', challenge: challenge._id })
+        .catch(e => console.error('No se pudo limpiar el aviso del reto:', e.message));
 
     if (action === 'accept') {
         // ⚠️ EL RELOJ ARRANCA AQUI, NO AL RETAR.

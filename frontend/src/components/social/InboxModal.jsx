@@ -104,7 +104,7 @@ export default function InboxModal({
                                         // El duelo manda sobre el entreno: si la
                                         // notificacion habla de un duelo, lo que
                                         // quieres ver es el resultado.
-                                        if (n.type === 'duelo') navigate('/social/duelos');
+                                        if (n.type === 'duelo' || n.type === 'reto') navigate('/social/duelos');
                                         else if (n.workout) navigate(`/social/entreno/${n.workout}`);
                                         else if (n.actor?._id) navigate(`/social/user/${n.actor._id}`);
                                     }}
@@ -120,14 +120,16 @@ export default function InboxModal({
                                             <span className="font-black text-white">{n.actor?.username || 'Alguien'}</span>
                                             {n.type === 'like'
                                                 ? ' le ha dado me gusta a tu entreno'
-                                                : n.type === 'duelo'
-                                                    // El texto NO viene del servidor: "has ganado" y
-                                                    // "has perdido" son la MISMA notificacion leida por
-                                                    // dos personas distintas. Aqui se dice lo neutro y el
-                                                    // resultado esta a un toque.
-                                                    ? ' y tú habéis terminado un duelo'
-                                                    : ' ha comentado tu entreno'}
-                                            {n.type !== 'duelo' && n.workoutName
+                                                : n.type === 'reto'
+                                                    ? ' te ha retado a un duelo'
+                                                    : n.type === 'duelo'
+                                                        // El texto NO viene del servidor: "has ganado" y
+                                                        // "has perdido" son la MISMA notificacion leida por
+                                                        // dos personas distintas. Aqui se dice lo neutro y el
+                                                        // resultado esta a un toque.
+                                                        ? ' y tú habéis terminado un duelo'
+                                                        : ' ha comentado tu entreno'}
+                                            {n.type !== 'duelo' && n.type !== 'reto' && n.workoutName
                                                 ? <span className="text-zinc-500"> "{n.workoutName}"</span>
                                                 : null}
                                         </p>
@@ -138,7 +140,7 @@ export default function InboxModal({
                                     <div className="flex flex-col items-end gap-1 shrink-0">
                                         {n.type === 'like'
                                             ? <Heart size={14} className="text-red-500 fill-red-500" />
-                                            : n.type === 'duelo'
+                                            : (n.type === 'duelo' || n.type === 'reto')
                                                 ? <Swords size={14} className="text-yellow-500" />
                                                 : <MessageCircle size={14} className="text-blue-400" />}
                                         <span className="text-[9px] text-zinc-600 font-bold">{hace(n.createdAt)}</span>

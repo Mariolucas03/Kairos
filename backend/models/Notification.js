@@ -14,7 +14,10 @@ const notificationSchema = new mongoose.Schema({
     // Quién la provoca
     actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
-    type: { type: String, enum: ['like', 'comment', 'duelo'], required: true },
+    // 'reto' = alguien te ha desafiado. 'duelo' = un duelo ha terminado. Son
+    // dos avisos distintos y por eso son dos tipos: el primero pide que hagas
+    // algo (aceptar o pasar) y el segundo solo cuenta lo que ha pasado.
+    type: { type: String, enum: ['like', 'comment', 'duelo', 'reto'], required: true },
 
     // Entreno sobre el que se actúa
     workout: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutLog' },

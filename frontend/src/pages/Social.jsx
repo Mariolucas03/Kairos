@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
     Mail, Shield, Users, Search, Trophy, X, Loader2, ChevronDown, Dumbbell, UserPlus,
-    WifiOff, RefreshCw
+    WifiOff, RefreshCw, Swords
 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
@@ -166,11 +166,18 @@ export default function Social() {
     };
 
     // Orden por alcance, de lo más cercano a lo más amplio: buscas gente →
-    // tus amigos → tu clan → el ranking global. El buzón queda el último,
-    // separado, porque es el único que lleva el punto rojo (como en IG).
+    // tus amigos → un duelo con uno de ellos → tu clan → el ranking global. El
+    // buzón queda el último porque es el único que lleva el punto rojo.
+    //
+    // ⚠️ DUELOS NO ESTABA AQUÍ Y NO SE ENCONTRABA.
+    //
+    // La única forma de llegar era deslizando a la derecha sobre un amigo, que
+    // es un gesto que no se ve. Una pantalla a la que solo se llega con un gesto
+    // invisible es una pantalla que no existe.
     const ACTIONS = [
         { key: 'search', icon: Search, label: 'Buscar', onClick: () => setSearchOpen(true) },
         { key: 'friends', icon: Users, label: 'Amigos', onClick: () => navigate('/social/friends') },
+        { key: 'duelos', icon: Swords, label: 'Duelos', onClick: () => navigate('/social/duelos') },
         { key: 'clan', icon: Shield, label: 'Clan', onClick: () => navigate('/social/clans') },
         { key: 'ranking', icon: Trophy, label: 'Ranking', onClick: () => navigate('/social/ranking') },
         { key: 'inbox', icon: Mail, label: 'Buzón', onClick: openInbox, badge: totalNotifications }
@@ -216,13 +223,17 @@ export default function Social() {
                         </button>
                     </div>
                 ) : (
-                    /* Cinco baldosas iguales. Llevan el nombre debajo del icono:
-                       cinco siluetas grises en fila se parecen demasiado entre
-                       sí, y la del buzón y la del clan se confundían. El que
-                       tiene aviso se enciende en amarillo —línea de arriba,
-                       borde y icono— para que se vea de un vistazo cuál pide
-                       atención sin tener que buscar el número. */
-                    <div className="grid grid-cols-5 gap-1.5">
+                    /* Baldosas iguales, con el nombre debajo del icono: varias
+                       siluetas grises en fila se parecen demasiado entre sí, y
+                       la del buzón y la del clan se confundían. El que tiene
+                       aviso se enciende en amarillo —línea de arriba, borde e
+                       icono— para que se vea de un vistazo cuál pide atención
+                       sin tener que buscar el número.
+
+                       Dos filas de tres y no una de seis: a 375 px, seis
+                       columnas dejan 57 px por botón y "RANKING" no cabe. Con
+                       tres por fila el dedo tiene el doble de sitio. */
+                    <div className="grid grid-cols-3 gap-1.5">
                         {ACTIONS.map(({ key, icon: Icon, label, onClick, badge }) => {
                             const avisa = badge > 0;
                             return (

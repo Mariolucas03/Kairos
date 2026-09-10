@@ -7,6 +7,8 @@ const User = require('../models/User');
 const Challenge = require('../models/Challenge');
 const WorkoutLog = require('../models/WorkoutLog');
 const Notification = require('../models/Notification');
+const DailyLog = require('../models/DailyLog');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 const { createChallenge, respondChallenge, getChallenges, deleteChallenge } = require('../controllers/challengeController');
 const { resolverDuelos, finDelDuelo } = require('../services/duelosService');
@@ -373,6 +375,199 @@ describe('Duelos: quién gana y quién cobra', () => {
         // También al que perdió: enterarse es parte del juego.
         const paraQuien = avisos.map(a => a.user.toString()).sort();
         assert.deepStrictEqual(paraQuien, [yo._id.toString(), rival._id.toString()].sort());
+    });
+});
+
+describe('Duelos: cada tipo mide lo suyo', () => {
+
+    before(async () => { await arrancar(); });
+    after(async () => { await parar(); });
+    beforeEach(async () => { await limpiar(); siguiente = 0; });
+
+    /** Un duelo del tipo que se pida, aceptado y ya vencido. */
+    const dueloDe = async (tipo, apuesta = 100) => {
+        const [yo, rival] = await dosAmigos();
+        const p = fingirPeticion({ user: yo, body: { opponentId: String(rival._id), type: tipo, betAmount: apuesta } });
+        await createChallenge(p.req, p.res);
+        const duelo = p.res.enviado;
+        await responder(rival, duelo, 'accept');
+
+        const inicio = new Date(Date.now() - 8 * 86400000);
+        await Challenge.updateOne({ _id: duelo._id },
+            { $set: { startDate: inicio, endDate: finDelDuelo(inicio) } });
+
+        return { yo, rival, inicio };
+    };
+
+    /** Un día del usuario con la XP y las misiones que se le digan. */
+    const diaDe = (userId, fecha, { xp = 0, misiones = 0 }) => DailyLog.create({
+        user: userId,
+        date: getMadridDateString(fecha),
+        gains: { xp, coins: 0, lives: 0 },
+        missionStats: { completed: misiones, total: 3, listCompleted: [] }
+    });
+
+    test('un tipo de duelo inventado se rechaza', async () => {
+        const [yo, rival] = await dosAmigos();
+        const p = fingirPeticion({ user: yo, body: { opponentId: String(rival._id), type: 'pasos', betAmount: 50 } });
+
+        // Los pasos y los kilómetros salen de una casilla donde tecleas un
+        // número. Con una apuesta de por medio eso es "quién escribe más".
+        await assert.rejects(() => createChallenge(p.req, p.res), /no existe/i);
+    });
+
+    test('ENTRENOS: gana quien más veces fue, no quien más levantó', async () => {
+        const { yo, rival, inicio } = await dueloDe('entrenos');
+        const d = (n) => new Date(inicio.getTime() + n * 86400000);
+
+        // El rival mueve MUCHÍSIMO más peso, pero en una sola sesión. En un
+        // duelo de kilos ganaría de calle; aquí lo que cuenta es aparecer.
+        await entrenar(rival._id, 50000, d(1));
+        await entrenar(yo._id, 100, d(1));
+        await entrenar(yo._id, 100, d(2));
+        await entrenar(yo._id, 100, d(3));
+
+        await resolverDuelos();
+
+        assert.strictEqual(await fichasDe(yo), 1100, 'no ha ganado quien más entrenó');
+        const cerrado = await Challenge.findOne().lean();
+        assert.strictEqual(cerrado.volumenChallenger, 3, 'se están contando kilos, no sesiones');
+        assert.strictEqual(cerrado.volumenOpponent, 1);
+    });
+
+    test('XP: suma la de todos los días del duelo', async () => {
+        const { yo, rival, inicio } = await dueloDe('xp');
+        const d = (n) => new Date(inicio.getTime() + n * 86400000);
+
+        await diaDe(yo._id, d(1), { xp: 300 });
+        await diaDe(yo._id, d(2), { xp: 250 });
+        await diaDe(rival._id, d(1), { xp: 400 });
+
+        await resolverDuelos();
+
+        const cerrado = await Challenge.findOne().lean();
+        assert.strictEqual(cerrado.volumenChallenger, 550);
+        assert.strictEqual(cerrado.volumenOpponent, 400);
+        assert.strictEqual(await fichasDe(yo), 1100);
+    });
+
+    test('XP: los días de FUERA del duelo no cuentan', async () => {
+        const { yo, rival, inicio } = await dueloDe('xp');
+
+        // Un día antes de empezar y otro después de acabar. Ninguno es suyo.
+        await diaDe(yo._id, new Date(inicio.getTime() - 86400000), { xp: 9999 });
+        await diaDe(yo._id, new Date(inicio.getTime() + 9 * 86400000), { xp: 9999 });
+        await diaDe(rival._id, new Date(inicio.getTime() + 86400000), { xp: 10 });
+
+        await resolverDuelos();
+
+        const cerrado = await Challenge.findOne().lean();
+        assert.strictEqual(cerrado.volumenChallenger, 0, 'ha contado XP de fuera del plazo');
+        assert.strictEqual(await fichasDe(rival), 1100);
+    });
+
+    test('MISIONES: se cuentan las completadas de cada día', async () => {
+        const { yo, rival, inicio } = await dueloDe('misiones');
+        const d = (n) => new Date(inicio.getTime() + n * 86400000);
+
+        await diaDe(yo._id, d(1), { misiones: 3 });
+        await diaDe(yo._id, d(2), { misiones: 2 });
+        await diaDe(rival._id, d(1), { misiones: 3 });
+        await diaDe(rival._id, d(2), { misiones: 3 });
+
+        await resolverDuelos();
+
+        const cerrado = await Challenge.findOne().lean();
+        assert.strictEqual(cerrado.volumenChallenger, 5);
+        assert.strictEqual(cerrado.volumenOpponent, 6);
+        assert.strictEqual(await fichasDe(rival), 1100, 'no ha ganado quien más misiones hizo');
+    });
+
+    test('cada tipo mira SU dato y no el de al lado', async () => {
+        // Un duelo de XP no puede fijarse en los kilos: si lo hiciera, entrenar
+        // ganaría un duelo de misiones y la app estaría midiendo otra cosa
+        // distinta de la que te prometió al aceptar.
+        const { yo, rival, inicio } = await dueloDe('xp');
+        const dentro = new Date(inicio.getTime() + 86400000);
+
+        await entrenar(yo._id, 99000, dentro);          // muchos kilos, cero XP
+        await diaDe(rival._id, dentro, { xp: 5 });      // nada de gimnasio, 5 XP
+
+        await resolverDuelos();
+
+        assert.strictEqual(await fichasDe(rival), 1100, 'el duelo de XP está mirando los kilos');
+    });
+
+    test('EL MARCADOR EN VIVO: un duelo en marcha dice cómo va', async () => {
+        const [yo, rival] = await dosAmigos();
+        const duelo = (await retar(yo, rival, 100)).enviado;
+        await responder(rival, duelo, 'accept');
+
+        await entrenar(yo._id, 4000, new Date());
+        await entrenar(rival._id, 2500, new Date());
+
+        const p = fingirPeticion({ user: { ...yo.toObject(), id: String(yo._id) } });
+        await getChallenges(p.req, p.res);
+        const enMarcha = p.res.enviado.duelos.find(d => d.status === 'active');
+
+        // ⚠️ Sin esto, un duelo son siete días sin que pase nada: aceptas y no
+        // sabes nada hasta la última noche. Lo que hace volver al gimnasio es
+        // ver que vas por detrás y que quedan tres días.
+        assert.ok(enMarcha.marcador, 'un duelo en marcha no dice cómo va');
+        assert.strictEqual(enMarcha.marcador.retador, 4000);
+        assert.strictEqual(enMarcha.marcador.rival, 2500);
+        assert.strictEqual(enMarcha.marcador.unidad, 'kg');
+    });
+
+    test('el marcador en vivo usa la MISMA cuenta que reparte el bote', async () => {
+        const { yo, rival, inicio } = await dueloDe('xp');
+        const dentro = new Date(inicio.getTime() + 86400000);
+        await diaDe(yo._id, dentro, { xp: 700 });
+        await diaDe(rival._id, dentro, { xp: 300 });
+
+        // Se mira el marcador ANTES de cerrarlo...
+        const p = fingirPeticion({ user: { ...yo.toObject(), id: String(yo._id) } });
+        await getChallenges(p.req, p.res);
+        const antes = p.res.enviado.duelos.find(d => d.status === 'active').marcador;
+
+        // ...y los números guardados DESPUÉS.
+        await resolverDuelos();
+        const cerrado = await Challenge.findOne().lean();
+
+        // Tienen que coincidir. Si el marcador que miras toda la semana no es el
+        // que reparte el bote, la app te está enseñando un duelo distinto del
+        // que estás jugando.
+        assert.strictEqual(antes.retador, cerrado.volumenChallenger);
+        assert.strictEqual(antes.rival, cerrado.volumenOpponent);
+    });
+
+    test('los pendientes y los terminados no traen marcador', async () => {
+        const [yo, rival] = await dosAmigos();
+        await retar(yo, rival, 100);
+
+        const p = fingirPeticion({ user: { ...yo.toObject(), id: String(yo._id) } });
+        await getChallenges(p.req, p.res);
+
+        // Uno pendiente no ha empezado, así que no hay nada que contar, y
+        // calcularlo serían dos consultas por duelo para pintar un cero.
+        assert.strictEqual(p.res.enviado.duelos[0].marcador, undefined);
+    });
+
+    test('la lista dice qué se puede medir, para no escribirlo en el móvil', async () => {
+        const [yo, rival] = await dosAmigos();
+        await retar(yo, rival);
+
+        const p = fingirPeticion({ user: { ...yo.toObject(), id: String(yo._id) } });
+        await getChallenges(p.req, p.res);
+
+        const medidas = p.res.enviado.medidas;
+        assert.ok(Array.isArray(medidas) && medidas.length >= 4);
+        for (const m of medidas) {
+            assert.ok(m.clave && m.etiqueta && m.unidad, `medida incompleta: ${JSON.stringify(m)}`);
+        }
+        // Y las que se quitaron siguen fuera.
+        const claves = medidas.map(m => m.clave);
+        assert.ok(!claves.includes('steps') && !claves.includes('distance'));
     });
 });
 

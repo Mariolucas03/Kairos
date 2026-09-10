@@ -1,8 +1,10 @@
 const Challenge = require('../models/Challenge');
 const WorkoutLog = require('../models/WorkoutLog');
+const DailyLog = require('../models/DailyLog');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { volumenDe } = require('../controllers/gymController');
+const { getMadridDateString } = require('../utils/dateHelpers');
 
 /**
  * QUIÉN GANA EL DUELO, Y QUIÉN COBRA.
@@ -43,6 +45,122 @@ const volumenEntre = async (userId, desde, hasta) => {
     }).select('exercises.sets').lean();
 
     return logs.reduce((total, log) => total + volumenDe(log.exercises || []), 0);
+};
+
+/** Cuantas sesiones de gimnasio hizo entre dos fechas. */
+const entrenosEntre = (userId, desde, hasta) => WorkoutLog.countDocuments({
+    user: userId,
+    type: 'gym',
+    date: { $gte: desde, $lt: hasta }
+});
+
+/**
+ * SUMA UN CONTADOR DIARIO A LO LARGO DEL DUELO.
+ *
+ * ⚠️ AQUI SE MIDE POR DIAS ENTEROS, Y NO ES LO MISMO QUE ARRIBA.
+ *
+ * La XP y las misiones no viven en un registro con hora: se acumulan en el
+ * `DailyLog`, que va por dia y guarda la fecha como texto "AAAA-MM-DD". Asi que
+ * un duelo de XP cuenta los siete DIAS de Madrid que toca el duelo, no las 168
+ * horas exactas.
+ *
+ * Es justo aunque no sea exacto: los dos jugadores comparten las MISMAS fechas,
+ * porque salen del mismo duelo. Lo unico que se cuela es la XP que el retado ya
+ * hubiera hecho el dia que acepto, y eso le pasa igual a los dos.
+ */
+const sumaDiaria = async (userId, desde, hasta, campo) => {
+    // El ultimo instante que todavia esta dentro, para no arrastrar el dia
+    // siguiente cuando el duelo termina justo a medianoche.
+    const primerDia = getMadridDateString(desde);
+    const ultimoDia = getMadridDateString(new Date(new Date(hasta).getTime() - 1));
+
+    const [r] = await DailyLog.aggregate([
+        { $match: { user: userId, date: { $gte: primerDia, $lte: ultimoDia } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: [campo, 0] } } } }
+    ]);
+    return r?.total || 0;
+};
+
+/**
+ * LO QUE SE PUEDE MEDIR EN UN DUELO.
+ *
+ * ⚠️ LO QUE ESTA AQUI TIENE QUE CALCULARLO EL SERVIDOR.
+ *
+ * Esa es la unica regla. En esta app casi todo lo escribes tu, y mientras
+ * compitas contigo mismo da igual: mentir solo te perjudica. Con una apuesta de
+ * por medio, mentir es quitarle fichas a un amigo.
+ *
+ * Los kilos y los entrenos salen de los entrenos guardados —con techo por sesion
+ * y con la misma cuenta que mueve los rangos—. La XP y las misiones las reparte
+ * el servidor y no hay ninguna casilla donde teclearlas.
+ *
+ * Por eso NO estan los pasos ni los kilometros, que el modelo declaraba al
+ * principio: los dos salen de una casilla donde escribes un numero a mano. Un
+ * duelo de pasos seria "quien teclea el numero mas grande".
+ */
+const MEDIDAS = {
+    gym: {
+        etiqueta: 'Kilos movidos',
+        pista: 'Gana quien más peso levante en total',
+        unidad: 'kg',
+        medir: volumenEntre
+    },
+    entrenos: {
+        etiqueta: 'Entrenos',
+        pista: 'Gana quien más veces vaya al gimnasio',
+        unidad: 'entrenos',
+        medir: entrenosEntre
+    },
+    xp: {
+        etiqueta: 'Experiencia',
+        pista: 'Todo suma: gimnasio, misiones y comida',
+        unidad: 'XP',
+        medir: (u, d, h) => sumaDiaria(u, d, h, '$gains.xp')
+    },
+    misiones: {
+        etiqueta: 'Misiones',
+        pista: 'Gana quien más misiones complete',
+        unidad: 'misiones',
+        medir: (u, d, h) => sumaDiaria(u, d, h, '$missionStats.completed')
+    }
+};
+
+const TIPOS = Object.keys(MEDIDAS);
+
+/** El catálogo tal y como lo necesita la pantalla, sin las funciones. */
+const catalogoDeMedidas = () => TIPOS.map(clave => ({
+    clave,
+    etiqueta: MEDIDAS[clave].etiqueta,
+    pista: MEDIDAS[clave].pista,
+    unidad: MEDIDAS[clave].unidad
+}));
+
+/**
+ * COMO VA LA COSA AHORA MISMO.
+ *
+ * ⚠️ SIN ESTO, UN DUELO ES SIETE DIAS SIN QUE PASE NADA.
+ *
+ * Aceptabas, y hasta la noche del septimo dia no sabias absolutamente nada. Eso
+ * no es un duelo, es una espera: lo que hace que quieras volver al gimnasio es
+ * ver que vas dos mil kilos por detras y que quedan tres dias.
+ *
+ * Se mide con la MISMA funcion que decide quien gana al cerrarlo. Calcularlo de
+ * otra manera aqui —o peor, en el movil— haria que el marcador que miras toda
+ * la semana no fuera el que reparte el bote.
+ *
+ * Se corta en `endDate` aunque se mire despues: pasada esa hora ya no cuenta
+ * nada, y seguir sumando seria enseñar un marcador que no es el que paga.
+ */
+const marcadorEnVivo = async (duelo, ahora = new Date()) => {
+    const medida = MEDIDAS[duelo.type] || MEDIDAS.gym;
+    const hasta = new Date(Math.min(new Date(duelo.endDate).getTime(), ahora.getTime()));
+
+    const [retador, rival] = await Promise.all([
+        medida.medir(duelo.challenger?._id || duelo.challenger, duelo.startDate, hasta),
+        medida.medir(duelo.opponent?._id || duelo.opponent, duelo.startDate, hasta)
+    ]);
+
+    return { retador, rival, unidad: medida.unidad, etiqueta: medida.etiqueta };
 };
 
 /** Suma fichas a alguien. Devuelve si se pudo. */
@@ -125,9 +243,14 @@ const resolverDuelos = async (ahora = new Date()) => {
     const vencidos = await Challenge.find({ status: 'active', endDate: { $lte: ahora } });
 
     for (const duelo of vencidos) {
+        // Cada tipo de duelo mide una cosa distinta, pero el resto —quien gana,
+        // como se paga, como se avisa— es exactamente igual. Por eso la medida
+        // es un dato y no un `if` por cada tipo repartido por el fichero.
+        const medida = MEDIDAS[duelo.type] || MEDIDAS.gym;
+
         const [volRetador, volRival] = await Promise.all([
-            volumenEntre(duelo.challenger, duelo.startDate, duelo.endDate),
-            volumenEntre(duelo.opponent, duelo.startDate, duelo.endDate)
+            medida.medir(duelo.challenger, duelo.startDate, duelo.endDate),
+            medida.medir(duelo.opponent, duelo.startDate, duelo.endDate)
         ]);
 
         // Empate incluye el 0 a 0: si ninguno de los dos entrenó, nadie ha
@@ -161,4 +284,7 @@ const resolverDuelos = async (ahora = new Date()) => {
     return resumen;
 };
 
-module.exports = { resolverDuelos, pagarDuelo, volumenEntre, finDelDuelo, DUELO_DIAS };
+module.exports = {
+    resolverDuelos, pagarDuelo, volumenEntre, finDelDuelo, marcadorEnVivo,
+    MEDIDAS, TIPOS, catalogoDeMedidas, DUELO_DIAS
+};

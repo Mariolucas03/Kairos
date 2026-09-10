@@ -33,8 +33,14 @@ const fetcher = (url) => api.get(url).then(res => res.data);
  * ha salido en este proyecto.
  */
 
-/** Los kilos, como se leen: "12.400 kg". */
-const enKilos = (n) => `${Math.round(n || 0).toLocaleString('es-ES')} kg`;
+/**
+ * El número con su unidad: "12.400 kg", "5 entrenos", "1.200 XP".
+ *
+ * La unidad la manda el servidor con cada duelo, para que añadir un tipo nuevo
+ * no obligue a tocar esta pantalla.
+ */
+const conUnidad = (n, unidad = '') =>
+    `${Math.round(n || 0).toLocaleString('es-ES')}${unidad ? ' ' + unidad : ''}`;
 
 /** "3 días", "1 día", "hoy". Lo que queda para que se cierre. */
 const loQueQueda = (fin) => {
@@ -71,6 +77,73 @@ const Seccion = ({ titulo, color, children }) => (
 const Tarjeta = ({ children, borde = 'border-white/[0.07]' }) => (
     <div className={`bg-[#0a0a0c] border ${borde} rounded-2xl p-3.5`}>{children}</div>
 );
+
+/**
+ * CÓMO VA EL DUELO AHORA MISMO.
+ *
+ * ⚠️ ESTO ES LO QUE LE FALTABA A LOS DUELOS.
+ *
+ * Sin marcador, aceptar un duelo era empezar siete días de silencio: no sabías
+ * nada hasta la última noche. Lo que hace que vuelvas al gimnasio es abrir la
+ * app y ver que vas dos mil kilos por detrás y que quedan tres días.
+ *
+ * Los números vienen del SERVIDOR, calculados con la misma función que reparte
+ * el bote al cerrar. Sumarlos aquí daría un marcador distinto del que decide
+ * quién gana, y entonces estarías mirando un duelo que no es el tuyo.
+ */
+const Marcador = ({ mio, suyo, unidad, rival }) => {
+    const total = mio + suyo;
+    // Sin datos todavía, la barra se queda a la mitad: un 0-0 no lo gana nadie.
+    const miParte = total > 0 ? (mio / total) * 100 : 50;
+    const voyGanando = mio > suyo;
+    const empate = mio === suyo;
+
+    return (
+        <div className="mt-3">
+            <div className="flex items-end justify-between gap-2 mb-2">
+                <div className="min-w-0 flex-1">
+                    <p className={`text-[17px] font-black tabular-nums leading-none not-italic ${voyGanando ? 'text-yellow-500' : 'text-zinc-300'}`}>
+                        {conUnidad(mio, unidad)}
+                    </p>
+                    <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mt-1">Tú</p>
+                </div>
+                <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest pb-3 shrink-0">vs</span>
+                <div className="min-w-0 flex-1 text-right">
+                    <p className={`text-[17px] font-black tabular-nums leading-none not-italic ${!voyGanando && !empate ? 'text-yellow-500' : 'text-zinc-300'}`}>
+                        {conUnidad(suyo, unidad)}
+                    </p>
+                    <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mt-1 truncate">
+                        {rival?.username}
+                    </p>
+                </div>
+            </div>
+
+            {/* La barra: tu parte del total. De un vistazo se ve por cuánto vas. */}
+            <div className="h-1.5 rounded-full bg-zinc-900 overflow-hidden flex">
+                <div
+                    className="h-full transition-all duration-500"
+                    style={{
+                        width: `${miParte}%`,
+                        background: voyGanando ? '#eab308' : '#3f3f46'
+                    }}
+                />
+                <div
+                    className="h-full flex-1 transition-all duration-500"
+                    style={{ background: !voyGanando && !empate ? '#eab308' : '#27272a' }}
+                />
+            </div>
+
+            <p className={`text-[10px] font-black uppercase tracking-widest mt-2 text-center not-italic ${empate ? 'text-zinc-500' : voyGanando ? 'text-yellow-500' : 'text-red-400'}`}>
+                {empate
+                    ? (total === 0 ? 'Nadie ha empezado' : 'Empate')
+                    : voyGanando
+                        ? `Ganas por ${conUnidad(mio - suyo, unidad)}`
+                        : `Pierdes por ${conUnidad(suyo - mio, unidad)}`}
+            </p>
+        </div>
+    );
+};
+
 
 const Boton = ({ children, onClick, tono = 'neutro', disabled }) => {
     const tonos = {
@@ -110,11 +183,21 @@ export default function DuelosPage() {
     const rivalSugerido = params.get('rival');
     const [creando, setCreando] = useState(() => Boolean(rivalSugerido));
     const [apuesta, setApuesta] = useState(50);
+    // 'gym' de partida porque es una app de gimnasio. Las claves las manda el
+    // servidor, asi que si algun dia se añade un tipo aparece aqui solo.
+    const [tipo, setTipo] = useState('gym');
 
     // Memorizado porque de el cuelgan dos useMemo: con un array nuevo en
     // cada pintado, los dos se recalculaban siempre y no servian de nada.
     const duelos = useMemo(() => data?.duelos || [], [data]);
     const dias = data?.duracionDias;
+    const medidas = useMemo(() => data?.medidas || [], [data]);
+    // Los duelos terminados no traen marcador —sus numeros ya estan guardados—,
+    // asi que la unidad se busca por tipo en el catalogo del servidor.
+    const unidadDe = useMemo(() => {
+        const porClave = Object.fromEntries(medidas.map(m => [m.clave, m.unidad]));
+        return (tipo) => porClave[tipo] || '';
+    }, [medidas]);
     // El sugerido primero: es a quien venias a retar.
     const amigos = useMemo(() => {
         const lista = amigosData?.friends || [];
@@ -172,7 +255,7 @@ export default function DuelosPage() {
     };
 
     const retar = (rivalId) => pedir(
-        () => api.post('/challenges', { opponentId: rivalId, type: 'gym', betAmount: apuesta }),
+        () => api.post('/challenges', { opponentId: rivalId, type: tipo, betAmount: apuesta }),
         'Duelo enviado. A ver si se atreve.'
     ).then(() => setCreando(false));
 
@@ -189,7 +272,7 @@ export default function DuelosPage() {
         <div className="pt-safe-page pb-28">
             <SocialSubHeader
                 title="Duelos"
-                subtitle={dias ? `${dias} días midiendo kilos` : 'Kilos movidos'}
+                subtitle={dias ? `${dias} días, el que más gane` : 'Uno contra uno'}
                 icon={Swords}
                 right={
                     <div className="flex items-center gap-1.5 bg-zinc-900 border border-white/[0.07] rounded-xl px-2.5 py-1.5 shrink-0">
@@ -226,7 +309,12 @@ export default function DuelosPage() {
                                                 {d.challenger?.username}
                                             </p>
                                             <p className="text-[10px] text-zinc-500">
-                                                te reta por <span className="text-yellow-500 font-black">{d.betAmount}</span> fichas
+                                                {/* A QUE te reta importa tanto como cuanto: uno
+                                                    de kilos y uno de misiones no se aceptan
+                                                    igual segun como andes de tiempo. */}
+                                                {medidas.find(m => m.clave === d.type)?.etiqueta || 'Kilos movidos'}
+                                                {' · '}
+                                                <span className="text-yellow-500 font-black">{d.betAmount}</span> fichas
                                             </p>
                                         </div>
                                     </div>
@@ -252,6 +340,7 @@ export default function DuelosPage() {
                         <Seccion titulo="En marcha" color="text-emerald-500">
                             {activos.map(d => {
                                 const rival = elOtro(d, miId);
+                                const soyRetador = d.challenger?._id === miId;
                                 return (
                                     <Tarjeta key={d._id} borde="border-emerald-500/25">
                                         <div className="flex items-center gap-3">
@@ -261,18 +350,20 @@ export default function DuelosPage() {
                                                     contra {rival?.username}
                                                 </p>
                                                 <p className="text-[10px] text-zinc-500">
-                                                    {loQueQueda(d.endDate)} · bote de{' '}
+                                                    {d.marcador?.etiqueta || 'Kilos movidos'} · {loQueQueda(d.endDate)} · bote de{' '}
                                                     <span className="text-yellow-500 font-black">{d.betAmount * 2}</span>
                                                 </p>
                                             </div>
                                         </div>
-                                        {/* Los kilos NO se enseñan mientras corre el duelo: el
-                                            servidor solo los calcula al cerrarlo, y pintar aquí
-                                            una cuenta hecha en el móvil daría un número distinto
-                                            del que decide quién gana. */}
-                                        <p className="text-[9px] text-zinc-600 mt-3 mb-2.5 text-center leading-snug">
-                                            El resultado se hace público la noche que termina.
-                                        </p>
+                                        {d.marcador && (
+                                            <Marcador
+                                                mio={soyRetador ? d.marcador.retador : d.marcador.rival}
+                                                suyo={soyRetador ? d.marcador.rival : d.marcador.retador}
+                                                unidad={d.marcador.unidad}
+                                                rival={rival}
+                                            />
+                                        )}
+                                        <div className="h-2.5" />
                                         {/* En un contenedor flex porque `Boton` reparte el
                                             ancho con `flex-1`, y suelto se quedaba en una
                                             pastilla estrecha pegada a la izquierda. */}
@@ -342,7 +433,7 @@ export default function DuelosPage() {
                                                     <span className="text-zinc-600"> contra {rival?.username}</span>
                                                 </p>
                                                 <p className="text-[10px] text-zinc-500 tabular-nums">
-                                                    {enKilos(mios)} contra {enKilos(suyos)}
+                                                    {conUnidad(mios, unidadDe(d.type))} contra {conUnidad(suyos, unidadDe(d.type))}
                                                 </p>
                                             </div>
                                             <span className={`text-[12px] font-black tabular-nums shrink-0 ${gane ? 'text-yellow-500' : 'text-zinc-600'}`}>
@@ -393,6 +484,36 @@ export default function DuelosPage() {
                             </button>
                         </div>
 
+                        {/* ⚠️ QUE SE MIDE, PRIMERO.
+                            Es la decision que cambia el duelo entero: uno de kilos
+                            y uno de misiones no se parecen en nada. La apuesta va
+                            despues porque es el detalle. */}
+                        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-2">
+                            ¿A qué jugáis?
+                        </p>
+                        <div className="grid grid-cols-2 gap-1.5 mb-4">
+                            {medidas.map(m => {
+                                const elegido = tipo === m.clave;
+                                return (
+                                    <button
+                                        key={m.clave}
+                                        type="button"
+                                        onClick={() => setTipo(m.clave)}
+                                        className={`p-2.5 rounded-2xl border text-left transition-colors ${elegido
+                                            ? 'bg-yellow-500/[0.08] border-yellow-500/40'
+                                            : 'bg-zinc-900 border-white/[0.07]'}`}
+                                    >
+                                        <span className={`block text-[11px] font-black uppercase tracking-tight not-italic ${elegido ? 'text-yellow-500' : 'text-zinc-300'}`}>
+                                            {m.etiqueta}
+                                        </span>
+                                        <span className="block text-[9px] text-zinc-600 leading-tight mt-0.5">
+                                            {m.pista}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
                         <SelectorApuesta
                             valor={apuesta}
                             onChange={setApuesta}
@@ -402,7 +523,7 @@ export default function DuelosPage() {
                         />
 
                         <p className="text-[10px] text-zinc-500 mt-3 mb-4 leading-snug">
-                            Gana quien más kilos mueva en {dias} días. El bote son{' '}
+                            {dias} días. El bote son{' '}
                             <span className="text-yellow-500 font-black">{apuesta * 2}</span> fichas
                             y se cobra cuando acepte.
                         </p>

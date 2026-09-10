@@ -10,19 +10,20 @@ const mongoose = require('mongoose');
  * Los duelos empezaban y se quedaban activos para siempre. La pantalla decía
  * "próximamente", así que al menos no mentía.
  *
- * ⚠️ SOLO DE GIMNASIO, Y ESO ES UNA DECISION, NO UN RECORTE.
+ * ⚠️ LOS PASOS Y LOS KILOMETROS NO ESTAN, Y ESO ES UNA DECISION.
  *
- * Aquí se declaraban cuatro tipos: misiones, gimnasio, pasos y kilómetros. Pero
- * en esta app TODO lo escribes tú. Los pasos se guardan desde una casilla donde
- * tecleas un número, y los kilómetros igual. Eso da igual mientras compitas
- * contigo mismo —mentir solo te perjudica—, pero un duelo con apuesta convierte
- * mentir en quitarle fichas a otro. Un duelo de pasos seria "quien teclea el
- * numero mas grande".
+ * Se declaraban cuatro tipos al principio: misiones, gimnasio, pasos y
+ * kilometros. Los dos ultimos se van porque salen de una casilla donde tecleas
+ * un numero a mano. Eso da igual mientras compitas contigo mismo —mentir solo te
+ * perjudica—, pero un duelo con apuesta convierte mentir en quitarle fichas a un
+ * amigo. Un duelo de pasos seria "quien teclea el numero mas grande".
  *
- * El de gimnasio es el unico que ya viene acotado: el volumen tiene un techo por
- * sesion (MAX_VOLUMEN_SESION) y se calcula con `volumenDe`, la misma cuenta que
- * mueve los rangos musculares. Sigue siendo un numero que escribes tu, pero es
- * el que menos se presta.
+ * Lo que queda lo calcula el SERVIDOR: los kilos y los entrenos salen de las
+ * sesiones guardadas (con techo por sesion, y con la misma cuenta que mueve los
+ * rangos musculares), y la XP y las misiones las reparte el servidor sin que
+ * haya ninguna casilla donde escribirlas.
+ *
+ * Que mide cada uno esta en services/duelosService.js, en MEDIDAS.
  */
 const challengeSchema = new mongoose.Schema({
     challenger: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -30,7 +31,7 @@ const challengeSchema = new mongoose.Schema({
 
     type: {
         type: String,
-        enum: ['gym'],       // kilos movidos en la semana
+        enum: ['gym', 'entrenos', 'xp', 'misiones'],
         default: 'gym',
         required: true
     },
