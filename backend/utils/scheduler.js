@@ -10,6 +10,7 @@ const SystemState = require('../models/SystemState');
 const Notification = require('../models/Notification');
 const Routine = require('../models/Routine');
 const WorkoutLog = require('../models/WorkoutLog');
+const { resolverDuelos } = require('../services/duelosService');
 
 // Clave donde se anota el ULTIMO dia ya castigado, para no castigar dos veces
 const CLAVE_NOCTURNO = 'nightly-maintenance';
@@ -638,6 +639,25 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
         // 4. LIMPIEZA
         for (const freq of frequenciesToPunish) {
             await processCycle(freq);
+        }
+
+        // ⚠️ CERRAR LOS DUELOS QUE HAN VENCIDO.
+        //
+        // Aqui es donde el duelo deja de estar a medias: hasta que esto existio,
+        // un reto aceptado se quedaba activo para siempre y la apuesta no la
+        // cobraba nadie.
+        //
+        // Va dentro del try del mantenimiento pero con su propio catch: si algo
+        // falla repartiendo un bote, no puede llevarse por delante el resto de
+        // la noche (los castigos de misiones ya se han aplicado arriba).
+        try {
+            const duelos = await resolverDuelos();
+            if (duelos.cerrados || duelos.rescatados) {
+                console.log('⚔️ Duelos: ' + duelos.cerrados + ' cerrados, ' +
+                    duelos.pagados + ' pagados, ' + duelos.rescatados + ' rescatados.');
+            }
+        } catch (err) {
+            console.error('Error cerrando duelos:', err);
         }
 
         // Las notificaciones sociales no se borraban NUNCA. Son la unica coleccion

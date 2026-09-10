@@ -14,11 +14,16 @@ const notificationSchema = new mongoose.Schema({
     // Quién la provoca
     actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
-    type: { type: String, enum: ['like', 'comment'], required: true },
+    type: { type: String, enum: ['like', 'comment', 'duelo'], required: true },
 
     // Entreno sobre el que se actúa
     workout: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutLog' },
     workoutName: { type: String, default: '' },
+
+    // Duelo del que se avisa. El texto NO se guarda aquí: "has ganado" y "has
+    // perdido" son la misma notificación leída por dos personas distintas, así
+    // que la frase se arma en el móvil a partir del duelo.
+    challenge: { type: mongoose.Schema.Types.ObjectId, ref: 'Challenge' },
 
     // Texto del comentario (vacío en los me gusta)
     text: { type: String, default: '' },
