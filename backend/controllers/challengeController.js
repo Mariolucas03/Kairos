@@ -221,75 +221,25 @@ const createChallenge = asyncHandler(async (req, res) => {
 });
 
 
-// @desc    Actualizar desafío (Aceptar/Huir/Modificar)
-// @route   PUT /api/challenges/:id
-// @access  Private
-const updateChallenge = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-
-    // 1. VALIDACIÓN TÉCNICA
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        res.status(400);
-        throw new Error('ID de desafío inválido');
-    }
-
-    // 2. BÚSQUEDA
-    const challenge = await Challenge.findById(id);
-
-    // 3. VALIDACIÓN DE EXISTENCIA
-    if (!challenge) {
-        res.status(404);
-        throw new Error('El desafío ya no existe');
-    }
-
-    if (!esParte(challenge, req.user._id)) {
-        res.status(403);
-        throw new Error('Ese desafío no es tuyo');
-    }
-
-    // El cuerpo de la petición YA NO se escribe. Antes se pasaba entero al
-    // update, y no hay ningún campo del reto que el cliente deba poder fijar a
-    // mano: ni la apuesta, ni el estado, ni el ganador. Cuando la función se
-    // termine, cada cambio tendrá su propia ruta con sus reglas.
-    res.status(200).json(challenge);
-});
-
-// @desc    Eliminar desafío / Responder (Lógica combinada para limpiar)
-// @route   DELETE /api/challenges/:id
-const deleteChallenge = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        res.status(400);
-        throw new Error('ID de desafío inválido');
-    }
-
-    const challenge = await Challenge.findById(id);
-
-    if (!challenge) {
-        res.status(404);
-        throw new Error('Desafío no encontrado');
-    }
-
-    if (!esParte(challenge, req.user._id)) {
-        res.status(403);
-        throw new Error('Ese desafío no es tuyo');
-    }
-
-    // Igual que arriba: borrar un duelo aceptado se llevaria las fichas
-    // retenidas de los dos. Para salirse de uno empezado esta 'flee', que al
-    // menos le da el bote a alguien.
-    if (challenge.status !== 'pending') {
-        res.status(400);
-        throw new Error(challenge.status === 'active'
-            ? 'Ese duelo ya está en marcha. Puedes rendirte, pero no borrarlo.'
-            : 'Un duelo terminado no se borra: es parte de tu historial.');
-    }
-
-    await challenge.deleteOne();
-
-    res.status(200).json({ id: id });
-});
+/*
+ * AQUI VIVIAN `updateChallenge` (PUT /:id) y `deleteChallenge` (DELETE /:id).
+ *
+ * Las dos estaban muertas: ninguna pantalla las llamaba.
+ *
+ * El PUT no hacia NADA. Validaba el id, buscaba el duelo, comprobaba que fuera
+ * tuyo... y devolvia el duelo sin tocarlo. Antes escribia `req.body` entero
+ * —con lo que se podian reescribir la apuesta, el estado y hasta el ganador—, se
+ * cerro ese agujero dejando la ruta vacia, y la ruta vacia se quedo ahi.
+ *
+ * El DELETE era una segunda puerta a lo que ya hace `respond` con 'reject':
+ * borrar un duelo pendiente. Dos formas de cancelar un duelo son dos formas que
+ * hay que mantener seguras, y ya costo una: DELETE borraba el documento sin
+ * mirar el estado, asi que con el duelo aceptado se llevaba por delante las
+ * fichas retenidas de los DOS.
+ *
+ * Para salirse de un duelo esta `respond`: 'reject' si esta pendiente y 'flee'
+ * si ya ha empezado (y entonces el bote es para el que se queda).
+ */
 
 // --- NUEVO: Manejar respuesta (Aceptar/Rechazar) ---
 const respondChallenge = asyncHandler(async (req, res) => {
@@ -422,7 +372,5 @@ const respondChallenge = asyncHandler(async (req, res) => {
 module.exports = {
     getChallenges,
     createChallenge,
-    updateChallenge,
-    deleteChallenge,
-    respondChallenge // <--- Asegúrate de exportar esto
+    respondChallenge
 };

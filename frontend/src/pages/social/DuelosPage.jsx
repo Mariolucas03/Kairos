@@ -235,7 +235,7 @@ export default function DuelosPage() {
      * después sería enseñar un saldo que no es el tuyo.
      */
     const pedir = async (fn, exito) => {
-        if (enVuelo) return;
+        if (enVuelo) return false;
         setEnVuelo(true);
         try {
             const res = await fn();
@@ -246,20 +246,35 @@ export default function DuelosPage() {
             // cabecera enseñaría un saldo que no es el tuyo.
             if (res?.data?.user) setUser(res.data.user);
             setToast({ message: exito, type: 'success' });
+            return true;
         } catch (e) {
             setToast({
                 message: e?.response?.data?.message || 'No se ha podido. Inténtalo otra vez.',
                 type: 'error'
             });
+            // ⚠️ SE DEVUELVE SI SALIO BIEN, Y NO ES UN DETALLE.
+            //
+            // Antes esto no devolvia nada y el que llamaba encadenaba un
+            // `.then()`: como los fallos se recogen AQUI, la promesa se resolvia
+            // igual y la ventana de "nuevo duelo" se cerraba tambien cuando el
+            // servidor decia que no. Veias el error y a la vez perdias el tipo y
+            // la apuesta que acababas de elegir.
+            return false;
         } finally {
             setEnVuelo(false);
         }
     };
 
-    const retar = (rivalId) => pedir(
-        () => api.post('/challenges', { opponentId: rivalId, type: tipo, betAmount: apuesta }),
-        'Duelo enviado. A ver si se atreve.'
-    ).then(() => setCreando(false));
+    const retar = async (rivalId) => {
+        const salioBien = await pedir(
+            () => api.post('/challenges', { opponentId: rivalId, type: tipo, betAmount: apuesta }),
+            'Duelo enviado. A ver si se atreve.'
+        );
+        // Solo se cierra si de verdad se ha creado. Si el servidor rechaza —sin
+        // fichas, ya teneis uno, ya no sois amigos— la ventana se queda con lo
+        // que habias elegido para poder cambiar lo que sea y reintentar.
+        if (salioBien) setCreando(false);
+    };
 
     const responder = (id, action, exito) => pedir(
         () => api.post('/challenges/respond', { challengeId: id, action }),

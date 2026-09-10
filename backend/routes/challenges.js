@@ -3,9 +3,7 @@ const router = express.Router();
 const {
     getChallenges,
     createChallenge,
-    updateChallenge,
-    deleteChallenge,
-    respondChallenge // <--- 1. Importamos la nueva función del controlador
+    respondChallenge
 } = require('../controllers/challengeController');
 
 // 2. CORRECCIÓN IMPORTANTE: Quitamos las llaves { } alrededor de protect
@@ -17,13 +15,13 @@ router.route('/')
     .get(protect, getChallenges)
     .post(protect, createChallenge);
 
-// 3. NUEVA RUTA: Responder desafíos (Aceptar/Huir)
-// Es importante ponerla ANTES de /:id para evitar conflictos de ruta
+// Aceptar, rechazar o rendirse. Es la UNICA forma de cambiar un duelo.
+//
+// Aqui debajo estaban PUT /:id y DELETE /:id. Ninguna pantalla las llamaba: el
+// PUT no hacia nada y el DELETE era una segunda puerta a lo que ya hace
+// 'reject'. Dos formas de cancelar un duelo son dos formas que mantener
+// seguras, y esa ya costo una (borraba el duelo con las fichas de los dos
+// dentro).
 router.post('/respond', protect, respondChallenge);
-
-// Rutas con ID: /api/challenges/:id
-router.route('/:id')
-    .put(protect, updateChallenge)
-    .delete(protect, deleteChallenge);
 
 module.exports = router;

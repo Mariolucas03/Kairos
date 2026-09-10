@@ -10,7 +10,7 @@ const Notification = require('../models/Notification');
 const DailyLog = require('../models/DailyLog');
 const { getMadridDateString } = require('../utils/dateHelpers');
 
-const { createChallenge, respondChallenge, getChallenges, deleteChallenge } = require('../controllers/challengeController');
+const { createChallenge, respondChallenge, getChallenges } = require('../controllers/challengeController');
 const { resolverDuelos, finDelDuelo } = require('../services/duelosService');
 
 /**
@@ -656,15 +656,18 @@ describe('Duelos: salirse a medias', () => {
         assert.strictEqual(cerrado.winner.toString(), yo._id.toString());
     });
 
-    test('borrar un duelo en marcha no se permite', async () => {
+    test('un duelo terminado no se puede volver a tocar', async () => {
         const [yo, rival] = await dosAmigos();
         const duelo = (await retar(yo, rival, 100)).enviado;
         await responder(rival, duelo, 'accept');
+        await responder(rival, duelo, 'flee');
 
-        const p = fingirPeticion({ user: yo, params: { id: String(duelo._id) } });
-        await assert.rejects(() => deleteChallenge(p.req, p.res), /ya está en marcha/i);
+        // Ya se ha pagado el bote. Volver a pasar por aquí no puede pagarlo otra
+        // vez ni resucitar el duelo.
+        await assert.rejects(() => responder(rival, duelo, 'flee'), /ya está terminado/i);
 
-        assert.strictEqual(await Challenge.countDocuments(), 1);
+        assert.strictEqual(await fichasDe(yo), 1100);
+        assert.strictEqual(await fichasDe(yo) + await fichasDe(rival), 2000);
     });
 
     test('el duelo de otras dos personas no se toca', async () => {
