@@ -64,8 +64,16 @@ const routineSchema = new mongoose.Schema({
     defaultRest: { type: Number, default: 60 },
 
     exercises: [exerciseSchema],
+
+    // Cuando se entreno por ultima vez. La usa el aviso de "hoy toca" para
+    // decir "la ultima fue hace 6 dias" —ver utils/scheduler.js—, que es lo que
+    // convierte un despertador en una decision. Se escribe al guardar el entreno.
     lastPerformed: { type: Date },
-    timesCompleted: { type: Number, default: 0 },
+
+    // Aqui vivia `timesCompleted`. No lo leia NADIE y tampoco lo escribia nadie:
+    // llevaba desde el primer dia valiendo 0 en todas las rutinas. Un contador
+    // que no cuenta es peor que no tener contador, porque el dia que alguien lo
+    // pinte en una pantalla dira que no has entrenado nunca.
     createdAt: { type: Date, default: Date.now }
 });
 

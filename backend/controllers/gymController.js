@@ -1008,6 +1008,26 @@ const saveWorkoutLog = async (req, res) => {
             records
         });
 
+        // ⚠️ LA RUTINA NO SE MARCABA COMO HECHA.
+        //
+        // `lastPerformed` se leia desde siempre —el aviso de "hoy toca" lo usa
+        // para decirte cuanto hace de la ultima— y no lo escribia nadie. Asi
+        // que la notificacion decia "Aun sin estrenar" en TODAS tus rutinas,
+        // para siempre, por muchas veces que las entrenaras.
+        //
+        // Es el patron de siempre pero del reves: hasta ahora los campos muertos
+        // eran los que se escribian y nadie leia; este se lee y nadie escribia.
+        //
+        // Va fuera del try/catch de la respuesta a proposito: el entreno YA esta
+        // guardado, y no marcar la fecha no puede convertirse en un 500 que haga
+        // al movil reintentar y duplicar la sesion.
+        if (routineId) {
+            Routine.updateOne(
+                { _id: routineId, user: req.user._id },
+                { $set: { lastPerformed: log.date } }
+            ).catch(e => console.error('No se pudo marcar la rutina como hecha:', e.message));
+        }
+
         avisarAmigosDelEntreno(req.user._id, routineName || 'Entrenamiento Libre');
 
         const today = getTodayDateString();

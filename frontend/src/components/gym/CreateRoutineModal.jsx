@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play, Clock, PersonStanding, MoveHorizontal, Link2, SlidersHorizontal } from 'lucide-react';
+import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play, Clock, PersonStanding, MoveHorizontal, Link2, SlidersHorizontal, Repeat } from 'lucide-react';
 
 // Domingo primero para que coincida con Date.getDay(), pero se PINTA empezando
 // en lunes, que es como se lee una semana aquí.
@@ -14,6 +14,7 @@ const DIAS = [
 import api from '../../services/api';
 import ExerciseSelector from './ExerciseSelector';
 import ExerciseSheet from './ExerciseSheet';
+import { limpiarRango, cerrarRango, RANGO_POR_DEFECTO } from '../../utils/rangoDeReps';
 
 // Paleta de la app. Es una sugerencia, no una jaula: debajo hay un selector
 // libre para cualquier color. Se guardan como HEX, no como nombre ('blue'),
@@ -80,7 +81,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
             muscleDetail: ex.muscleDetail || '',
             secondary: ex.secondary || [],
             sets: 3, // Valor inicial por defecto
-            reps: "10-12",
+            reps: RANGO_POR_DEFECTO,
             rest: 0 // 0 = usa el descanso general de la rutina
         }));
         setAddedExercises([...addedExercises, ...formatted]);
@@ -147,6 +148,24 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
         const num = parseInt(val);
         newExercises[index].rest = isNaN(num) || num < 0 ? 0 : Math.min(num, 600);
         setAddedExercises(newExercises);
+    };
+
+    /**
+     * El rango de repeticiones, que es lo que decide cuándo te sube el peso.
+     * Antes estaba clavado en "10-12" para todo. El porqué y las reglas del
+     * texto, en utils/rangoDeReps.js.
+     */
+    const updateExerciseReps = (index, val) => {
+        const nuevos = [...addedExercises];
+        nuevos[index] = { ...nuevos[index], reps: limpiarRango(val) };
+        setAddedExercises(nuevos);
+    };
+
+    /** Vacío o a medio escribir ("12-") vuelve al rango de siempre. */
+    const cerrarReps = (index) => {
+        const nuevos = [...addedExercises];
+        nuevos[index] = { ...nuevos[index], reps: cerrarRango(nuevos[index].reps) };
+        setAddedExercises(nuevos);
     };
 
     // Candado de reentrada. NO basta con `disabled={estado}`: el estado no cambia
@@ -336,8 +355,16 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                             addedExercises.map((ex, idx) => (
                                 <div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 group animate-in slide-in-from-bottom-2 duration-300">
 
-                                  {/* FILA PRINCIPAL: nombre, series, descanso y orden */}
-                                  <div className="flex items-center justify-between">
+                                  {/* ⚠️ ANTES ESTO ERA UNA SOLA FILA Y EL NOMBRE NO CABIA.
+                                      En un movil de 375 px los recuadros se comian 263 de los
+                                      287 disponibles y el nombre del ejercicio quedaba con
+                                      CERO pixeles de ancho: la tarjeta no decia que ejercicio
+                                      era. Ya iba justo con dos recuadros; con el de REPS
+                                      desaparecia del todo.
+
+                                      Ahora son dos filas: arriba quien es y los botones de
+                                      orden, abajo cuanto. */}
+                                  <div className="flex items-center justify-between gap-2">
 
                                     {/* INFO EJERCICIO */}
                                     <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -379,10 +406,22 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                         </div>
                                     </div>
 
-                                    {/* 🔥 FIX PUNTO 14: INPUT SERIES DENTRO DE LA TARJETA */}
-                                    <div className="flex items-center gap-3">
+                                    {/* CONTROLES ORDEN/BORRAR */}
+                                    <div className="flex flex-col gap-1 shrink-0">
+                                        <div className="flex gap-1">
+                                            <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0} className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 disabled:opacity-20"><ArrowUp size={12} /></button>
+                                            <button onClick={() => moveExercise(idx, 1)} disabled={idx === addedExercises.length - 1} className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 disabled:opacity-20"><ArrowDown size={12} /></button>
+                                        </div>
+                                        <button onClick={() => removeExercise(idx)} className="bg-red-900/20 p-1 rounded text-red-500 hover:bg-red-900/40 w-full flex justify-center"><Trash2 size={14} /></button>
+                                    </div>
+                                  </div>
+
+                                  {/* FILA 2: cuanto. Los tres reparten el ancho a partes
+                                      iguales en vez de pelearse por el, asi que la tarjeta
+                                      se ve igual de bien en un movil estrecho que en el PC. */}
+                                  <div className="flex items-stretch gap-2 mt-3">
                                         {/* Descanso propio. Vacío = hereda el de la rutina */}
-                                        <div className="flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
+                                        <div className="flex-1 flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
                                             <label className="text-[9px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
                                                 <Timer size={8} /> SEG
                                             </label>
@@ -395,11 +434,11 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                 placeholder={String(restTime)}
                                                 onChange={(e) => updateExerciseRest(idx, e.target.value)}
                                                 title="Descanso solo para este ejercicio. Vacío usa el general."
-                                                className="w-10 bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-700"
+                                                className="w-full bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-700"
                                             />
                                         </div>
 
-                                        <div className="flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
+                                        <div className="flex-1 flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
                                             <label className="text-[9px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
                                                 <Hash size={8} /> SETS
                                             </label>
@@ -409,19 +448,28 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                 max="20"
                                                 value={ex.sets}
                                                 onChange={(e) => updateExerciseSets(idx, e.target.value)}
-                                                className="w-10 bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0"
+                                                className="w-full bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0"
                                             />
                                         </div>
 
-                                        {/* CONTROLES ORDEN/BORRAR */}
-                                        <div className="flex flex-col gap-1 border-l border-zinc-800 pl-3">
-                                            <div className="flex gap-1">
-                                                <button onClick={() => moveExercise(idx, -1)} disabled={idx === 0} className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 disabled:opacity-20"><ArrowUp size={12} /></button>
-                                                <button onClick={() => moveExercise(idx, 1)} disabled={idx === addedExercises.length - 1} className="bg-zinc-800 p-1 rounded hover:bg-zinc-700 text-zinc-400 disabled:opacity-20"><ArrowDown size={12} /></button>
-                                            </div>
-                                            <button onClick={() => removeExercise(idx)} className="bg-red-900/20 p-1 rounded text-red-500 hover:bg-red-900/40 w-full flex justify-center"><Trash2 size={14} /></button>
+                                        {/* El rango que decide cuándo subes de peso. Antes no se podía tocar. */}
+                                        <div className="flex-1 flex flex-col items-center bg-black p-1.5 rounded-lg border border-zinc-800">
+                                            <label className="text-[9px] font-black text-zinc-500 uppercase flex items-center gap-0.5 mb-0.5">
+                                                <Repeat size={8} /> REPS
+                                            </label>
+                                            <input
+                                                type="text"
+                                                // Teclado numérico en el móvil, pero admitiendo el guion:
+                                                // con type="number" no se puede escribir "10-12".
+                                                inputMode="numeric"
+                                                value={ex.reps ?? ''}
+                                                placeholder="10-12"
+                                                onChange={(e) => updateExerciseReps(idx, e.target.value)}
+                                                onBlur={() => cerrarReps(idx)}
+                                                title="Cuando aguantes el número de arriba en todas las series, la app te sube el peso. Vale 5, 3-5 o 10-12."
+                                                className="w-full bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-700"
+                                            />
                                         </div>
-                                    </div>
                                   </div>
 
                                   {/* Abrir/cerrar los ajustes finos de este ejercicio */}
