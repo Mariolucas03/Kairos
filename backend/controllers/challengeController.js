@@ -4,8 +4,9 @@ const User = require('../models/User');
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
 const {
-    finDelDuelo, pagarDuelo, marcadorEnVivo, TIPOS, catalogoDeMedidas, DUELO_DIAS
+    finDelDuelo, pagarDuelo, marcadorEnVivo, MEDIDAS, TIPOS, catalogoDeMedidas, DUELO_DIAS
 } = require('../services/duelosService');
+const { sendPushToUser } = require('./pushController');
 
 /**
  * COBRAR LA APUESTA.
@@ -200,6 +201,21 @@ const createChallenge = asyncHandler(async (req, res) => {
         type: 'reto',
         challenge: challenge._id
     }).catch(e => console.error('No se pudo avisar del reto:', e.message));
+
+    // Y el push, que es el que hace que se entere hoy y no pasado mañana. Un
+    // reto sin contestar no le cuesta nada al que reta, pero se queda parado: el
+    // duelo no empieza hasta que el otro dice que si.
+    (async () => {
+        const persona = await User.findById(opponentId).select('username pushSubscriptions');
+        if (!persona) return;
+        const medida = MEDIDAS[type] || MEDIDAS.gym;
+        await sendPushToUser(persona, {
+            title: `⚔️ ${req.user.username} te ha retado`,
+            body: `${medida.etiqueta} durante ${DUELO_DIAS} días, ${apuesta} fichas cada uno. Acepta o pasa.`,
+            icon: '/assets/icons/ficha.png',
+            url: '/social/duelos'
+        });
+    })().catch(e => console.error('No se pudo mandar el push del reto:', e.message));
 
     res.status(201).json(challenge);
 });

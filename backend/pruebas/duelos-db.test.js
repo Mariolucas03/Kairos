@@ -63,6 +63,14 @@ const retar = async (yo, rival, apuesta = 100) => {
     return p.res;
 };
 
+/**
+ * Los avisos se mandan SUELTOS, sin `await`: el reto ya esta creado y un aviso
+ * perdido no puede convertirse en un error que haga pensar que no se ha enviado.
+ * Eso es correcto en produccion y obliga a esperar aqui, porque si no la prueba
+ * mira el buzon antes de que se haya escrito nada.
+ */
+const esperarAvisos = () => new Promise(r => setImmediate(() => setImmediate(r)));
+
 const responder = async (yo, duelo, action) => {
     const p = fingirPeticion({ user: yo, body: { challengeId: String(duelo._id), action } });
     await respondChallenge(p.req, p.res);
@@ -183,6 +191,46 @@ describe('Duelos: la apuesta se cobra de verdad', () => {
         // cancela y él ha pagado por nada.
         assert.strictEqual(await fichasDe(rival), 1000, 'no le han devuelto la apuesta');
         assert.strictEqual(await Challenge.countDocuments(), 0, 'el duelo imposible sigue ahí');
+    });
+
+    test('⚠️ QUE TE RETEN TIENE QUE NOTARSE', async () => {
+        const [yo, rival] = await dosAmigos();
+        await retar(yo, rival, 100);
+        await esperarAvisos();
+
+        // Antes no se creaba ningún aviso. Un reto se queda esperando en una
+        // pantalla en la que hay que entrar a propósito, así que el retado no se
+        // enteraba nunca y el duelo se moría solo: el que reta cree que pasan de
+        // él, y el otro ni lo ha visto.
+        const avisos = await Notification.find({ type: 'reto' }).lean();
+        assert.strictEqual(avisos.length, 1);
+        assert.strictEqual(avisos[0].user.toString(), rival._id.toString(), 'el aviso no es para el retado');
+        assert.strictEqual(avisos[0].actor.toString(), yo._id.toString());
+    });
+
+    test('el aviso del reto se va en cuanto contestas', async () => {
+        const [yo, rival] = await dosAmigos();
+        const duelo = (await retar(yo, rival, 100)).enviado;
+        await esperarAvisos();
+        assert.strictEqual(await Notification.countDocuments({ type: 'reto' }), 1);
+
+        await responder(rival, duelo, 'accept');
+        await esperarAvisos();
+
+        // Ese aviso pide que hagas algo, y ya lo has hecho. Dejarlo en el buzón
+        // sería tenerte pidiendo una respuesta que ya diste.
+        assert.strictEqual(await Notification.countDocuments({ type: 'reto' }), 0);
+    });
+
+    test('rechazarlo también se lleva el aviso', async () => {
+        const [yo, rival] = await dosAmigos();
+        const duelo = (await retar(yo, rival, 100)).enviado;
+        await esperarAvisos();
+
+        await responder(rival, duelo, 'reject');
+        await esperarAvisos();
+
+        assert.strictEqual(await Notification.countDocuments({ type: 'reto' }), 0);
     });
 
     test('solo se puede retar a un amigo', async () => {

@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { volumenDe } = require('../controllers/gymController');
 const { getMadridDateString } = require('../utils/dateHelpers');
+const { sendPushToUser } = require('../controllers/pushController');
 
 /**
  * QUIÉN GANA EL DUELO, Y QUIÉN COBRA.
@@ -203,22 +204,69 @@ const pagarDuelo = async (duelo) => {
     return true;
 };
 
-/** El aviso del resultado, uno para cada uno, con enlace al duelo. */
+/** "12.400 kg", "5 entrenos". Igual que en la pantalla. */
+const conUnidad = (n, unidad) => `${Math.round(n || 0).toLocaleString('es-ES')} ${unidad}`;
+
+/**
+ * EL AVISO DEL RESULTADO.
+ *
+ * ⚠️ VA POR DOS SITIOS, Y NO ES DUPLICAR.
+ *
+ * La notificacion del buzon se queda —es el historial, y esta ahi cuando entres
+ * mañana—. El push es el que TE ENTERA: un duelo que se resuelve de madrugada y
+ * no avisa al movil es un duelo del que te enteras tres dias despues, cuando ya
+ * no significa nada.
+ *
+ * Cada uno recibe SU frase. "Has ganado" y "has perdido" son el mismo suceso
+ * leido por dos personas, y por eso el texto no se guarda en la notificacion
+ * sino que se arma aqui para el push y en el movil para el buzon.
+ */
 const avisarDelResultado = async (duelo) => {
+    const medida = MEDIDAS[duelo.type] || MEDIDAS.gym;
     const partes = [
-        { yo: duelo.challenger, el: duelo.opponent },
-        { yo: duelo.opponent, el: duelo.challenger }
+        { yo: duelo.challenger, el: duelo.opponent, mio: duelo.volumenChallenger, suyo: duelo.volumenOpponent },
+        { yo: duelo.opponent, el: duelo.challenger, mio: duelo.volumenOpponent, suyo: duelo.volumenChallenger }
     ];
 
-    await Promise.all(partes.map(({ yo, el }) => Notification.create({
-        user: yo,
-        actor: el,
-        type: 'duelo',
-        challenge: duelo._id,
-        // El texto se arma en el móvil a partir del duelo, para poder decir
-        // "has ganado" o "has perdido" según quién lo esté leyendo.
-        text: ''
-    }).catch(() => null)));   // un aviso perdido no puede tumbar un pago
+    await Promise.all(partes.map(async ({ yo, el, mio, suyo }) => {
+        // El buzon primero: es lo que queda, y no depende de que el movil tenga
+        // los avisos activados.
+        await Notification.create({
+            user: yo, actor: el, type: 'duelo', challenge: duelo._id, text: ''
+        }).catch(() => null);
+
+        // Y el push, que es el que te entera. Hace falta el usuario entero
+        // porque las suscripciones viven dentro de el.
+        try {
+            const persona = await User.findById(yo).select('username pushSubscriptions');
+            if (!persona) return;
+
+            const gane = duelo.winner && duelo.winner.toString() === yo.toString();
+            const empate = !duelo.winner;
+            const rival = await User.findById(el).select('username').lean();
+            const contra = rival?.username || 'tu rival';
+
+            const marcador = `${conUnidad(mio, medida.unidad)} contra ${conUnidad(suyo, medida.unidad)}.`;
+
+            await sendPushToUser(persona, {
+                title: empate
+                    ? `🤝 Empate contra ${contra}`
+                    : gane
+                        ? `🏆 Has ganado el duelo contra ${contra}`
+                        : `Has perdido el duelo contra ${contra}`,
+                body: empate
+                    ? `${marcador} Cada uno recupera sus ${duelo.betAmount} fichas.`
+                    : gane
+                        ? `${marcador} El bote de ${duelo.betAmount * 2} fichas es tuyo.`
+                        : `${marcador} Se lleva el bote.`,
+                icon: '/assets/icons/ficha.png',
+                url: '/social/duelos'
+            });
+        } catch (e) {
+            // Un aviso perdido no puede tumbar un pago: el bote YA esta repartido.
+            console.error('No se pudo avisar del duelo:', e.message);
+        }
+    }));
 };
 
 /**

@@ -22,8 +22,10 @@ const fetcher = (url) => api.get(url).then(res => res.data);
  * apuesta no se cobraba nunca. Deslizar en un amigo sacaba un aviso de "en
  * construcción" porque no había nada que enseñar.
  *
- * Un duelo es una semana midiendo los KILOS MOVIDOS en el gimnasio. Los dos
- * ponen la misma apuesta al aceptar, y quien más levante se lleva el bote.
+ * Un duelo es una semana midiendo una cosa: kilos movidos, entrenos, XP o
+ * misiones. Los dos ponen la misma apuesta al aceptar y el que más haga se
+ * lleva el bote. Qué se puede medir lo dice el servidor —ver MEDIDAS en
+ * services/duelosService.js—, y esta pantalla solo pinta lo que le manden.
  *
  * ⚠️ LA DURACIÓN NO ESTÁ ESCRITA AQUÍ.
  *
