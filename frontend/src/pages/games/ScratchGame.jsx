@@ -1,8 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Info, X } from 'lucide-react';
+import { Zap, Info, X, Volume2, VolumeX } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import SelectorApuesta from '../../components/games/SelectorApuesta';
+import CapaRasca from '../../components/games/CapaRasca';
+import { crearSintetizador, melodias, haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
+
+// La cuadricula es 3x3 con un hueco de 12 px (gap-3). La capa de rascar
+// necesita saber donde esta cada casilla, y esto es la unica fuente.
+const HUECO = 12;
+const celdaDelRasca = (i, ancho, alto) => {
+    const w = (ancho - 2 * HUECO) / 3;
+    const h = (alto - 2 * HUECO) / 3;
+    return { x: (i % 3) * (w + HUECO), y: Math.floor(i / 3) * (h + HUECO), ancho: w, alto: h };
+};
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
@@ -132,27 +143,66 @@ export default function ScratchGame() {
         }
     };
 
+    // ⚠️ EL SONIDO DE RASCAR, y de cuando asoma una casilla.
+    const sonidoRef = useRef(null);
+    const roceRef = useRef(null);
+    useEffect(() => {
+        sonidoRef.current = crearSintetizador();
+        // Un roce: ruido con un filtro alto, que sigue a la velocidad del dedo.
+        roceRef.current = sonidoRef.current.continuo({ frecuenciaBase: 1800, frecuenciaExtra: 1600, volumenMax: 0.12 });
+        return () => sonidoRef.current?.parar();
+    }, []);
+    const [conSonido, setConSonido] = useState(haySonidoJuegos);
+    const alternarSonido = () => {
+        const nuevo = !conSonido;
+        cambiarSonidoJuegos(nuevo);
+        setConSonido(nuevo);
+        sonidoRef.current?.parar();
+        sonidoRef.current = crearSintetizador();
+        roceRef.current = sonidoRef.current.continuo({ frecuenciaBase: 1800, frecuenciaExtra: 1600, volumenMax: 0.12 });
+    };
+
+    // Se lee `result` por ref porque `reveal` lo llama el canvas desde eventos
+    // del puntero, fuera de un pintado de React.
+    const resultRef = useRef(result);
+    resultRef.current = result;
+
     const reveal = (i) => {
-        if (!isPlaying || revealed[i] || !grid[i]) return;
-        const newRev = [...revealed];
-        newRev[i] = true;
-        setRevealed(newRev);
+        // ⚠️ ACTUALIZACION FUNCIONAL, no `[...revealed]`.
+        //
+        // Las casillas las destapa el dedo, y en una sola pasada pueden caer
+        // dos seguidas antes de que React repinte. Con el `revealed` del cierre
+        // la segunda pisaba a la primera y una casilla ya rascada volvia a
+        // contar como tapada.
+        setRevealed(prev => {
+            if (prev[i]) return prev;
+            const nuevo = [...prev];
+            nuevo[i] = true;
 
-        // Si es la última casilla rascada, mostramos el resultado
-        if (newRev.every(Boolean) && result) {
-            setIsPlaying(false);
+            // Un "ding" al asomar la casilla, mas agudo cuantas mas lleves.
+            const cuantas = nuevo.filter(Boolean).length;
+            sonidoRef.current?.nota({ frecuencia: 660 * Math.pow(2, cuantas / 12), duracion: 0.14, volumen: 0.12 });
 
-            if (result.won) {
-                setShowRain(true);
-                setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
+            // Si es la ultima, el resultado.
+            const res = resultRef.current;
+            if (nuevo.every(Boolean) && res) {
+                setIsPlaying(false);
+                roceRef.current?.(0);
+                if (res.won) {
+                    setShowRain(true);
+                    setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
+                    const s = sonidoRef.current;
+                    setTimeout(() => (res.prize >= 200 ? melodias.granPremio : melodias.ganar)(s), 250);
+                } else {
+                    setTimeout(() => melodias.perder(sonidoRef.current), 250);
+                }
+                if (res.user) {
+                    setUser(res.user);
+                    localStorage.setItem('user', JSON.stringify(res.user));
+                }
             }
-
-            // Sincronizar el usuario con los datos que nos dio el servidor
-            if (result.user) {
-                setUser(result.user);
-                localStorage.setItem('user', JSON.stringify(result.user));
-            }
-        }
+            return nuevo;
+        });
     };
 
     const winningSymbols = Object.values(SYMBOLS).filter(s => s.type !== 'none').sort((a, b) => b.prize - a.prize);
@@ -169,7 +219,16 @@ export default function ScratchGame() {
                     <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <button onClick={() => setShowInfo(true)} aria-label="Ver la tabla de premios" className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={alternarSonido}
+                        aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                    >
+                        {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                    <button onClick={() => setShowInfo(true)} aria-label="Ver la tabla de premios" className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                </div>
             </div>
 
             {/* TÍTULO */}
@@ -190,31 +249,35 @@ export default function ScratchGame() {
                 <div className="bg-[#18181b] border border-white/[0.07] p-1 rounded-3xl w-full transform transition-all">
                     <div className="bg-black/90 rounded-[1.8rem] p-6 border border-white/[0.07] relative overflow-hidden flex flex-col gap-6">
 
-                        {/* CUADRÍCULA */}
+                        {/* CUADRICULA. Debajo, los simbolos; encima, la capa de plata
+                            que se rasca con el dedo. Antes de comprar carton, el reverso. */}
                         <div className="grid grid-cols-3 gap-3 aspect-square relative z-10 w-full mx-auto">
                             {grid.map((item, i) => (
-                                <button
+                                <div
                                     key={i}
-                                    onClick={() => reveal(i)}
-                                    disabled={!isPlaying || revealed[i]}
-                                    className={`
-                                        relative w-full h-full rounded-xl overflow-hidden transition-all cursor-pointer active:scale-95 
-                                        ${revealed[i] ? 'bg-zinc-900 shadow-[inset_0_0_10px_black] border border-white/[0.07]' : 'bg-transparent border-0'}
-                                    `}
+                                    className={`relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center border ${revealed[i] ? 'bg-zinc-900 shadow-[inset_0_0_12px_black] border-white/[0.07]' : 'bg-[#0d0d10] border-white/[0.05]'}`}
                                 >
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        {revealed[i] && item ? (
-                                            <span className="text-5xl animate-in zoom-in duration-300 drop-shadow-md filter leading-none select-none">{item.icon}</span>
-                                        ) : (
-                                            <img
-                                                src={CARD_BACK_IMG}
-                                                alt="reverso"
-                                                className="absolute inset-0 w-full h-full object-cover animate-pulse opacity-100"
-                                            />
-                                        )}
-                                    </div>
-                                </button>
+                                    {isPlaying || revealed[i] ? (
+                                        item && (
+                                            <span className={`text-5xl drop-shadow-md filter leading-none select-none transition-transform duration-300 ${revealed[i] ? 'scale-100' : 'scale-90 opacity-80'}`}>
+                                                {item.icon}
+                                            </span>
+                                        )
+                                    ) : (
+                                        <img src={CARD_BACK_IMG} alt="reverso" className="absolute inset-0 w-full h-full object-cover opacity-100" draggable="false" />
+                                    )}
+                                </div>
                             ))}
+
+                            {/* LA PLATA. Un solo canvas sobre las nueve: el dedo cruza
+                                de una a otra sin levantarse. */}
+                            <CapaRasca
+                                activa={isPlaying}
+                                reveladas={revealed}
+                                celda={celdaDelRasca}
+                                onRevelar={reveal}
+                                onRascar={(v) => roceRef.current?.(v)}
+                            />
                         </div>
 
                         {/* CONTROLES / RESULTADO */}
