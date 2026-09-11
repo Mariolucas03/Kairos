@@ -183,17 +183,27 @@ export default function BlackJack() {
         setResultModal(null);
     };
 
+    // ⚠️ El contenedor era `justify-center` + `overflow-hidden`. En un movil con
+    // la barra del navegador (unos 700px de alto) el contenido no cabia y,
+    // centrado, se salia POR ARRIBA y POR ABAJO a la vez: el titulo se metia
+    // debajo de la cabecera y el boton de jugar quedaba cortado sin poder
+    // llegar a el. Ahora el contenido se centra con `my-auto` —que nunca se
+    // hace negativo— y si no cabe, se hace scroll.
     return (
-        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-40 pb-4 overflow-hidden select-none font-sans">
+        <div className="fixed inset-0 bg-black flex flex-col items-center pt-28 pb-4 overflow-y-auto overflow-x-hidden select-none font-sans">
 
             {/* HEADER FLOTANTE */}
-            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
-                <BackButton to="/games" />
+            {/* Tres columnas de verdad: la de la izquierda y la de la derecha pesan
+                lo mismo, y asi la caja de fichas queda CENTRADA aunque a un lado
+                haya un boton y al otro dos. Con `justify-between` se iba hacia
+                el lado que menos ocupaba. */}
+            <div className="fixed top-12 left-4 right-4 flex items-center z-50">
+                <div className="flex-1 flex"><BackButton to="/games" /></div>
                 <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-green-500/50 backdrop-blur-md shadow-2xl">
                     <span className="text-green-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center justify-end gap-2">
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
@@ -212,7 +222,7 @@ export default function BlackJack() {
             )}
 
             {/* ZONA DE JUEGO */}
-            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-6">
+            <div className="my-auto flex flex-col items-center w-full max-w-sm px-4 gap-6">
 
                 {/* --- MESA --- */}
                 <div className="w-full rounded-[3rem] p-6 relative flex flex-col justify-between min-h-[480px]"
@@ -230,8 +240,9 @@ export default function BlackJack() {
                     </p>
 
                     {/* EL ZAPATO: de aqui salen las cartas. Un taco de dorsos en
-                        la esquina, con el canto visible. */}
-                    <div ref={zapatoRef} className="absolute -top-2 -right-1 z-20 pointer-events-none" style={{ width: 52, height: 76 }}>
+                        la esquina, con el canto visible. DENTRO de la mesa: colgaba
+                        fuera del borde y se montaba con la cabecera. */}
+                    <div ref={zapatoRef} className="absolute top-3 right-3 z-20 pointer-events-none" style={{ width: 52, height: 76 }}>
                         {[0, 1, 2, 3].map(i => (
                             <div key={i} className="absolute inset-0 rounded-lg overflow-hidden border border-white/15 bg-black"
                                 style={{ transform: `translate(${-i * 1.5}px, ${-i * 1.5}px)`, boxShadow: '0 2px 4px rgba(0,0,0,0.6)' }}>

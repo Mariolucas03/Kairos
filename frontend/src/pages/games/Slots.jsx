@@ -299,19 +299,29 @@ export default function Slots() {
         }
     };
 
+    // ⚠️ El contenedor era `justify-center` + `overflow-hidden`. En un movil con
+    // la barra del navegador (unos 700px de alto) el contenido no cabia y,
+    // centrado, se salia POR ARRIBA y POR ABAJO a la vez: el titulo se metia
+    // debajo de la cabecera y el boton de jugar quedaba cortado sin poder
+    // llegar a el. Ahora el contenido se centra con `my-auto` —que nunca se
+    // hace negativo— y si no cabe, se hace scroll.
     return (
-        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-32 pb-10 overflow-hidden select-none font-sans">
+        <div className="fixed inset-0 bg-black flex flex-col items-center pt-28 pb-6 overflow-y-auto overflow-x-hidden select-none font-sans">
             {showRain && <ChipRain isFading={isRainFading} />}
 
 
             {/* HEADER */}
-            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
-                <BackButton to="/games" />
+            {/* Tres columnas de verdad: la de la izquierda y la de la derecha pesan
+                lo mismo, y asi la caja de fichas queda CENTRADA aunque a un lado
+                haya un boton y al otro dos. Con `justify-between` se iba hacia
+                el lado que menos ocupaba. */}
+            <div className="fixed top-12 left-4 right-4 flex items-center z-50">
+                <div className="flex-1 flex"><BackButton to="/games" /></div>
                 <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-purple-500/50 backdrop-blur-md shadow-2xl">
                     <span className="text-purple-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center justify-end gap-2">
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
@@ -324,7 +334,7 @@ export default function Slots() {
             </div>
 
             {/* MÁQUINA */}
-            <div className="w-full max-w-sm px-4 relative z-10 flex flex-col items-center gap-4">
+            <div className="my-auto w-full max-w-sm px-4 relative z-10 flex flex-col items-center gap-4">
 
                 {/* ⚠️ El titulo iba en `absolute top-28` mientras la maquina va
                     en el flujo y centrada. En cuanto la pantalla no era lo

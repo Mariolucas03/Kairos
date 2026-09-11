@@ -163,19 +163,25 @@ export default function TowerGame() {
     return (
         <div className="fixed inset-0 bg-black flex flex-col items-center pt-28 overflow-hidden select-none">
             {/* CABECERA */}
-            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-20">
-                <BackButton to="/games" />
+            {/* Tres columnas de verdad: la de la izquierda y la de la derecha pesan
+                lo mismo, y asi la caja de fichas queda CENTRADA aunque a un lado
+                haya un boton y al otro dos. Con `justify-between` se iba hacia
+                el lado que menos ocupaba. */}
+            <div className="absolute top-12 left-4 right-4 flex items-center z-20">
+                <div className="flex-1 flex"><BackButton to="/games" /></div>
                 <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-emerald-500/50 backdrop-blur-md shadow-2xl">
                     <span className="text-emerald-400 font-black text-xl tabular-nums">{fichas.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="fichas" />
                 </div>
-                <button
-                    onClick={alternarSonido}
-                    aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                    className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
-                >
-                    {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                </button>
+                <div className="flex-1 flex items-center justify-end gap-2">
+                    <button
+                        onClick={alternarSonido}
+                        aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                    >
+                        {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                </div>
             </div>
 
             <div className="w-full max-w-sm px-5 flex-1 flex flex-col min-h-0">

@@ -210,19 +210,29 @@ export default function ScratchGame() {
 
     const winningSymbols = Object.values(SYMBOLS).filter(s => s.type !== 'none').sort((a, b) => b.prize - a.prize);
 
+    // ⚠️ El contenedor era `justify-center` + `overflow-hidden`. En un movil con
+    // la barra del navegador (unos 700px de alto) el contenido no cabia y,
+    // centrado, se salia POR ARRIBA y POR ABAJO a la vez: el titulo se metia
+    // debajo de la cabecera y el boton de jugar quedaba cortado sin poder
+    // llegar a el. Ahora el contenido se centra con `my-auto` —que nunca se
+    // hace negativo— y si no cabe, se hace scroll.
     return (
-        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-40 pb-4 overflow-hidden select-none font-sans">
+        <div className="fixed inset-0 bg-black flex flex-col items-center pt-28 pb-4 overflow-y-auto overflow-x-hidden select-none font-sans">
 
             {showRain && <ChipRain isFading={isRainFading} />}
 
             {/* HEADER */}
-            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
-                <BackButton to="/games" />
+            {/* Tres columnas de verdad: la de la izquierda y la de la derecha pesan
+                lo mismo, y asi la caja de fichas queda CENTRADA aunque a un lado
+                haya un boton y al otro dos. Con `justify-between` se iba hacia
+                el lado que menos ocupaba. */}
+            <div className="fixed top-12 left-4 right-4 flex items-center z-50">
+                <div className="flex-1 flex"><BackButton to="/games" /></div>
                 <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-yellow-500/50 backdrop-blur-md shadow-2xl">
                     <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center justify-end gap-2">
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
@@ -234,20 +244,21 @@ export default function ScratchGame() {
                 </div>
             </div>
 
-            {/* TÍTULO */}
-            <div className="absolute top-28 w-full text-center z-10">
-                <h1 className="text-4xl font-black text-yellow-400 tracking-[-0.045em] uppercase not-italic pointer-events-none">
-                    RASCA Y GANA
-                </h1>
-                {errorMsg && (
-                    <div onClick={() => setErrorMsg(null)} className="mx-6 mt-3 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl cursor-pointer">
-                        {errorMsg}
-                    </div>
-                )}
-            </div>
-
             {/* ZONA DE JUEGO */}
-            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 relative z-10">
+            <div className="my-auto flex flex-col items-center w-full max-w-sm px-4 relative z-10 gap-4">
+
+                {/* El titulo iba en `absolute top-28`, fuera del flujo: en cuanto
+                    la pantalla era corta, el carton subia y le pasaba por encima. */}
+                <div className="w-full text-center">
+                    <h1 className="text-4xl font-black text-yellow-400 tracking-[-0.045em] uppercase not-italic pointer-events-none">
+                        RASCA Y GANA
+                    </h1>
+                    {errorMsg && (
+                        <div onClick={() => setErrorMsg(null)} className="mx-2 mt-3 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl cursor-pointer">
+                            {errorMsg}
+                        </div>
+                    )}
+                </div>
 
                 <div className="bg-[#18181b] border border-white/[0.07] p-1 rounded-3xl w-full transform transition-all">
                     <div className="bg-black/90 rounded-[1.8rem] p-6 border border-white/[0.07] relative overflow-hidden flex flex-col gap-6">
@@ -283,8 +294,11 @@ export default function ScratchGame() {
                             />
                         </div>
 
-                        {/* CONTROLES / RESULTADO */}
-                        <div className="relative z-10 min-h-[60px] flex items-center justify-center">
+                        {/* CONTROLES / RESULTADO. ⚠️ En COLUMNA: era `flex` a secas
+                            (fila) y, al comprar carton, el selector de apuesta y el
+                            boton salian uno AL LADO del otro, el selector saliendose
+                            por la izquierda y el boton cortado por la derecha. */}
+                        <div className="relative z-10 min-h-[60px] flex flex-col justify-center">
                             {revealed.every(Boolean) && result ? (
                                 <div className="text-center w-full animate-in zoom-in">
                                     <div className="mb-4">
@@ -323,7 +337,7 @@ export default function ScratchGame() {
                                     </button>
                                 </div>
                             ) : (
-                                <>
+                                <div className="w-full">
                                 {/* Mientras rascas NO se puede cambiar: la apuesta
                                     de este carton ya esta cobrada. */}
                                 <div className={`mb-3 transition-opacity ${isPlaying ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -359,7 +373,7 @@ export default function ScratchGame() {
                                         </div>
                                     )}
                                 </button>
-                                </>
+                                </div>
                             )}
                         </div>
 

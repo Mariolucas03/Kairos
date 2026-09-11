@@ -352,7 +352,9 @@ export default function FortuneWheel() {
                                 key={rueda.id}
                                 onClick={() => !bloqueada && setSelectedMode(rueda.id)}
                                 disabled={bloqueada}
-                                className={`w-full p-4 rounded-3xl border flex items-center justify-between transition-all relative overflow-hidden ${bloqueada ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' : 'active:scale-[0.98]'}`}
+                                // Todas de la MISMA altura: con la altura al gusto del texto,
+                                // cada tarjeta salia distinta y la caja del coste bailaba.
+                                className={`w-full h-[104px] px-4 rounded-3xl border flex items-center justify-between transition-all relative overflow-hidden ${bloqueada ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' : 'active:scale-[0.98]'}`}
                                 style={bloqueada ? undefined : { background: `${rueda.acento}14`, borderColor: `${rueda.acento}55` }}
                             >
                                 <div className="flex items-center gap-4 min-w-0">
@@ -361,7 +363,7 @@ export default function FortuneWheel() {
                                     </div>
                                     <div className="text-left min-w-0">
                                         <h3 className="text-lg font-black uppercase leading-none truncate" style={{ color: bloqueada ? '#71717a' : rueda.acento }}>{rueda.nombre}</h3>
-                                        <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-wide leading-tight">
+                                        <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-wide leading-tight line-clamp-2">
                                             {bloqueada ? 'Ya usada hoy. Vuelve mañana.' : rueda.descripcion}
                                         </p>
                                         {/* Lo maximo que puede salir, para decidir con datos. Sale del

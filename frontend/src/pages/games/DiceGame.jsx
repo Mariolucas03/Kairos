@@ -179,21 +179,33 @@ export default function Dice() {
         }
     };
 
+    // ⚠️ El contenedor era `justify-center` + `overflow-hidden`. En un movil con
+    // la barra del navegador (unos 700px de alto) el contenido no cabia y,
+    // centrado, se salia POR ARRIBA y POR ABAJO a la vez: el titulo se metia
+    // debajo de la cabecera y el boton de jugar quedaba cortado sin poder
+    // llegar a el. Ahora el contenido se centra con `my-auto` —que nunca se
+    // hace negativo— y si no cabe, se hace scroll.
     return (
-        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-24 pb-4 overflow-hidden select-none font-sans">
+        <div className="fixed inset-0 bg-black flex flex-col items-center pt-28 pb-4 overflow-y-auto overflow-x-hidden select-none font-sans">
             {showRain && <ChipRain isFading={false} />}
-            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
-                <BackButton to="/games" />
+            {/* Tres columnas de verdad: la de la izquierda y la de la derecha pesan
+                lo mismo, y asi la caja de fichas queda CENTRADA aunque a un lado
+                haya un boton y al otro dos. Con `justify-between` se iba hacia
+                el lado que menos ocupaba. */}
+            <div className="fixed top-12 left-4 right-4 flex items-center z-50">
+                <div className="flex-1 flex"><BackButton to="/games" /></div>
                 <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-blue-500/50"><span className="text-blue-400 font-black text-xl">{visualBalance}</span><img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" /></div>
-                <button
-                    onClick={alternarSonido}
-                    aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                    className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
-                >
-                    {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                </button>
+                <div className="flex-1 flex items-center justify-end gap-2">
+                    <button
+                        onClick={alternarSonido}
+                        aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                    >
+                        {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                </div>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-5 z-10">
+            <div className="my-auto flex flex-col items-center w-full max-w-sm px-4 gap-5 z-10">
                 {/* El titulo iba en `absolute top-28` y la mesa, que ahora es
                     mas alta para que los dados tengan de donde caer, le pasaba
                     por encima. En el flujo no lo pisa nada. */}

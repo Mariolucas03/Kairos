@@ -282,13 +282,13 @@ const RUEDAS = [
     },
     {
         id: 'bronce', nombre: 'Bronce', coste: 25, acento: '#b45309',
-        descripcion: 'Para empezar. Premios pequeños, casi siempre algo.',
+        descripcion: 'Para empezar. Casi siempre algo.',
         // 170 / 8 = 21,25 -> 85% de 25
         premios: [0, 10, 20, 30, 50, 0, 15, 45].map(v => ({ v, t: 'c' }))
     },
     {
         id: 'hardcore', nombre: 'Todo o nada', coste: 50, acento: '#ef4444',
-        descripcion: 'Cinco vacíos y un premio gordo. Una de seis.',
+        descripcion: 'Cinco vacíos y un premio gordo.',
         // 255 / 6 = 42,5 -> 85% de 50
         premios: [0, 0, 0, 0, 0, 255].map(v => ({ v, t: 'c' }))
     },

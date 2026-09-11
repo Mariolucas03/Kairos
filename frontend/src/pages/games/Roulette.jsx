@@ -365,13 +365,17 @@ export default function Roulette() {
             {showRain && <ChipRain isFading={isRainFading} />}
 
             {/* HEADER */}
-            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-20">
-                <BackButton to="/games" />
+            {/* Tres columnas de verdad: la de la izquierda y la de la derecha pesan
+                lo mismo, y asi la caja de fichas queda CENTRADA aunque a un lado
+                haya un boton y al otro dos. Con `justify-between` se iba hacia
+                el lado que menos ocupaba. */}
+            <div className="absolute top-12 left-4 right-4 flex items-center z-20">
+                <div className="flex-1 flex"><BackButton to="/games" /></div>
                 <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-yellow-500/50 backdrop-blur-md shadow-2xl transition-all duration-200">
                     <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center justify-end gap-2">
                     {/* El sonido va encendido de serie: es el efecto de un boton
                         que has pulsado tu, no musica que arranca sola. Pero se
                         apaga con un toque y se acuerda. */}
@@ -436,8 +440,13 @@ export default function Roulette() {
                 )}
             </div>
 
-            {/* PANEL DESLIZANTE MESA */}
-            <div className={`fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_60px_rgba(0,0,0,0.9)] z-30 flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)`} style={{ height: isTableOpen ? '65%' : '140px' }}>
+            {/* PANEL DESLIZANTE MESA.
+                ⚠️ Cerrado medía 140px A MANO, y lo que lleva dentro (fichas +
+                boton de girar) mide mas: el boton de APOSTAR salia cortado por
+                abajo, y en un movil con barra del navegador casi no se veia.
+                Ahora el panel mide lo que mide su contenido y lo que se abre y
+                se cierra es la MESA de en medio, de 0 a su altura. */}
+            <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_60px_rgba(0,0,0,0.9)] z-30 flex flex-col">
                 <div className="px-3 pt-3 pb-2 border-b border-white/[0.07] bg-zinc-900 rounded-t-[2rem]">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <button onClick={() => setPaintMode(!paintMode)} disabled={spinning} aria-label="Pintar apuestas arrastrando" className={`p-2 rounded-xl border transition-all ${paintMode ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-zinc-800 border-zinc-600 text-zinc-400'}`}>
@@ -503,8 +512,14 @@ export default function Roulette() {
                     )}
                 </div>
 
-                <div className={`flex-1 overflow-hidden relative flex items-center justify-center bg-zinc-950/50 transition-opacity duration-300 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                    <div className="transform scale-[0.65] origin-center w-full flex flex-col items-center">
+                <div
+                    className={`overflow-hidden relative flex items-center justify-center bg-zinc-950/50 transition-all duration-500 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                    style={{ height: isTableOpen ? '42vh' : 0 }}
+                >
+                    {/* La mesa mide 600px y se encoge. A 0,65 salian 390px: en un
+                        movil de 375 el CERO quedaba cortado por la izquierda y la
+                        columna 2:1 por la derecha. A 0,6 son 360 y cabe entera. */}
+                    <div className="transform scale-[0.6] origin-center w-full flex flex-col items-center">
                         <div className="grid grid-cols-[50px_1fr_40px] gap-1 select-none min-w-[600px]">
                             <button onMouseDown={() => !paintMode && placeBet('number', 0, [0], 36)} onPointerDown={() => paintMode && handleInteractionStart(0)} onMouseEnter={(e) => paintMode && isPointerDown && handleInteractionMove(e)} data-number="0" className="rounded-l-lg border border-green-700 bg-green-900/60 flex items-center justify-center text-white font-black text-xl hover:bg-green-800 relative touch-none" style={{ gridRow: '1 / span 3' }}>
                                 <span className="-rotate-90">0</span>{renderBoardChip(b => b.value === 0)}
