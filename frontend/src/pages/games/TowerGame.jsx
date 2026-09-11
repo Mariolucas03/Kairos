@@ -43,6 +43,10 @@ export default function TowerGame() {
     const [revealed, setRevealed] = useState({});      // { [planta]: losaTrampa }
     // La losa que se esta pisando ahora mismo, hundida y sin resolver.
     const [pisando, setPisando] = useState(null);      // { planta, tile }
+    // Que losa pisaste en cada planta superada. `revealed` solo guarda donde
+    // estaba la trampa, y con eso las DOS losas seguras rebotaban al aguantar:
+    // el rebote es del pie, y el pie estuvo en una sola.
+    const [pisadas, setPisadas] = useState({});        // { [planta]: tile }
     // La planta cuya trampa acaba de romperse: para el temblor y la caida.
     const [rota, setRota] = useState(null);
 
@@ -73,7 +77,7 @@ export default function TowerGame() {
     const empezar = async () => {
         if (busy) return;
         if (bet > fichas) { setError('No te llegan las fichas'); return; }
-        setBusy(true); setError(null); setResult(null); setRevealed({}); setRota(null); setPisando(null);
+        setBusy(true); setError(null); setResult(null); setRevealed({}); setRota(null); setPisando(null); setPisadas({});
         try {
             const res = await api.post('/games/tower', { action: 'start', bet });
             setToken(res.data.token);
@@ -112,6 +116,7 @@ export default function TowerGame() {
 
             setPisando(null);
             setRevealed(prev => ({ ...prev, [plantaActual]: d.trapTile }));
+            setPisadas(prev => ({ ...prev, [plantaActual]: tile }));
 
             if (d.status === 'playing') {
                 sonidoRef.current?.aguanta(plantaActual);
@@ -227,7 +232,7 @@ export default function TowerGame() {
                                     {Array.from({ length: TILES }).map((_, tile) => {
                                         const esTrampaRevelada = trampa !== undefined && tile === trampa;
                                         const esSegura = trampa !== undefined && tile !== trampa;
-                                        const laPisada = superada && revealed[planta] !== undefined && tile !== trampa && !pisando;
+                                        const laPisada = superada && pisadas[planta] === tile && !pisando;
                                         const hundida = pisando?.planta === planta && pisando?.tile === tile;
                                         const seRompe = esTrampaRevelada && rota === planta;
 

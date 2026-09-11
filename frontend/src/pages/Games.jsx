@@ -138,14 +138,16 @@ export default function Games() {
     // en el menu, que es el gesto que el navegador exige para sonar.
     const sonado = useRef(false);
     useEffect(() => {
-        if (isLocked || sonado.current || !haySonidoJuegos()) return;
+        // Hasta que no llega el dia no se sabe si esta cerrado: la campanilla
+        // sonaba en el primer pintado y luego salia el candado.
+        if (!daily || isLocked || sonado.current || !haySonidoJuegos()) return;
         sonado.current = true;
         const s = crearSintetizador();
         s.nota({ frecuencia: 1047, duracion: 0.35, volumen: 0.10 });
         s.nota({ frecuencia: 1319, duracion: 0.5, volumen: 0.10, retraso: 0.12 });
         const id = setTimeout(s.parar, 1500);
         return () => clearTimeout(id);
-    }, [isLocked]);
+    }, [isLocked, daily]);
 
     // --- VISTA BLOQUEADA ---
     if (isLocked) {

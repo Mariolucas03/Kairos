@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { Gift, Flame, Diamond, Lock, X, Volume2, VolumeX, Coins, Star, Crown, Zap, Loader2 } from 'lucide-react';
@@ -314,6 +314,10 @@ export default function FortuneWheel() {
     const ruedas = data?.ruedas || [];
     const diariaUsadaHoy = !!data?.diariaUsadaHoy;
     const ruedaAbierta = ruedas.find(r => r.id === selectedMode);
+    // Memorizada: `configDe` crea el icono y las cuñas nuevos cada vez, y con
+    // eso `RuedaFortuna` (que es `memo`) se repintaba en cada pintado de la
+    // pagina aunque no hubiera cambiado nada.
+    const config = useMemo(() => (ruedaAbierta ? configDe(ruedaAbierta) : null), [ruedaAbierta]);
 
     useEffect(() => { if (selectedMode) setIsUiHidden(true); else setIsUiHidden(false); return () => setIsUiHidden(false); }, [selectedMode, setIsUiHidden]);
 
@@ -328,7 +332,9 @@ export default function FortuneWheel() {
             </div>
 
             {ruedaAbierta ? (
-                <ActiveWheel config={configDe(ruedaAbierta)} user={user} setUser={setUser} onBack={() => setSelectedMode(null)} onSpinComplete={handleSpinComplete} />
+                // `key` por rueda: sin ella, al cambiar de rueda el componente se
+                // reutiliza y hereda el angulo y el modal de la anterior.
+                <ActiveWheel key={ruedaAbierta.id} config={config} user={user} setUser={setUser} onBack={() => setSelectedMode(null)} onSpinComplete={handleSpinComplete} />
             ) : (
                 <div className="flex flex-col gap-3">
                     {!data && (

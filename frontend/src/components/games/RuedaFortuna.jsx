@@ -128,7 +128,8 @@ const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, i
                                 textAnchor="middle"
                                 dominantBaseline="middle"
                                 fill="#fff"
-                                style={{ font: '900 30px ui-sans-serif, system-ui, sans-serif', letterSpacing: '-1px', textShadow: '0 2px 2px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6)' }}
+                                filter="url(#rf-sombra)"
+                                style={{ font: '900 30px ui-sans-serif, system-ui, sans-serif', letterSpacing: '-1px' }}
                             >{p.label}</text>
                             <image href="/assets/icons/ficha.png" x="-13" y="-104" width="26" height="26" filter="url(#rf-sombra)" />
                         </g>

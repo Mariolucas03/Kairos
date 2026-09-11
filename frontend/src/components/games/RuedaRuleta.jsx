@@ -117,6 +117,12 @@ const RuedaRuleta = forwardRef(function RuedaRuleta({ numeros, anguloSegmento, r
                     <stop offset="73%" stopColor="#000" stopOpacity="0.55" />
                 </radialGradient>
 
+                {/* `textShadow` no existe en texto SVG: el relieve de los numeros
+                    se pintaba con eso y no salia. Un filtro de sombra si. */}
+                <filter id="rr-relieve" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="1" stdDeviation="0.8" floodColor="#000" floodOpacity="0.9" />
+                </filter>
+
                 <radialGradient id="rr-brillo" cx="32%" cy="22%" r="55%">
                     <stop offset="0%" stopColor="#fff" stopOpacity="0.20" />
                     <stop offset="60%" stopColor="#fff" stopOpacity="0.04" />
@@ -205,11 +211,10 @@ const RuedaRuleta = forwardRef(function RuedaRuleta({ numeros, anguloSegmento, r
                                 textAnchor="middle"
                                 dominantBaseline="middle"
                                 fill="#fff"
+                                filter="url(#rr-relieve)"
                                 style={{
                                     font: '700 15px ui-sans-serif, system-ui, sans-serif',
-                                    letterSpacing: '-0.5px',
-                                    // Grabado, no impreso: la sombra le da relieve.
-                                    textShadow: '0 1px 1px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.5)'
+                                    letterSpacing: '-0.5px'
                                 }}
                             >{n}</text>
                         </g>

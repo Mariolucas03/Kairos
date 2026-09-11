@@ -25,13 +25,17 @@ const ChipRain = ({ isFading }) => { /* Mantén tu ChipRain original aquí (lo a
  * cubo que se mueve hacia arriba parece que crece.
  */
 const DadoEnMesa = ({ cara, refs, tamaño }) => (
-    <div className="relative" style={{ width: tamaño, height: tamaño, perspective: 700 }}>
+    <div className="relative" style={{ width: tamaño, height: tamaño }}>
         <div
             ref={el => { refs.sombra = el; }}
             className="absolute left-1/2 rounded-full bg-black/70 pointer-events-none"
             style={{ width: tamaño * 0.95, height: tamaño * 0.35, bottom: -tamaño * 0.22, transform: 'translateX(-50%)', filter: 'blur(6px)', willChange: 'transform, opacity' }}
         />
-        <div ref={el => { refs.altura = el; }} style={{ willChange: 'transform' }}>
+        {/* ⚠️ La `perspective` va AQUI, en el padre directo del cubo. Estaba en
+            el abuelo, y un div intermedio sin `transform-style: preserve-3d`
+            aplana: el cubo se veia en proyeccion plana, con sus caras pero sin
+            la profundidad de un dado de verdad. */}
+        <div ref={el => { refs.altura = el; }} style={{ willChange: 'transform', perspective: 520 }}>
             <Dado3D ref={el => { refs.cubo = el; }} tamaño={tamaño} rotX={ORIENTACION[cara].x} rotY={ORIENTACION[cara].y} rotZ={refs.zFinal || 0} />
         </div>
     </div>

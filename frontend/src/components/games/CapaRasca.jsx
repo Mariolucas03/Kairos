@@ -60,7 +60,11 @@ export default function CapaRasca({ activa, reveladas, celda, onRevelar, onRasca
             const c = celda(i, rect.width, rect.height);
             ctx.save();
             ctx.beginPath();
-            ctx.roundRect(c.x, c.y, c.ancho, c.alto, 12);
+            // `roundRect` no esta en los WebView de Android viejos; sin el
+            // respaldo, esto reventaba el componente entero y el rasca
+            // desaparecia. Con esquinas rectas se juega igual.
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(c.x, c.y, c.ancho, c.alto, 12);
+            else ctx.rect(c.x, c.y, c.ancho, c.alto);
             ctx.clip();
 
             // Plata: un degradado en diagonal con dos brillos, como el de las
