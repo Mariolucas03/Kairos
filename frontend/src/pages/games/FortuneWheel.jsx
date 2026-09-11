@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gift, Flame, Diamond, Lock, X, Info, AlertTriangle, Zap } from 'lucide-react';
+import { Gift, Flame, Diamond, Lock, X, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 import { getMadridDateString } from '../../utils/dateHelpers';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
+import RuedaFortuna from '../../components/games/RuedaFortuna';
+import { trayectoriaRueda } from '../../utils/fisicaRuedaFortuna';
+import { crearSintetizador, melodias, haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
+
+// A esta velocidad (grados/ms) el zumbido se satura. Sale de la fisica.
+const VELOCIDAD_MAXIMA = 0.9;
 
 // --- COMPONENTE DE LLUVIA DE MONEDAS ---
 const CoinsRain = () => {
@@ -72,10 +78,28 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
     const [winData, setWinData] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
 
+    // ⚠️ EL GIRO NO PASA POR REACT. Cada frame escribe el transform del disco
+    // y el de la lengüeta directamente en el DOM (ver handleSpin).
+    const ruedaRef = useRef(null);
+    const animacionRef = useRef(null);
+    const sonidoRef = useRef(null);
+
+    const [conSonido, setConSonido] = useState(haySonidoJuegos);
+    const alternarSonido = () => {
+        const nuevo = !conSonido;
+        cambiarSonidoJuegos(nuevo);
+        setConSonido(nuevo);
+        if (!nuevo) sonidoRef.current?.parar();
+    };
+
+    useEffect(() => () => {
+        if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+        sonidoRef.current?.parar();
+    }, []);
+
     const currentFichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
     const prizes = config.prizes;
     const numSegments = prizes.length;
-    const segmentAngle = 360 / numSegments;
 
     const handleSpin = async () => {
         if (spinning) return;
@@ -100,17 +124,30 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
             // El tiro diario solo se marca como gastado si el servidor lo aceptó
             onSpinComplete();
 
-            // Animación
-            const offset = segmentAngle / 2;
-            const targetAngle = 360 - (winIndex * segmentAngle + offset);
-            const extraSpins = 360 * (5 + Math.floor(Math.random() * 3));
-            const currentMod = rotation % 360;
-            const distToTarget = targetAngle - currentMod;
-            const finalRotation = rotation + extraSpins + (distToTarget > 0 ? distToTarget : distToTarget + 360);
+            // EL GIRO, FRAME A FRAME. El premio ya esta decidido; `trayectoriaRueda`
+            // dice donde esta la rueda y cuanto esta doblada la lengueta en cada
+            // instante, y aqui solo se pintan y se hacen sonar.
+            const tr = trayectoriaRueda({ giroAlEmpezar: rotation, indiceGanador: winIndex, segmentos: numSegments });
 
-            setRotation(finalRotation);
+            const sonido = crearSintetizador();
+            sonidoRef.current = sonido;
+            const zumbido = sonido.continuo({ frecuenciaBase: 200, frecuenciaExtra: 350, volumenMax: 0.10 });
 
-            setTimeout(() => {
+            let terminado = false;
+            const terminar = () => {
+                if (terminado) return;
+                terminado = true;
+                clearTimeout(salvavidas);
+                if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+                sonido.parar();
+                sonidoRef.current = null;
+
+                // El disco se deja EXACTAMENTE en su sitio y la lengueta recta,
+                // por si el ultimo frame no llego a pintarse.
+                if (ruedaRef.current?.disco) ruedaRef.current.disco.style.transform = `rotate(${tr.giroFinal}deg)`;
+                if (ruedaRef.current?.lengueta) ruedaRef.current.lengueta.style.transform = 'rotate(0deg)';
+                setRotation(tr.giroFinal);
+
                 setSpinning(false);
                 setWinData(serverPrize);
                 // Se sincroniza SIEMPRE, gane o no: si el premio era 0 antes no se
@@ -119,11 +156,54 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                     setUser(updatedUser);
                     localStorage.setItem('user', JSON.stringify(updatedUser));
                 }
-            }, 5000);
+
+                const fin = crearSintetizador();
+                if (serverPrize?.v > 0) (serverPrize.v >= 500 ? melodias.granPremio : melodias.ganar)(fin);
+                else melodias.perder(fin);
+                setTimeout(fin.parar, 2500);
+            };
+
+            const t0 = performance.now();
+            let msAnterior = 0;
+            const frame = (ahora) => {
+                const ms = Math.min(ahora - t0, tr.duracion);
+                const disco = ruedaRef.current?.disco;
+                const lengueta = ruedaRef.current?.lengueta;
+                if (!disco || !lengueta) { sonido.parar(); return; }
+
+                disco.style.transform = `rotate(${tr.rueda(ms)}deg)`;
+                // La lengueta se dobla EN CONTRA del giro: la rueda va hacia
+                // positivo y la empuja hacia el otro lado.
+                lengueta.style.transform = `rotate(${tr.lengueta(ms)}deg)`;
+
+                const v = Math.min(tr.velocidad(ms) / VELOCIDAD_MAXIMA, 1);
+                zumbido(v);
+
+                // Un tic por cada pivote que pasa. La cadencia sale de la fisica:
+                // al frenar pasan menos por segundo.
+                const tics = tr.pivotesEntre(msAnterior, ms);
+                for (let i = 0; i < tics; i++) {
+                    sonido.golpe({ frecuencia: 2800 + Math.random() * 600, duracion: 0.035, volumen: 0.14 + 0.2 * v, q: 6 });
+                }
+                msAnterior = ms;
+
+                if (ms < tr.duracion) {
+                    animacionRef.current = requestAnimationFrame(frame);
+                } else {
+                    terminar();
+                }
+            };
+
+            // El salvavidas: rAF no dispara con la pestana en segundo plano.
+            // Sin esto, cambiar de app a mitad de giro lo dejaba colgado.
+            const salvavidas = setTimeout(terminar, tr.duracion + 600);
+            animacionRef.current = requestAnimationFrame(frame);
 
         } catch (error) {
             console.error("Error ruleta:", error);
             setErrorMsg(error.response?.data?.message || "No se pudo tirar");
+            if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+            sonidoRef.current?.parar();
             setSpinning(false);
         }
     };
@@ -136,23 +216,21 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                     {errorMsg}
                 </div>
             )}
-            <div className="relative w-[320px] h-[320px] mb-10">
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 w-8 h-10 bg-white" style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)', filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.5))' }}></div>
-                <div className="w-full h-full rounded-full border-8 border-zinc-900 shadow-2xl overflow-hidden relative bg-zinc-950 transition-transform cubic-bezier(0.15, 0, 0.15, 1)"
-                    style={{ transform: `rotate(${rotation}deg)`, transitionDuration: spinning ? '5000ms' : '0ms' }}>
-                    <div className="absolute inset-0 w-full h-full" style={{ background: `conic-gradient(${prizes.map((p, i) => `${p.color} ${i * segmentAngle}deg ${(i + 1) * segmentAngle}deg`).join(', ')})` }} />
-                    {prizes.map((prize, i) => (
-                        <div key={i} className="absolute top-0 left-1/2 w-[80px] h-[50%] -ml-[40px] origin-bottom flex flex-col justify-start pt-5 items-center gap-1" style={{ transform: `rotate(${i * segmentAngle + segmentAngle / 2}deg)`, transformOrigin: 'bottom center' }}>
-                            <span className="text-white font-black text-xl drop-shadow-md leading-none rotate-180 mb-1" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{prize.label}</span>
-                            <img src="/assets/icons/ficha.png" alt="f" className="w-6 h-6 object-contain drop-shadow-md rotate-180" />
-                        </div>
-                    ))}
-                    <div className="absolute inset-0 m-auto w-16 h-16 bg-zinc-900 rounded-full border-4 border-zinc-800 shadow-inner flex items-center justify-center text-zinc-400 z-20">{config.icon}</div>
-                </div>
+            <div className="relative w-[330px] h-[340px] mb-6 drop-shadow-[0_18px_40px_rgba(0,0,0,0.9)]">
+                <RuedaFortuna ref={ruedaRef} premios={prizes} rotacion={rotation} iconoCentro={config.icon} />
             </div>
-            <button onClick={handleSpin} disabled={spinning} className={`w-full py-5 rounded-2xl font-black text-lg uppercase tracking-widest transition-all active:scale-95 shadow-xl ${spinning ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200'}`}>
-                {spinning ? 'Girando...' : `GIRAR (${config.cost === 0 ? 'GRATIS' : config.cost})`}
-            </button>
+            <div className="w-full flex items-center gap-2">
+                <button onClick={handleSpin} disabled={spinning} className={`flex-1 py-5 rounded-2xl font-black text-lg uppercase tracking-widest transition-all active:scale-95 shadow-xl ${spinning ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200'}`}>
+                    {spinning ? 'Girando...' : `GIRAR (${config.cost === 0 ? 'GRATIS' : config.cost})`}
+                </button>
+                <button
+                    onClick={alternarSonido}
+                    aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                    className={`w-14 h-[68px] rounded-2xl border border-zinc-800 bg-zinc-900 flex items-center justify-center active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                >
+                    {conSonido ? <Volume2 size={22} /> : <VolumeX size={22} />}
+                </button>
+            </div>
 
             {winData && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-6 animate-in zoom-in-95 duration-200">
