@@ -34,6 +34,7 @@ export default function CartaAnimada({
     desdeRef = null,
     retraso = 0,
     revelarTras = null,
+    retrasoVolteo = 0,
     ancho,
     alto,
     alRepartir = null,
@@ -102,10 +103,16 @@ export default function CartaAnimada({
     useLayoutEffect(() => {
         const antes = ocultaAnterior.current;
         ocultaAnterior.current = oculta;
-        if (antes && !oculta && giro !== 0) {
+        if (!(antes && !oculta && giro !== 0)) return;
+        // `retrasoVolteo` escalona: el flop del poquer son tres cartas que
+        // llegan a la vez y se destapan una detras de otra.
+        const voltear = () => {
             setGiro(0);
             if (!avisadoVolteo.current) { avisadoVolteo.current = true; alVoltear?.(); }
-        }
+        };
+        if (!retrasoVolteo) { voltear(); return; }
+        const id = setTimeout(voltear, retrasoVolteo);
+        return () => clearTimeout(id);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [oculta]);
 

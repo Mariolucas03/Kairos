@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
@@ -9,6 +9,13 @@ import api from '../../services/api';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import CartaPoker from '../../components/games/CartaPoker';
+import CartaAnimada from '../../components/games/CartaAnimada';
+import { crearSonidoCartas } from '../../utils/sonidoCartas';
+
+// Las medidas de CartaPoker, para darle su hueco a la carta animada.
+const MEDIDA = { xs: [26, 38], sm: [38, 55], md: [52, 74] };
+// Entre carta y carta del flop al destaparse, y entre mis dos al repartir.
+const ENTRE_CARTAS = 150;
 import { useAuthStore } from '../../store/useAuthStore';
 
 const fetcher = (url) => api.get(url).then(r => r.data);
@@ -81,6 +88,42 @@ export default function Poker() {
      */
     const setUser = useAuthStore(state => state.setUser);
     const misFichas = mesa?.jugadores?.find(j => j.soyYo)?.fichas;
+
+    // ⚠️ LO QUE SUENA EN LA MESA, y de donde salen las cartas.
+    //
+    // El bote sube cuando alguien apuesta: suena una ficha. Llega un resultado:
+    // suena ganar o perder segun este yo entre los ganadores. Se compara con lo
+    // de antes para sonar solo en el CAMBIO, no en cada refresco de la mesa.
+    //
+    // Va aqui arriba, con el resto de hooks, y no junto al tapete: mas abajo hay
+    // un `return` para la lista de mesas, y un hook despues de un return
+    // condicional rompe la regla de los hooks.
+    const mazoRef = useRef(null);
+    const sonidoRef = useRef(null);
+    const boteAnterior = useRef(mesa?.bote);
+    const resultadoAnterior = useRef(mesa?.ultimoResultado);
+    const miNombre = mesa?.jugadores?.find(j => j.soyYo)?.nombre;
+    useEffect(() => {
+        sonidoRef.current = crearSonidoCartas();
+        return () => sonidoRef.current?.parar();
+    }, []);
+    useEffect(() => {
+        const bote = mesa?.bote;
+        if (typeof bote === 'number' && typeof boteAnterior.current === 'number' && bote > boteAnterior.current) {
+            sonidoRef.current?.ficha();
+        }
+        boteAnterior.current = bote;
+    }, [mesa?.bote]);
+    useEffect(() => {
+        const r = mesa?.ultimoResultado;
+        if (r && r !== resultadoAnterior.current) {
+            const gane = r.ganadores?.some(g => g.soyYo || g.nombre === miNombre);
+            const s = sonidoRef.current;
+            // Un pelin despues: que se vean las cartas de los demas primero.
+            setTimeout(() => { if (gane) { s?.fichas(6); s?.ganar(); } else s?.perder(); }, 700);
+        }
+        resultadoAnterior.current = r;
+    }, [mesa?.ultimoResultado, miNombre]);
 
     useEffect(() => {
         if (typeof misFichas !== 'number') return;
@@ -442,11 +485,33 @@ export default function Poker() {
                             }}
                         />
 
-                        {/* El centro: cinco cartas y el bote debajo */}
+                        {/* EL MAZO, arriba del tapete: de aqui salen mis cartas. */}
+                        <div ref={mazoRef} className="absolute left-1/2 top-[8%] -translate-x-1/2 z-10 pointer-events-none" style={{ width: 26, height: 38 }}>
+                            {[0, 1, 2].map(i => (
+                                <div key={i} className="absolute inset-0" style={{ transform: `translate(${-i}px, ${-i}px)` }}>
+                                    <CartaPoker carta={null} tamano="xs" />
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* El centro: cinco cartas y el bote debajo. Cada hueco es
+                            una carta que nace boca abajo y SE VOLTEA cuando llega la
+                            comunitaria: el flop se destapa de tres en tres, escalonado,
+                            y el turn y el river de una en una. La clave lleva el numero
+                            de mano para que al empezar otra nazcan tapadas otra vez. */}
                         <div className="absolute inset-x-[14%] inset-y-[19%] flex flex-col items-center justify-center gap-2.5 px-2">
                             <div className="flex items-center justify-center gap-1">
                                 {[0, 1, 2, 3, 4].map(i => (
-                                    <CartaPoker key={i} carta={m.comunitarias[i] || null} tamano="sm" />
+                                    <CartaAnimada
+                                        key={`${m.manoNumero}-${i}`}
+                                        cara={<CartaPoker carta={m.comunitarias[i] || null} tamano="sm" />}
+                                        dorso={<CartaPoker carta={null} tamano="sm" />}
+                                        oculta={!m.comunitarias[i]}
+                                        retrasoVolteo={i < 3 ? i * ENTRE_CARTAS : 0}
+                                        ancho={MEDIDA.sm[0]}
+                                        alto={MEDIDA.sm[1]}
+                                        alVoltear={() => sonidoRef.current?.voltear()}
+                                    />
                                 ))}
                             </div>
 
@@ -534,7 +599,20 @@ export default function Poker() {
                         hay que leer de verdad. */}
                     {yo?.cartas?.length > 0 && (
                         <div className="flex items-center justify-center gap-2 mb-4">
-                            {yo.cartas.map((c, i) => <CartaPoker key={i} carta={c} tamano="md" />)}
+                            {yo.cartas.map((c, i) => (
+                                // Salen del mazo, una tras otra. La clave lleva el numero
+                                // de mano: en la siguiente vuelven a repartirse.
+                                <CartaAnimada
+                                    key={`${m.manoNumero}-mia-${i}`}
+                                    cara={<CartaPoker carta={c} tamano="md" />}
+                                    dorso={<CartaPoker carta={null} tamano="md" />}
+                                    desdeRef={mazoRef}
+                                    retraso={i * ENTRE_CARTAS}
+                                    ancho={MEDIDA.md[0]}
+                                    alto={MEDIDA.md[1]}
+                                    alRepartir={() => sonidoRef.current?.repartir()}
+                                />
+                            ))}
                         </div>
                     )}
 
@@ -557,10 +635,22 @@ export default function Poker() {
 
                             {res.manos.length > 0 && (
                                 <div className="mt-3 space-y-1.5">
-                                    {res.manos.map(mano => (
+                                    {res.manos.map((mano, k) => (
                                         <div key={mano.puesto} className="flex items-center gap-2">
                                             <span className="text-[10px] text-zinc-500 w-16 truncate">{mano.nombre}</span>
-                                            {mano.cartas.map((c, i) => <CartaPoker key={i} carta={c} tamano="xs" />)}
+                                            {/* Las manos de los demas se destapan una a una: el
+                                                showdown es el momento de la partida. */}
+                                            {mano.cartas.map((c, i) => (
+                                                <CartaAnimada
+                                                    key={`${m.manoNumero}-${mano.puesto}-${i}`}
+                                                    cara={<CartaPoker carta={c} tamano="xs" />}
+                                                    dorso={<CartaPoker carta={null} tamano="xs" />}
+                                                    revelarTras={150 + k * 260 + i * 90}
+                                                    ancho={MEDIDA.xs[0]}
+                                                    alto={MEDIDA.xs[1]}
+                                                    alVoltear={() => sonidoRef.current?.voltear()}
+                                                />
+                                            ))}
                                         </div>
                                     ))}
                                 </div>
