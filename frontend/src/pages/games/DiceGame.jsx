@@ -1,32 +1,47 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Info, X, Trophy, Frown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
 import SelectorApuesta from '../../components/games/SelectorApuesta';
+import Dado3D from '../../components/games/Dado3D';
+import { trayectoriaDado, ORIENTACION } from '../../utils/fisicaDados';
+import { crearSintetizador, melodias, haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// El segundo dado sale un pelin despues del primero: dos dados que caen
+// exactamente a la vez se ven como uno duplicado.
+const RETRASO_SEGUNDO = 140;
 const ChipRain = ({ isFading }) => { /* Mantén tu ChipRain original aquí (lo abrevio por espacio) */
     return <div className={`fixed inset-0 pointer-events-none z-[9999] overflow-hidden transition-opacity duration-1000 ${isFading ? 'opacity-0' : 'opacity-100'}`}><style>{`@keyframes fall { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(120vh) rotate(360deg); } }`}</style>{Array.from({ length: 50 }).map((_, i) => <img key={i} src="/assets/icons/ficha.png" className="absolute will-change-transform" style={{ left: `${Math.random() * 100}%`, top: `-${Math.random() * 50}vh`, width: '30px', animation: `fall ${1 + Math.random()}s linear ${Math.random()}s infinite` }} alt="" />)}</div>;
 };
 
-const DigitalDie = ({ value, rolling }) => {
-    const [displayNum, setDisplayNum] = useState(value);
-    useEffect(() => {
-        let int; if (rolling) int = setInterval(() => setDisplayNum(Math.floor(Math.random() * 6) + 1), 80); else setDisplayNum(value);
-        return () => clearInterval(int);
-    }, [rolling, value]);
-    return <div className={`w-32 h-32 md:w-40 md:h-40 bg-black/80 backdrop-blur-xl border-4 rounded-[2rem] flex items-center justify-center relative overflow-hidden transition-all duration-300 ${rolling ? 'scale-95 border-cyan-500/20' : 'scale-100 border-cyan-400'}`}><span className={`text-8xl md:text-9xl font-black text-white transition-all ${rolling ? 'blur-sm opacity-50' : 'blur-0 opacity-100'}`}>{displayNum}</span></div>;
-};
+/**
+ * UN DADO SOBRE LA MESA, con su sombra.
+ *
+ * El cubo va dentro de un contenedor que sube y baja (la altura) y la sombra
+ * se queda en la mesa, encogiendo y aclarandose cuanto mas alto esta el dado.
+ * Es la sombra lo que hace que el ojo lea "esta en el aire": sin ella, un
+ * cubo que se mueve hacia arriba parece que crece.
+ */
+const DadoEnMesa = ({ cara, refs, tamaño }) => (
+    <div className="relative" style={{ width: tamaño, height: tamaño, perspective: 700 }}>
+        <div
+            ref={el => { refs.sombra = el; }}
+            className="absolute left-1/2 rounded-full bg-black/70 pointer-events-none"
+            style={{ width: tamaño * 0.95, height: tamaño * 0.35, bottom: -tamaño * 0.22, transform: 'translateX(-50%)', filter: 'blur(6px)', willChange: 'transform, opacity' }}
+        />
+        <div ref={el => { refs.altura = el; }} style={{ willChange: 'transform' }}>
+            <Dado3D ref={el => { refs.cubo = el; }} tamaño={tamaño} rotX={ORIENTACION[cara].x} rotY={ORIENTACION[cara].y} rotZ={refs.zFinal || 0} />
+        </div>
+    </div>
+);
 
 export default function Dice() {
     // 🔥 CONECTAMOS CON ZUSTAND
     const user = useAuthStore(state => state.user);
     const setUser = useAuthStore(state => state.setUser);
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
-    const navigate = useNavigate();
 
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
@@ -37,6 +52,25 @@ export default function Dice() {
     const [resultModal, setResultModal] = useState(null);
     const [showRain, setShowRain] = useState(false);
     const [errorMsg, setErrorMsg] = useState(null);
+
+    // ⚠️ LA TIRADA NO PASA POR REACT. Cada frame escribe los transforms de los
+    // dos cubos y sus sombras directamente en el DOM (ver handleRoll).
+    const dadosRef = useRef([{}, {}]);
+    const animacionRef = useRef(null);
+    const sonidoRef = useRef(null);
+
+    const [conSonido, setConSonido] = useState(haySonidoJuegos);
+    const alternarSonido = () => {
+        const nuevo = !conSonido;
+        cambiarSonidoJuegos(nuevo);
+        setConSonido(nuevo);
+        if (!nuevo) sonidoRef.current?.parar();
+    };
+
+    useEffect(() => () => {
+        if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+        sonidoRef.current?.parar();
+    }, []);
 
     // SALDO DERIVADO, no un estado paralelo.
     // Antes era un useState que además NO se resincronizaba con el usuario (los
@@ -51,33 +85,133 @@ export default function Dice() {
         setResultModal(null); setRolling(true); setShowRain(false); setErrorMsg(null);
 
         try {
+            // 1. Las caras las decide el servidor. Lo de abajo es el camino.
             const res = await api.post('/games/dice', { bet, prediction: selectedOption });
-            await sleep(1500);
-            setDices(res.data.dices);
-            setRolling(false);
-            if (res.data.won) { setShowRain(true); setTimeout(() => setShowRain(false), 3000); }
-            setResultModal({ won: res.data.won, amount: res.data.payout, sum: res.data.sum });
-            setUser(res.data.user);
+            const caras = res.data.dices;
+
+            const trayectorias = caras.map((cara, i) => trayectoriaDado({ cara, retraso: i * RETRASO_SEGUNDO }));
+            const duracion = Math.max(...trayectorias.map(t => t.duracion));
+
+            const sonido = crearSintetizador();
+            sonidoRef.current = sonido;
+            // El cubilete: un traqueteo de golpes cortos justo antes de soltar.
+            for (let i = 0; i < 7; i++) {
+                setTimeout(() => sonido.golpe({ frecuencia: 1400 + Math.random() * 600, duracion: 0.03, volumen: 0.16, q: 5 }), i * 45);
+            }
+            const aterrizado = trayectorias.map(() => [false, false, false]);
+
+            let terminado = false;
+            const terminar = () => {
+                if (terminado) return;
+                terminado = true;
+                clearTimeout(salvavidas);
+                if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+                sonido.parar();
+                sonidoRef.current = null;
+
+                // Se deja cada cubo EXACTAMENTE en su orientacion final y en la
+                // mesa, por si el ultimo frame no llego a pintarse. Y se guarda
+                // el giro en Z con el que se quedo, para que al repintar React
+                // no lo enderece de golpe.
+                trayectorias.forEach((tr, i) => {
+                    const r = dadosRef.current[i];
+                    r.zFinal = ((tr.finZ % 360) + 360) % 360;
+                    if (r.cubo) r.cubo.style.transform = `rotateZ(${tr.finZ}deg) rotateX(${tr.finX}deg) rotateY(${tr.finY}deg)`;
+                    if (r.altura) r.altura.style.transform = 'translateY(0px)';
+                    if (r.sombra) { r.sombra.style.transform = 'translateX(-50%) scale(1)'; r.sombra.style.opacity = '1'; }
+                });
+
+                setDices(caras);
+                setRolling(false);
+                if (res.data.won) { setShowRain(true); setTimeout(() => setShowRain(false), 3000); }
+                setResultModal({ won: res.data.won, amount: res.data.payout, sum: res.data.sum });
+                setUser(res.data.user);
+
+                const fin = crearSintetizador();
+                (res.data.won ? melodias.ganar : melodias.perder)(fin);
+                setTimeout(fin.parar, 1500);
+            };
+
+            const t0 = performance.now();
+            const frame = (ahora) => {
+                const ms = ahora - t0;
+                trayectorias.forEach((tr, i) => {
+                    const r = dadosRef.current[i];
+                    if (!r.cubo || !r.altura || !r.sombra) return;
+                    const e = tr.estado(ms);
+                    r.cubo.style.transform = `rotateZ(${e.rotZ}deg) rotateX(${e.rotX}deg) rotateY(${e.rotY}deg)`;
+                    r.altura.style.transform = `translateY(${e.altura}px)`;
+                    // La sombra: mas pequeña y mas clara cuanto mas alto.
+                    const lejos = Math.min(-e.altura / 150, 1);
+                    r.sombra.style.transform = `translateX(-50%) scale(${1 - 0.45 * lejos})`;
+                    r.sombra.style.opacity = String(1 - 0.6 * lejos);
+
+                    // Cada vez que toca la mesa, un golpe de madera. Mas flojo
+                    // cada bote, que cae de mas bajo.
+                    tr.aterrizajes.forEach((cuando, k) => {
+                        if (!aterrizado[i][k] && ms >= cuando) {
+                            aterrizado[i][k] = true;
+                            sonido.golpe({ frecuencia: 380 - k * 60, duracion: 0.09 - k * 0.02, volumen: 0.5 - k * 0.15, q: 3 });
+                        }
+                    });
+                });
+
+                if (ms < duracion) {
+                    animacionRef.current = requestAnimationFrame(frame);
+                } else {
+                    terminar();
+                }
+            };
+
+            // El salvavidas: rAF no dispara en segundo plano. Sin esto, cambiar
+            // de app a mitad de tirada la dejaba colgada.
+            const salvavidas = setTimeout(terminar, duracion + 600);
+            animacionRef.current = requestAnimationFrame(frame);
         } catch (e) {
             setErrorMsg(e.response?.data?.message || 'No se pudo tirar. Inténtalo otra vez.');
+            if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+            sonidoRef.current?.parar();
             setRolling(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-40 pb-4 overflow-hidden select-none font-sans">
+        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-24 pb-4 overflow-hidden select-none font-sans">
             {showRain && <ChipRain isFading={false} />}
-            <div className="absolute top-12 left-4 right-4 flex justify-between z-50"><BackButton to="/games" /><div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-blue-500/50"><span className="text-blue-400 font-black text-xl">{visualBalance}</span><img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" /></div><div></div></div>
-            <div className="absolute top-28 w-full text-center z-10">
-                <h1 className="text-4xl font-black not-italic text-cyan-400">NEON DICE</h1>
-                {errorMsg && (
-                    <div onClick={() => setErrorMsg(null)} className="mx-6 mt-3 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl cursor-pointer">
-                        {errorMsg}
-                    </div>
-                )}
+            <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
+                <BackButton to="/games" />
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-blue-500/50"><span className="text-blue-400 font-black text-xl">{visualBalance}</span><img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" /></div>
+                <button
+                    onClick={alternarSonido}
+                    aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                    className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                >
+                    {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                </button>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-8 z-10">
-                <div className="relative w-full flex justify-center gap-6"><DigitalDie value={dices[0]} rolling={rolling} /><DigitalDie value={dices[1]} rolling={rolling} /></div>
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-5 z-10">
+                {/* El titulo iba en `absolute top-28` y la mesa, que ahora es
+                    mas alta para que los dados tengan de donde caer, le pasaba
+                    por encima. En el flujo no lo pisa nada. */}
+                <div className="w-full text-center">
+                    <h1 className="text-4xl font-black not-italic text-cyan-400">NEON DICE</h1>
+                    {errorMsg && (
+                        <div onClick={() => setErrorMsg(null)} className="mx-2 mt-3 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl cursor-pointer">
+                            {errorMsg}
+                        </div>
+                    )}
+                </div>
+                {/* LA MESA. Fieltro con luz cenital, y los dos dados encima con
+                    sitio arriba para caer desde el aire. */}
+                <div
+                    className="relative w-full rounded-[2rem] border border-white/[0.07] flex items-end justify-center gap-10 pb-9 pt-28 overflow-visible"
+                    style={{ background: 'radial-gradient(ellipse at 50% 30%, #123c2e 0%, #0b2a20 55%, #061a14 100%)', boxShadow: 'inset 0 0 60px rgba(0,0,0,0.7), 0 20px 40px rgba(0,0,0,0.6)' }}
+                >
+                    {/* El borde de madera de la mesa */}
+                    <div className="absolute inset-0 rounded-[2rem] pointer-events-none" style={{ boxShadow: 'inset 0 0 0 6px #3b2416, inset 0 0 0 7px #1a0e08' }} />
+                    <DadoEnMesa cara={dices[0]} refs={dadosRef.current[0]} tamaño={84} />
+                    <DadoEnMesa cara={dices[1]} refs={dadosRef.current[1]} tamaño={84} />
+                </div>
                 <div className="bg-black/60 px-8 py-3 rounded-full border border-white/10"><span className="text-5xl font-black text-white">{rolling ? '?' : dices[0] + dices[1]}</span></div>
                 <div className="w-full grid grid-cols-3 gap-2.5">
                     {[
