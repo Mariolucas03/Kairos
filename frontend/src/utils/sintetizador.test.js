@@ -97,13 +97,15 @@ describe('El interruptor del sonido', () => {
     });
 
     test('un almacenamiento bloqueado no rompe el interruptor', () => {
-        const original = Storage.prototype.setItem;
-        Storage.prototype.setItem = () => { throw new Error('QuotaExceeded'); };
+        // `Storage` no esta en los globales del linter: se llega por el propio localStorage.
+        const proto = Object.getPrototypeOf(localStorage);
+        const original = proto.setItem;
+        proto.setItem = () => { throw new Error('QuotaExceeded'); };
         try {
             expect(() => cambiarSonidoJuegos(false)).not.toThrow();
             expect(haySonidoJuegos()).toBe(false);
         } finally {
-            Storage.prototype.setItem = original;
+            proto.setItem = original;
             cambiarSonidoJuegos(true);
         }
     });
