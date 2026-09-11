@@ -1,5 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Bomb, Coins, Loader2, TrendingUp, Trophy } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bomb, Coins, Loader2, TrendingUp, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { crearSonidoTorre } from '../../utils/sonidoTorre';
+import { haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
+
+// Lo que tarda en saberse si la losa aguanta, como MINIMO. El servidor
+// contesta en el acto, y eso mata la tension: pisas y ya. Medio segundo con la
+// losa hundida bajo el pie, sin saber, es el juego entero.
+const SUSPENSE = 520;
 import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
@@ -34,6 +41,24 @@ export default function TowerGame() {
     const [error, setError] = useState(null);
     const [result, setResult] = useState(null);       // { status, payout }
     const [revealed, setRevealed] = useState({});      // { [planta]: losaTrampa }
+    // La losa que se esta pisando ahora mismo, hundida y sin resolver.
+    const [pisando, setPisando] = useState(null);      // { planta, tile }
+    // La planta cuya trampa acaba de romperse: para el temblor y la caida.
+    const [rota, setRota] = useState(null);
+
+    const sonidoRef = useRef(null);
+    useEffect(() => {
+        sonidoRef.current = crearSonidoTorre();
+        return () => sonidoRef.current?.parar();
+    }, []);
+    const [conSonido, setConSonido] = useState(haySonidoJuegos);
+    const alternarSonido = () => {
+        const nuevo = !conSonido;
+        cambiarSonidoJuegos(nuevo);
+        setConSonido(nuevo);
+        sonidoRef.current?.parar();
+        sonidoRef.current = crearSonidoTorre();
+    };
 
     const jugando = !!token;
     const acumulado = floor > 0 && multipliers.length ? Math.round(bet * multipliers[floor - 1]) : 0;
@@ -48,7 +73,7 @@ export default function TowerGame() {
     const empezar = async () => {
         if (busy) return;
         if (bet > fichas) { setError('No te llegan las fichas'); return; }
-        setBusy(true); setError(null); setResult(null); setRevealed({});
+        setBusy(true); setError(null); setResult(null); setRevealed({}); setRota(null); setPisando(null);
         try {
             const res = await api.post('/games/tower', { action: 'start', bet });
             setToken(res.data.token);
@@ -70,22 +95,44 @@ export default function TowerGame() {
         if (busy || !token) return;
         setBusy(true); setError(null);
         const plantaActual = floor;
+
+        // El pie sobre la losa: se hunde YA, antes de saber nada.
+        setPisando({ planta: plantaActual, tile });
+        sonidoRef.current?.pisar();
+        const pisadaEn = performance.now();
+
         try {
             const res = await api.post('/games/tower', { action: 'pick', token, choice: tile });
             const d = res.data;
+
+            // Se espera lo que falte hasta el suspense minimo: la losa hundida
+            // bajo el pie, sin saber si aguanta.
+            const falta = SUSPENSE - (performance.now() - pisadaEn);
+            if (falta > 0) await new Promise(r => setTimeout(r, falta));
+
+            setPisando(null);
             setRevealed(prev => ({ ...prev, [plantaActual]: d.trapTile }));
 
             if (d.status === 'playing') {
+                sonidoRef.current?.aguanta(plantaActual);
                 setToken(d.token);
                 setFloor(d.floor);
             } else {
                 setToken(null);
                 setFloor(d.floor);
                 sincronizar(d.user);
+                if (d.status === 'won') {
+                    sonidoRef.current?.cobrar(true);
+                    confetti();
+                } else {
+                    // Se rompe: cruje, cae, y la torre entera tiembla.
+                    setRota(plantaActual);
+                    sonidoRef.current?.romper();
+                }
                 setResult({ status: d.status, payout: d.payout });
-                if (d.status === 'won') confetti();
             }
         } catch (e) {
+            setPisando(null);
             setError(e.response?.data?.message || 'Error de conexión');
             setToken(null);
         } finally { setBusy(false); }
@@ -98,6 +145,7 @@ export default function TowerGame() {
             const res = await api.post('/games/tower', { action: 'cashout', token });
             setToken(null);
             sincronizar(res.data.user);
+            sonidoRef.current?.cobrar(floor >= 5);
             setResult({ status: 'cashed', payout: res.data.payout });
             confetti();
         } catch (e) {
@@ -116,7 +164,13 @@ export default function TowerGame() {
                     <span className="text-emerald-400 font-black text-xl tabular-nums">{fichas.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="fichas" />
                 </div>
-                <div className="w-10" />
+                <button
+                    onClick={alternarSonido}
+                    aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                    className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                >
+                    {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                </button>
             </div>
 
             <div className="w-full max-w-sm px-5 flex-1 flex flex-col min-h-0">
@@ -125,8 +179,40 @@ export default function TowerGame() {
                     Sube sin pisar la trampa · retírate cuando quieras
                 </p>
 
+                <style>{`
+                    /* La losa que se hunde bajo el pie, sin saber si aguanta. */
+                    @keyframes torreHundir { to { transform: translateY(4px); box-shadow: 0 1px 0 #0a0a0c, inset 0 2px 6px rgba(0,0,0,0.6); } }
+                    /* Aguanta: vuelve arriba con un pelin de rebote y se enciende. */
+                    @keyframes torreAguanta {
+                        0%   { transform: translateY(4px); }
+                        60%  { transform: translateY(-2px); }
+                        100% { transform: translateY(0); }
+                    }
+                    /* Se rompe: se raja, se ladea y cae. */
+                    @keyframes torreRomper {
+                        0%   { transform: translateY(4px) rotateX(0deg); opacity: 1; }
+                        25%  { transform: translateY(6px) rotateX(-8deg) rotateZ(2deg); }
+                        100% { transform: translateY(70px) rotateX(-70deg) rotateZ(-6deg); opacity: 0.18; }
+                    }
+                    /* Y la torre entera tiembla. */
+                    @keyframes torreTemblor {
+                        0%, 100% { transform: translate(0, 0); }
+                        20% { transform: translate(-3px, 2px); }
+                        40% { transform: translate(3px, -2px); }
+                        60% { transform: translate(-2px, 1px); }
+                        80% { transform: translate(2px, -1px); }
+                    }
+                    .torre-hundida  { animation: torreHundir 140ms ease-out forwards; }
+                    .torre-aguanta  { animation: torreAguanta 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+                    .torre-rota     { animation: torreRomper 650ms cubic-bezier(0.55, 0, 1, 0.45) forwards; transform-origin: 50% 100%; }
+                    .torre-tiembla  { animation: torreTemblor 450ms ease-out; }
+                    @media (prefers-reduced-motion: reduce) {
+                        .torre-hundida, .torre-aguanta, .torre-rota, .torre-tiembla { animation: none !important; }
+                    }
+                `}</style>
+
                 {/* TORRE: de la planta más alta a la más baja */}
-                <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col-reverse gap-1.5 pb-3">
+                <div className={`flex-1 overflow-y-auto no-scrollbar flex flex-col-reverse gap-1.5 pb-3 ${rota !== null ? 'torre-tiembla' : ''}`} style={{ perspective: 700 }}>
                     {plantas.map((mult, planta) => {
                         const esActual = jugando && planta === floor;
                         const superada = planta < floor;
@@ -141,18 +227,34 @@ export default function TowerGame() {
                                     {Array.from({ length: TILES }).map((_, tile) => {
                                         const esTrampaRevelada = trampa !== undefined && tile === trampa;
                                         const esSegura = trampa !== undefined && tile !== trampa;
+                                        const laPisada = superada && revealed[planta] !== undefined && tile !== trampa && !pisando;
+                                        const hundida = pisando?.planta === planta && pisando?.tile === tile;
+                                        const seRompe = esTrampaRevelada && rota === planta;
 
-                                        let clase = 'bg-zinc-900 border-zinc-800 text-zinc-700';
-                                        if (esTrampaRevelada) clase = 'bg-red-900/60 border-red-500 text-red-400';
-                                        else if (esSegura && superada) clase = 'bg-emerald-900/40 border-emerald-500/50 text-emerald-400';
-                                        else if (esActual) clase = 'bg-zinc-800 border-emerald-500/40 text-white active:scale-95';
+                                        // Losas de piedra con su canto: la cara de arriba mas clara,
+                                        // el borde de abajo mas oscuro. Es lo que las hace pisables.
+                                        let clase = 'text-zinc-700';
+                                        let estilo = { background: 'linear-gradient(180deg, #26262b 0%, #18181c 100%)', boxShadow: '0 4px 0 #0a0a0c, 0 5px 8px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.05)' };
+                                        if (esTrampaRevelada) {
+                                            clase = 'text-red-400';
+                                            estilo = { background: 'linear-gradient(180deg, #5a1a1a 0%, #3a0f0f 100%)', boxShadow: '0 4px 0 #1a0505, 0 0 18px rgba(239,68,68,0.35)', border: '1px solid rgba(239,68,68,0.6)' };
+                                        } else if (esSegura && superada) {
+                                            clase = 'text-emerald-300';
+                                            estilo = { background: 'linear-gradient(180deg, #14532d 0%, #0b3b20 100%)', boxShadow: '0 4px 0 #052e16, 0 0 14px rgba(16,185,129,0.25)', border: '1px solid rgba(16,185,129,0.5)' };
+                                        } else if (esActual) {
+                                            clase = 'text-white';
+                                            estilo = { background: 'linear-gradient(180deg, #3a3a42 0%, #232328 100%)', boxShadow: '0 4px 0 #0a0a0c, 0 5px 10px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08)', border: '1px solid rgba(16,185,129,0.4)' };
+                                        }
+
+                                        const animacion = seRompe ? 'torre-rota' : hundida ? 'torre-hundida' : (laPisada && planta === floor - 1) ? 'torre-aguanta' : '';
 
                                         return (
                                             <button
                                                 key={tile}
                                                 disabled={!esActual || busy}
                                                 onClick={() => pisar(tile)}
-                                                className={`h-11 rounded-xl border font-black text-sm flex items-center justify-center transition-all disabled:cursor-default ${clase}`}
+                                                className={`h-11 rounded-xl font-black text-sm flex items-center justify-center disabled:cursor-default ${clase} ${animacion}`}
+                                                style={{ ...estilo, willChange: 'transform' }}
                                             >
                                                 {esTrampaRevelada ? <Bomb size={16} /> : esSegura && superada ? <Coins size={16} /> : esActual ? '?' : ''}
                                             </button>
