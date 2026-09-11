@@ -1,31 +1,59 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Spade, Club, Heart, Diamond, Info, X, Trophy, Frown, Handshake } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Info, X, Trophy, Frown, Handshake, Volume2, VolumeX } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
 import SelectorApuesta from '../../components/games/SelectorApuesta';
+import CartaAnimada from '../../components/games/CartaAnimada';
+import { crearSonidoCartas } from '../../utils/sonidoCartas';
+import { haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
 
-// --- COMPONENTE CARTA ---
-const Card = ({ card, hidden, small }) => (
-    <div className={`
-        flex-shrink-0 animate-in fade-in zoom-in slide-in-from-top-4 duration-500
-        ${small ? 'w-12 h-16 md:w-14 md:h-20 text-xs' : 'w-16 h-24 md:w-20 md:h-28 text-base'}
-        rounded-xl shadow-xl flex flex-col items-center justify-center relative transition-all select-none overflow-hidden
-        ${hidden ? 'border-2 border-white/20 bg-black' : 'bg-white border border-zinc-300'}
-    `}>
-        {hidden ? (
-            <img src="/assets/images/reverso-carta.png" alt="Hidden" className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-            <>
-                <span className={`font-black absolute top-1 left-1.5 leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.value}</span>
-                <span className={`text-2xl md:text-4xl ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.suit}</span>
-                <span className={`font-black absolute bottom-1 right-1.5 rotate-180 leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>{card.value}</span>
-            </>
-        )}
+// Milisegundos entre carta y carta al repartir. Un crupier reparte a este
+// ritmo; mas rapido es una rafaga, mas lento aburre.
+const ENTRE_CARTAS = 160;
+
+// --- LA CARA DE UNA CARTA (lo que se ve cuando esta boca arriba) ---
+const CaraCarta = ({ card, small }) => {
+    const roja = ['♥', '♦'].includes(card?.suit);
+    return (
+        <div className={`w-full h-full rounded-xl flex flex-col items-center justify-center relative select-none overflow-hidden bg-[#f8f7f4] border border-black/25 ${small ? 'text-xs' : 'text-base'}`}
+            style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.6), 0 6px 14px rgba(0,0,0,0.45)' }}>
+            <span className={`font-black absolute top-1 left-1.5 leading-none ${roja ? 'text-red-600' : 'text-black'}`}>{card?.value}</span>
+            <span className={`${small ? 'text-2xl' : 'text-3xl md:text-4xl'} ${roja ? 'text-red-600' : 'text-black'}`}>{card?.suit}</span>
+            <span className={`font-black absolute bottom-1 right-1.5 rotate-180 leading-none ${roja ? 'text-red-600' : 'text-black'}`}>{card?.value}</span>
+        </div>
+    );
+};
+
+// --- EL DORSO ---
+const Dorso = () => (
+    <div className="w-full h-full rounded-xl overflow-hidden border-2 border-white/20 bg-black" style={{ boxShadow: '0 6px 14px rgba(0,0,0,0.45)' }}>
+        <img src="/assets/images/reverso-carta.png" alt="" className="w-full h-full object-cover" draggable="false" />
     </div>
 );
+
+/**
+ * UNA CARTA EN LA MESA: sale del zapato, y si esta tapada se voltea al
+ * destaparse. `indice` escalona el reparto.
+ */
+const Card = ({ card, hidden, small, indice = 0, zapatoRef, sonido }) => {
+    const ancho = small ? 48 : 64;
+    const alto = small ? 68 : 96;
+    return (
+        <CartaAnimada
+            cara={<CaraCarta card={card} small={small} />}
+            dorso={<Dorso />}
+            oculta={!!hidden}
+            desdeRef={zapatoRef}
+            retraso={indice * ENTRE_CARTAS}
+            ancho={ancho}
+            alto={alto}
+            alRepartir={() => sonido.current?.repartir()}
+            alVoltear={() => sonido.current?.voltear()}
+        />
+    );
+};
 
 // Calcular score visualmente en frontend (el servidor ya validó la lógica)
 const calculateScore = (hand) => {
@@ -40,9 +68,37 @@ export default function BlackJack() {
     const user = useAuthStore(state => state.user);
     const setUser = useAuthStore(state => state.setUser);
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
-    const navigate = useNavigate();
 
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
+
+    // El zapato: de donde salen las cartas. Las cartas miden su distancia a el.
+    const zapatoRef = useRef(null);
+    // Un sintetizador por partida, que se para al salir.
+    const sonidoRef = useRef(null);
+    useEffect(() => {
+        sonidoRef.current = crearSonidoCartas();
+        return () => sonidoRef.current?.parar();
+    }, []);
+
+    const [conSonido, setConSonido] = useState(haySonidoJuegos);
+    const alternarSonido = () => {
+        const nuevo = !conSonido;
+        cambiarSonidoJuegos(nuevo);
+        setConSonido(nuevo);
+        // Con el interruptor cambiado hace falta un sintetizador nuevo: el de
+        // antes ya decidio si sonaba al crearse.
+        sonidoRef.current?.parar();
+        sonidoRef.current = crearSonidoCartas();
+    };
+
+    // ⚠️ Las cartas que YA estaban en la mesa no se vuelven a repartir.
+    //
+    // Cada carta se anima al montarse. Si al pedir carta React volviera a
+    // montar las anteriores, saldrian todas del zapato otra vez. Se evita con
+    // claves ESTABLES por carta (su posicion en la mano) en vez de por indice
+    // de un array que se reconstruye. Y el retraso del reparto solo cuenta las
+    // cartas nuevas de esta jugada: se guarda cuantas habia antes.
+    const cartasAntes = useRef({ d: 0, p: [] });
 
     // Estados JWT y Backend
     const [sessionToken, setSessionToken] = useState(null);
@@ -74,11 +130,17 @@ export default function BlackJack() {
 
         setErrorMsg(null);
         setIsProcessing(true);
-        if (action === 'deal') setResultModal(null);
+        if (action === 'deal') { setResultModal(null); sonidoRef.current?.ficha(); }
 
         try {
             const res = await api.post('/games/blackjack', { action, bet, token: sessionToken });
             const { state, token, user: updatedUser } = res.data;
+
+            // Cuantas cartas habia antes de esta jugada, para escalonar solo las
+            // nuevas. En un 'deal' no habia ninguna.
+            cartasAntes.current = action === 'deal'
+                ? { d: 0, p: [] }
+                : { d: gameState?.dHand?.length || 0, p: (gameState?.pHands || []).map(h => h.cards.length) };
 
             setSessionToken(token);
             setGameState(state);
@@ -94,11 +156,15 @@ export default function BlackJack() {
                         localStorage.setItem('user', JSON.stringify(updatedUser));
                     }
 
-                    setResultModal({
-                        type: won ? (isPush ? 'push' : 'win') : 'lose',
-                        amount: state.payout
-                    });
-                }, 1000); // 1 segundo de suspense al levantar carta del dealer
+                    const tipo = won ? (isPush ? 'push' : 'win') : 'lose';
+                    setResultModal({ type: tipo, amount: state.payout });
+                    const s = sonidoRef.current;
+                    if (tipo === 'win') { s?.fichas(5); s?.ganar(); }
+                    else if (tipo === 'push') s?.empate();
+                    else s?.perder();
+                    // El tiempo que tardan en llegar las cartas nuevas del crupier
+                    // mas el volteo: el modal no puede salir con cartas en el aire.
+                }, 600 + ((state.dHand?.length || 0) - (cartasAntes.current.d || 0)) * ENTRE_CARTAS + 480);
             }
 
         } catch (error) {
@@ -127,7 +193,16 @@ export default function BlackJack() {
                     <span className="text-green-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={alternarSonido}
+                        aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                    >
+                        {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                    <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                </div>
             </div>
 
             {errorMsg && (
@@ -140,8 +215,30 @@ export default function BlackJack() {
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm px-4 gap-6">
 
                 {/* --- MESA --- */}
-                <div className="w-full bg-[#1b4d3e] border-[8px] border-[#2d2a2a] rounded-[3rem] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[480px]">
-                    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "20px 20px" }}></div>
+                <div className="w-full rounded-[3rem] p-6 relative flex flex-col justify-between min-h-[480px]"
+                    style={{
+                        // Fieltro con luz cenital y el borde de madera acolchado de
+                        // una mesa de verdad. El overflow es visible a proposito:
+                        // las cartas salen del zapato, que esta en la esquina.
+                        background: 'radial-gradient(ellipse at 50% 35%, #1f6b52 0%, #174d3c 50%, #0e3328 100%)',
+                        boxShadow: 'inset 0 0 70px rgba(0,0,0,0.55), inset 0 0 0 8px #3b2416, inset 0 0 0 10px #1a0e08, 0 24px 50px rgba(0,0,0,0.7)'
+                    }}>
+                    {/* El arco de la mesa, como el que lleva pintado todo tapete de blackjack */}
+                    <div className="absolute left-6 right-6 top-[46%] h-24 rounded-[100%] border-t-2 border-yellow-200/25 pointer-events-none" />
+                    <p className="absolute left-0 right-0 top-[52%] text-center text-[9px] font-black tracking-[0.35em] text-yellow-100/25 uppercase pointer-events-none">
+                        Blackjack paga 3 a 2
+                    </p>
+
+                    {/* EL ZAPATO: de aqui salen las cartas. Un taco de dorsos en
+                        la esquina, con el canto visible. */}
+                    <div ref={zapatoRef} className="absolute -top-2 -right-1 z-20 pointer-events-none" style={{ width: 52, height: 76 }}>
+                        {[0, 1, 2, 3].map(i => (
+                            <div key={i} className="absolute inset-0 rounded-lg overflow-hidden border border-white/15 bg-black"
+                                style={{ transform: `translate(${-i * 1.5}px, ${-i * 1.5}px)`, boxShadow: '0 2px 4px rgba(0,0,0,0.6)' }}>
+                                <img src="/assets/images/reverso-carta.png" alt="" className="w-full h-full object-cover opacity-90" draggable="false" />
+                            </div>
+                        ))}
+                    </div>
 
                     {/* DEALER */}
                     <div className="flex flex-col items-center relative z-10 pt-4">
@@ -152,7 +249,14 @@ export default function BlackJack() {
                         </div>
                         <div className="flex -space-x-8 h-28 items-center justify-center">
                             {gameState?.dHand ? gameState.dHand.map((c, i) => (
-                                <Card key={i} card={c} hidden={c.hidden} />
+                                // La clave es la posicion en la mano: estable entre
+                                // jugadas, asi que las cartas viejas no se remontan.
+                                // El retraso solo cuenta las que son nuevas.
+                                <Card key={`d${i}`} card={c} hidden={c.hidden}
+                                    // En el reparto inicial van intercaladas: jugador, crupier,
+                                    // jugador, crupier. Despues, cada carta nueva sale en cuanto llega.
+                                    indice={cartasAntes.current.d === 0 ? i * 2 + 1 : Math.max(0, i - cartasAntes.current.d)}
+                                    zapatoRef={zapatoRef} sonido={sonidoRef} />
                             )) : (
                                 <div className="w-16 h-24 border-2 border-white/20 rounded-xl border-dashed opacity-30"></div>
                             )}
@@ -170,7 +274,11 @@ export default function BlackJack() {
                                 return (
                                     <div key={index} className={`flex flex-col items-center transition-all duration-300 ${isActive ? 'scale-105 z-20' : 'opacity-80 scale-95 z-10'}`}>
                                         <div className="flex -space-x-8 mb-2">
-                                            {hand.cards.map((c, idx) => <Card key={idx} card={c} small={gameState.pHands.length > 1} />)}
+                                            {hand.cards.map((c, idx) => (
+                                                <Card key={`p${index}-${idx}`} card={c} small={gameState.pHands.length > 1}
+                                                    indice={cartasAntes.current.p.length === 0 ? idx * 2 : Math.max(0, idx - (cartasAntes.current.p[index] || 0))}
+                                                    zapatoRef={zapatoRef} sonido={sonidoRef} />
+                                            ))}
                                         </div>
                                         <div className={`px-3 py-1 rounded-full border text-xs font-black shadow-xl ${isActive ? 'bg-yellow-500 text-black border-yellow-400' : 'bg-black/70 text-white border-white/20'}`}>
                                             {score}
