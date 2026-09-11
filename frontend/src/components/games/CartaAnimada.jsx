@@ -23,8 +23,9 @@ import { useLayoutEffect, useRef, useState } from 'react';
  *     con `preserve-3d`: el dorso por delante hasta la mitad, la cara después.
  *
  * `retraso` escalona el reparto: la segunda carta sale después de la primera.
- * `alRepartir` y `alVoltear` son para el sonido: se llaman cuando la carta
- * arranca y cuando se da la vuelta.
+ * `revelarTras` (ms) hace que una carta nazca tapada y se destape sola pasado
+ * ese tiempo: es para los desvelos escalonados, como las cartas de los rivales
+ * al resolverse una mano. `alRepartir` y `alVoltear` son para el sonido.
  */
 export default function CartaAnimada({
     cara,
@@ -32,6 +33,7 @@ export default function CartaAnimada({
     oculta = false,
     desdeRef = null,
     retraso = 0,
+    revelarTras = null,
     ancho,
     alto,
     alRepartir = null,
@@ -42,10 +44,23 @@ export default function CartaAnimada({
     const [transformInicial, setTransformInicial] = useState(null);
     const [enSitio, setEnSitio] = useState(false);
     // La cara se voltea SOLO si empezó tapada: una carta que nace boca arriba
-    // no tiene que girar.
-    const nacioOculta = useRef(oculta);
-    const [giro, setGiro] = useState(oculta ? 180 : 0);
+    // no tiene que girar. Con `revelarTras` nace tapada aunque `oculta` sea
+    // false: se destapa sola cuando toque.
+    const empiezaTapada = oculta || revelarTras !== null;
+    const nacioOculta = useRef(empiezaTapada);
+    const [giro, setGiro] = useState(empiezaTapada ? 180 : 0);
     const avisadoVolteo = useRef(false);
+
+    // El desvelo programado.
+    useLayoutEffect(() => {
+        if (revelarTras === null) return;
+        const id = setTimeout(() => {
+            setGiro(0);
+            if (!avisadoVolteo.current) { avisadoVolteo.current = true; alVoltear?.(); }
+        }, revelarTras);
+        return () => clearTimeout(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Reparto: medir y arrancar desde el zapato.
     useLayoutEffect(() => {
@@ -77,10 +92,17 @@ export default function CartaAnimada({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Volteo: cuando deja de estar oculta.
+    // Volteo: cuando `oculta` PASA de true a false.
+    //
+    // ⚠️ Solo en el cambio, no al montar. Este efecto tambien corre en el
+    // primer pintado, y ahi `oculta` ya es false para una carta con
+    // `revelarTras`: la volteaba en el acto y se cargaba el desvelo programado.
+    // Se guarda el valor anterior y se actua solo si de verdad ha cambiado.
+    const ocultaAnterior = useRef(oculta);
     useLayoutEffect(() => {
-        if (!nacioOculta.current) return;
-        if (!oculta && giro !== 0) {
+        const antes = ocultaAnterior.current;
+        ocultaAnterior.current = oculta;
+        if (antes && !oculta && giro !== 0) {
             setGiro(0);
             if (!avisadoVolteo.current) { avisadoVolteo.current = true; alVoltear?.(); }
         }

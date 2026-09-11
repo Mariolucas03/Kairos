@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
@@ -9,6 +9,15 @@ import api from '../../services/api';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import CartaEspanola, { NOMBRES } from '../../components/games/CartaEspanola';
+import CartaAnimada from '../../components/games/CartaAnimada';
+import { crearSonidoCartas } from '../../utils/sonidoCartas';
+
+// Al resolverse, las cartas de los rivales se destapan una tras otra a este
+// ritmo. La tuya ya esta levantada; la ultima en destaparse decide.
+const ENTRE_DESVELOS = 320;
+
+// Las medidas de CartaEspanola, para darle a la carta animada su hueco.
+const MEDIDA = { sm: [38, 56], md: [92, 134], lg: [118, 172] };
 import SelectorApuesta from '../../components/games/SelectorApuesta';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -49,6 +58,14 @@ export default function CartaAlta() {
     const [enVuelo, setEnVuelo] = useState(false);
     const [toast, setToast] = useState(null);
     const [resultado, setResultado] = useState(null);
+
+    // El mazo, de donde salen las cartas al resolverse. Y el sonido de la mesa.
+    const mazoRef = useRef(null);
+    const sonidoRef = useRef(null);
+    useEffect(() => {
+        sonidoRef.current = crearSonidoCartas();
+        return () => sonidoRef.current?.parar();
+    }, []);
     const [confirmar, setConfirmar] = useState(null);
     const [invitando, setInvitando] = useState(false);
 
@@ -114,7 +131,17 @@ export default function CartaAlta() {
         setResultado(r.data.resultado || null);
         if (r.data.resultado) {
             const res = r.data.resultado;
-            avisar(res.texto, res.empate ? 'success' : res.ganeYo ? 'success' : 'error');
+            // El aviso y el sonido del resultado esperan a que se destape la
+            // ultima carta: decir "has ganado" con las cartas de los rivales
+            // aun boca abajo es contar el final antes de la pelicula.
+            const cuantas = res.tiradas?.length || 1;
+            setTimeout(() => {
+                avisar(res.texto, res.empate ? 'success' : res.ganeYo ? 'success' : 'error');
+                const s = sonidoRef.current;
+                if (res.empate) s?.empate();
+                else if (res.ganeYo) { s?.fichas(5); s?.ganar(); }
+                else s?.perder();
+            }, cuantas * ENTRE_DESVELOS + 500);
         }
         return r;
     }, 'No se pudo levantar la carta');
@@ -413,23 +440,70 @@ export default function CartaAlta() {
                         </div>
                     )}
 
-                    {/* La mesa */}
-                    <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-6 mb-5">
+                    {/* La mesa: tapete con luz cenital y el mazo arriba, de
+                        donde salen las cartas al resolverse. */}
+                    <div className="relative rounded-3xl p-6 pt-10 mb-5"
+                        style={{
+                            background: 'radial-gradient(ellipse at 50% 30%, #3a2a16 0%, #241a0e 55%, #150f08 100%)',
+                            boxShadow: 'inset 0 0 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.06)'
+                        }}>
+                        {/* EL MAZO: un taco de dorsos, con el canto visible */}
+                        <div ref={mazoRef} className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none" style={{ width: 38, height: 56 }}>
+                            {[0, 1, 2, 3].map(i => (
+                                <div key={i} className="absolute inset-0" style={{ transform: `translate(${-i * 1.2}px, ${-i * 1.2}px)` }}>
+                                    <CartaEspanola carta={null} tamano="sm" />
+                                </div>
+                            ))}
+                        </div>
+
                         {resultado ? (
                             <div className="flex flex-wrap items-end justify-center gap-4">
-                                {resultado.tiradas.map((t, i) => (
-                                    <div key={i} className="flex flex-col items-center gap-2">
-                                        <CartaEspanola carta={t.carta} tamano="md" />
-                                        <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-[92px]"
-                                            style={{ color: t.nombre === resultado.ganador ? ACENTO : '#52525b' }}>
-                                            {t.soyYo ? 'Tú' : t.nombre}
-                                        </span>
-                                    </div>
-                                ))}
+                                {resultado.tiradas.map((t, i) => {
+                                    const ganadora = !resultado.empate && t.nombre === resultado.ganador;
+                                    return (
+                                        <div key={t.nombre || i} className="flex flex-col items-center gap-2">
+                                            {/* La tuya ya estaba levantada: nace boca arriba y en su
+                                                sitio. Las de los rivales salen del mazo y se destapan
+                                                una tras otra, la ultima decide. */}
+                                            <div className={`rounded-xl transition-shadow duration-500 ${ganadora ? 'shadow-[0_0_28px_rgba(201,130,43,0.55)]' : ''}`}>
+                                                <CartaAnimada
+                                                    cara={<CartaEspanola carta={t.carta} tamano="md" />}
+                                                    dorso={<CartaEspanola carta={null} tamano="md" />}
+                                                    desdeRef={t.soyYo ? null : mazoRef}
+                                                    retraso={t.soyYo ? 0 : i * 140}
+                                                    // La tuya tambien nace tapada y se destapa en el acto:
+                                                    // si eres el ultimo en levantar, el resultado llega
+                                                    // con la misma respuesta y el arbol cambia de golpe,
+                                                    // asi que el volteo de "levantar" se perderia.
+                                                    revelarTras={t.soyYo ? 60 : 400 + i * ENTRE_DESVELOS}
+                                                    ancho={MEDIDA.md[0]}
+                                                    alto={MEDIDA.md[1]}
+                                                    alRepartir={() => sonidoRef.current?.repartir()}
+                                                    alVoltear={() => sonidoRef.current?.voltear()}
+                                                />
+                                            </div>
+                                            <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-[92px]"
+                                                style={{ color: ganadora ? ACENTO : '#52525b' }}>
+                                                {t.soyYo ? 'Tú' : t.nombre}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="flex justify-center">
-                                <CartaEspanola carta={s.enCurso?.miCarta} tamano="lg" />
+                                {/* Tu carta, boca abajo en la mesa hasta que la levantas: y
+                                    levantarla es DARLE LA VUELTA, no cambiarla por otra. La
+                                    clave es fija para que el volteo sea la misma carta. */}
+                                <CartaAnimada
+                                    key="mi-carta"
+                                    cara={<CartaEspanola carta={s.enCurso?.miCarta} tamano="lg" />}
+                                    dorso={<CartaEspanola carta={null} tamano="lg" />}
+                                    oculta={!s.enCurso?.miCarta}
+                                    ancho={MEDIDA.lg[0]}
+                                    alto={MEDIDA.lg[1]}
+                                    alVoltear={() => sonidoRef.current?.voltear()}
+                                />
                             </div>
                         )}
 
