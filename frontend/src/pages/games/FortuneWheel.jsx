@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gift, Flame, Diamond, Lock, X, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import useSWR from 'swr';
+import { Gift, Flame, Diamond, Lock, X, Volume2, VolumeX, Coins, Star, Crown, Zap, Loader2 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
-import { getMadridDateString } from '../../utils/dateHelpers';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
 import RuedaFortuna from '../../components/games/RuedaFortuna';
@@ -55,20 +55,59 @@ const CoinsRain = () => {
     return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[100]" />;
 };
 
-// --- CONFIGURACIÓN DE RULETAS ---
-const WHEEL_CONFIG = {
-    daily: {
-        id: 'daily', title: "Diaria", cost: 0, color: "text-blue-400", border: "border-blue-500/30", bg: "bg-blue-900/10", icon: <Gift size={24} />, desc: "Gratis. Riesgo Cero.",
-        prizes: [{ label: '10', color: '#1d4ed8' }, { label: '50', color: '#eab308' }, { label: '5', color: '#3f3f46' }, { label: '25', color: '#16a34a' }, { label: '100', color: '#9333ea' }, { label: '5', color: '#3f3f46' }]
-    },
-    hardcore: {
-        id: 'hardcore', title: "Hardcore", cost: 50, color: "text-red-500", border: "border-red-500/30", bg: "bg-red-900/10", icon: <Flame size={24} />, desc: "Todo o nada.",
-        prizes: [{ label: '0', color: '#09090b' }, { label: '0', color: '#27272a' }, { label: '1K', color: '#dc2626' }, { label: '0', color: '#09090b' }, { label: '0', color: '#27272a' }, { label: '200', color: '#ea580c' }]
-    },
-    premium: {
-        id: 'premium', title: "Premium", cost: 200, color: "text-purple-400", border: "border-purple-500/30", bg: "bg-purple-900/10", icon: <Diamond size={24} />, desc: "Premios altos.",
-        prizes: [{ label: '250', color: '#7e22ce' }, { label: '300', color: '#c026d3' }, { label: '500', color: '#ca8a04' }, { label: '210', color: '#4338ca' }, { label: '400', color: '#be185d' }, { label: '1K', color: '#0f766e' }]
-    }
+/**
+ * ⚠️ AQUI HABIA UNA COPIA DE LAS RUEDAS, Y MENTIA.
+ *
+ * Coste, premios y etiquetas estaban escritos aqui, y los premios de verdad en
+ * el servidor. Cuando se reequilibro la economia solo se toco el servidor: la
+ * rueda enseñaba "1K" y pagaba 200. Ahora el catalogo entero viene de
+ * `GET /games/fortune` —nombre, coste, color, premios— y aqui solo se decide
+ * como pintarlo. No queda nada que pueda quedarse viejo.
+ */
+const ICONOS = { daily: Gift, bronce: Coins, hardcore: Flame, plata: Star, oro: Crown, jackpot: Diamond, xp: Zap };
+
+/** "1K", "2.4K", "250", o un punto para el cero. */
+const etiquetaDe = (v) => {
+    if (!v) return '·';
+    if (v >= 1000) return `${(v / 1000).toFixed(v % 1000 ? 1 : 0)}K`;
+    return String(v);
+};
+
+/** Aclara u oscurece un #rrggbb. */
+const tono = (hex, f) => {
+    const n = parseInt(hex.slice(1), 16);
+    const c = (x) => Math.max(0, Math.min(255, Math.round(x)));
+    const r = c(((n >> 16) & 255) * f), g = c(((n >> 8) & 255) * f), b = c((n & 255) * f);
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+};
+
+/**
+ * Los colores de las cuñas salen del acento de la rueda: se alternan con dos
+ * grises para que se distingan, los vacios van oscuros para que se vea que
+ * son vacios, y el premio mas gordo va en dorado para que se vea a que
+ * apuntas. Asi una rueda nueva en el servidor sale ya con su aspecto.
+ */
+const cunasDe = (rueda) => {
+    const maximo = Math.max(...rueda.premios.map(p => p.v));
+    const base = [rueda.acento, '#1f1f24', tono(rueda.acento, 0.65), '#2a2a31'];
+    return rueda.premios.map((p, i) => ({
+        label: etiquetaDe(p.v),
+        color: p.v === 0 ? '#111114' : p.v === maximo && maximo > 0 ? '#c9a33f' : base[i % base.length]
+    }));
+};
+
+/** Lo que el juego usa de una rueda, montado a partir del catalogo. */
+const configDe = (rueda) => {
+    const Icono = ICONOS[rueda.id] || Star;
+    return {
+        id: rueda.id,
+        title: rueda.nombre,
+        cost: rueda.coste,
+        desc: rueda.descripcion,
+        acento: rueda.acento,
+        icon: <Icono size={24} />,
+        prizes: cunasDe(rueda)
+    };
 };
 
 // --- RULETA ACTIVA ---
@@ -245,9 +284,9 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                             )}
                         </div>
                         <h2 className={`text-3xl font-black uppercase not-italic mb-2 ${winData.v > 0 ? 'text-yellow-400' : 'text-white'}`}>{winData.v > 0 ? '¡GANASTE!' : 'MALA SUERTE'}</h2>
-                        <p className="text-sm text-zinc-400 mb-8 font-medium">{winData.v > 0 ? `Has conseguido ${winData.v} fichas.` : 'No has ganado nada esta vez.'}</p>
-                        <button onClick={() => { setWinData(null); onBack(); }} className="w-full bg-white text-black font-black py-4 rounded-xl uppercase tracking-widest hover:bg-zinc-200 shadow-lg">
-                            {winData.v > 0 ? 'RECOGER Y SALIR' : 'CONTINUAR'}
+                        <p className="text-sm text-zinc-400 mb-8 font-medium">{winData.v > 0 ? `Has conseguido ${winData.v.toLocaleString('es-ES')} ${winData.t === 'xp' ? 'XP' : 'fichas'}.` : 'No has ganado nada esta vez.'}</p>
+                        <button onClick={() => { setWinData(null); if (config.cost === 0) onBack(); }} className="w-full bg-white text-black font-black py-4 rounded-xl uppercase tracking-widest hover:bg-zinc-200 shadow-lg">
+                            {winData.v > 0 ? 'RECOGER' : 'CONTINUAR'}
                         </button>
                     </div>
                 </div>
@@ -264,44 +303,77 @@ export default function FortuneWheel() {
     const navigate = useNavigate();
 
     const [selectedMode, setSelectedMode] = useState(null);
-    const [lastSpinDate, setLastSpinDate] = useState(() => localStorage.getItem('last_wheel_spin_date'));
-    // Hora de Madrid (no UTC): así el giro diario se renueva a medianoche real
-    const getTodayStr = () => getMadridDateString();
-    const hasSpunToday = lastSpinDate === getTodayStr();
+
+    // El catalogo y si la gratis de hoy ya esta usada, los dos del servidor.
+    // Antes el "una al dia" vivia en localStorage y bloqueaba TODAS las ruedas
+    // (una tirada diaria en total). Las de pago devuelven el 85%, como los
+    // dados: girarlas sin limite es seguro para la economia y es lo que se
+    // espera de una rueda de feria. La unica que se limita es la gratis, y
+    // eso lo decide el servidor, que es quien la cobra.
+    const { data, mutate } = useSWR('/games/fortune', (url) => api.get(url).then(r => r.data));
+    const ruedas = data?.ruedas || [];
+    const diariaUsadaHoy = !!data?.diariaUsadaHoy;
+    const ruedaAbierta = ruedas.find(r => r.id === selectedMode);
 
     useEffect(() => { if (selectedMode) setIsUiHidden(true); else setIsUiHidden(false); return () => setIsUiHidden(false); }, [selectedMode, setIsUiHidden]);
 
-    const handleSpinComplete = () => { const today = getTodayStr(); localStorage.setItem('last_wheel_spin_date', today); setLastSpinDate(today); };
+    // Tras un giro se vuelve a preguntar: si era la gratis, ahora esta usada.
+    const handleSpinComplete = () => { mutate(); };
 
     return (
         <div className={`flex flex-col h-full animate-in fade-in select-none px-4 pb-20 ${selectedMode ? 'pt-24' : 'pt-4'}`}>
             <div className="flex items-center mb-6">
                 <BackButton onClick={() => selectedMode ? setSelectedMode(null) : navigate('/games')} />
-                <h1 className="ml-4 text-xl font-black not-italic uppercase text-white tracking-tight">{selectedMode ? WHEEL_CONFIG[selectedMode].title : 'Ruleta de la Fortuna'}</h1>
+                <h1 className="ml-4 text-xl font-black not-italic uppercase text-white tracking-tight">{ruedaAbierta ? ruedaAbierta.nombre : 'Ruleta de la Fortuna'}</h1>
             </div>
 
-            {selectedMode ? (
-                <ActiveWheel config={WHEEL_CONFIG[selectedMode]} user={user} setUser={setUser} onBack={() => setSelectedMode(null)} onSpinComplete={handleSpinComplete} />
+            {ruedaAbierta ? (
+                <ActiveWheel config={configDe(ruedaAbierta)} user={user} setUser={setUser} onBack={() => setSelectedMode(null)} onSpinComplete={handleSpinComplete} />
             ) : (
-                <div className="flex flex-col gap-4">
-                    <div className="bg-yellow-900/20 border border-yellow-500/30 p-4 rounded-2xl flex items-center gap-3 mb-2">
-                        <AlertTriangle className="text-yellow-500 shrink-0" size={24} />
-                        <div><h3 className="text-white font-bold text-xs uppercase tracking-wider">Límite Diario Global</h3><p className="text-[10px] text-zinc-400">Solo puedes tirar <strong>una vez al día</strong>, sin importar qué ruleta elijas.</p></div>
-                    </div>
-                    {hasSpunToday && (
-                        <div className="bg-zinc-800/80 border border-zinc-700 p-4 rounded-2xl text-center animate-pulse">
-                            <Lock className="mx-auto text-zinc-500 mb-2" size={32} /><h3 className="text-zinc-400 font-black text-lg uppercase">Vuelve Mañana</h3><p className="text-zinc-600 text-xs font-bold">Ya has gastado tu tiro de hoy.</p>
-                        </div>
+                <div className="flex flex-col gap-3">
+                    {!data && (
+                        <div className="flex justify-center py-16 text-zinc-600"><Loader2 size={22} className="animate-spin" /></div>
                     )}
-                    {Object.values(WHEEL_CONFIG).map((config) => {
-                        const isDisabled = hasSpunToday;
+                    {ruedas.map((rueda) => {
+                        const Icono = ICONOS[rueda.id] || Star;
+                        const esGratis = rueda.coste === 0;
+                        // Solo la gratis se bloquea, y solo si ya se uso hoy.
+                        const bloqueada = esGratis && diariaUsadaHoy;
+                        const maximo = Math.max(...rueda.premios.map(p => p.v));
+                        const enXp = rueda.premios[0]?.t === 'xp';
                         return (
-                            <button key={config.id} onClick={() => !isDisabled && setSelectedMode(config.id)} disabled={isDisabled} className={`w-full p-5 rounded-3xl border flex items-center justify-between group transition-all relative overflow-hidden ${isDisabled ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' : `${config.bg} ${config.border} active:scale-[0.98]`}`}>
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-2xl bg-black border border-white/[0.07] ${config.color} shadow-lg`}>{isDisabled ? <Lock size={24} /> : config.icon}</div>
-                                    <div className="text-left"><h3 className={`text-lg font-black uppercase leading-none ${isDisabled ? 'text-zinc-500' : config.color}`}>{config.title}</h3><p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-wide">{config.desc}</p></div>
+                            <button
+                                key={rueda.id}
+                                onClick={() => !bloqueada && setSelectedMode(rueda.id)}
+                                disabled={bloqueada}
+                                className={`w-full p-4 rounded-3xl border flex items-center justify-between transition-all relative overflow-hidden ${bloqueada ? 'bg-zinc-900 border-zinc-800 opacity-50 cursor-not-allowed grayscale' : 'active:scale-[0.98]'}`}
+                                style={bloqueada ? undefined : { background: `${rueda.acento}14`, borderColor: `${rueda.acento}55` }}
+                            >
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="p-3 rounded-2xl bg-black border border-white/[0.07] shadow-lg shrink-0" style={{ color: rueda.acento }}>
+                                        {bloqueada ? <Lock size={24} /> : <Icono size={24} />}
+                                    </div>
+                                    <div className="text-left min-w-0">
+                                        <h3 className="text-lg font-black uppercase leading-none truncate" style={{ color: bloqueada ? '#71717a' : rueda.acento }}>{rueda.nombre}</h3>
+                                        <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-wide leading-tight">
+                                            {bloqueada ? 'Ya usada hoy. Vuelve mañana.' : rueda.descripcion}
+                                        </p>
+                                        {/* Lo maximo que puede salir, para decidir con datos. Sale del
+                                            mismo catalogo que paga, asi que no puede mentir. */}
+                                        {!bloqueada && maximo > 0 && (
+                                            <p className="text-[10px] font-black mt-1 tabular-nums" style={{ color: rueda.acento }}>
+                                                hasta {maximo.toLocaleString('es-ES')} {enXp ? 'XP' : 'fichas'}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-end"><span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Coste</span><div className="bg-black px-3 py-1.5 rounded-lg border border-zinc-800 flex items-center gap-1.5"><span className={`text-sm font-black ${isDisabled ? 'text-zinc-600' : 'text-white'}`}>{config.cost === 0 ? "GRATIS" : config.cost}</span>{config.cost > 0 && <img src="/assets/icons/ficha.png" className={`w-3.5 h-3.5 ${isDisabled ? 'grayscale opacity-50' : ''}`} alt="F" />}</div></div>
+                                <div className="flex flex-col items-end shrink-0 pl-2">
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Coste</span>
+                                    <div className="bg-black px-3 py-1.5 rounded-lg border border-zinc-800 flex items-center gap-1.5">
+                                        <span className={`text-sm font-black ${bloqueada ? 'text-zinc-600' : 'text-white'}`}>{esGratis ? 'GRATIS' : rueda.coste}</span>
+                                        {!esGratis && <img src="/assets/icons/ficha.png" className="w-3.5 h-3.5" alt="F" />}
+                                    </div>
+                                </div>
                             </button>
                         );
                     })}

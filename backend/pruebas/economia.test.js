@@ -113,8 +113,13 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         assert.strictEqual(premioDelRasca(null, 100), 0);
     });
 
-    test('las tiradas de pago de la ruleta devuelven entre el 70% y el 100%', () => {
-        for (const modo of ['hardcore', 'premium']) {
+    test('TODAS las ruedas de pago devuelven entre el 70% y el 100%', () => {
+        // Se recorren las que haya, no una lista escrita aqui: el dia que se
+        // añada una rueda queda vigilada sin tocar la prueba. Las de XP no se
+        // miden en fichas y van aparte.
+        const dePago = Object.keys(FORTUNE_COSTS).filter(m => FORTUNE_COSTS[m] > 0 && FORTUNE_PRIZES[m][0].t === 'c');
+        assert.ok(dePago.length >= 4, 'tiene que haber varias ruedas de pago');
+        for (const modo of dePago) {
             const coste = FORTUNE_COSTS[modo];
             const premios = FORTUNE_PRIZES[modo].map(p => p.v);
             const media = premios.reduce((a, b) => a + b, 0) / premios.length;
@@ -125,6 +130,43 @@ describe('Casino: ningun juego puede regalar dinero', () => {
             assert.ok(devuelve > SUELO_SANO,
                 `La ruleta "${modo}" devuelve el ${devuelve.toFixed(1)}%: demasiado dura`);
         }
+    });
+
+    test('las ruedas de pago devuelven EXACTAMENTE el 85%: el mismo margen que los dados', () => {
+        // Entre 70 y 100 es "sano". Pero la regla de la casa es 85 clavado, y
+        // una rueda al 99% seria "sana" y aun asi la mejor forma de ganar
+        // fichas de la app. Redondeo de 1% por los enteros de los premios.
+        for (const modo of Object.keys(FORTUNE_COSTS)) {
+            const coste = FORTUNE_COSTS[modo];
+            if (coste === 0 || FORTUNE_PRIZES[modo][0].t !== 'c') continue;
+            const premios = FORTUNE_PRIZES[modo].map(p => p.v);
+            const media = premios.reduce((a, b) => a + b, 0) / premios.length;
+            assert.ok(Math.abs(media / coste - 0.85) < 0.01,
+                `La rueda "${modo}" devuelve el ${(media / coste * 100).toFixed(1)}%, no el 85%`);
+        }
+    });
+
+    test('la rueda de experiencia es modesta: un entreno da mas', () => {
+        const xp = Object.keys(FORTUNE_PRIZES).filter(m => FORTUNE_PRIZES[m][0].t === 'xp');
+        for (const modo of xp) {
+            const premios = FORTUNE_PRIZES[modo].map(p => p.v);
+            const media = premios.reduce((a, b) => a + b, 0) / premios.length;
+            assert.ok(media <= 100, `La rueda "${modo}" da ${media} XP de media: comprar niveles a golpe de ruleta`);
+            assert.ok(FORTUNE_COSTS[modo] > 0, 'la de XP no puede ser gratis');
+        }
+    });
+
+    test('cada rueda del catalogo tiene lo que el movil necesita para pintarla', () => {
+        // El movil ya no tiene ninguna copia: si aqui falta el nombre o el color,
+        // la rueda sale sin el.
+        const { RUEDAS } = require('../controllers/gamesController');
+        for (const r of RUEDAS) {
+            assert.ok(r.id && r.nombre && r.acento && r.descripcion, `rueda incompleta: ${JSON.stringify(r).slice(0, 60)}`);
+            assert.ok(r.premios.length >= 6 && r.premios.length <= 8, `${r.id}: entre 6 y 8 premios, para que se lean`);
+            for (const p of r.premios) assert.ok(typeof p.v === 'number' && ['c', 'xp'].includes(p.t));
+        }
+        const ids = RUEDAS.map(r => r.id);
+        assert.strictEqual(new Set(ids).size, ids.length, 'dos ruedas con el mismo id');
     });
 
     test('la tirada gratis de la ruleta sigue siendo gratis y modesta', () => {

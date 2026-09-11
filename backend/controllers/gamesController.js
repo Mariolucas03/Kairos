@@ -250,13 +250,78 @@ const playScratch = asyncHandler(async (req, res) => {
 // pruebas. Estas tablas ya regalaron dinero una vez (los tres modos pagaban
 // mas de lo que costaban); una prueba que mide lo que devuelven es lo unico
 // que evita que vuelva a pasar sin que nadie se entere.
-const FORTUNE_COSTS = { daily: 0, hardcore: 50, premium: 200 };
+/**
+ * LAS RUEDAS DE LA FORTUNA.
+ *
+ * ⚠️ EL CATALOGO VIVE AQUI Y SOLO AQUI. El movil lo pide y lo pinta.
+ *
+ * Antes las etiquetas de la rueda estaban escritas en el movil y los premios
+ * en el servidor, y cuando se reequilibro la economia solo se toco el
+ * servidor: la rueda enseñaba "1K" y pagaba 200. Es el fallo de "el mismo
+ * numero en dos sitios" que mas veces ha salido en este proyecto, y aqui era
+ * el peor posible porque le decia al usuario que iba a ganar algo que no.
+ * Ahora el servidor manda la rueda entera (coste, premios, nombre, color) y el
+ * movil no tiene nada que pueda quedarse viejo.
+ *
+ * ⚠️ TODAS LAS DE PAGO DEVUELVEN EL 85%, ni una mas ni una menos.
+ *
+ * Es el mismo margen que los dados y el rasca. Con eso, girar sin limite es
+ * seguro para la economia: cada tirada deja un 15% en la casa, de media. Por
+ * eso las de pago NO tienen limite diario; la gratis si, porque es dinero
+ * regalado y sin limite seria una fuente infinita.
+ *
+ * `t: 'c'` son fichas; `t: 'xp'` es experiencia. La rueda de XP es la unica
+ * que no se mide en fichas y por eso su unica regla es ser modesta: comprar
+ * niveles a golpe de ruleta no es lo que la app quiere premiar.
+ */
+const RUEDAS = [
+    {
+        id: 'daily', nombre: 'Diaria', coste: 0, acento: '#3b82f6',
+        descripcion: 'Gratis. Una al día.',
+        premios: [{ v: 10, t: 'c' }, { v: 50, t: 'c' }, { v: 5, t: 'c' }, { v: 25, t: 'c' }, { v: 100, t: 'c' }, { v: 5, t: 'c' }]
+    },
+    {
+        id: 'bronce', nombre: 'Bronce', coste: 25, acento: '#b45309',
+        descripcion: 'Para empezar. Premios pequeños, casi siempre algo.',
+        // 170 / 8 = 21,25 -> 85% de 25
+        premios: [0, 10, 20, 30, 50, 0, 15, 45].map(v => ({ v, t: 'c' }))
+    },
+    {
+        id: 'hardcore', nombre: 'Todo o nada', coste: 50, acento: '#ef4444',
+        descripcion: 'Cinco vacíos y un premio gordo. Una de seis.',
+        // 255 / 6 = 42,5 -> 85% de 50
+        premios: [0, 0, 0, 0, 0, 255].map(v => ({ v, t: 'c' }))
+    },
+    {
+        id: 'plata', nombre: 'Plata', coste: 100, acento: '#94a3b8',
+        descripcion: 'La de en medio. Se puede duplicar.',
+        // 680 / 8 = 85 -> 85% de 100
+        premios: [0, 50, 75, 100, 150, 0, 60, 245].map(v => ({ v, t: 'c' }))
+    },
+    {
+        id: 'oro', nombre: 'Oro', coste: 250, acento: '#eab308',
+        descripcion: 'Premios altos y pocos vacíos.',
+        // 1700 / 8 = 212,5 -> 85% de 250
+        premios: [0, 100, 150, 250, 400, 50, 200, 550].map(v => ({ v, t: 'c' }))
+    },
+    {
+        id: 'jackpot', nombre: 'Jackpot', coste: 500, acento: '#a855f7',
+        descripcion: 'Casi todo vacío. Uno lo cambia todo.',
+        // 3400 / 8 = 425 -> 85% de 500
+        premios: [0, 0, 100, 200, 300, 0, 400, 2400].map(v => ({ v, t: 'c' }))
+    },
+    {
+        id: 'xp', nombre: 'Experiencia', coste: 40, acento: '#22d3ee',
+        descripcion: 'Paga en XP, no en fichas.',
+        // 730 / 8 = 91 XP de media. Modesta: un entreno da mas.
+        premios: [30, 60, 100, 150, 250, 20, 80, 40].map(v => ({ v, t: 'xp' }))
+    }
+];
 
-    const FORTUNE_PRIZES = {
-        daily: [{ v: 10, t: 'c' }, { v: 50, t: 'c' }, { v: 5, t: 'c' }, { v: 25, t: 'c' }, { v: 100, t: 'c' }, { v: 5, t: 'c' }],
-        hardcore: [{ v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 200, t: 'c' }, { v: 0, t: 'c' }, { v: 0, t: 'c' }, { v: 55, t: 'c' }],
-        premium: [{ v: 100, t: 'c' }, { v: 120, t: 'c' }, { v: 180, t: 'c' }, { v: 90, t: 'c' }, { v: 150, t: 'c' }, { v: 380, t: 'c' }]
-    };
+// Las dos tablas de siempre, DERIVADAS del catalogo: es lo que leen el juego y
+// las pruebas de economia, y asi no hay dos copias que puedan desacordarse.
+const FORTUNE_COSTS = Object.fromEntries(RUEDAS.map(r => [r.id, r.coste]));
+const FORTUNE_PRIZES = Object.fromEntries(RUEDAS.map(r => [r.id, r.premios]));
 
 const SLOT_SYMBOLS = [
     { id: 'cherry', icon: '🍒', val: 4, weight: 25 },
@@ -448,6 +513,19 @@ const playFortuneWheel = asyncHandler(async (req, res) => {
     }
 
     res.json({ winIndex, prize: winObj, user: finalUser });
+});
+
+/**
+ * El catalogo para el movil, y si la gratis de hoy ya esta usada. Lo segundo
+ * lo decide el servidor —que es quien la limita— y no un localStorage que el
+ * usuario puede borrar.
+ */
+const getFortuneWheels = asyncHandler(async (req, res) => {
+    const u = await User.findById(req.user._id).select('ultimaRuletaDiaria').lean();
+    res.json({
+        ruedas: RUEDAS,
+        diariaUsadaHoy: u?.ultimaRuletaDiaria === getMadridDateString()
+    });
 });
 
 // ==========================================
@@ -731,7 +809,8 @@ const playTower = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-    playDice, playScratch, playSlots, playRoulette, playFortuneWheel, playBlackjack, playTower,
+    playDice, playScratch, playSlots, playRoulette, playFortuneWheel, getFortuneWheels, playBlackjack, playTower,
+    RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.
     SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS,
