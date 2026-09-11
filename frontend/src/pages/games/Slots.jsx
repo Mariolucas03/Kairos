@@ -1,12 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Cherry, Gem, Star, Crown, Clover, Info, X, Skull, Ghost } from 'lucide-react';
+import { Zap, Cherry, Gem, Star, Crown, Clover, Info, X, Skull, Ghost, Volume2, VolumeX } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
 import SelectorApuesta from '../../components/games/SelectorApuesta';
+import { trayectoriaRodillo, montarTira, PARADAS, RELLENO } from '../../utils/fisicaRodillos';
+import { crearSintetizador, melodias, haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
+
+// Filas que se ven en la ventana de cada rodillo.
+const FILAS = 4;
+// A esta velocidad (simbolos/ms) la estela se satura. Sale de la fisica.
+const VELOCIDAD_MAXIMA = 0.045;
 
 // --- IMAGEN DE PORTADA ---
 const SLOT_COVER_IMG = '/assets/images/neon-cover.png';
@@ -70,11 +78,56 @@ export default function Slots() {
     // Grid inicial visual para que no esté vacío
     const [cols, setCols] = useState(Array(4).fill(Array(4).fill({ id: 'cherry' })));
 
-    // Control de Animación
-    const [spinningCols, setSpinningCols] = useState([false, false, false, false]);
-    const spinningRef = useRef([false, false, false, false]);
-    const finalGridRef = useRef(null);
+    // ⚠️ LOS RODILLOS NO PASAN POR REACT MIENTRAS GIRAN.
+    //
+    // Cada uno es una tira larga de simbolos, y en cada frame se le escribe el
+    // transform directamente al DOM. Meter la posicion en estado seria repintar
+    // los cuatro rodillos con sus decenas de simbolos sesenta veces por
+    // segundo, que en un movil se ve como tirones.
+    //
+    // `tiras` solo cambia dos veces por tirada: al arrancar (se monta la tira
+    // con el resultado del servidor al final) y al terminar (se deja solo lo
+    // visible, en la misma posicion, asi que no se nota el cambio).
+    const [tiras, setTiras] = useState(() => cols.map(c => c.map(s => s.id)));
+    const rodillosRef = useRef([]);        // los <div> que se desplazan
+    const ventanaRef = useRef(null);       // para medir la altura de una fila
     const animationRef = useRef(null);
+    const sonidoRef = useRef(null);
+
+    // ⚠️ LA ALTURA DE UNA FILA SE MIDE UNA VEZ Y VALE PARA TODO.
+    //
+    // Los simbolos se pintan con esta altura y el bucle desplaza la tira en
+    // multiplos de ella. Si se pintaran con un % y se midiera aparte, cualquier
+    // diferencia —el padding, un redondeo— se multiplicaria por las decenas de
+    // simbolos que pasan y el rodillo acabaria media fila fuera de sitio,
+    // enseñando un premio que no se paga.
+    const [filaPx, setFilaPx] = useState(0);
+    useLayoutEffect(() => {
+        const medir = () => {
+            const v = ventanaRef.current;
+            if (!v) return;
+            const estilo = getComputedStyle(v);
+            const alto = v.clientHeight - parseFloat(estilo.paddingTop) - parseFloat(estilo.paddingBottom);
+            setFilaPx(alto / FILAS);
+        };
+        medir();
+        window.addEventListener('resize', medir);
+        return () => window.removeEventListener('resize', medir);
+    }, []);
+
+    const [conSonido, setConSonido] = useState(haySonidoJuegos);
+    const alternarSonido = () => {
+        const nuevo = !conSonido;
+        cambiarSonidoJuegos(nuevo);
+        setConSonido(nuevo);
+        if (!nuevo) sonidoRef.current?.parar();
+    };
+
+    // Si el usuario se va a mitad de tirada, se para el bucle y el sonido.
+    useEffect(() => () => {
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        sonidoRef.current?.parar();
+    }, []);
 
     const [isGameActive, setIsGameActive] = useState(false);
 
@@ -98,12 +151,6 @@ export default function Slots() {
         return () => setIsUiHidden(false);
     }, [setIsUiHidden]);
 
-    // Función auxiliar para obtener columnas aleatorias durante la animación visual
-    const getRandomCol = () => Array(4).fill(null).map(() => {
-        const keys = Object.keys(ICONS);
-        return { id: keys[Math.floor(Math.random() * keys.length)] };
-    });
-
     // --- JUGAR (CONEXIÓN AL BACKEND) ---
     const handleSpin = async () => {
         if (!gameStarted) { setGameStarted(true); return; }
@@ -111,88 +158,140 @@ export default function Slots() {
         if (visualBalance < bet) { setMsg("No te llegan las fichas"); return; }
 
         setIsGameActive(true);
-        setSpinningCols([true, true, true, true]);
-        spinningRef.current = [true, true, true, true];
         setMsg("Girando...");
         setResult({ won: false, payout: 0, winningCells: [] });
         setShowRain(false);
         setIsRainFading(false);
 
         try {
-            // 2. Pedir resultado al backend
+            // 1. El resultado lo decide el servidor. Todo lo de abajo es el
+            //    camino hasta el.
             const res = await api.post('/games/slots', { bet });
+            const gridFinal = res.data.grid;   // 4 columnas de 4 {id}
 
-            // 3. Guardamos la matriz ganadora que dice el backend
-            finalGridRef.current = res.data.grid;
+            // 2. Montar las tiras: lo que se ve ahora, luego relleno, y al final
+            //    lo que dijo el servidor. Empezar por lo visible es lo que evita
+            //    el salto al arrancar: el rodillo sale de donde esta.
+            const catalogo = Object.keys(ICONS);
+            const visiblesAhora = cols.map(c => c.map(s => s.id));
+            const definitivos = gridFinal.map(c => c.map(s => s.id));
+            const nuevasTiras = definitivos.map((finales, i) =>
+                visiblesAhora[i].concat(montarTira({ relleno: RELLENO[i], definitivos: finales, catalogo }))
+            );
+            // ⚠️ `flushSync` y no un `await requestAnimationFrame`.
+            //
+            // Hace falta que las tiras nuevas esten en el DOM antes de empezar a
+            // moverlas. Esperar un frame para eso parecia lo natural, pero rAF
+            // NO dispara con la pestaña en segundo plano: la tirada se quedaba
+            // esperando ese frame para siempre, ANTES de armar el salvavidas.
+            // flushSync obliga a React a pintar aqui mismo, sin frames.
+            flushSync(() => setTiras(nuevasTiras));
 
-            // 4. Bucle Animación Visual Rápida
-            animationRef.current = setInterval(() => {
-                setCols(prevCols => prevCols.map((col, i) => {
-                    if (!spinningRef.current[i]) return finalGridRef.current[i];
-                    return getRandomCol();
-                }));
-            }, 50);
+            // Cada rodillo tiene su trayectoria: la posicion final es la que
+            // deja los 4 ultimos simbolos en la ventana.
+            const trayectorias = nuevasTiras.map((tira, i) =>
+                trayectoriaRodillo({ relleno: tira.length - FILAS, duracion: PARADAS[i] })
+            );
 
-            // 5. Paradas Secuenciales
-            setTimeout(() => stopColumn(0), 500);
-            setTimeout(() => stopColumn(1), 1000);
-            setTimeout(() => stopColumn(2), 1500);
-            setTimeout(() => {
-                clearInterval(animationRef.current);
-                stopColumn(3);
+            const sonido = crearSintetizador();
+            sonidoRef.current = sonido;
+            const ronroneo = sonido.continuo({ frecuenciaBase: 180, frecuenciaExtra: 320, volumenMax: 0.14 });
+            const parado = [false, false, false, false];
+            const duracionTotal = Math.max(...PARADAS);
 
-                // Mostrar resultados del servidor
-                setResult({
-                    won: res.data.won,
-                    payout: res.data.payout,
-                    winningCells: res.data.winningCells
-                });
+            let terminado = false;
+            const terminar = () => {
+                if (terminado) return;
+                terminado = true;
+                clearTimeout(salvavidas);
+                if (animationRef.current) cancelAnimationFrame(animationRef.current);
+                sonido.parar();
+                sonidoRef.current = null;
+
+                // Se deja en cada rodillo solo lo visible, en la posicion 0. Es
+                // lo mismo que se veia, asi que el cambio no se nota, y la
+                // siguiente tirada arranca de aqui.
+                setCols(gridFinal);
+                setTiras(definitivos);
+                rodillosRef.current.forEach(r => { if (r) { r.style.transform = 'translateY(0px)'; r.style.filter = 'none'; } });
+
+                setResult({ won: res.data.won, payout: res.data.payout, winningCells: res.data.winningCells });
 
                 if (res.data.won) {
                     setMsg("¡PREMIO!");
                     setShowRain(true);
                     setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
+                    // La melodia va en un sintetizador nuevo: el de la tirada ya
+                    // se esta apagando.
+                    const fanfarria = crearSintetizador();
+                    (res.data.payout >= bet * 10 ? melodias.granPremio : melodias.ganar)(fanfarria);
+                    setTimeout(fanfarria.parar, 2500);
                 } else {
                     setMsg("Inténtalo de nuevo");
+                    const s2 = crearSintetizador();
+                    melodias.perder(s2);
+                    setTimeout(s2.parar, 1000);
                 }
 
-                // Sincronizar saldo final
                 if (res.data.user) {
                     setUser(res.data.user);
                     localStorage.setItem('user', JSON.stringify(res.data.user));
                 }
-
                 setIsGameActive(false);
-            }, 2000);
+            };
+
+            const t0 = performance.now();
+            const frame = (ahora) => {
+                const ms = ahora - t0;
+                let vMax = 0;
+
+                trayectorias.forEach((tr, i) => {
+                    const el = rodillosRef.current[i];
+                    if (!el) return;
+                    const pos = tr.posicion(ms);
+                    const v = Math.min(tr.velocidad(ms) / VELOCIDAD_MAXIMA, 1);
+                    vMax = Math.max(vMax, v);
+                    el.style.transform = `translateY(${-pos * filaPx}px)`;
+                    // La estela: a mucha velocidad los simbolos se emborronan en
+                    // vertical. Es lo que hace el ojo con una tira rapida.
+                    el.style.filter = v > 0.05 ? `blur(${(v * 2.2).toFixed(1)}px)` : 'none';
+
+                    // El "clonc" de encajar, una vez por rodillo, cuando llega.
+                    if (!parado[i] && ms >= tr.msLlegada) {
+                        parado[i] = true;
+                        sonido.golpe({ frecuencia: 220 + i * 25, duracion: 0.11, volumen: 0.5, q: 3 });
+                        sonido.golpe({ frecuencia: 1800, duracion: 0.03, volumen: 0.18 });
+                    }
+                });
+
+                ronroneo(vMax);
+
+                if (ms < duracionTotal) {
+                    animationRef.current = requestAnimationFrame(frame);
+                } else {
+                    terminar();
+                }
+            };
+
+            // El salvavidas: rAF no dispara con la pestaña en segundo plano.
+            // Sin esto, cambiar de app a mitad de tirada la dejaba colgada.
+            const salvavidas = setTimeout(terminar, duracionTotal + 600);
+            animationRef.current = requestAnimationFrame(frame);
 
         } catch (error) {
             console.error("Error en Slots:", error);
             // El saldo se recalcula solo: no hace falta deshacer nada a mano
             setMsg(error.response?.data?.message || "No se pudo tirar");
-            clearInterval(animationRef.current);
+            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+            sonidoRef.current?.parar();
             setIsGameActive(false);
-            setSpinningCols([false, false, false, false]);
         }
-    };
-
-    const stopColumn = (index) => {
-        spinningRef.current[index] = false;
-        setSpinningCols(prev => { const next = [...prev]; next[index] = false; return next; });
-        setCols(prev => {
-            const next = [...prev];
-            next[index] = finalGridRef.current[index];
-            return next;
-        });
     };
 
     return (
         <div className="fixed inset-0 bg-black flex flex-col items-center justify-center pt-32 pb-10 overflow-hidden select-none font-sans">
             {showRain && <ChipRain isFading={isRainFading} />}
 
-            <style>{`
-                .slot-spin { animation: slotScroll 0.1s linear infinite; }
-                @keyframes slotScroll { 0% { transform: translateY(-5%); filter: blur(2px); } 50% { transform: translateY(5%); } 100% { transform: translateY(-5%); } }
-            `}</style>
 
             {/* HEADER */}
             <div className="absolute top-12 left-4 right-4 flex justify-between items-center z-50">
@@ -201,7 +300,16 @@ export default function Slots() {
                     <span className="text-purple-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={alternarSonido}
+                        aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                    >
+                        {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                    <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                </div>
             </div>
 
             {/* MÁQUINA */}
@@ -223,24 +331,53 @@ export default function Slots() {
                         <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]"></div>
                     </div>
 
-                    {/* GRID */}
-                    <div className="absolute inset-0 bg-[#0a0a0c] grid grid-cols-4 gap-1 p-2">
-                        {cols.map((column, colIdx) => (
-                            <div key={colIdx} className={`relative flex flex-col justify-around bg-white/5 rounded-lg overflow-hidden ${spinningCols[colIdx] ? 'slot-spin' : ''}`}>
-                                <div className="absolute inset-0 shadow-[inset_0_0_10px_black] pointer-events-none z-10" />
-                                {column.map((symbol, rowIdx) => {
-                                    const isWinCell = result.won && result.winningCells && result.winningCells.includes(`${colIdx}-${rowIdx}`);
-                                    return (
-                                        <div key={rowIdx} className={`flex-1 flex items-center justify-center transition-all duration-300 ${isWinCell ? 'bg-yellow-500/30 shadow-[inset_0_0_20px_rgba(234,179,8,0.5)]' : ''}`}>
-                                            <div className={`drop-shadow-md transform ${isWinCell ? 'scale-125 brightness-125' : 'scale-100'}`}>
-                                                {ICONS[symbol.id]}
+                    {/* LOS RODILLOS.
+                        Cada columna es una ventana con una tira larga dentro que
+                        se desplaza hacia arriba. Solo se ven cuatro filas; el
+                        resto de la tira queda escondido por el overflow. Durante
+                        la tirada el transform lo escribe el bucle de frames, no
+                        React (ver handleSpin). */}
+                    <div ref={ventanaRef} className="absolute inset-0 bg-[#0a0a0c] grid grid-cols-4 gap-1 p-2">
+                        {tiras.map((tira, colIdx) => (
+                            <div key={colIdx} className="relative rounded-lg overflow-hidden bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-800">
+                                {/* La tira. Cada simbolo mide exactamente una fila
+                                    de la ventana (100% / FILAS), para que la posicion
+                                    en simbolos se convierta en pixeles sin error. */}
+                                <div
+                                    ref={el => { rodillosRef.current[colIdx] = el; }}
+                                    className="absolute inset-x-0 top-0"
+                                    style={{ willChange: 'transform, filter' }}
+                                >
+                                    {tira.map((id, rowIdx) => {
+                                        // Solo pueden ganar los 4 ultimos (los visibles al terminar).
+                                        const filaVisible = rowIdx - (tira.length - FILAS);
+                                        const isWinCell = result.won && filaVisible >= 0
+                                            && result.winningCells?.includes(`${colIdx}-${filaVisible}`);
+                                        return (
+                                            <div
+                                                key={rowIdx}
+                                                className={`flex items-center justify-center transition-colors duration-300 ${isWinCell ? 'bg-yellow-500/30 shadow-[inset_0_0_20px_rgba(234,179,8,0.5)]' : ''}`}
+                                                style={{ height: filaPx ? `${filaPx}px` : `${100 / FILAS}%` }}
+                                            >
+                                                <div className={`drop-shadow-md transition-transform ${isWinCell ? 'scale-125 brightness-125' : 'scale-100'}`}>
+                                                    {ICONS[id]}
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
+
+                                {/* El rodillo es un cilindro: arriba y abajo se
+                                    curvan hacia la sombra. Es lo que lo despega de
+                                    una lista de iconos. */}
+                                <div className="absolute inset-x-0 top-0 h-[22%] bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10" />
+                                <div className="absolute inset-x-0 bottom-0 h-[22%] bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-10" />
+                                {/* Y el reflejo del cristal, fijo, que no gira. */}
+                                <div className="absolute inset-0 pointer-events-none z-10" style={{ background: 'linear-gradient(105deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 35%, transparent 55%)' }} />
                             </div>
                         ))}
                     </div>
+
                 </div>
 
                 {/* CONTROLES */}
