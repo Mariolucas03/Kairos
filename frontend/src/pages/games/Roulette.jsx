@@ -1,18 +1,26 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake, Pencil, Check } from 'lucide-react';
+import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake, Pencil, Check, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
-import RuedaRuleta, { RADIO_PISTA, RADIO_CASILLA } from '../../components/games/RuedaRuleta';
+import RuedaRuleta from '../../components/games/RuedaRuleta';
+import { trayectoria, separadoresCruzados, RADIO_PISTA, RADIO_CASILLA, RADIO_DEFLECTORES } from '../../utils/fisicaRuleta';
+import { crearSonidoRuleta, haySonidoRuleta, cambiarSonidoRuleta } from '../../utils/sonidoRuleta';
 
 // --- CONSTANTES ---
 const WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
 const SEGMENT_ANGLE = 360 / 37;
 const CHIP_VALUES = [10, 20, 50, 100, 500];
-const SPIN_DURATION = 3500;
+
+// A partir de esta velocidad (grados/ms) la bola va "a tope": el zumbido y la
+// estela se saturan. Sale de la fisica: es lo que hace la bola al arrancar.
+const VELOCIDAD_MAXIMA = 0.95;
+// Por debajo de este radio la bola ya roza los separadores, y cada uno que
+// cruza es un clac. En la pista de fuera no toca ninguno.
+const RADIO_DONDE_HAY_SEPARADORES = 72;
 
 const TABLE_ROWS = [
     [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
@@ -83,10 +91,39 @@ export default function Roulette() {
 
     // Animación
     const [spinning, setSpinning] = useState(false);
+    // Los angulos DONDE SE QUEDARON rueda y bola: la siguiente tirada arranca
+    // de ahi, no de cero, para que no den un salto al empezar.
     const [wheelRotation, setWheelRotation] = useState(0);
     const [ballRotation, setBallRotation] = useState(0);
-    // En tanto por ciento del radio: la pista por fuera, la casilla al parar.
     const [ballDistance, setBallDistance] = useState(RADIO_PISTA);
+
+    // ⚠️ LA TIRADA NO PASA POR REACT.
+    //
+    // Cada frame escribe el transform de la rueda y de la bola directamente en
+    // el DOM. Meterlo en estado seria repintar el SVG entero (37 casillas, sus
+    // separadores y sus numeros) sesenta veces por segundo, que en un movil se
+    // nota como tirones justo en lo unico que se esta mirando.
+    const ruedaRef = useRef(null);       // el <g> que gira, dentro del SVG
+    const bolaGiroRef = useRef(null);    // el contenedor que rota con la bola
+    const bolaRef = useRef(null);        // la bola: su altura y su estela
+    const animacionRef = useRef(null);   // el requestAnimationFrame en curso
+    const sonidoRef = useRef(null);
+
+    const [conSonido, setConSonido] = useState(haySonidoRuleta);
+    const alternarSonido = () => {
+        const nuevo = !conSonido;
+        cambiarSonidoRuleta(nuevo);
+        setConSonido(nuevo);
+        // Si se apaga a mitad de tirada, se calla en el acto.
+        if (!nuevo) sonidoRef.current?.parar();
+    };
+
+    // Si el usuario se va a mitad de tirada, se para todo: un rAF suelto
+    // escribiendo en nodos que ya no existen y un zumbido que no se apaga.
+    useEffect(() => () => {
+        if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+        sonidoRef.current?.parar();
+    }, []);
 
     const [resultModal, setResultModal] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
@@ -158,26 +195,41 @@ export default function Roulette() {
             const res = await api.post('/games/roulette', { bets });
             const { winNum, totalWin, user: updatedUser } = res.data;
 
-            // 2. Calcular animación exacta para que caiga en winNum
+            // 2. LA TIRADA, FRAME A FRAME.
             //
-            // ⚠️ Los números se dibujan en el CENTRO de su casilla
-            // (i * SEGMENT_ANGLE + SEGMENT_ANGLE/2), pero aquí se giraba solo
-            // hasta el BORDE de la casilla. Faltaba medio segmento, así que la
-            // bola caía siempre en la raya entre el número premiado y el de al
-            // lado, y parecía que la ruleta pagaba un número distinto del que
-            // salía.
+            // El numero ya esta decidido: esto solo dibuja el camino hasta el.
+            // `trayectoria` (utils/fisicaRuleta.js) dice donde estan la rueda y
+            // la bola en cada instante, y aqui solo se pintan y se hacen sonar.
+            //
+            // ⚠️ Los numeros se dibujan en el CENTRO de su casilla (i * angulo +
+            // angulo/2). Apuntar al borde dejaba la bola en la raya entre dos
+            // numeros y parecia que la ruleta pagaba otro distinto del que salia.
             const winIndex = WHEEL_NUMBERS.indexOf(winNum);
-            const wheelSpins = 5;
-            const currentRotationNormalized = wheelRotation % 360;
-            const targetAngle = winIndex * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2);
-            const newWheelRotation = wheelRotation + (360 * wheelSpins) + (targetAngle - currentRotationNormalized);
+            const tr = trayectoria({
+                ruedaAlEmpezar: wheelRotation,
+                bolaAlEmpezar: ballRotation,
+                anguloCasilla: winIndex * SEGMENT_ANGLE + (SEGMENT_ANGLE / 2)
+            });
 
-            setWheelRotation(newWheelRotation);
-            setBallRotation(ballRotation + (8 * 360));
-            setTimeout(() => setBallDistance(RADIO_CASILLA), SPIN_DURATION - 800);
+            const sonido = crearSonidoRuleta();
+            sonidoRef.current = sonido;
 
-            // 3. Finalizar y mostrar premios
-            setTimeout(() => {
+            let terminado = false;
+            const terminar = () => {
+                // Puede llegar por dos caminos —el ultimo frame o el salvavidas
+                // de abajo— y el segundo no puede volver a pagar ni a repintar.
+                if (terminado) return;
+                terminado = true;
+                clearTimeout(salvavidas);
+                if (animacionRef.current) cancelAnimationFrame(animacionRef.current);
+
+                setWheelRotation(tr.ruedaAlFinal);
+                setBallRotation(tr.bola(tr.duracion).angulo);
+                setBallDistance(RADIO_CASILLA);
+                sonido.parar();
+                sonidoRef.current = null;
+                animacionRef.current = null;
+
                 setSpinning(false);
                 setLastBets(apuestaDeEstaRonda);
                 setBets([]);
@@ -196,8 +248,73 @@ export default function Roulette() {
                 // Sincronizar el saldo devuelto por el servidor
                 setUser(updatedUser);
                 localStorage.setItem('user', JSON.stringify(updatedUser));
+            };
 
-            }, SPIN_DURATION);
+            const t0 = performance.now();
+            let relativoAnterior = tr.bola(0).relativo;
+            let golpeDado = false;
+            let asientoDado = false;
+
+            const frame = (ahora) => {
+                const ms = Math.min(ahora - t0, tr.duracion);
+                const rueda = tr.rueda(ms);
+                const bola = tr.bola(ms);
+                const v = Math.min(bola.velocidad / VELOCIDAD_MAXIMA, 1);
+
+                // Si el componente se ha ido, los nodos ya no estan: se para.
+                if (!ruedaRef.current || !bolaGiroRef.current || !bolaRef.current) {
+                    sonido.parar();
+                    return;
+                }
+
+                ruedaRef.current.style.transform = `rotate(${rueda}deg)`;
+                bolaGiroRef.current.style.transform = `rotate(${bola.angulo}deg)`;
+                bolaRef.current.style.top = `${(100 - bola.radio) / 2}%`;
+                // La estela: a mucha velocidad la bola se alarga en la direccion
+                // en la que va (que en su propio marco es la horizontal). Es lo
+                // que hace el ojo con una bola rapida, y lo que hace que no
+                // parezca un punto dando saltos de un frame al siguiente.
+                bolaRef.current.style.transform = `translateX(-50%) scaleX(${1 + 1.8 * v * v})`;
+                bolaRef.current.style.opacity = String(1 - 0.25 * v);
+
+                // --- SONIDO ---
+                // El zumbido de rodar: solo mientras esta en la pista o cayendo.
+                sonido.rodar(bola.asentada ? 0 : v);
+
+                // Cada separador que cruza mientras va por abajo es un clac. La
+                // cadencia sale sola de la fisica: al frenar cruza menos por
+                // segundo y el clac-clac se espacia, que es EL sonido de la ruleta.
+                if (!bola.asentada && bola.radio < RADIO_DONDE_HAY_SEPARADORES) {
+                    const n = separadoresCruzados(relativoAnterior, bola.relativo, SEGMENT_ANGLE);
+                    for (let i = 0; i < n; i++) sonido.clac(0.35 + v);
+                }
+                relativoAnterior = bola.relativo;
+
+                // El golpe contra el deflector, una vez, cuando baja de la pista.
+                if (!golpeDado && bola.radio < RADIO_DEFLECTORES) { golpeDado = true; sonido.golpe(); }
+                // Y el traqueteo final al quedarse.
+                if (!asientoDado && bola.asentada) { asientoDado = true; sonido.asiento(); }
+
+                if (ms < tr.duracion) {
+                    animacionRef.current = requestAnimationFrame(frame);
+                } else {
+                    terminar();
+                }
+            };
+
+            // ⚠️ EL SALVAVIDAS.
+            //
+            // `requestAnimationFrame` NO dispara si la pestaña esta en segundo
+            // plano: si el usuario cambia de app a mitad de tirada, el bucle se
+            // queda parado y la tirada no termina nunca —el boton en "girando"
+            // y el premio sin enseñar—. El codigo de antes iba con setTimeout
+            // y siempre acababa; esto conserva esa garantia. Como la trayectoria
+            // es funcion del tiempo, terminar tarde pinta el mismo final.
+            //
+            // Va declarado ANTES de arrancar el bucle porque `terminar` lo
+            // cancela, y `terminar` puede llegar desde el primer frame.
+            const salvavidas = setTimeout(terminar, tr.duracion + 600);
+            animacionRef.current = requestAnimationFrame(frame);
 
         } catch (error) {
             console.error(error);
@@ -254,31 +371,53 @@ export default function Roulette() {
                     <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
-                <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                <div className="flex items-center gap-2">
+                    {/* El sonido va encendido de serie: es el efecto de un boton
+                        que has pulsado tu, no musica que arranca sola. Pero se
+                        apaga con un toque y se acuerda. */}
+                    <button
+                        onClick={alternarSonido}
+                        aria-label={conSonido ? 'Silenciar la ruleta' : 'Activar el sonido de la ruleta'}
+                        className={`p-2 rounded-xl border active:scale-95 transition-transform ${conSonido ? 'bg-zinc-900/80 border-zinc-800 text-zinc-300' : 'bg-zinc-900/80 border-zinc-800 text-zinc-600'}`}
+                    >
+                        {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                    <button onClick={() => setShowInfo(true)} className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white active:scale-95 transition-transform"><Info /></button>
+                </div>
             </div>
 
             {/* RUEDA */}
             <div className="flex-1 w-full flex flex-col items-center justify-center pb-32 relative z-10 transition-all duration-500" style={{ opacity: isTableOpen ? 0.3 : 1, transform: isTableOpen ? 'scale(0.9) translateY(-20px)' : 'scale(1) translateY(0)' }}>
                 <div className="relative w-[86vw] h-[86vw] max-w-[340px] max-h-[340px] drop-shadow-[0_18px_40px_rgba(0,0,0,0.9)]">
                     <RuedaRuleta
+                        ref={ruedaRef}
                         numeros={WHEEL_NUMBERS}
                         anguloSegmento={SEGMENT_ANGLE}
                         rotacion={wheelRotation}
-                        girando={spinning}
-                        duracion={SPIN_DURATION}
                     />
 
                     {/* LA BOLA. Va fuera del SVG y en su propia capa porque gira
-                        a otro ritmo que la rueda: es lo que hace que parezca que
-                        rueda de verdad y no que esté pegada a una casilla. */}
-                    <div className="absolute inset-0 z-20 pointer-events-none" style={{ transform: `rotate(-${ballRotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(0.1, 0, 0.1, 1)` : 'none' }}>
+                        a otro ritmo que la rueda, y AL REVES. Durante la tirada
+                        su posicion la escribe el bucle de frames directamente
+                        (ver `frame` en spin); estos estilos son donde se queda
+                        entre tirada y tirada. */}
+                    <div
+                        ref={bolaGiroRef}
+                        className="absolute inset-0 z-20 pointer-events-none"
+                        style={{ transform: `rotate(${ballRotation}deg)`, willChange: 'transform' }}
+                    >
                         <div
-                            className="absolute top-0 left-1/2 -ml-[7px] w-3.5 h-3.5 rounded-full"
+                            ref={bolaRef}
+                            className="absolute left-1/2 w-3.5 h-3.5 rounded-full"
                             style={{
-                                marginTop: `${(100 - ballDistance) / 2}%`,
-                                transition: spinning ? `margin-top 1s ease-in-out ${SPIN_DURATION - 1000}ms` : 'none',
-                                background: 'radial-gradient(circle at 32% 28%, #ffffff 0%, #e9ecf0 45%, #9aa1a8 100%)',
-                                boxShadow: '0 2px 5px rgba(0,0,0,0.85), inset 0 -1px 2px rgba(0,0,0,0.35)'
+                                top: `${(100 - ballDistance) / 2}%`,
+                                transform: 'translateX(-50%)',
+                                willChange: 'transform, top',
+                                // Marfil: un brillo pequeño arriba a la izquierda, sombra
+                                // propia abajo a la derecha y una sombra proyectada que
+                                // la despega de la pista.
+                                background: 'radial-gradient(circle at 30% 26%, #ffffff 0%, #f3f4f6 28%, #c9ced4 62%, #7c8289 100%)',
+                                boxShadow: '0 3px 6px rgba(0,0,0,0.9), 0 0 1px rgba(255,255,255,0.6), inset -1px -2px 3px rgba(0,0,0,0.45), inset 1px 1px 2px rgba(255,255,255,0.9)'
                             }}
                         />
                     </div>

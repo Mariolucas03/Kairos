@@ -22,9 +22,23 @@
  *      90-58    el cono
  *      58-0     la torreta, con sus cuatro brazos
  *
- * Los ángulos van en grados desde las 12 y en el sentido de las agujas, igual
- * que iba el `conic-gradient`, para no tener que tocar la lógica del giro.
+ * Los ángulos van en grados desde las 12 y en el sentido de las agujas.
+ *
+ * ⚠️ EL GIRO NO LO HACE CSS: LO HACE EL JUEGO, FRAME A FRAME.
+ *
+ * Antes la rueda giraba con una `transition` de CSS y una curva fija. Eso no
+ * deja meter física: la bola tiene que frenar a otro ritmo, caer, rebotar y
+ * quedarse pegada a la casilla, y para que todo cuadre hay que saber dónde
+ * está la rueda en CADA instante, no dejar que el navegador lo interpole por
+ * su cuenta. Por eso el grupo que gira se expone con un `ref`: el juego le
+ * escribe el `transform` directamente en cada frame, sin pasar por React
+ * (37 casillas repintándose 60 veces por segundo se notarían en un móvil).
+ *
+ * `rotacion` es el ángulo visual TAL CUAL —lo que va dentro del rotate()—,
+ * sin el signo cambiado de antes. Solo importa al montar y al terminar una
+ * tirada, que es cuando el juego lo guarda en estado.
  */
+import { forwardRef, memo } from 'react';
 
 const ROJOS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
 
@@ -47,7 +61,7 @@ const cuna = (rFuera, rDentro, a0, a1) => {
     return `M ${x0} ${y0} A ${rFuera} ${rFuera} 0 0 1 ${x1} ${y1} L ${x2} ${y2} A ${rDentro} ${rDentro} 0 0 0 ${x3} ${y3} Z`;
 };
 
-export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando, duracion }) {
+const RuedaRuleta = forwardRef(function RuedaRuleta({ numeros, anguloSegmento, rotacion }, ref) {
     return (
         <svg viewBox="-200 -200 400 400" className="w-full h-full" style={{ overflow: 'visible' }}>
             <defs>
@@ -92,6 +106,17 @@ export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando
                     <stop offset="100%" stopColor="#000" stopOpacity="0.75" />
                 </radialGradient>
 
+                {/* La profundidad de las casillas: oscuras junto a los bordes,
+                    claras en medio. Es lo que las hunde; sin esto son pegatinas
+                    de colores sobre un disco. */}
+                <radialGradient id="rr-hondo" cx="50%" cy="50%" r="50%">
+                    <stop offset="44%" stopColor="#000" stopOpacity="0.55" />
+                    <stop offset="50%" stopColor="#000" stopOpacity="0.05" />
+                    <stop offset="66%" stopColor="#000" stopOpacity="0" />
+                    <stop offset="71%" stopColor="#000" stopOpacity="0.28" />
+                    <stop offset="73%" stopColor="#000" stopOpacity="0.55" />
+                </radialGradient>
+
                 <radialGradient id="rr-brillo" cx="32%" cy="22%" r="55%">
                     <stop offset="0%" stopColor="#fff" stopOpacity="0.20" />
                     <stop offset="60%" stopColor="#fff" stopOpacity="0.04" />
@@ -101,6 +126,11 @@ export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando
 
             {/* ── LO QUE NO GIRA: el cuenco y la pista ────────────────────── */}
             <circle r="200" fill="url(#rr-madera)" />
+            {/* Las vetas: anillos finos y desiguales. Madera torneada, no un
+                gradiente marron. */}
+            {[181, 184.5, 187, 190.5, 193, 196.5].map((r, i) => (
+                <circle key={r} r={r} fill="none" stroke="#000" strokeWidth={i % 2 ? 0.5 : 0.9} opacity={0.10 + (i % 3) * 0.05} />
+            ))}
             <circle r="200" fill="none" stroke="#1a0e08" strokeWidth="3" />
             <circle r="186" fill="none" stroke="#000" strokeWidth="1" opacity="0.35" />
             <circle r="175" fill="url(#rr-laton)" />
@@ -119,8 +149,9 @@ export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando
 
             {/* ── LO QUE GIRA: las casillas, los números y la torreta ─────── */}
             <g
+                ref={ref}
                 style={{
-                    transform: `rotate(-${rotacion}deg)`,
+                    transform: `rotate(${rotacion}deg)`,
                     // ⚠️ '0px 0px' y no 'center'.
                     //
                     // El viewBox va de -200 a 200, asi que el centro de la rueda
@@ -131,7 +162,7 @@ export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando
                     // salia entera de la pantalla: tras el primer giro solo
                     // quedaban la madera y la pista, que no giran.
                     transformOrigin: '0px 0px',
-                    transition: girando ? `transform ${duracion}ms cubic-bezier(0.25, 0.1, 0.25, 1)` : 'none'
+                    willChange: 'transform'
                 }}
             >
                 <circle r="150" fill="url(#rr-laton)" />
@@ -144,6 +175,10 @@ export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando
                         <path key={`c${n}`} d={cuna(146, 90, a0, a1)} fill={relleno} stroke="#000" strokeWidth="0.4" />
                     );
                 })}
+
+                {/* La sombra que hunde las casillas. Va encima de los colores y
+                    debajo de los separadores. */}
+                <circle r="146" fill="url(#rr-hondo)" pointerEvents="none" />
 
                 {/* Los separadores. Van DESPUÉS de las casillas para que se vean
                     por encima, y estrechan hacia el centro como los de verdad. */}
@@ -170,7 +205,12 @@ export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando
                                 textAnchor="middle"
                                 dominantBaseline="middle"
                                 fill="#fff"
-                                style={{ font: '700 15px ui-sans-serif, system-ui, sans-serif', letterSpacing: '-0.5px' }}
+                                style={{
+                                    font: '700 15px ui-sans-serif, system-ui, sans-serif',
+                                    letterSpacing: '-0.5px',
+                                    // Grabado, no impreso: la sombra le da relieve.
+                                    textShadow: '0 1px 1px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.5)'
+                                }}
                             >{n}</text>
                         </g>
                     );
@@ -199,4 +239,8 @@ export default function RuedaRuleta({ numeros, anguloSegmento, rotacion, girando
             <circle r="199" fill="url(#rr-brillo)" pointerEvents="none" />
         </svg>
     );
-}
+});
+
+// Solo se repinta cuando cambian sus props, o sea al terminar una tirada. En
+// medio, el ref manda.
+export default memo(RuedaRuleta);
