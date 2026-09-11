@@ -94,8 +94,21 @@ export default function CapaRasca({ activa, reveladas, celda, onRevelar, onRasca
 
     useEffect(() => {
         pintarPlata();
-        window.addEventListener('resize', pintarPlata);
-        return () => window.removeEventListener('resize', pintarPlata);
+        // ⚠️ SOLO SI CAMBIA EL ANCHO.
+        //
+        // En el movil, la barra del navegador se esconde al hacer scroll y eso
+        // dispara `resize` con el mismo ancho y otro alto. Repintar ahi volvia
+        // a cubrir de plata las casillas a medio rascar: frotabas, se te iba
+        // la barra, y la plata volvia. Un cambio de ancho es girar el movil, y
+        // eso si obliga a repintar (la cuadricula cambia de tamaño).
+        let anchoAnterior = window.innerWidth;
+        const alCambiarTamano = () => {
+            if (Math.abs(window.innerWidth - anchoAnterior) < 2) return;
+            anchoAnterior = window.innerWidth;
+            pintarPlata();
+        };
+        window.addEventListener('resize', alCambiarTamano);
+        return () => window.removeEventListener('resize', alCambiarTamano);
         // Se repinta cuando arranca un cartón. Las reveladas se limpian aparte
         // (borrando), no repintando: repintar borraría los trazos a medias.
         // eslint-disable-next-line react-hooks/exhaustive-deps

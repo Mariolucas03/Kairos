@@ -162,47 +162,50 @@ export default function ScratchGame() {
         roceRef.current = sonidoRef.current.continuo({ frecuenciaBase: 1800, frecuenciaExtra: 1600, volumenMax: 0.12 });
     };
 
-    // Se lee `result` por ref porque `reveal` lo llama el canvas desde eventos
-    // del puntero, fuera de un pintado de React.
+    // Se leen por ref porque `reveal` lo llama el canvas desde eventos del
+    // puntero, fuera de un pintado de React, y varias veces seguidas.
     const resultRef = useRef(result);
     resultRef.current = result;
+    const reveladasRef = useRef(revealed);
+    reveladasRef.current = revealed;
 
     const reveal = (i) => {
-        // ⚠️ ACTUALIZACION FUNCIONAL, no `[...revealed]`.
+        // ⚠️ LA VERDAD ESTA EN EL REF, Y LOS EFECTOS FUERA DEL ESTADO.
         //
         // Las casillas las destapa el dedo, y en una sola pasada pueden caer
-        // dos seguidas antes de que React repinte. Con el `revealed` del cierre
-        // la segunda pisaba a la primera y una casilla ya rascada volvia a
-        // contar como tapada.
-        setRevealed(prev => {
-            if (prev[i]) return prev;
-            const nuevo = [...prev];
-            nuevo[i] = true;
+        // dos seguidas antes de que React repinte: con el `revealed` del cierre
+        // la segunda pisaba a la primera. Y meter el sonido y el fin de partida
+        // dentro del actualizador de `setRevealed` tampoco vale: React puede
+        // ejecutar un actualizador dos veces (lo hace en modo estricto), y
+        // entonces sonaba doble y el premio se disparaba dos veces.
+        if (reveladasRef.current[i]) return;
+        const nuevo = [...reveladasRef.current];
+        nuevo[i] = true;
+        reveladasRef.current = nuevo;
+        setRevealed(nuevo);
 
-            // Un "ding" al asomar la casilla, mas agudo cuantas mas lleves.
-            const cuantas = nuevo.filter(Boolean).length;
-            sonidoRef.current?.nota({ frecuencia: 660 * Math.pow(2, cuantas / 12), duracion: 0.14, volumen: 0.12 });
+        // Un "ding" al asomar la casilla, mas agudo cuantas mas lleves.
+        const cuantas = nuevo.filter(Boolean).length;
+        sonidoRef.current?.nota({ frecuencia: 660 * Math.pow(2, cuantas / 12), duracion: 0.14, volumen: 0.12 });
 
-            // Si es la ultima, el resultado.
-            const res = resultRef.current;
-            if (nuevo.every(Boolean) && res) {
-                setIsPlaying(false);
-                roceRef.current?.(0);
-                if (res.won) {
-                    setShowRain(true);
-                    setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
-                    const s = sonidoRef.current;
-                    setTimeout(() => (res.prize >= 200 ? melodias.granPremio : melodias.ganar)(s), 250);
-                } else {
-                    setTimeout(() => melodias.perder(sonidoRef.current), 250);
-                }
-                if (res.user) {
-                    setUser(res.user);
-                    localStorage.setItem('user', JSON.stringify(res.user));
-                }
+        // Si es la ultima, el resultado.
+        const res = resultRef.current;
+        if (nuevo.every(Boolean) && res) {
+            setIsPlaying(false);
+            roceRef.current?.(0);
+            if (res.won) {
+                setShowRain(true);
+                setTimeout(() => { setIsRainFading(true); setTimeout(() => setShowRain(false), 1000); }, 3000);
+                const s = sonidoRef.current;
+                setTimeout(() => (res.prize >= 200 ? melodias.granPremio : melodias.ganar)(s), 250);
+            } else {
+                setTimeout(() => melodias.perder(sonidoRef.current), 250);
             }
-            return nuevo;
-        });
+            if (res.user) {
+                setUser(res.user);
+                localStorage.setItem('user', JSON.stringify(res.user));
+            }
+        }
     };
 
     const winningSymbols = Object.values(SYMBOLS).filter(s => s.type !== 'none').sort((a, b) => b.prize - a.prize);

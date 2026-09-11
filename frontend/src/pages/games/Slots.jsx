@@ -254,7 +254,18 @@ export default function Slots() {
                     el.style.transform = `translateY(${-pos * filaPx}px)`;
                     // La estela: a mucha velocidad los simbolos se emborronan en
                     // vertical. Es lo que hace el ojo con una tira rapida.
-                    el.style.filter = v > 0.05 ? `blur(${(v * 2.2).toFixed(1)}px)` : 'none';
+                    //
+                    // ⚠️ Con umbral alto y sin volver a 'none' hasta parar. Un
+                    // `filter` es una capa que se rasteriza entera cada vez que
+                    // cambia; alternar entre blur y 'none' frame si, frame no
+                    // alrededor de un umbral bajo era rehacer la capa sin parar,
+                    // y en un movil eso son tirones. Ademas el desenfoque va
+                    // acotado: mas de 1.8px ya no es estela, es niebla.
+                    if (v > 0.18) {
+                        el.style.filter = `blur(${Math.min(v * 2, 1.8).toFixed(1)}px)`;
+                    } else if (el.style.filter !== 'none') {
+                        el.style.filter = 'none';
+                    }
 
                     // El "clonc" de encajar, una vez por rodillo, cuando llega.
                     if (!parado[i] && ms >= tr.msLlegada) {
