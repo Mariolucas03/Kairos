@@ -13,7 +13,7 @@ describe('Rangos musculares con tres escalones', () => {
         for (let i = 1; i < ESCALONES.length; i++) {
             assert.ok(ESCALONES[i].min > ESCALONES[i - 1].min, `el escalon ${ESCALONES[i].label} no sube`);
         }
-        assert.deepStrictEqual(ESCALONES.slice(3, 6).map(e => e.label), ['Madera 1', 'Madera 2', 'Madera 3']);
+        assert.deepStrictEqual(ESCALONES.slice(3, 6).map(e => e.label), ['Madera I', 'Madera II', 'Madera III']);
     });
 
     test('el escalon 1 de cada rango empieza donde empieza el rango', () => {
@@ -24,15 +24,15 @@ describe('Rangos musculares con tres escalones', () => {
     });
 
     test('con los puntos justos se esta en el escalon, y el progreso es hacia el siguiente', () => {
-        const madera2 = ESCALONES.find(e => e.label === 'Madera 2');
+        const madera2 = ESCALONES.find(e => e.label === 'Madera II');
         const r = getRankForPoints(madera2.min);
-        assert.strictEqual(r.rankLabel, 'Madera 2');
+        assert.strictEqual(r.rankLabel, 'Madera II');
         assert.strictEqual(r.rank, 'madera');
         assert.strictEqual(r.tier, 2);
         assert.strictEqual(r.progress, 0);
-        assert.strictEqual(r.nextRankLabel, 'Madera 3');
-        assert.strictEqual(getRankForPoints(0).rankLabel, 'Novato 1');
-        assert.strictEqual(getRankForPoints(1e9).rankLabel, 'Leyenda 3');
+        assert.strictEqual(r.nextRankLabel, 'Madera III');
+        assert.strictEqual(getRankForPoints(0).rankLabel, 'Novato I');
+        assert.strictEqual(getRankForPoints(1e9).rankLabel, 'Leyenda III');
         assert.strictEqual(getRankForPoints(1e9).nextRankLabel, null);
     });
 

@@ -30,7 +30,7 @@ const SECONDARY_FACTOR = 0.4;
 const CARDIO_POINTS_PER_MINUTE = 25;
 
 /**
- * DIEZ RANGOS, Y CADA UNO EN TRES: Madera 1, Madera 2, Madera 3, Bronce 1...
+ * DIEZ RANGOS, Y CADA UNO EN TRES: Madera I, Madera II, Madera III, Bronce I...
  *
  * ⚠️ REEQUILIBRADO. Con los umbrales de antes (Madera a 10.000, Leyenda a
  * un millon por grupo) subir el primer rango costaba semanas y Leyenda no lo
@@ -62,6 +62,7 @@ const RANKS = [
     { key: 'leyenda', label: 'Leyenda', min: 800000, color: '#ef4444' }
 ];
 const SUBRANGOS = 3;
+const ROMANOS = ['I', 'II', 'III'];
 // Donde "acabaria" Leyenda, solo para partirla en tres: no hay nada encima.
 const TOPE_LEYENDA = 2000000;
 
@@ -71,7 +72,8 @@ const ESCALONES = RANKS.flatMap((r, i) => {
     const tramo = (fin - r.min) / SUBRANGOS;
     return Array.from({ length: SUBRANGOS }, (_, t) => ({
         key: r.key, base: r.label, tier: t + 1,
-        label: `${r.label} ${t + 1}`,
+        // En romanos, como los rangos de los juegos: Madera I, II, III
+        label: `${r.label} ${ROMANOS[t]}`,
         min: Math.round(r.min + tramo * t),
         color: r.color,
         indice: i * SUBRANGOS + t
@@ -96,7 +98,7 @@ const getRankForPoints = (points) => {
         rank: current.key,          // 'madera': el rango, para el icono y el color
         rankBase: current.base,     // 'Madera'
         tier: current.tier,         // 1, 2 o 3
-        rankLabel: current.label,   // 'Madera 2'
+        rankLabel: current.label,   // 'Madera II'
         rankColor: current.color,
         rankIndex: index,           // 0..29, para detectar subidas
         maxRankIndex: ESCALONES.length - 1,

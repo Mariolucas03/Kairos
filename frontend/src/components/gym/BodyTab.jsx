@@ -209,7 +209,7 @@ export default function BodyTab() {
                             cada serie suma <span className="text-white font-bold">peso × repeticiones</span>.
                             Si un ejercicio trabaja varios músculos, el principal se lleva todo y cada
                             secundario un <span className="text-white font-bold">40%</span>.
-                            Cada rango tiene <span className="text-white font-bold">tres escalones</span> (Madera 1, 2 y 3) antes del siguiente.
+                            Cada rango tiene <span className="text-white font-bold">tres escalones</span> (Madera I, II y III) antes del siguiente.
                         </p>
                         {escala && (
                             <div className="grid grid-cols-2 gap-1.5">
