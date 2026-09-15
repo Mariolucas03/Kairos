@@ -44,6 +44,7 @@ export default function Register() {
     // Un formulario de tres campos y un boton es dar de alta un expediente;
     // esto es empezar un juego.
     const [paso, setPaso] = useState(0);
+    const [pulso, setPulso] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [exito, setExito] = useState(null);
@@ -113,6 +114,11 @@ export default function Register() {
             tarjetaTitulo={paso === 0 ? 'Tu nombre' : paso === 1 ? 'Tu cuerpo' : 'Tu llave'}
             error={error}
             exito={exito}
+            pulso={pulso}
+            nombre={formData.username}
+            mujer={formData.gender || null}
+            construido={(formData.username.trim().length >= 3 ? 0.34 : 0) + (formData.gender ? 0.33 : 0) + (formData.email && formData.password ? 0.33 : 0)}
+            etiquetaAvatar="Construyendo"
             pie={
                 <>
                     <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">
@@ -153,6 +159,7 @@ export default function Register() {
                             placeholder="Guerrero"
                             maxLength={MAX_ALIAS}
                             autoComplete="username"
+                            onEnfocar={() => setPulso(p => p + 1)}
                             contador={
                                 <span
                                     className="text-[9px] font-black uppercase tracking-[0.1em] not-italic transition-colors"
@@ -212,6 +219,7 @@ export default function Register() {
                             onChange={handleChange}
                             placeholder="tu@email.com"
                             autoComplete="email"
+                            onEnfocar={() => setPulso(p => p + 1)}
                         />
 
                         <CampoAuth
@@ -224,6 +232,7 @@ export default function Register() {
                             placeholder="••••••••"
                             esClave
                             autoComplete="new-password"
+                            onEnfocar={() => setPulso(p => p + 1)}
                         >
                             {/* Medidor de fuerza. Aparece solo al empezar a escribir:
                                 cinco rayas grises antes de tocar nada son ruido. */}
@@ -263,8 +272,8 @@ export default function Register() {
                         <button
                             type="button"
                             onClick={siguiente}
-                            className="flex-1 h-12 rounded-2xl font-black uppercase tracking-[0.16em] text-[12px] text-white flex items-center justify-center gap-2 active:scale-[0.985] transition-transform not-italic"
-                            style={{ background: ACENTO }}
+                            className="flex-1 h-12 rounded-2xl font-black uppercase tracking-[0.16em] text-[12px] text-white flex items-center justify-center gap-2 active:scale-[0.985] transition-transform not-italic textura-metal"
+                            style={{ backgroundColor: ACENTO, boxShadow: '0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.35)' }}
                         >
                             Siguiente <ArrowRight size={16} strokeWidth={3} />
                         </button>

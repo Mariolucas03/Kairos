@@ -563,6 +563,24 @@ const createCustomExercise = async (req, res) => {
     }
 };
 
+/**
+ * Los kilos totales de CADA usuario, para el percentil. Es una pasada por
+ * todos los entrenos de todo el mundo: se guarda diez minutos en memoria
+ * (con el servidor gratuito, hacerla en cada visita a Cuerpo era lo que
+ * dejaba la pantalla en blanco cuando tardaba mas de la cuenta).
+ */
+let cacheTotales = { en: 0, lista: [] };
+const totalesDeTodos = async () => {
+    if (Date.now() - cacheTotales.en < 10 * 60 * 1000) return cacheTotales.lista;
+    const lista = await WorkoutLog.aggregate([
+        { $match: { type: 'gym' } },
+        { $unwind: '$exercises' }, { $unwind: '$exercises.sets' },
+        { $group: { _id: '$user', volumen: { $sum: { $multiply: [{ $ifNull: ['$exercises.sets.weight', 0] }, { $ifNull: ['$exercises.sets.reps', 0] }] } } } }
+    ]);
+    cacheTotales = { en: Date.now(), lista };
+    return lista;
+};
+
 // @desc  Rangos de cada grupo muscular (nivel según kg, reps y constancia)
 // @route GET /api/gym/muscle-ranks
 const getMuscleRanksController = async (req, res) => {
@@ -579,11 +597,7 @@ const getMuscleRanksController = async (req, res) => {
         const miTotal = grupos.reduce((a, r) => a + (r.points || 0), 0);
         let percentil = null;
         try {
-            const totales = await WorkoutLog.aggregate([
-                { $match: { type: 'gym' } },
-                { $unwind: '$exercises' }, { $unwind: '$exercises.sets' },
-                { $group: { _id: '$user', volumen: { $sum: { $multiply: [{ $ifNull: ['$exercises.sets.weight', 0] }, { $ifNull: ['$exercises.sets.reps', 0] }] } } } }
-            ]);
+            const totales = await totalesDeTodos();
             if (totales.length >= 2) {
                 const porDebajo = totales.filter(t => t.volumen < miTotal).length;
                 // "Estas entre el X% mas fuerte": los que te superan mas tu

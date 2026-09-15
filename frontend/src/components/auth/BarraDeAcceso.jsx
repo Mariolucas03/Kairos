@@ -69,8 +69,8 @@ export default function BarraDeAcceso({ acento = '#eab308', etiqueta = 'Levanta 
                 tabIndex={0}
                 aria-label={etiqueta}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); completar(); } }}
-                className="relative h-16 rounded-2xl border overflow-hidden outline-none focus-visible:ring-2"
-                style={{ background: 'rgba(0,0,0,0.6)', borderColor: acento + '55', touchAction: 'none' }}
+                className="relative h-16 rounded-2xl border overflow-hidden outline-none focus-visible:ring-2 textura-carbono"
+                style={{ borderColor: acento + '55', touchAction: 'none', boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.05)' }}
             >
                 {/* Lo recorrido se enciende */}
                 <div

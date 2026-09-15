@@ -17,6 +17,21 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [exito, setExito] = useState(null);
+    // El escaner: un latido por cada campo en el que entras, y si el nombre es
+    // de alguien, su avatar. Se pide al dejar de escribir, no por cada tecla.
+    const [pulso, setPulso] = useState(0);
+    const [vistazo, setVistazo] = useState(null);
+    useEffect(() => {
+        const nombre = formData.username.trim();
+        setVistazo(null);
+        if (nombre.length < 3) return;
+        const t = setTimeout(() => {
+            api.get(`/auth/vistazo/${encodeURIComponent(nombre)}`)
+                .then(r => setVistazo(r.data))
+                .catch(() => setVistazo(null));
+        }, 600);
+        return () => clearTimeout(t);
+    }, [formData.username]);
 
     // Para poder cancelar el salto si la pantalla se desmonta antes de tiempo
     const temporizador = useRef(null);
@@ -99,6 +114,11 @@ export default function Login() {
             tarjetaTitulo="Identificarse"
             error={error}
             exito={exito}
+            pulso={pulso}
+            vistazo={vistazo}
+            nombre={formData.username}
+            construido={(formData.username.trim() ? 0.5 : 0) + (formData.password ? 0.5 : 0)}
+            etiquetaAvatar="Identificando"
             pie={
                 <>
                     <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">
@@ -125,6 +145,7 @@ export default function Login() {
                     onChange={handleChange}
                     placeholder="Guerrero01"
                     autoComplete="username"
+                    onEnfocar={() => setPulso(p => p + 1)}
                 />
 
                 <CampoAuth
@@ -137,6 +158,7 @@ export default function Login() {
                     placeholder="••••••••"
                     esClave
                     autoComplete="current-password"
+                    onEnfocar={() => setPulso(p => p + 1)}
                 />
 
                 {/* La puerta es una barra de pesas: se agarra el disco y se

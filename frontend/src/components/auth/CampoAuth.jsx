@@ -22,7 +22,8 @@ export function CampoAuth({
     maxLength,
     autoComplete,
     contador,
-    children
+    children,
+    onEnfocar
 }) {
     const [enfocado, setEnfocado] = useState(false);
     const [verClave, setVerClave] = useState(false);
@@ -53,7 +54,7 @@ export function CampoAuth({
                     name={nombre}
                     value={valor}
                     onChange={onChange}
-                    onFocus={() => setEnfocado(true)}
+                    onFocus={() => { setEnfocado(true); onEnfocar?.(); }}
                     onBlur={() => setEnfocado(false)}
                     placeholder={placeholder}
                     maxLength={maxLength}

@@ -130,7 +130,7 @@ const getMuscleRanks = async (userId, opciones = {}) => {
             // ⚠️ Faltaba muscleDetail: sin él todo el volumen se acumulaba en el
             // grupo grande y la pierna entera subía de rango a la vez, aunque el
             // ejercicio dijera exactamente qué músculo trabaja.
-            .select('name muscle muscleDetail secondary shares isCardio').lean()
+            .select('name muscle muscleDetail secondary shares isCardio thumb gif').lean()
     ]);
 
     // Índice nombre de ejercicio -> músculos, para no consultar por cada serie
@@ -142,7 +142,10 @@ const getMuscleRanks = async (userId, opciones = {}) => {
             secondary: (ex.secondary || []).map(s => resolveMuscleGroup(s)),
             // El reparto llega como Map de Mongoose o como objeto plano (.lean())
             shares: ex.shares ? Object.fromEntries(ex.shares instanceof Map ? ex.shares : Object.entries(ex.shares)) : null,
-            isCardio: !!ex.isCardio
+            isCardio: !!ex.isCardio,
+            // Para enseñar el ejercicio con su dibujo en el detalle del musculo
+            thumb: ex.thumb || '',
+            gif: ex.gif || ''
         };
     });
 
@@ -156,9 +159,12 @@ const getMuscleRanks = async (userId, opciones = {}) => {
         const m = (porEjercicio[musculo] = porEjercicio[musculo] || {});
         const e = (m[nombre] = m[nombre] || { volumen: 0, sesiones: new Set(), mejorPeso: 0, ultima: null });
         e.volumen += parte;
-        e.sesiones.add(new Date(fecha).toISOString().slice(0, 10));
+        // Una fecha rara en un entreno viejo no puede tirar la pantalla entera
+        const f = new Date(fecha);
+        const dia = Number.isNaN(f.getTime()) ? String(fecha) : f.toISOString().slice(0, 10);
+        e.sesiones.add(dia);
         if (mejorPeso > e.mejorPeso) e.mejorPeso = mejorPeso;
-        if (!e.ultima || new Date(fecha) > new Date(e.ultima)) e.ultima = fecha;
+        if (!Number.isNaN(f.getTime()) && (!e.ultima || f > new Date(e.ultima))) e.ultima = fecha;
     };
 
     // Acumuladores: los 8 grupos de siempre MÁS cada músculo concreto.
@@ -283,6 +289,8 @@ const getMuscleRanks = async (userId, opciones = {}) => {
             result[musculo].ejercicios = Object.entries(lista)
                 .map(([nombre, e]) => ({
                     nombre,
+                    thumb: byName[nombre.toLowerCase()]?.thumb || '',
+                    gif: byName[nombre.toLowerCase()]?.gif || '',
                     volumen: Math.round(e.volumen),
                     sesiones: e.sesiones.size,
                     mejorPeso: e.mejorPeso,

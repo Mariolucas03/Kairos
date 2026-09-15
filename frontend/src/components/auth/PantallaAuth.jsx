@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react';
+import { Proyeccion, AvatarEnConstruccion } from './ConsolaBiometrica';
 
 /**
  * CHASIS DE LAS PANTALLAS DE ACCESO.
@@ -25,11 +26,19 @@ export default function PantallaAuth({
     error,
     exito,
     children,
-    pie
+    pie,
+    // El escaner: cuanto llevas construido (0..1), el cuerpo elegido, la
+    // persona reconocida por el nombre, y el latido al entrar en un campo.
+    construido = 0,
+    mujer = null,
+    vistazo = null,
+    nombre = '',
+    etiquetaAvatar,
+    pulso = 0
 }) {
     return (
         <div
-            className="relative min-h-screen bg-black flex flex-col items-center justify-center px-6 py-10 select-none overflow-hidden"
+            className="relative min-h-screen bg-black flex flex-col items-center justify-center px-6 py-8 select-none overflow-x-hidden"
             style={{ '--acento': acento }}
         >
             {/* ── FONDO VIVO ────────────────────────────────────────────────
@@ -56,21 +65,13 @@ export default function PantallaAuth({
 
             <div className="relative z-10 w-full max-w-sm">
 
-                {/* ── MARCA ─────────────────────────────────────────────── */}
-                <div className="flex flex-col items-center mb-9">
-                    <div className="relative auth-entra" style={{ animationDelay: '0.05s' }}>
-                        {/* Halo que late por detrás del emblema */}
-                        <div
-                            className="auth-late absolute inset-0 rounded-2xl blur-xl"
-                            style={{ background: acento }}
-                            aria-hidden="true"
-                        />
-                        <div
-                            className="auth-flota relative w-16 h-16 rounded-2xl flex items-center justify-center border"
-                            style={{ background: 'rgba(255,255,255,0.04)', borderColor: acento + '4d' }}
-                        >
-                            <Icono size={30} style={{ color: acento }} />
-                        </div>
+                {/* ── LA PROYECCIÓN Y LA MARCA ──────────────────────────
+                    Los diagramas de referencia en su pantalla de vidrio, y
+                    debajo el nombre. El emblema va pequeño, en la esquina de
+                    la proyección: es la consola, no un logo sobre una foto. */}
+                <div className="flex flex-col items-center mb-7">
+                    <div className="auth-entra w-full" style={{ animationDelay: '0.05s' }}>
+                        <Proyeccion acento={acento} pulso={pulso} icono={Icono} />
                     </div>
 
                     <h1
@@ -135,7 +136,10 @@ export default function PantallaAuth({
                                 </div>
                             )}
 
-                            <div className="relative z-10">{children}</div>
+                            <div className="relative z-10">
+                                <AvatarEnConstruccion acento={acento} construido={construido} mujer={mujer} vistazo={vistazo} nombre={nombre} etiqueta={etiquetaAvatar} />
+                                {children}
+                            </div>
                         </>
                     )}
                 </div>

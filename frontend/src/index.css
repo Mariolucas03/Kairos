@@ -255,3 +255,31 @@ body {
         transform: none;
     }
 }
+
+/* --- LA CONSOLA DE ACCESO: texturas y luces --- */
+/* Metal cepillado: rayas finas horizontales con un brillo que cruza */
+.textura-metal {
+    background-image:
+        linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0) 40%, rgba(0,0,0,0.35)),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, rgba(0,0,0,0) 1px 3px);
+}
+/* Fibra de carbono: dos tramas cruzadas, en oscuro */
+.textura-carbono {
+    background-color: #111114;
+    background-image:
+        linear-gradient(27deg, #151519 5px, transparent 5px),
+        linear-gradient(207deg, #151519 5px, transparent 5px),
+        linear-gradient(27deg, #202024 5px, transparent 5px),
+        linear-gradient(207deg, #202024 5px, transparent 5px),
+        linear-gradient(90deg, #18181c 10px, transparent 10px),
+        linear-gradient(#1a1a1e 25%, #161619 25%, #161619 50%, transparent 50%, transparent 75%, #262629 75%, #262629);
+    background-size: 20px 20px;
+    background-position: 0 5px, 10px 0, 0 10px, 10px 5px, 0 0, 0 0;
+}
+/* El barrido de luz que recorre la proyeccion */
+@keyframes auth-barrido { 0% { top: -20%; } 100% { top: 110%; } }
+.auth-barrido { animation: auth-barrido 3.8s linear infinite; }
+/* El latido de la proyeccion al entrar en un campo */
+@keyframes auth-latido { 0% { transform: scale(1); } 40% { transform: scale(1.015); } 100% { transform: scale(1); } }
+.auth-latido { animation: auth-latido 0.7s ease-out; }
+@media (prefers-reduced-motion: reduce) { .auth-barrido, .auth-latido { animation: none; } }

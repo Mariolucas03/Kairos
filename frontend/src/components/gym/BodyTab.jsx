@@ -14,7 +14,7 @@ const miles = (n) => (n || 0).toLocaleString('es-ES');
 export default function BodyTab() {
     // El cuerpo que se pinta: el de mujer si asi se dijo al crear el personaje.
     const mujer = useAuthStore(state => state.user?.physicalStats?.gender === 'female');
-    const { data: ranksData, isLoading } = useSWR('/gym/muscle-ranks', fetcher);
+    const { data: ranksData, isLoading, error, mutate: recargarRangos } = useSWR('/gym/muscle-ranks', fetcher);
     const { data: entrenados } = useSWR('/gym/progress', fetcher);
 
     const [muscleSel, setMuscleSel] = useState(null);
@@ -53,6 +53,19 @@ export default function BodyTab() {
 
     if (isLoading) {
         return <div className="py-16 text-center text-zinc-600 text-xs font-bold uppercase animate-pulse">Calculando tus rangos...</div>;
+    }
+
+    // ⚠️ Si la peticion falla (el servidor gratuito despertando, o sin red), la
+    // pestaña se quedaba VACIA: ni cuerpo ni rangos ni explicacion. Parecia
+    // que todo habia desaparecido. Se dice, y se puede reintentar.
+    if (error && !ranksData) {
+        return (
+            <div className="py-12 text-center">
+                <p className="text-sm font-black text-white uppercase">No se han podido cargar tus rangos</p>
+                <p className="text-[11px] text-zinc-500 mt-1">El servidor no ha contestado. Suele ser que estaba despertando.</p>
+                <button onClick={() => recargarRangos()} className="mt-4 px-5 py-2.5 rounded-xl bg-yellow-500 text-black text-xs font-black uppercase tracking-widest active:scale-95 transition-transform">Reintentar</button>
+            </div>
+        );
     }
 
     return (
@@ -146,9 +159,17 @@ export default function BodyTab() {
                                                 key={e.nombre}
                                                 type="button"
                                                 onClick={() => setEjercicio(e.nombre)}
-                                                className="shrink-0 w-[132px] text-left rounded-2xl border p-2.5 active:scale-[0.98] transition-transform"
+                                                className="shrink-0 w-[140px] text-left rounded-2xl border overflow-hidden active:scale-[0.98] transition-transform"
                                                 style={{ borderColor: e.rankColor + '55', background: e.rankColor + '0f' }}
                                             >
+                                                {/* El dibujo del ejercicio, para saber cual es de un
+                                                    vistazo (como en Symmetry). Sin dibujo, el nombre. */}
+                                                <div className="h-[84px] bg-white flex items-center justify-center overflow-hidden">
+                                                    {(e.thumb || e.gif)
+                                                        ? <img src={e.thumb || e.gif} alt="" loading="lazy" className="w-full h-full object-cover" onError={(ev) => { ev.currentTarget.style.display = 'none'; }} />
+                                                        : <span className="text-[10px] font-black text-zinc-400 uppercase px-2 text-center">{e.nombre}</span>}
+                                                </div>
+                                                <div className="p-2.5">
                                                 <div className="flex items-center gap-1.5">
                                                     <IconoRango rango={e.rank} color={e.rankColor} tamano={16} />
                                                     <span className="text-[9px] font-black uppercase not-italic truncate" style={{ color: e.rankColor }}>{e.rankLabel}</span>
@@ -156,6 +177,7 @@ export default function BodyTab() {
                                                 <p className="text-[11px] font-black text-white leading-tight mt-1.5 line-clamp-2 not-italic">{e.nombre}</p>
                                                 <p className="text-[9px] text-zinc-400 font-bold mt-1 not-italic">{e.sesiones} {e.sesiones === 1 ? 'vez' : 'veces'} · {miles(e.volumen)} kg</p>
                                                 {e.mejorPeso > 0 && <p className="text-[9px] text-zinc-600 font-bold not-italic">mejor {e.mejorPeso} kg</p>}
+                                                </div>
                                             </button>
                                         ))}
                                     </div>

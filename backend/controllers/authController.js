@@ -85,4 +85,30 @@ const loginUser = async (req, res) => {
 };
 
 // ...
-module.exports = { registerUser, loginUser };
+/**
+ * UN VISTAZO ANTES DE ENTRAR.
+ *
+ * La pantalla de acceso es un panel de control: al escribir tu nombre, el
+ * avatar de al lado del formulario se convierte en TU avatar (foto, marco,
+ * nivel, cuerpo) antes de poner la contraseña. Es lo mismo que ya se ve de
+ * cualquiera en el ranking o en su perfil publico: nada privado. Sin
+ * contraseña no se entra, esto solo saluda.
+ *
+ * @route GET /api/auth/vistazo/:username
+ */
+const vistazo = async (req, res) => {
+    try {
+        const nombre = String(req.params.username || '').trim();
+        if (nombre.length < 3 || nombre.length > 30) return res.status(404).json({ message: 'Nadie' });
+        const escapado = nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const u = await User.findOne({ username: new RegExp('^' + escapado + '$', 'i') })
+            .select('username avatar frame level title physicalStats.gender').lean();
+        if (!u) return res.status(404).json({ message: 'Nadie' });
+        res.json({ username: u.username, avatar: u.avatar || null, frame: u.frame || null, level: u.level || 1, title: u.title || '', gender: u.physicalStats?.gender || null });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error' });
+    }
+};
+
+module.exports = { registerUser, loginUser, vistazo };
