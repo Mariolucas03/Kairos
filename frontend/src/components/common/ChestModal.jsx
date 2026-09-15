@@ -1,130 +1,121 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { Zap } from 'lucide-react';
 
-export default function ChestModal({ isOpen, onClose, reward, chestType = 'wood', chestImage }) {
-    const [animationState, setAnimationState] = useState('idle'); // idle, opening, revealed
+/**
+ * ABRIR UN COFRE.
+ *
+ * Tocas el cofre, tiembla, y sale lo que habia dentro: fichas, XP o un objeto
+ * del catalogo. El premio ya viene decidido del servidor (`reward`); aqui
+ * solo se le da teatro.
+ *
+ * ⚠️ El icono del cofre es un EMOJI. Antes se metia en un <img src>, y un emoji
+ * no es una URL: salia el icono de imagen rota en vez del cofre.
+ *
+ * `reward`: { tipo: 'fichas'|'xp'|'objeto', valor, objeto?, duplicado?, cofre }
+ */
 
-    useEffect(() => {
-        if (isOpen) setAnimationState('idle');
-    }, [isOpen]);
+const RAREZA = {
+    comun: { nombre: 'Común', color: '#a1a1aa' },
+    raro: { nombre: 'Raro', color: '#60a5fa' },
+    epico: { nombre: 'Épico', color: '#c084fc' },
+    legendario: { nombre: 'Legendario', color: '#facc15' }
+};
+
+const Icono = ({ icono, clase = 'text-8xl' }) => (
+    (icono?.startsWith?.('/') || icono?.startsWith?.('http'))
+        ? <img src={icono} alt="" className="w-full h-full object-contain" draggable="false" />
+        : <span className={`${clase} leading-none select-none`}>{icono || '📦'}</span>
+);
+
+export default function ChestModal({ isOpen, onClose, reward }) {
+    const [fase, setFase] = useState('cerrado');   // cerrado, abriendo, abierto
+
+    useEffect(() => { if (isOpen) setFase('cerrado'); }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const handleOpen = () => {
-        if (animationState !== 'idle') return;
-        setAnimationState('opening');
-
-        // Simular tiempo de animación (1.5s de temblor) antes de mostrar premio
-        setTimeout(() => {
-            setAnimationState('revealed');
-        }, 1500);
+    const abrir = () => {
+        if (fase !== 'cerrado') return;
+        setFase('abriendo');
+        setTimeout(() => setFase('abierto'), 1400);
     };
 
-    // Color de fondo para el premio según el tipo
-    const chestColor = chestType === 'legendary' ? 'bg-yellow-500 shadow-yellow-500/50' : 'bg-amber-700 shadow-amber-900/50';
+    const cofre = reward?.cofre || {};
+    const rarezaCofre = RAREZA[cofre.rareza] || RAREZA.comun;
+    const objeto = reward?.objeto;
+    const rarezaPremio = objeto ? (RAREZA[objeto.rarity] || RAREZA.comun) : null;
+    const color = reward?.tipo === 'objeto' ? rarezaPremio.color : reward?.tipo === 'xp' ? '#22d3ee' : '#a855f7';
+
+    const titulo = reward?.tipo === 'objeto' ? '¡Objeto nuevo!' : reward?.duplicado ? 'Ya lo tenías' : '¡Premio!';
+    const detalle = reward?.tipo === 'objeto'
+        ? `${objeto.name} · ${rarezaPremio.nombre}`
+        : reward?.duplicado
+            ? `${objeto?.name} repetido: ${reward.valor} fichas`
+            : reward?.tipo === 'xp' ? `+${reward.valor} XP` : `+${reward?.valor} fichas`;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn select-none">
-            <div className="flex flex-col items-center relative">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-sm select-none animate-in fade-in">
+            <style>{`
+                @keyframes cofreTiembla {
+                    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+                    15% { transform: translate(-4px, 2px) rotate(-3deg); }
+                    30% { transform: translate(4px, -2px) rotate(3deg); }
+                    45% { transform: translate(-4px, 0) rotate(-2deg); }
+                    60% { transform: translate(4px, 2px) rotate(2deg); }
+                    75% { transform: translate(-2px, -2px) rotate(-1deg); }
+                }
+                @keyframes cofreFlota { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+                @keyframes cofreSale { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+                .cofre-flota { animation: cofreFlota 1.6s ease-in-out infinite; }
+                .cofre-tiembla { animation: cofreTiembla 0.35s linear infinite; }
+                .cofre-sale { animation: cofreSale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+            `}</style>
 
-                {/* --- FASE 1 & 2: EL COFRE (IMAGEN) --- */}
-                {animationState !== 'revealed' && (
-                    <div
-                        onClick={handleOpen}
-                        className={`
-                            w-48 h-48 flex items-center justify-center cursor-pointer transition-transform relative z-20
-                            ${animationState === 'idle' ? 'animate-bounce-slow hover:scale-105' : ''}
-                            ${animationState === 'opening' ? 'animate-shake' : ''}
-                        `}
-                    >
-                        {chestImage ? (
-                            <img
-                                src={chestImage}
-                                alt="Cofre"
-                                className="w-full h-full object-contain drop-shadow-2xl image-pixelated"
-                            />
-                        ) : (
-                            <span className="text-8xl">📦</span>
+            <div className="flex flex-col items-center relative px-6 w-full max-w-sm">
+                {fase !== 'abierto' ? (
+                    <>
+                        <div
+                            onClick={abrir}
+                            className={`w-44 h-44 flex items-center justify-center cursor-pointer relative ${fase === 'cerrado' ? 'cofre-flota' : 'cofre-tiembla'}`}
+                        >
+                            <div className="absolute inset-4 rounded-full blur-2xl opacity-40" style={{ background: rarezaCofre.color }} />
+                            <div className="relative"><Icono icono={cofre.icono} /></div>
+                        </div>
+                        <p className="mt-2 text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: rarezaCofre.color }}>{cofre.nombre || 'Cofre'}</p>
+                        <p className="mt-4 text-white/80 font-bold animate-pulse uppercase tracking-widest text-sm">
+                            {fase === 'cerrado' ? 'Toca para abrir' : 'Abriendo…'}
+                        </p>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center cofre-sale w-full">
+                        <div className="relative w-36 h-36 flex items-center justify-center mb-5">
+                            <div className="absolute inset-0 rounded-full blur-3xl opacity-50" style={{ background: color }} />
+                            <div className="relative w-28 h-28 rounded-3xl flex items-center justify-center border" style={{ background: `${color}22`, borderColor: `${color}66` }}>
+                                {reward?.tipo === 'objeto' || reward?.duplicado
+                                    ? <Icono icono={objeto?.sprite || objeto?.icon} clase="text-6xl" />
+                                    : reward?.tipo === 'xp'
+                                        ? <Zap size={56} color={color} fill={color} />
+                                        : <img src="/assets/icons/ficha.png" alt="" className="w-16 h-16 object-contain" />}
+                            </div>
+                        </div>
+
+                        <h2 className="text-3xl font-black text-white uppercase tracking-tight not-italic text-center">{titulo}</h2>
+                        <div className="mt-3 text-base font-black px-6 py-2.5 rounded-full border text-white text-center" style={{ background: `${color}22`, borderColor: `${color}66` }}>
+                            {detalle}
+                        </div>
+                        {reward?.tipo === 'objeto' && (
+                            <p className="mt-3 text-[11px] text-zinc-500 font-bold text-center">Ya está en tu inventario. Equípalo desde ahí.</p>
                         )}
-                    </div>
-                )}
-
-                {/* --- FASE 3: EL PREMIO --- */}
-                {animationState === 'revealed' && reward && (
-                    <div className="flex flex-col items-center animate-popIn relative z-30">
-                        {/* Resplandor de fondo */}
-                        <div className={`absolute inset-0 blur-3xl rounded-full z-0 opacity-50 ${chestType === 'legendary' ? 'bg-yellow-400' : 'bg-blue-400'}`}></div>
-
-                        <div className="z-10 mb-6 drop-shadow-2xl">
-                            {/* Si el premio es un ITEM, mostramos su icono. Si son monedas/xp, un emoji */}
-                            {reward.type === 'item' && reward.icon ? (
-                                <div className="w-32 h-32">
-                                    <img src={reward.icon} alt="Premio" className="w-full h-full object-contain image-pixelated" />
-                                </div>
-                            ) : (
-                                <div className="text-9xl">
-                                    {reward.type === 'coins' && '💰'}
-                                    {reward.type === 'xp' && '✨'}
-                                </div>
-                            )}
-                        </div>
-
-                        <h2 className="z-10 text-3xl font-black text-white uppercase tracking-widest drop-shadow-md mb-2">
-                            {reward.type === 'item' ? '¡Objeto!' : '¡Recompensa!'}
-                        </h2>
-
-                        <div className={`z-10 text-xl font-bold px-8 py-3 rounded-full border-2 border-white/20 text-white shadow-xl ${chestColor}`}>
-                            {reward.type === 'coins' && `+${reward.value} Monedas`}
-                            {reward.type === 'xp' && `+${reward.value} XP`}
-                            {reward.type === 'item' && reward.value}
-                        </div>
 
                         <button
                             onClick={onClose}
-                            className="z-10 mt-8 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-gray-200 hover:scale-105 transition-all shadow-lg active:scale-95"
+                            className="mt-8 w-full py-4 bg-white text-black font-black rounded-2xl uppercase tracking-widest active:scale-95 transition-transform shadow-lg"
                         >
-                            RECOGER
+                            Recoger
                         </button>
                     </div>
                 )}
-
-                {/* Texto de instrucción */}
-                {animationState === 'idle' && (
-                    <p className="mt-4 text-white/80 font-bold animate-pulse uppercase tracking-widest text-sm">¡Toca para abrir!</p>
-                )}
             </div>
-
-            {/* Estilos CSS Inline */}
-            <style>{`
-                .image-pixelated { image-rendering: pixelated; }
-
-                @keyframes shake {
-                    0% { transform: translate(1px, 1px) rotate(0deg); }
-                    10% { transform: translate(-1px, -2px) rotate(-1deg); }
-                    20% { transform: translate(-3px, 0px) rotate(1deg); }
-                    30% { transform: translate(3px, 2px) rotate(0deg); }
-                    40% { transform: translate(1px, -1px) rotate(1deg); }
-                    50% { transform: translate(-1px, 2px) rotate(-1deg); }
-                    60% { transform: translate(-3px, 1px) rotate(0deg); }
-                    70% { transform: translate(3px, 1px) rotate(-1deg); }
-                    80% { transform: translate(-1px, -1px) rotate(1deg); }
-                    90% { transform: translate(1px, 2px) rotate(0deg); }
-                    100% { transform: translate(1px, -2px) rotate(-1deg); }
-                }
-                .animate-shake { animation: shake 0.5s infinite; }
-                
-                @keyframes popIn {
-                    0% { transform: scale(0.5); opacity: 0; }
-                    60% { transform: scale(1.1); opacity: 1; }
-                    100% { transform: scale(1); opacity: 1; }
-                }
-                .animate-popIn { animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
-
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-            `}</style>
         </div>
     );
 }

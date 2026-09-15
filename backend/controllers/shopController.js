@@ -1,6 +1,7 @@
 const ShopItem = require('../models/ShopItem');
 const User = require('../models/User');
 const { addRewards } = require('../services/levelService');
+const { COFRES, cofrePorId, catalogoDeCofres, abrirCofre } = require('../services/cofresService');
 
 /**
  * CATÁLOGO DE LA TIENDA
@@ -65,10 +66,14 @@ const SEED_ITEMS = [
     { name: 'Néctar de los Dioses', price: 400, category: 'consumable', icon: '🏺', rarity: 'epico', effectType: 'heal', effectValue: 100, description: 'Restaura toda tu vida.' },
 
     // ================= COFRES =================
-    { name: 'Cofre Roñoso', price: 50, category: 'chest', icon: '📦', rarity: 'comun', description: 'Riesgo bajo, premio bajo.' },
-    { name: 'Cofre de Plata', price: 120, category: 'chest', icon: '🎁', rarity: 'raro', description: 'Algo mejor que el anterior.' },
-    { name: 'Cofre Dorado', price: 250, category: 'chest', icon: '🧰', rarity: 'epico', description: 'Equilibrado.' },
-    { name: 'Cofre Legendario', price: 1000, category: 'chest', icon: '💎', rarity: 'legendario', description: 'Alto riesgo, alta recompensa.' },
+    // Los diez cofres salen de cofresService: ahi esta cada tabla de premios y
+    // de ahi salen tambien los porcentajes que enseña el movil. `effectType`
+    // guarda el id del cofre, que es lo que une el objeto de la tienda con su
+    // tabla al abrirlo.
+    ...COFRES.map(c => ({
+        name: c.nombre, price: c.precio, category: 'chest', icon: c.icono, rarity: c.rareza,
+        description: c.descripcion, effectType: c.id
+    })),
 
     // ================= TEMAS =================
     { name: 'Modo Oscuro', price: 0, category: 'theme', icon: '🌙', rarity: 'comun', description: 'El clásico de Kairos.', effectType: 'dark' },
@@ -275,33 +280,6 @@ const buyItem = async (req, res) => {
 };
 
 // 4. USAR / EQUIPAR
-/**
- * Lo que devuelve un cofre, a partir de lo que cuesta.
- *
- * ⚠️ Los cuatro cofres daban EXACTAMENTE lo mismo: 100 monedas una de cada
- * cinco veces y 10 el resto, costaran 50 fichas o 1.000. Es decir, el Cofre
- * Legendario costaba VEINTE VECES más que el Roñoso y devolvía lo mismo, con
- * "alto riesgo, alta recompensa" escrito debajo. Comprarlo era tirar el dinero,
- * y no había forma de darse cuenta salvo abriendo unos cuantos y sospechando.
- *
- * Ahora el premio sale del precio, así que:
- *
- *  - La proporción es la misma para los cuatro (56% de media), que es
- *    exactamente la que ya tenía el Roñoso: 50 → 100 ó 10. El cofre barato no
- *    cambia ni un número; los caros dejan de ser una estafa.
- *  - Lo que cambia entre cofres es el TAMAÑO del salto, que es lo que hace que
- *    arriesgar signifique algo: el Legendario da 2.000 ó 200.
- *
- * Se exporta para poder comprobarlo desde las pruebas: un cofre que devuelve de
- * menos no da ningún error, igual que el rasca que devolvía de más.
- */
-const premioDeCofre = (precio) => {
-    const seguro = Number(precio);
-    if (!Number.isFinite(seguro) || seguro <= 0) return 0;
-    // Una de cada cinco veces sale el premio gordo
-    return Math.round(seguro * (Math.random() > 0.8 ? 2 : 0.2));
-};
-
 const useItem = async (req, res) => {
     try {
         const { itemId } = req.body;
@@ -336,17 +314,7 @@ const useItem = async (req, res) => {
         // para que dos peticiones simultáneas con el mismo objeto no dupliquen el premio del
         // cofre ni pisen el descuento de cantidad (lost update).
         if (item.category === 'consumable' || item.category === 'chest') {
-            let prize = 0;
-            if (item.category === 'chest') {
-                prize = premioDeCofre(item.price);
-                rewardData = { type: 'coins', value: prize };
-                msg = "Cofre abierto";
-            } else {
-                msg = "Poción usada";
-            }
-
             const inc = { 'inventory.$[elem].quantity': -1 };
-            if (prize) inc.coins = prize;
 
             const updatedForItem = await User.findOneAndUpdate(
                 { _id: user._id, inventory: { $elemMatch: { item: itemId, quantity: { $gte: 1 } } } },
@@ -363,6 +331,26 @@ const useItem = async (req, res) => {
                 { _id: user._id },
                 { $pull: { inventory: { item: itemId, quantity: { $lte: 0 } } } }
             );
+
+            // EL COFRE: el premio lo decide y lo aplica el servicio, con la
+            // tabla del cofre. Ya esta descontado del inventario (arriba, con
+            // candado), asi que dos aperturas a la vez no pueden dar dos premios
+            // por un solo cofre.
+            if (item.category === 'chest') {
+                const cofre = cofrePorId(item.effectType) || COFRES.find(c => c.nombre === item.name);
+                if (!cofre) return res.status(400).json({ message: 'Este cofre ya no existe' });
+                const premio = await abrirCofre(user._id, cofre);
+                rewardData = { ...premio, cofre: { id: cofre.id, nombre: cofre.nombre, icono: cofre.icono, rareza: cofre.rareza } };
+                msg = premio.tipo === 'objeto'
+                    ? `Te ha tocado: ${premio.objeto.name}`
+                    : premio.duplicado
+                        ? `${premio.objeto.name} ya lo tenías: ${premio.valor} fichas`
+                        : premio.tipo === 'xp' ? `+${premio.valor} XP` : `+${premio.valor} fichas`;
+                const updatedUser = await User.findById(user._id).populate('inventory.item');
+                return res.json({ message: msg, user: limpiarInventario(updatedUser), reward: rewardData });
+            }
+
+            msg = 'Poción usada';
 
             // ⚠️ AQUÍ NO PASABA NADA. El objeto se descontaba del inventario y
             // se devolvía "Poción usada", pero effectType/effectValue no se leían
@@ -479,9 +467,13 @@ const seedShop = async (req, res) => {
     } catch (error) { res.status(500).json({ message: 'Error en seed' }); }
 };
 
+/** El catalogo de cofres con sus porcentajes, para el boton de informacion. */
+const getCofres = async (req, res) => {
+    res.json({ cofres: catalogoDeCofres() });
+};
+
 module.exports = {
-    getShopItems, createCustomReward, buyItem, useItem, seedShop, exchangeCurrency,
-    // Se exporta SOLO para las pruebas: los cuatro cofres devolvian lo mismo
-    // costaran lo que costaran, y eso no da ningun error.
-    premioDeCofre
+    getShopItems, createCustomReward, buyItem, useItem, seedShop, exchangeCurrency, getCofres,
+    // Solo para las pruebas: es el catalogo con el que se miden los cofres.
+    SEED_ITEMS
 };

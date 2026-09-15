@@ -5,7 +5,7 @@ const {
     SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
     PLINKO_MULTIPLICADORES, PLINKO_FILAS
 } = require('../controllers/gamesController');
-const { premioDeCofre } = require('../controllers/shopController');
+
 const { premioDelRasca } = require('../controllers/gamesController');
 
 /**
@@ -307,62 +307,73 @@ describe('Casino: ningun juego puede regalar dinero', () => {
 /**
  * LOS COFRES
  *
- * Son el puente entre las fichas del casino y las monedas de la tienda, asi que
- * comparten el problema del casino: si dan de mas, imprimen monedas; si dan de
- * menos, comprarlos es tirar el dinero. Y no se nota abriendo uno.
- *
- * Lo que habia: los CUATRO devolvian exactamente lo mismo (100 o 10) costaran 50
- * fichas o 1.000. El Legendario costaba veinte veces mas que el Ronoso y daba lo
- * mismo, con "alto riesgo, alta recompensa" en la descripcion.
+ * Se compran con fichas y dan fichas, XP u objetos. Comparten el problema del
+ * casino: si dan de mas, imprimen fichas; si dan de menos, comprarlos es tirar
+ * el dinero. Y no se nota abriendo uno. Aqui se mide cada tabla: los objetos
+ * valen su precio de tienda, las fichas lo que son, y el XP no cuenta (es el
+ * extra). Cada cofre tiene que devolver entre el 60% y el 90% de su precio.
  */
-describe('Cofres: lo caro tiene que dar mas que lo barato', () => {
+describe('Cofres: diez tablas, y ninguna regala ni estafa', () => {
+    const { COFRES, resumenDe, tirar } = require('../services/cofresService');
+    const { SEED_ITEMS } = require('../controllers/shopController');
 
-    const PRECIOS = [50, 120, 250, 1000];
-    const TIRADAS = 60000;
-
-    const mediaDe = (precio) => {
-        let total = 0;
-        for (let i = 0; i < TIRADAS; i++) total += premioDeCofre(precio);
-        return total / TIRADAS;
+    // El precio medio de un objeto del catalogo por rareza y categoria, que es
+    // lo que vale de verdad sacarlo de un cofre.
+    const precioMedio = (rareza, categorias) => {
+        const lista = SEED_ITEMS.filter(i => i.rarity === rareza && categorias.includes(i.category) && i.price > 0 && i.category !== 'chest');
+        assert.ok(lista.length > 0, `no hay objetos ${rareza} en ${categorias.join(',')}: el cofre daria fichas de relleno`);
+        return lista.reduce((a, i) => a + i.price, 0) / lista.length;
     };
 
-    test('todos devuelven la misma proporcion, y ninguno regala dinero', () => {
-        for (const precio of PRECIOS) {
-            const porcentaje = (mediaDe(precio) / precio) * 100;
+    const valorMedio = (cofre) => {
+        const total = cofre.tabla.reduce((a, e) => a + e.peso, 0);
+        return cofre.tabla.reduce((acc, e) => {
+            const p = e.peso / total;
+            if (e.t === 'fichas') return acc + p * (e.min + e.max) / 2;
+            if (e.t === 'xp') return acc;
+            return acc + p * precioMedio(e.rareza, e.categorias);
+        }, 0);
+    };
 
-            assert.ok(porcentaje < 100,
-                `El cofre de ${precio} devuelve el ${porcentaje.toFixed(1)}%: esta REGALANDO monedas`);
-
-            // La proporcion de referencia es la que ya tenia el cofre barato
-            // (56%): si un cofre se sale de ahi, es que su premio dejo de
-            // depender de su precio, que es justo el fallo que hubo.
-            assert.ok(Math.abs(porcentaje - 56) < 3,
-                `El cofre de ${precio} devuelve el ${porcentaje.toFixed(1)}%, y deberia rondar el 56% como los demas`);
+    test('hay diez cofres, con id, precio y tabla', () => {
+        assert.strictEqual(COFRES.length, 10);
+        const ids = new Set(COFRES.map(c => c.id));
+        assert.strictEqual(ids.size, 10, 'dos cofres con el mismo id');
+        for (const c of COFRES) {
+            assert.ok(c.precio > 0 && c.nombre && c.icono && c.descripcion, `cofre incompleto: ${c.id}`);
+            assert.ok(c.tabla.length >= 2, `${c.id}: una tabla de un solo premio no es un cofre`);
         }
     });
 
-    test('cuanto mas caro es el cofre, mas da', () => {
-        let anterior = 0;
-        for (const precio of PRECIOS) {
-            const media = mediaDe(precio);
-            assert.ok(media > anterior,
-                `El cofre de ${precio} no da mas que el anterior: pagar mas tiene que servir para algo`);
-            anterior = media;
+    test('ningun cofre devuelve mas del 90% ni menos del 60% de lo que cuesta', () => {
+        for (const c of COFRES) {
+            const devuelve = valorMedio(c) / c.precio * 100;
+            assert.ok(devuelve < 90, `El ${c.nombre} devuelve el ${devuelve.toFixed(0)}%: REGALA fichas`);
+            assert.ok(devuelve > 60, `El ${c.nombre} devuelve el ${devuelve.toFixed(0)}%: es tirar el dinero`);
         }
     });
 
-    test('el cofre barato sigue dando lo mismo que siempre', () => {
-        // 50 fichas -> 100 monedas una de cada cinco veces, 10 el resto. Es el
-        // unico que estaba bien, asi que el arreglo no puede haberlo movido.
-        const salidas = new Set();
-        for (let i = 0; i < 2000; i++) salidas.add(premioDeCofre(50));
-        assert.deepStrictEqual([...salidas].sort((a, b) => a - b), [10, 100]);
+    test('los cofres no dan monedas de oro: fichas, XP u objetos, nada mas', () => {
+        for (const c of COFRES) for (const e of c.tabla) {
+            assert.ok(['fichas', 'xp', 'objeto'].includes(e.t), `${c.id}: premio de tipo ${e.t}`);
+            if (e.t === 'objeto') assert.ok(!e.categorias.includes('chest') && !e.categorias.includes('reward'), `${c.id}: un cofre no puede dar cofres ni premios personales`);
+        }
     });
 
-    test('un precio imposible no genera premios imposibles', () => {
-        for (const basura of ['mucho', -50, 0, null, undefined, Infinity, NaN]) {
-            const premio = premioDeCofre(basura);
-            assert.strictEqual(premio, 0, `premioDeCofre(${basura}) deberia dar 0 y da ${premio}`);
+    test('los porcentajes que se enseñan suman 100 y salen de la misma tabla que paga', () => {
+        for (const c of COFRES) {
+            const resumen = resumenDe(c);
+            const suma = resumen.reduce((a, r) => a + r.porcentaje, 0);
+            assert.ok(Math.abs(suma - 100) < 0.5, `${c.id}: los porcentajes suman ${suma}`);
+            assert.strictEqual(resumen.length, c.tabla.length);
         }
+    });
+
+    test('la tirada respeta los pesos', () => {
+        const tabla = [{ t: 'a', peso: 90 }, { t: 'b', peso: 10 }];
+        let b = 0;
+        for (let i = 0; i < 20000; i++) if (tirar(tabla).t === 'b') b++;
+        const pct = b / 200;
+        assert.ok(pct > 8 && pct < 12, `el premio del 10% sale el ${pct}%`);
     });
 });

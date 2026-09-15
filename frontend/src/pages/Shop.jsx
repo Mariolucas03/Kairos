@@ -71,8 +71,10 @@ export default function Shop() {
     // Cofres
     const [rewardData, setRewardData] = useState(null);
     const [isChestModalOpen, setIsChestModalOpen] = useState(false);
-    const [currentChestType, setCurrentChestType] = useState('wood');
-    const [currentChestImage, setCurrentChestImage] = useState(null);
+    // Los cofres con sus porcentajes: se enseñan en la ficha del cofre, y
+    // salen de la misma tabla que decide el premio en el servidor.
+    const { data: cofresData } = useSWR('/shop/cofres', fetcher);
+    const cofreDe = (item) => (cofresData?.cofres || []).find(c => c.id === item?.effectType || c.nombre === item?.name) || null;
 
     // Items y Creación
     const [selectedItem, setSelectedItem] = useState(null);
@@ -169,10 +171,6 @@ export default function Shop() {
 
             if (selectedItem.category === 'chest') {
                 setRewardData(res.data.reward);
-                setCurrentChestImage(selectedItem.icon);
-                if (selectedItem.name.includes('Legendario')) setCurrentChestType('legendary');
-                else if (selectedItem.name.includes('Dorado')) setCurrentChestType('gold');
-                else setCurrentChestType('wood');
                 setIsChestModalOpen(true);
             } else {
                 showToast(res.data.message);
@@ -395,6 +393,31 @@ export default function Shop() {
                             {selectedItem.description || "Sin descripción disponible"}
                         </p>
 
+                        {/* LO QUE PUEDE SALIR, CON SU PORCENTAJE. Sale de la tabla
+                            del servidor, la misma que decide el premio. */}
+                        {selectedItem.category === 'chest' && (() => {
+                            const cofre = cofreDe(selectedItem);
+                            if (!cofre) return null;
+                            const colorDe = (p) => p.tipo === 'fichas' ? ACENTO_FICHAS : p.tipo === 'xp' ? '#22d3ee' : (RARITIES[p.rareza]?.accent || '#71717a');
+                            return (
+                                <div className="relative z-10 w-full -mt-3 mb-6 text-left">
+                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.16em] mb-2 px-1">Qué puede salir</p>
+                                    <div className="flex flex-col gap-1.5">
+                                        {cofre.probabilidades.map((p, i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <span className="w-10 shrink-0 text-right text-[11px] font-black tabular-nums" style={{ color: colorDe(p) }}>{String(p.porcentaje).replace('.', ',')}%</span>
+                                                <div className="flex-1 h-1.5 rounded-full bg-[#18181b] overflow-hidden">
+                                                    <div className="h-full rounded-full" style={{ width: `${p.porcentaje}%`, background: colorDe(p) }} />
+                                                </div>
+                                                <span className="w-28 shrink-0 text-[10px] font-bold text-zinc-300 truncate">{p.etiqueta}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-[9px] text-zinc-600 mt-2 px-1">Un objeto repetido se convierte en la mitad de su precio en fichas.</p>
+                                </div>
+                            );
+                        })()}
+
                         <button
                             onClick={activeTab === 'shop' ? handleBuy : handleUse}
                             disabled={isProcessing}
@@ -498,7 +521,7 @@ export default function Shop() {
                 </div>
             )}
 
-            <ChestModal isOpen={isChestModalOpen} onClose={() => setIsChestModalOpen(false)} reward={rewardData} chestType={currentChestType} chestImage={currentChestImage} />
+            <ChestModal isOpen={isChestModalOpen} onClose={() => setIsChestModalOpen(false)} reward={rewardData} />
         </div>
     );
 }

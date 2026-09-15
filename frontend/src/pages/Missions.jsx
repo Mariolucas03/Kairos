@@ -108,7 +108,6 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
     const [dragX, setDragX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [inputValue, setInputValue] = useState('');
-    const [showInput, setShowInput] = useState(false);
     const startX = useRef(0);
     const THRESHOLD = 80;
 
@@ -152,11 +151,16 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
 
     const handleNumericSubmit = (e) => {
         e.preventDefault();
-        if (!inputValue) return;
-        onUpdateProgress(mission, parseFloat(inputValue));
+        const n = parseFloat(inputValue);
+        if (!inputValue || !Number.isFinite(n) || n <= 0) return;
+        onUpdateProgress(mission, n);
         setInputValue('');
-        setShowInput(false);
     };
+
+    // Los atajos de sumar, a la medida del objetivo: para 100 dominadas, +1,
+    // +5 y +10; para 5 km, +1. Nunca mas grandes que lo que queda.
+    const queda = Math.max(0, mission.target - mission.progress);
+    const atajos = [1, 5, 10, 25].filter(n => n <= queda && n <= Math.max(1, mission.target / 4)).slice(0, 3);
 
     const cardStyle = {
         transform: `translate3d(${dragX}px, 0, 0)`,
@@ -289,19 +293,60 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                                 <span className="text-[13px] font-black not-italic" style={{ color: styles.accent }}>/{mission.target}</span>
                                 {mission.unit && <span className="text-[10px] font-bold text-zinc-500 uppercase truncate">{mission.unit}</span>}
                             </div>
-                            {!isBinary && !mission.completed && !isPending && !viewAllMode && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setShowInput(!showInput); }}
-                                    aria-label="Añadir progreso"
-                                    className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center active:scale-90 transition-transform"
-                                    style={{ background: `${styles.color}1f`, color: styles.color }}
-                                >
-                                    <Plus size={17} strokeWidth={2.6} />
-                                </button>
-                            )}
                         </div>
 
                         {renderProgressBar()}
+
+                        {/* ANOTAR LO QUE LLEVAS, SIEMPRE A LA VISTA.
+                            Antes habia que descubrir un "+" pequeño para poder
+                            escribir una cantidad, y la unica accion evidente era
+                            deslizar para completar: con "100 dominadas" no se veia
+                            como apuntar 50 y seguir luego. Ahora la fila de sumar
+                            esta siempre en las misiones con objetivo, con atajos
+                            y una casilla para escribir. Los toques aqui no
+                            arrancan el deslizamiento de la tarjeta. */}
+                        {!isBinary && !mission.completed && !isPending && !viewAllMode && (
+                            <form
+                                onSubmit={handleNumericSubmit}
+                                onClick={e => e.stopPropagation()}
+                                onTouchStart={e => e.stopPropagation()}
+                                onMouseDown={e => e.stopPropagation()}
+                                className="mt-3 flex items-center gap-1.5"
+                            >
+                                {atajos.map(n => (
+                                    <button
+                                        key={n}
+                                        type="button"
+                                        onClick={() => onUpdateProgress(mission, n)}
+                                        aria-label={`Sumar ${n}`}
+                                        className="h-9 px-2.5 shrink-0 rounded-xl text-xs font-black tabular-nums active:scale-90 transition-transform"
+                                        style={{ background: `${styles.color}1f`, color: styles.color }}
+                                    >
+                                        +{n}
+                                    </button>
+                                ))}
+                                <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    min="1"
+                                    placeholder="Otra…"
+                                    aria-label="Añadir progreso"
+                                    className="flex-1 min-w-0 h-9 bg-black border border-zinc-800 rounded-xl px-2 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-all placeholder:text-zinc-700 placeholder:font-bold"
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!inputValue}
+                                    aria-label="Anotar la cantidad"
+                                    style={{ backgroundColor: styles.accent }}
+                                    className="h-9 w-10 shrink-0 rounded-xl font-black text-black flex items-center justify-center active:scale-95 transition-transform disabled:opacity-40"
+                                >
+                                    <Check size={17} />
+                                </button>
+                            </form>
+                        )}
 
                         {/* Leyenda de los retos sociales */}
                         {mission.isCoop && mission.participants?.length > 1 && (
@@ -337,12 +382,6 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
                             )}
                         </div>
 
-                        {showInput && !isBinary && (
-                            <form onSubmit={handleNumericSubmit} className="mt-3 flex gap-2 animate-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
-                                <input type="number" inputMode="numeric" pattern="[0-9]*" autoFocus placeholder="Cantidad..." className="flex-1 bg-black border border-zinc-800 rounded-xl px-3 py-2 text-white font-black text-sm text-center outline-none focus:border-zinc-600 transition-all" value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-                                <button type="submit" style={{ backgroundColor: styles.accent }} className="px-4 rounded-xl font-black text-black active:scale-95 transition-transform"><Check size={18} /></button>
-                            </form>
-                        )}
                     </div>
 
                     {isPending && (
