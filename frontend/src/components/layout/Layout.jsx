@@ -201,7 +201,14 @@ function LayoutContent() {
                 salga hay que arreglarlo en su sitio, o queda inalcanzable.
                 Los hijos con su propio scroll horizontal (el mapa de
                 constancia) siguen funcionando igual. */}
-            <main ref={mainRef} className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-md mx-auto relative overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pt-28 pb-safe-content px-4'}`}>
+            <main
+                ref={mainRef}
+                className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-md mx-auto relative overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pb-safe-content px-4'}`}
+                // El hueco de arriba es el alto REAL de la cabecera (la mide ella
+                // y lo publica en --alto-cabecera) mas un poco de aire. Antes era
+                // pt-28 a mano, y la cabecera mide mas que eso.
+                style={!isUiHidden && !routeHidesChrome ? { paddingTop: 'calc(var(--alto-cabecera, 116px) + 10px)' } : undefined}
+            >
                 {/* Pasamos el contexto memoizado a las páginas temporalmente */}
                 <Outlet context={contextValue} />
             </main>

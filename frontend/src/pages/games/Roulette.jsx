@@ -485,9 +485,12 @@ export default function Roulette() {
                     MesaRuleta). Se abre de 0 a su altura. */}
                 <div
                     className={`overflow-hidden relative bg-zinc-950/50 transition-all duration-500 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                    style={{ height: isTableOpen ? 'min(42vh, 210px)' : 0 }}
+                    // `touch-action: none` y sin rebote: al pintar fichas con el
+                    // dedo, el arrastre movia la pagina entera (iOS la deja
+                    // rebotar aunque no haya scroll) y parecia que se movia la mesa.
+                    style={{ height: isTableOpen ? 'min(50vh, 250px)' : 0, touchAction: 'none', overscrollBehavior: 'none' }}
                 >
-                    <div className="px-2 pt-2 pb-1 mx-auto" style={{ maxWidth: 440 }}>
+                    <div className="px-1.5 pt-2 pb-1 mx-auto" style={{ maxWidth: 460 }}>
                         <MesaRuleta
                             bets={bets}
                             onApostar={placeBet}

@@ -10,13 +10,18 @@ import { FichaG } from './Ficha';
  * de cada apuesta. Como es un SVG con viewBox, se estira al ancho que haya y
  * no se corta nada: ni el cero por la izquierda ni el 2:1 por la derecha.
  *
- * Geometria (viewBox 0 0 400 190):
+ * Geometria (viewBox 0 0 400 216):
  *     x   6-38    el cero (tres filas de alto)
- *     x  40-364   los 36 numeros, 12 columnas de 27
+ *     x  40-364   los 36 numeros, 12 columnas de 27 y filas de 46
  *     x 366-394   las columnas 2:1
- *     y   6-120   las tres filas de numeros
- *     y 123-150   las docenas
- *     y 153-182   las apuestas de fuera (1-18, par, rojo, negro, impar, 19-36)
+ *     y   6-144   las tres filas de numeros
+ *     debajo, las docenas y las apuestas de fuera (1-18, par, rojo, negro, impar, 19-36)
+ *
+ * A CABALLO Y ESQUINA, como en la mesa de verdad: entre dos casillas que se
+ * tocan hay una zona invisible que apuesta a las dos (paga x18), y en cada
+ * cruce de cuatro, otra que apuesta a las cuatro (x9). Se pintan ENCIMA de
+ * los numeros, asi que tocar justo la raya coge la raya y tocar el centro
+ * coge el numero. En modo pintar no existen: pintar es de numeros.
  *
  * Las apuestas se hacen con `onApostar(type, value, numbers, multiplier)`,
  * los mismos cuatro datos de siempre: el servidor no cambia.
@@ -32,7 +37,11 @@ const FILAS = [
     [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
     [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
 ];
-const X0 = 40, ANCHO = 27, Y0 = 6, ALTO = 38;
+const X0 = 40, ANCHO = 27, Y0 = 6, ALTO = 46;
+// Donde empiezan las docenas y las de fuera, debajo de las tres filas
+const Y_DOCENAS = Y0 + ALTO * 3 + 3;
+const Y_FUERA = Y_DOCENAS + 30;
+const ALTO_TOTAL = Y_FUERA + 33;
 const ORO = '#d9b24c';
 
 const colorDe = (n) => (n === 0 ? 'url(#mr-verde)' : ROJOS.has(n) ? 'url(#mr-rojo)' : 'url(#mr-negro)');
@@ -94,7 +103,7 @@ const MesaRuleta = ({ bets, onApostar, modoPintar = false, onInicioPintar, ganad
     const todos = Array.from({ length: 36 }, (_, i) => i + 1);
 
     return (
-        <svg viewBox="0 0 400 190" className="w-full h-auto select-none" style={{ display: 'block' }}>
+        <svg viewBox={`0 0 400 ${ALTO_TOTAL}`} className="w-full h-auto select-none" style={{ display: 'block', touchAction: 'none' }}>
             <defs>
                 <radialGradient id="mr-pano" cx="50%" cy="40%" r="80%">
                     <stop offset="0%" stopColor="#1a6b3a" />
@@ -121,8 +130,8 @@ const MesaRuleta = ({ bets, onApostar, modoPintar = false, onInicioPintar, ganad
             </defs>
 
             {/* El paño */}
-            <rect x="0" y="0" width="400" height="190" rx="10" fill="url(#mr-pano)" />
-            <rect x="0" y="0" width="400" height="190" rx="10" fill="url(#mr-tejido)" pointerEvents="none" />
+            <rect x="0" y="0" width="400" height={ALTO_TOTAL} rx="10" fill="url(#mr-pano)" />
+            <rect x="0" y="0" width="400" height={ALTO_TOTAL} rx="10" fill="url(#mr-tejido)" pointerEvents="none" />
 
             {/* EL CERO */}
             <g>
@@ -168,7 +177,7 @@ const MesaRuleta = ({ bets, onApostar, modoPintar = false, onInicioPintar, ganad
             {[1, 2, 3].map((d, i) => (
                 <Casilla
                     key={`doc${d}`}
-                    x={X0 + i * ANCHO * 4} y={123} w={ANCHO * 4} h={27}
+                    x={X0 + i * ANCHO * 4} y={Y_DOCENAS} w={ANCHO * 4} h={27}
                     fill="rgba(0,0,0,0.25)" etiqueta={['1ª 12', '2ª 12', '3ª 12'][i]} tam={12}
                     apuestas={de(b => b.type === 'dozen' && b.value === d)}
                     onApostar={simple('dozen', d, docena(d), 3)}
@@ -186,12 +195,48 @@ const MesaRuleta = ({ bets, onApostar, modoPintar = false, onInicioPintar, ganad
             ].map((a, i) => (
                 <Casilla
                     key={a.t}
-                    x={X0 + i * ANCHO * 2} y={153} w={ANCHO * 2} h={29}
+                    x={X0 + i * ANCHO * 2} y={Y_FUERA} w={ANCHO * 2} h={30}
                     fill={a.fill} etiqueta={a.t} tam={11}
                     apuestas={de(b => b.type === a.k && b.value === a.v)}
                     onApostar={simple(a.k, a.v, a.nums, 2)}
                 />
             ))}
+
+            {/* A CABALLO (dos que se tocan) y ESQUINA (cuatro): zonas
+                invisibles sobre las rayas, con la ficha centrada en la raya. */}
+            {!modoPintar && FILAS.map((fila, f) => fila.map((n, c) => {
+                const zonas = [];
+                const cx = X0 + c * ANCHO, cy = Y0 + f * ALTO;
+                // de lado: con el de la columna siguiente
+                if (c < 11) {
+                    const otro = FILAS[f][c + 1];
+                    const clave = [n, otro].sort((a, b) => a - b).join('-');
+                    zonas.push({ tipo: 'split', clave, nums: [n, otro], x: cx + ANCHO, y: cy + ALTO / 2, w: 10, h: ALTO - 12 });
+                }
+                // arriba-abajo: con el de la fila siguiente (misma columna)
+                if (f < 2) {
+                    const otro = FILAS[f + 1][c];
+                    const clave = [n, otro].sort((a, b) => a - b).join('-');
+                    zonas.push({ tipo: 'split', clave, nums: [n, otro], x: cx + ANCHO / 2, y: cy + ALTO, w: ANCHO - 12, h: 10 });
+                }
+                // esquina: los cuatro del cruce de abajo a la derecha
+                if (c < 11 && f < 2) {
+                    const nums = [n, FILAS[f][c + 1], FILAS[f + 1][c], FILAS[f + 1][c + 1]].sort((a, b) => a - b);
+                    zonas.push({ tipo: 'corner', clave: nums.join('-'), nums, x: cx + ANCHO, y: cy + ALTO, w: 12, h: 12 });
+                }
+                return zonas.map(z => (
+                    <g key={`${z.tipo}-${z.clave}`}>
+                        <rect
+                            x={z.x - z.w / 2} y={z.y - z.h / 2} width={z.w} height={z.h}
+                            fill="transparent"
+                            onPointerDown={simple(z.tipo, z.clave, z.nums, z.tipo === 'split' ? 18 : 9)}
+                            className="cursor-pointer"
+                            style={{ touchAction: 'none' }}
+                        />
+                        <Pila apuestas={de(b => b.type === z.tipo && b.value === z.clave)} x={z.x} y={z.y} r={8} />
+                    </g>
+                ));
+            }))}
         </svg>
     );
 };

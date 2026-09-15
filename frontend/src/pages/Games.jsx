@@ -201,9 +201,7 @@ export default function Games() {
 
     // --- EL CASINO ---
     return (
-        // `pt-3`: la marquesina quedaba pegada a la cabecera y en el movil se
-        // veia cortada por arriba. Un poco de aire.
-        <div className="animate-in fade-in pt-3 pb-6 relative">
+        <div className="animate-in fade-in pb-6 relative">
             <style>{`
                 @keyframes casinoBombilla {
                     0%, 100% { opacity: 0.25; box-shadow: 0 0 0 rgba(253,224,71,0); }

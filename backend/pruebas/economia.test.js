@@ -293,6 +293,21 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         assert.ok(PLINKO_MULTIPLICADORES[0] < 1, 'en los bordes se pierde');
     });
 
+    test('ruleta: a caballo y esquina solo entre numeros que se tocan en el tapete', () => {
+        const { getCanonicalRouletteBet: canon } = require('../controllers/gamesController');
+        assert.deepStrictEqual(canon('split', '5-8'), { numbers: [5, 8], multiplier: 18 });   // de lado
+        assert.deepStrictEqual(canon('split', '5-6'), { numbers: [5, 6], multiplier: 18 });   // arriba-abajo
+        assert.strictEqual(canon('split', '1-36'), null);
+        assert.strictEqual(canon('split', '3-4'), null);      // el 3 arriba de una columna y el 4 abajo de la siguiente: no se tocan
+        assert.strictEqual(canon('split', '5-5'), null);
+        assert.deepStrictEqual(canon('corner', '5-6-8-9'), { numbers: [5, 6, 8, 9], multiplier: 9 });
+        assert.deepStrictEqual(canon('corner', '9-8-5-6'), { numbers: [5, 6, 8, 9], multiplier: 9 });
+        assert.strictEqual(canon('corner', '3-4-6-7'), null);   // el 3 no tiene fila de abajo
+        assert.strictEqual(canon('corner', '1-2-3-4'), null);
+        // Y pagan lo justo: 36 casillas + el cero, sin regalar
+        assert.ok(18 * 2 / 37 < 1 && 9 * 4 / 37 < 1);
+    });
+
     test('la pista de la torre no es un regalo: cuesta mas de lo que vale', () => {
         // Pasar de 1/2 a 2/3 de acertar vale (2/3 - 1/2) = 1/6 del premio final.
         // Si se cobrara menos, comprar la pista seria ganar dinero a la casa.

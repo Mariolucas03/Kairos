@@ -250,9 +250,9 @@ const avisarDelResultado = async (duelo) => {
 
             await sendPushToUser(persona, {
                 title: empate
-                    ? `🤝 Empate contra ${contra}`
+                    ? `Empate contra ${contra}`
                     : gane
-                        ? `🏆 Has ganado el duelo contra ${contra}`
+                        ? `Has ganado el duelo contra ${contra}`
                         : `Has perdido el duelo contra ${contra}`,
                 body: empate
                     ? `${marcador} Cada uno recupera sus ${duelo.betAmount} fichas.`

@@ -415,12 +415,51 @@ const TABLE_COLUMNS = {
 
 // 🔥 TABLA DE APUESTAS CANÓNICA: nunca confiamos en "numbers"/"multiplier" del cliente,
 // los recalculamos siempre a partir de type+value.
+/**
+ * Las apuestas "entre casillas" de una mesa de verdad: a caballo (dos numeros
+ * pegados, paga 17 a 1 = x18) y esquina (cuatro que se tocan, 8 a 1 = x9).
+ * `value` llega como "5-8" o "5-6-8-9". Solo valen si los numeros son
+ * vecinos DE VERDAD en el tapete: dos que se tocan de lado (mismo tercio,
+ * columnas seguidas) o de arriba a abajo (misma columna, tercios seguidos),
+ * y cuatro que forman un cuadrado. Cualquier otra combinacion se rechaza,
+ * que si no se podria apostar 1 y 36 "a caballo" con premio de caballo.
+ */
+const FILA_DE = (n) => (n - 1) % 3;            // 0 = fila del 1, 1 = del 2, 2 = del 3
+const COLUMNA_DE = (n) => Math.floor((n - 1) / 3);
+const sonVecinos = (a, b) => {
+    if (a < 1 || b < 1 || a > 36 || b > 36 || a === b) return false;
+    const mismaColumna = COLUMNA_DE(a) === COLUMNA_DE(b) && Math.abs(FILA_DE(a) - FILA_DE(b)) === 1;
+    const mismaFila = FILA_DE(a) === FILA_DE(b) && Math.abs(COLUMNA_DE(a) - COLUMNA_DE(b)) === 1;
+    return mismaColumna || mismaFila;
+};
+const numerosDe = (value, cuantos) => {
+    const lista = String(value || '').split('-').map(Number);
+    if (lista.length !== cuantos || lista.some(n => !Number.isInteger(n))) return null;
+    if (new Set(lista).size !== cuantos) return null;
+    return lista.sort((a, b) => a - b);
+};
+
 const getCanonicalRouletteBet = (type, value) => {
     switch (type) {
         case 'number': {
             const n = Number(value);
             if (!Number.isInteger(n) || n < 0 || n > 36) return null;
             return { numbers: [n], multiplier: 36 };
+        }
+        case 'split': {
+            const nums = numerosDe(value, 2);
+            if (!nums || !sonVecinos(nums[0], nums[1])) return null;
+            return { numbers: nums, multiplier: 18 };
+        }
+        case 'corner': {
+            const nums = numerosDe(value, 4);
+            if (!nums) return null;
+            // Un cuadrado: a, a+1 en una columna y a+3, a+4 en la siguiente,
+            // con a en la fila 1 o 2 (no en la del 3, que no tiene "abajo").
+            const [a, b, c, d] = nums;
+            const cuadrado = b === a + 1 && c === a + 3 && d === a + 4 && FILA_DE(a) !== 2 && c <= 36;
+            if (!cuadrado) return null;
+            return { numbers: nums, multiplier: 9 };
         }
         case 'column': {
             const col = Number(value);
@@ -924,7 +963,7 @@ const playPlinko = asyncHandler(async (req, res) => {
 
 module.exports = {
     playDice, playScratch, playSlots, playRoulette, playFortuneWheel, getFortuneWheels, playBlackjack, playTower, playPlinko,
-    PLINKO_MULTIPLICADORES, PLINKO_FILAS,
+    PLINKO_MULTIPLICADORES, PLINKO_FILAS, getCanonicalRouletteBet,
     RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.

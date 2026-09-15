@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import HealthWidget from './HealthWidget';
 import { useAuthStore } from '../../store/useAuthStore';
 import MarcoPerfil from '../common/MarcoPerfil';
@@ -33,6 +34,25 @@ export default function Header() {
     const user = useAuthStore(state => state.user);
     const setUser = useAuthStore(state => state.setUser);
 
+    // ⚠️ LA CABECERA MIDE LO QUE MIDE, Y EL CONTENIDO EMPIEZA DEBAJO.
+    //
+    // Es fija y su alto depende del movil: la zona segura de arriba (50 px
+    // como minimo, mas en un iPhone con notch) + la barra. El contenido de
+    // debajo llevaba un `pt-28` (112 px) escrito a mano, y la cabecera ya
+    // mide 115 de minimo: en el casino la marquesina salia cortada por arriba,
+    // y en un iPhone se cortaba todo un poco. Se mide y se publica como
+    // variable CSS; <main> la usa.
+    const cabecera = useRef(null);
+    useEffect(() => {
+        const nodo = cabecera.current;
+        if (!nodo) return;
+        const publicar = () => document.documentElement.style.setProperty('--alto-cabecera', `${nodo.offsetHeight}px`);
+        publicar();
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(publicar) : null;
+        ro?.observe(nodo);
+        return () => ro?.disconnect();
+    }, []);
+
     if (!user) return null;
 
     const level = user.level || 1;
@@ -63,7 +83,7 @@ export default function Header() {
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-md border-b border-zinc-800/50 safe-top pb-2 px-3 shadow-2xl select-none transition-all duration-300">
+        <header ref={cabecera} className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-md border-b border-zinc-800/50 safe-top pb-2 px-3 shadow-2xl select-none transition-all duration-300">
             <style>{customAnimationsStyle}</style>
             <div className="max-w-4xl mx-auto flex justify-between items-center relative h-14 sm:h-16">
 
