@@ -877,8 +877,54 @@ const playTower = asyncHandler(async (req, res) => {
     throw new Error('Acción inválida');
 });
 
+// ==========================================
+// 8. PLINKO (la bola que cae por el triangulo de clavos)
+// ==========================================
+/**
+ * Doce filas de clavos. En cada una la bola cae a la izquierda o a la
+ * derecha, y abajo hay trece casillas: la de en medio es la mas probable
+ * (una campana) y por eso es la que MAS paga aqui, al reves que en el plinko
+ * de siempre. Es lo que se pidio: por los bordes se pierde, y cuanto mas al
+ * centro mas se gana.
+ *
+ * ⚠️ LOS MULTIPLICADORES ESTAN CALCULADOS PARA DEVOLVER EL 85%.
+ *
+ * La probabilidad de cada casilla es binomial: C(12, k) / 4096. La suma de
+ * probabilidad x multiplicador da 0,851. La prueba de economia lo vigila:
+ * si se toca un numero de aqui sin recalcular, la prueba lo dice.
+ *
+ * El camino de cada bola (doce izquierdas/derechas) lo decide el servidor y
+ * se manda al movil, que solo lo dibuja: la casilla donde cae es la cuenta
+ * de derechas.
+ */
+const PLINKO_FILAS = 12;
+const PLINKO_MULTIPLICADORES = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.8, 0.7, 0.5, 0.4, 0.3, 0.2, 0.1];
+const PLINKO_MAX_BOLAS = 10;
+
+const playPlinko = asyncHandler(async (req, res) => {
+    const { bet, balls } = req.body;
+    const apuesta = normalizarApuesta(bet);
+    if (apuesta === null) { res.status(400); throw new Error('Apuesta mínima 10 por bola'); }
+    const bolas = Number(balls);
+    if (!Number.isInteger(bolas) || bolas < 1 || bolas > PLINKO_MAX_BOLAS) { res.status(400); throw new Error(`Entre 1 y ${PLINKO_MAX_BOLAS} bolas`); }
+
+    await chargeAndValidate(req.user._id, apuesta * bolas);
+
+    const resultados = Array.from({ length: bolas }, () => {
+        const camino = Array.from({ length: PLINKO_FILAS }, () => crypto.randomInt(2));   // 0 izquierda, 1 derecha
+        const casilla = camino.reduce((a, b) => a + b, 0);
+        const multiplicador = PLINKO_MULTIPLICADORES[casilla];
+        return { camino, casilla, multiplicador, premio: Math.round(apuesta * multiplicador) };
+    });
+    const total = resultados.reduce((a, r) => a + r.premio, 0);
+
+    const finalUser = await payPrize(req.user._id, total);
+    res.json({ bolas: resultados, total, apuesta, multiplicadores: PLINKO_MULTIPLICADORES, user: finalUser });
+});
+
 module.exports = {
-    playDice, playScratch, playSlots, playRoulette, playFortuneWheel, getFortuneWheels, playBlackjack, playTower,
+    playDice, playScratch, playSlots, playRoulette, playFortuneWheel, getFortuneWheels, playBlackjack, playTower, playPlinko,
+    PLINKO_MULTIPLICADORES, PLINKO_FILAS,
     RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.

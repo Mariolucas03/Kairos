@@ -2,7 +2,8 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
 const {
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
+    PLINKO_MULTIPLICADORES, PLINKO_FILAS
 } = require('../controllers/gamesController');
 const { premioDeCofre } = require('../controllers/shopController');
 const { premioDelRasca } = require('../controllers/gamesController');
@@ -271,6 +272,25 @@ describe('Casino: ningun juego puede regalar dinero', () => {
                 `La planta ${planta} paga mejor que la anterior: subir deberia ser mas arriesgado, no mas rentable`);
             anterior = devuelve;
         });
+    });
+
+    test('el plinko devuelve EXACTAMENTE el 85%, y el centro es lo que mas paga', () => {
+        // La bola cae a un lado u otro en cada fila: la casilla k tiene
+        // probabilidad C(filas, k) / 2^filas.
+        const n = PLINKO_FILAS;
+        assert.strictEqual(PLINKO_MULTIPLICADORES.length, n + 1, 'una casilla por cada numero de derechas posible');
+        const comb = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k + i) / i; return r; };
+        const devuelve = PLINKO_MULTIPLICADORES.reduce((acc, m, k) => acc + (comb(n, k) / Math.pow(2, n)) * m, 0);
+        assert.ok(Math.abs(devuelve - 0.85) < 0.01, `El plinko devuelve el ${(devuelve * 100).toFixed(1)}%, no el 85%`);
+
+        // Lo pedido: por los bordes se pierde, hacia el centro se gana.
+        const centro = Math.floor(n / 2);
+        for (let k = 1; k <= centro; k++) {
+            assert.ok(PLINKO_MULTIPLICADORES[k] >= PLINKO_MULTIPLICADORES[k - 1], `la casilla ${k} paga menos que la ${k - 1}`);
+            assert.strictEqual(PLINKO_MULTIPLICADORES[k], PLINKO_MULTIPLICADORES[n - k], 'el triangulo es simetrico');
+        }
+        assert.ok(PLINKO_MULTIPLICADORES[centro] > 1, 'en el centro se gana');
+        assert.ok(PLINKO_MULTIPLICADORES[0] < 1, 'en los bordes se pierde');
     });
 
     test('la pista de la torre no es un regalo: cuesta mas de lo que vale', () => {

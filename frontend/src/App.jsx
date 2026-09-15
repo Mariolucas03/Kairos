@@ -46,6 +46,7 @@ const Slots = lazy(() => import('./pages/games/Slots'));
 const TowerGame = lazy(() => import('./pages/games/TowerGame'));
 const CartaAlta = lazy(() => import('./pages/games/CartaAlta'));
 const Poker = lazy(() => import('./pages/games/Poker'));
+const Plinko = lazy(() => import('./pages/games/Plinko'));
 
 /**
  * Los mismos cargadores que usa lazy(), en una lista aparte para poder
@@ -189,6 +190,7 @@ function App() {
                             <Route path="/games/tower" element={<TowerGame />} />
                             <Route path="/games/carta-alta" element={<CartaAlta />} />
                             <Route path="/games/poker" element={<Poker />} />
+                            <Route path="/games/plinko" element={<Plinko />} />
                         </Route>
                     </Routes>
                 </Suspense>

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords, Club } from 'lucide-react';
+import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords, Club, Triangle } from 'lucide-react';
 import api from '../services/api';
 import WidgetCard, { WidgetBar } from '../components/common/WidgetCard';
 import { useAuthStore } from '../store/useAuthStore';
@@ -37,7 +37,8 @@ const MAQUINAS = [
     { id: 'dice', name: 'Dados', desc: 'Menos de 7, 7, más de 7', accent: '#3b82f6', Icon: Dices },
     { id: 'scratch', name: 'Rasca', desc: 'Rasca con el dedo', accent: '#a855f7', Icon: Ticket },
     { id: 'tower', name: 'La Torre', desc: 'Sube o piérdelo', accent: '#10b981', Icon: Building2 },
-    { id: 'fortune-wheel', name: 'Fortuna', desc: 'Siete ruedas', accent: '#eab308', Icon: CircleDollarSign }
+    { id: 'fortune-wheel', name: 'Fortuna', desc: 'Nueve ruedas', accent: '#eab308', Icon: CircleDollarSign },
+    { id: 'plinko', name: 'Plinko', desc: 'Al centro se gana', accent: '#f59e0b', Icon: Triangle }
 ];
 
 /**
