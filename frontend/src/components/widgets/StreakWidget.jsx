@@ -1,16 +1,16 @@
-import React from 'react';
-import { Flame, Gift } from 'lucide-react';
+import { Flame, Gift, Check } from 'lucide-react';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
 /**
- * RACHA + COFRE DIARIO.
- * El cofre vive aquí dentro (antes era un botón suelto en la cabecera).
- * Sigue llamando exactamente a la misma función `openCalendar` del hook
- * useDailyRewards, y `claimed` pinta el estado ya reclamado.
+ * RACHA + LO QUE DA HOY.
+ *
+ * La racha son los dias seguidos que entras y recoges. El boton abre el
+ * camino (DailyRewardModal), desde donde se recoge; si la de hoy esta
+ * pendiente, el boton la anuncia con lo que da.
  */
-export default function StreakWidget({ streak = 0, onOpenChest, claimed = false }) {
+export default function StreakWidget({ streak = 0, hoy = null, dia = null, onOpenChest, claimed = false }) {
     const accent = WIDGET_ACCENTS.streak;
-    const isSingular = streak === 1;
+    const n = streak || 0;
 
     return (
         <WidgetCard accent={accent} padding="px-[18px] py-4" className="h-full">
@@ -20,7 +20,7 @@ export default function StreakWidget({ streak = 0, onOpenChest, claimed = false 
                     className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: 'rgba(249,115,22,0.12)', color: accent }}
                 >
-                    <Flame size={22} />
+                    <Flame size={22} fill={n > 0 ? accent : 'none'} />
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -28,31 +28,34 @@ export default function StreakWidget({ streak = 0, onOpenChest, claimed = false 
                         RACHA
                     </span>
                     <div className="mt-2 flex items-baseline gap-1.5">
-                        <span className="text-2xl font-black text-white tracking-[-0.045em] leading-none not-italic">
-                            {streak}
+                        <span className="text-2xl font-black text-white tracking-[-0.045em] leading-none not-italic tabular-nums">
+                            {n}
                         </span>
-                        <span
-                            className="text-[11px] font-black tracking-[0.1em] leading-none not-italic"
-                            style={{ color: accent }}
-                        >
-                            {isSingular ? 'DÍA SEGUIDO' : 'DÍAS SEGUIDOS'}
+                        <span className="text-[11px] font-black tracking-[0.1em] leading-none not-italic" style={{ color: accent }}>
+                            {n === 1 ? 'DÍA SEGUIDO' : 'DÍAS SEGUIDOS'}
                         </span>
                     </div>
                 </div>
 
-                {/* COFRE DIARIO */}
+                {/* LA DE HOY: pendiente con su premio, o ya recogida */}
                 <button
                     onClick={(e) => { e.stopPropagation(); onOpenChest && onOpenChest(); }}
+                    aria-label={claimed ? 'Ver el camino de la racha' : 'Recoger la recompensa de hoy'}
                     className={`
-                        shrink-0 flex items-center gap-2.5 rounded-2xl px-3.5 py-[11px] border transition-all active:scale-95
+                        shrink-0 flex flex-col items-center justify-center rounded-2xl px-3.5 py-2 border transition-all active:scale-95 min-w-[86px]
                         ${claimed
-                            ? 'bg-white/[0.03] border-white/[0.07] text-zinc-600'
-                            : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/[0.18]'
+                            ? 'bg-white/[0.03] border-white/[0.07] text-zinc-500'
+                            : 'bg-orange-500/10 border-orange-500/30 text-orange-400'
                         }
                     `}
                 >
-                    <Gift size={19} className={claimed ? '' : 'animate-pulse'} />
-                    <span className="text-[10px] font-black tracking-[0.1em] not-italic">COFRE</span>
+                    <span className="flex items-center gap-1.5">
+                        {claimed ? <Check size={15} /> : <Gift size={17} className="animate-pulse" />}
+                        <span className="text-[10px] font-black tracking-[0.1em] not-italic">{claimed ? 'HECHO' : `DÍA ${dia || 1}`}</span>
+                    </span>
+                    {!claimed && hoy && (
+                        <span className="text-[9px] font-bold text-zinc-400 mt-0.5 not-italic truncate max-w-[84px]">{hoy.etiqueta}</span>
+                    )}
                 </button>
             </div>
         </WidgetCard>

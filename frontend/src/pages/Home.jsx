@@ -91,7 +91,7 @@ export default function Home() {
     const isSmoothMounted = useSmoothMount();
 
     const { dailyData: logData, loading: logLoading, updateWidget, calculations, refetch: recargarDiario } = useDailyLog(user);
-    const { showRewardModal, rewardData, closeModal, claimReward, openCalendar, hasClaimedToday, claiming, toast, clearToast } = useDailyRewards(user, setUser);
+    const { showRewardModal, camino, premioRecogido, closeModal, claimReward, openCalendar, hasClaimedToday, claiming, toast, clearToast } = useDailyRewards(user, setUser);
     const [showSettings, setShowSettings] = useState(false);
     // Aviso propio de la app para el alta de notificaciones (antes era un alert() del navegador)
     const [pushMsg, setPushMsg] = useState(null);
@@ -236,7 +236,9 @@ export default function Home() {
                 return (
                     <div className={readOnlyClass}>
                         <StreakWidget
-                            streak={user?.streak?.current}
+                            streak={camino ? camino.rachaViva : user?.streak?.current}
+                            hoy={camino?.hoy}
+                            dia={camino?.dia}
                             onOpenChest={openCalendar}
                             claimed={hasClaimedToday()}
                         />
@@ -301,7 +303,7 @@ export default function Home() {
 
     return (
         <div className="pb-6 animate-in fade-in select-none bg-black min-h-screen">
-            {showRewardModal && <DailyRewardModal data={rewardData} onClose={closeModal} onClaim={claimReward} claiming={claiming} />}
+            {showRewardModal && <DailyRewardModal camino={camino} premioRecogido={premioRecogido} onClose={closeModal} onClaim={claimReward} claiming={claiming} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
             {pushMsg && <Toast message={pushMsg.message} type={pushMsg.type} onClose={() => setPushMsg(null)} />}
 

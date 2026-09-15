@@ -10,7 +10,8 @@ const User = require('../models/User');
 const levelService = require('../services/levelService');
 // Importamos la función manual del scheduler
 const { runNightlyMaintenance } = require('../utils/scheduler');
-const { getRewardForDay } = require('../utils/dailyRewards');
+const { recompensaDelDia, tramoDelCamino } = require('../utils/caminoRacha');
+const ShopItem = require('../models/ShopItem');
 const { getMadridDateString } = require('../utils/dateHelpers');
 
 // ==========================================
@@ -67,107 +68,122 @@ const updateMacros = asyncHandler(async (req, res) => {
 });
 
 // ==========================================
-// 3. RECOMPENSA DIARIA
+// 3. LA RACHA Y SU RECOMPENSA DIARIA
 // ==========================================
-const claimDailyReward = asyncHandler(async (req, res) => {
-    const now = new Date();
-    // 🔥 Fechas SIEMPRE en hora de Madrid. Con toISOString() (UTC) el "día" cambiaba
-    // a las 02:00 locales, así que entre las 00:00 y 02:00 se podía reclamar dos veces
-    // y el modal reaparecía como no reclamado.
-    const todayStr = getMadridDateString(now);
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = getMadridDateString(yesterday);
+/**
+ * UNA SOLA RACHA: los dias SEGUIDOS que entras y recoges la recompensa.
+ *
+ * ⚠️ Antes habia dos cosas distintas con nombre parecido y se contradecian:
+ * una "racha" que subia al completar TODAS las misiones del dia (y que el
+ * castigo nocturno ponia a cero) y un "ciclo de recompensas" de siete dias
+ * que avanzaba por calendario aunque no entraras. El widget enseñaba una y
+ * el calendario la otra, y pasaban cosas raras: dias en rojo sin haber
+ * fallado nada, la racha a cero con la diaria cobrada...
+ *
+ * Ahora es lo que se pidio: dia 1, dia 2, dia 3... Si un dia no recoges,
+ * al siguiente vuelves al dia 1. Sin tope. El premio de cada dia esta en
+ * utils/caminoRacha.js y el movil lo pinta desde ahi (GET /users/camino).
+ */
 
-    // 🔒 ATÓMICO: comparamos contra el DÍA guardado como string (hora de Madrid), así que
-    // solo entra el primer clic del día natural. Evita doble premio por doble clic,
-    // por dos pestañas abiertas, o por el desfase UTC/Madrid de madrugada.
-    const claimLock = await User.findOneAndUpdate(
-        { _id: req.user._id, 'dailyRewards.lastClaimDay': { $ne: todayStr } },
-        { $set: { 'dailyRewards.lastClaimDay': todayStr, 'dailyRewards.lastClaimDate': now } },
-        { new: false } // Queremos el documento ANTERIOR para saber en qué día del ciclo estaba
+/** El dia del camino que toca hoy: sigue la racha si ayer se cobro, o el 1. */
+const diaQueToca = (usuario, hoyStr, ayerStr) => {
+    const ultimo = usuario.dailyRewards?.lastClaimDay
+        || (usuario.dailyRewards?.lastClaimDate ? getMadridDateString(new Date(usuario.dailyRewards.lastClaimDate)) : null);
+    if (ultimo === hoyStr) return { dia: usuario.streak?.current || 1, cobradoHoy: true };
+    if (ultimo === ayerStr) return { dia: (usuario.streak?.current || 0) + 1, cobradoHoy: false };
+    return { dia: 1, cobradoHoy: false };
+};
+
+const fechasDeHoy = () => {
+    const now = new Date();
+    const hoyStr = getMadridDateString(now);
+    const ayer = new Date(now); ayer.setDate(ayer.getDate() - 1);
+    return { now, hoyStr, ayerStr: getMadridDateString(ayer) };
+};
+
+/** Aplica el premio de un dia del camino a un usuario. */
+const darRecompensa = async (userId, premio) => {
+    if (premio.tipo === 'fichas') {
+        await User.updateOne({ _id: userId }, { $inc: { gameCoins: premio.valor } });
+    } else if (premio.tipo === 'xp') {
+        await levelService.addRewards(userId, premio.valor, 0, 0);
+    } else if (premio.tipo === 'hp') {
+        // Hasta el maximo y ni una mas, en la misma escritura.
+        await User.updateOne({ _id: userId }, [{ $set: { hp: { $min: [{ $add: [{ $ifNull: ['$hp', 0] }, premio.valor] }, { $ifNull: ['$maxHp', 100] }] } } }]);
+        await User.updateOne({ _id: userId }, [{ $set: { lives: '$hp' } }]);
+    } else if (premio.tipo === 'cofre') {
+        const cofre = await ShopItem.findOne({ category: 'chest', effectType: premio.cofre, user: null }).select('_id');
+        if (!cofre) return { ...premio, sinCofre: true };
+        const apilado = await User.updateOne({ _id: userId, 'inventory.item': cofre._id }, { $inc: { 'inventory.$.quantity': 1 } });
+        if (apilado.matchedCount === 0) await User.updateOne({ _id: userId }, { $push: { inventory: { item: cofre._id, quantity: 1 } } });
+    }
+    return premio;
+};
+
+const claimDailyReward = asyncHandler(async (req, res) => {
+    const { now, hoyStr, ayerStr } = fechasDeHoy();
+
+    // 🔒 ATOMICO: solo entra el primer clic del dia natural (hora de Madrid).
+    // Evita doble premio por doble clic, dos pestañas o el desfase UTC/Madrid.
+    const anterior = await User.findOneAndUpdate(
+        { _id: req.user._id, 'dailyRewards.lastClaimDay': { $ne: hoyStr } },
+        { $set: { 'dailyRewards.lastClaimDay': hoyStr, 'dailyRewards.lastClaimDate': now } },
+        { new: false }
     );
 
-    const alreadyClaimed = async () => {
-        const current = await User.findById(req.user._id).select('dailyRewards');
+    const yaCobrada = async () => {
+        const actual = await User.findById(req.user._id).select('dailyRewards streak');
         return res.status(400).json({
             success: false,
             alreadyClaimed: true,
-            message: '¡Ya has reclamado tu recompensa de hoy! Vuelve mañana.',
-            dailyRewards: current?.dailyRewards || null
+            message: '¡Ya has recogido la de hoy! Vuelve mañana.',
+            dailyRewards: actual?.dailyRewards || null,
+            streak: actual?.streak || null
         });
     };
+    if (!anterior) return yaCobrada();
 
-    if (!claimLock) return alreadyClaimed();
+    // Usuarios anteriores a `lastClaimDay` no tenian el campo y el candado de
+    // arriba no los frena: se mira tambien la fecha derivada.
+    const { dia, cobradoHoy } = diaQueToca(anterior, hoyStr, ayerStr);
+    if (cobradoHoy) return yaCobrada();
 
-    const previousRewards = claimLock.dailyRewards || { claimedDays: [], lastClaimDate: null };
-    const lastStr = previousRewards.lastClaimDay
-        || (previousRewards.lastClaimDate ? getMadridDateString(new Date(previousRewards.lastClaimDate)) : null);
+    const premio = await darRecompensa(req.user._id, recompensaDelDia(dia));
 
-    // Usuarios anteriores a este campo no tenían `lastClaimDay`, así que el lock de arriba
-    // no los frena. Comprobamos también la fecha derivada para no regalar un reclamo extra.
-    if (lastStr === todayStr) return alreadyClaimed();
-
-    // ⚠️ El ciclo avanza por DIAS DE CALENDARIO, no por reclamaciones.
-    // Antes, si no entrabas un dia, cyclePosition volvia a 0 y perdias el ciclo
-    // entero. Ahora la rueda gira sola: te saltas un dia y pierdes SOLO ese
-    // premio; el hueco queda sin cobrar y se pinta en rojo.
-    const previousDays = previousRewards.claimedDays || [];
-
-    const diasEntre = (desde, hasta) =>
-        Math.round((new Date(hasta + 'T00:00:00Z') - new Date(desde + 'T00:00:00Z')) / 86400000);
-
-    let inicioCiclo = previousRewards.cycleStartDay || todayStr;
-    let transcurridos = diasEntre(inicioCiclo, todayStr);
-
-    // Fuera de rango (ciclo terminado, o fecha rara): se empieza uno nuevo
-    let diasCobrados = previousDays;
-    if (transcurridos < 0 || transcurridos >= 7) {
-        inicioCiclo = todayStr;
-        transcurridos = 0;
-        diasCobrados = [];
-    }
-
-    const currentDay = transcurridos + 1;
-
-    // `claimedDays` lista SOLO los dias realmente cobrados de este ciclo.
-    // ⚠️ Antes se reconstruia como [1..currentDay], o sea que rellenaba de oficio
-    // los dias que NO habias reclamado: era imposible distinguir un dia cobrado
-    // de uno perdido. Ahora se anade el de hoy y punto; lo que falte entre 1 y
-    // currentDay es un dia perdido y la interfaz lo pinta en rojo.
-    const nextClaimedDays = [...new Set([...diasCobrados, currentDay])]
-        .filter(d => d >= 1 && d <= 7)
-        .sort((a, b) => a - b);
-
-    // 🔥 Recompensa calculada en el servidor según el día del ciclo (nunca confiar en el cliente)
-    const { coins: rewardCoins, gameCoins: rewardGameCoins, xp: rewardXP, hp: rewardHp } = getRewardForDay(currentDay);
-
-    const user = await User.findById(req.user._id);
-    user.dailyRewards.claimedDays = nextClaimedDays;
-    user.dailyRewards.lastClaimDate = now;
-    user.dailyRewards.lastClaimDay = todayStr;
-    user.dailyRewards.cycleStartDay = inicioCiclo;
-    if (rewardHp > 0) {
-        user.hp = Math.min(user.maxHp, (user.hp ?? 0) + rewardHp);
-        user.lives = user.hp;
-    }
-    await user.save();
-
-    const result = await levelService.addRewards(
-        user._id,
-        rewardXP,
-        rewardCoins,
-        rewardGameCoins
-    );
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: { 'streak.current': dia, 'streak.lastLogDate': now } },
+        { new: true }
+    ).populate('inventory.item');
 
     res.status(200).json({
         success: true,
-        message: `¡Has reclamado el Día ${currentDay}!`,
-        user: result.user,
-        // Lo devolvemos aparte para que el frontend pueda sincronizar el estado
-        // aunque el objeto `user` viaje incompleto por cualquier motivo.
-        dailyRewards: { claimedDays: nextClaimedDays, lastClaimDate: now, lastClaimDay: todayStr, cycleStartDay: inicioCiclo, currentDay },
-        reward: { xp: rewardXP, coins: rewardCoins, gameCoins: rewardGameCoins, hp: rewardHp, day: currentDay }
+        message: `Día ${dia} de racha`,
+        user,
+        streak: user.streak,
+        dia,
+        dailyRewards: { lastClaimDate: now, lastClaimDay: hoyStr, currentDay: dia },
+        reward: premio
+    });
+});
+
+/**
+ * El camino: en que dia estas, si hoy ya esta cobrado, y el tramo de premios
+ * alrededor para pintarlo. El movil no tiene copia de la tabla.
+ */
+const getCaminoRacha = asyncHandler(async (req, res) => {
+    const { hoyStr, ayerStr } = fechasDeHoy();
+    const usuario = await User.findById(req.user._id).select('dailyRewards streak').lean();
+    const { dia, cobradoHoy } = diaQueToca(usuario, hoyStr, ayerStr);
+    res.json({
+        dia,
+        cobradoHoy,
+        racha: cobradoHoy ? dia : (usuario.streak?.current || 0),
+        // La racha "viva": si ayer no se cobro, lo que se enseña como racha
+        // actual es 0 aunque el numero guardado sea otro.
+        rachaViva: cobradoHoy || dia > 1 ? (cobradoHoy ? dia : dia - 1) : 0,
+        hoy: recompensaDelDia(dia),
+        camino: tramoDelCamino(dia, 3, 10)
     });
 });
 
@@ -447,6 +463,7 @@ module.exports = {
     getMe,
     updateMacros,
     claimDailyReward,
+    getCaminoRacha,
     updatePhysicalStats,
     setRedemptionMission,
     reviveUser,

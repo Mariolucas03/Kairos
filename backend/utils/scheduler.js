@@ -249,14 +249,17 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
                 ? 'Te queda 1 misión'
                 : 'Te quedan ' + pendientes.length + ' misiones';
 
+            // La racha solo peligra si la diaria esta sin recoger: es lo que la
+            // rompe. Las misiones quitan vida, no racha.
+            const rachaEnJuego = diariaPendiente && racha >= 3;
             const cuerpo = [
                 frase + ' y ' + dano + ' HP en juego.',
-                racha >= 3 ? 'También pierdes tu racha de ' + racha + ' días.' : '',
-                diariaPendiente ? 'Y la recompensa diaria sin reclamar.' : ''
+                rachaEnJuego ? 'Y sin recoger la diaria pierdes tu racha de ' + racha + ' días.' : '',
+                !rachaEnJuego && diariaPendiente ? 'Y la recompensa diaria sin recoger.' : ''
             ].filter(Boolean).join(' ');
 
             await sendPushToUser(user, {
-                title: racha >= 3
+                title: rachaEnJuego
                     ? '🔥 Tu racha de ' + racha + ' días peligra'
                     : '⚠️ ' + frase,
                 body: cuerpo,
@@ -271,8 +274,8 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         //    a medianoche.
         if (diariaPendiente) {
             await sendPushToUser(user, {
-                title: '🎁 Recompensa diaria sin reclamar',
-                body: 'Caduca a medianoche. Entra y recógela.',
+                title: racha >= 3 ? '🔥 Tu racha de ' + racha + ' días peligra' : '🎁 Recompensa diaria sin recoger',
+                body: racha >= 3 ? 'Si no la recoges antes de medianoche, mañana empiezas por el día 1.' : 'Caduca a medianoche. Entra y recógela.',
                 icon: '/assets/icons/moneda.png',
                 url: '/home'
             });
@@ -674,9 +677,8 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
                     user.hp = newHp;
                     user.lives = newHp;
 
-                    if (data.failedItems.some(m => m.frequency === 'daily')) {
-                        user.streak.current = 0;
-                    }
+                    // La racha ya no se rompe aqui: es la de entrar y recoger la
+                    // recompensa, y se rompe sola el dia que no entras.
 
                     // Lanzamos guardado de Usuario y Log simultáneamente
                     await Promise.all([

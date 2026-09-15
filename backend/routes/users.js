@@ -6,6 +6,7 @@ const {
     getMe,
     updateMacros,
     claimDailyReward,
+    getCaminoRacha,
     updatePhysicalStats,
     simulateYesterday,
     setManualStreak,
@@ -21,7 +22,8 @@ const {
 // Rutas base: /api/users
 router.get('/', protect, getMe);
 router.put('/macros', protect, updateMacros);
-router.post('/claim-daily', protect, claimDailyReward); // <--- Esta fallaba
+router.post('/claim-daily', protect, claimDailyReward);
+router.get('/camino', protect, getCaminoRacha);
 router.put('/physical-stats', protect, updatePhysicalStats);
 // Ajustes del perfil público: descripción, cuenta privada y modo de gym
 router.put('/profile', protect, updateProfileSettings);
