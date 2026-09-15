@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Lock, User, ArrowRight, Swords, UserCheck } from 'lucide-react';
+import { Lock, User, Swords } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
 import PantallaAuth from '../components/auth/PantallaAuth';
-import { CampoAuth } from '../components/auth/CampoAuth';
-import BarraDeAcceso from '../components/auth/BarraDeAcceso';
+import { CampoAuth, BotonAuth } from '../components/auth/CampoAuth';
 
 const ACENTO = '#eab308'; // oro
 
@@ -17,26 +16,9 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [exito, setExito] = useState(null);
-    // El escaner: un latido por cada campo en el que entras, y si el nombre es
-    // de alguien, su avatar. Se pide al dejar de escribir, no por cada tecla.
-    const [pulso, setPulso] = useState(0);
-    const [vistazo, setVistazo] = useState(null);
-    useEffect(() => {
-        const nombre = formData.username.trim();
-        setVistazo(null);
-        if (nombre.length < 3) return;
-        const t = setTimeout(() => {
-            api.get(`/auth/vistazo/${encodeURIComponent(nombre)}`)
-                .then(r => setVistazo(r.data))
-                .catch(() => setVistazo(null));
-        }, 600);
-        return () => clearTimeout(t);
-    }, [formData.username]);
 
     // Para poder cancelar el salto si la pantalla se desmonta antes de tiempo
     const temporizador = useRef(null);
-    // El formulario, para que la barra lo envie al levantarla
-    const formulario = useRef(null);
 
     // Si ya hay sesión, salta el login
     useEffect(() => {
@@ -63,13 +45,8 @@ export default function Login() {
     };
 
     const handleSubmit = async (e) => {
-        e?.preventDefault?.();
-        if (loading) return false;
-        // Sin las dos cosas escritas no se levanta nada: se dice y ya.
-        if (!formData.username.trim() || !formData.password) {
-            setError('Escribe tu usuario y tu contraseña, y levanta la barra.');
-            return false;
-        }
+        e.preventDefault();
+        if (loading) return;
         setLoading(true);
         setError(null);
 
@@ -108,44 +85,29 @@ export default function Login() {
         <PantallaAuth
             acento={ACENTO}
             icono={Swords}
-            titulo="KAIROS"
-            subtitulo="Sistema de acceso"
-            tarjetaIcono={UserCheck}
-            tarjetaTitulo="Identificarse"
+            titulo="Entrar"
+            subtitulo="Bienvenido de nuevo"
             error={error}
             exito={exito}
-            pulso={pulso}
-            vistazo={vistazo}
-            nombre={formData.username}
-            construido={(formData.username.trim() ? 0.5 : 0) + (formData.password ? 0.5 : 0)}
-            etiquetaAvatar="Identificando"
             pie={
-                <>
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">
-                        ¿Aún no tienes expediente?
-                    </p>
-                    <Link
-                        to="/register"
-                        className="mt-2 inline-flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] hover:brightness-125 transition-all group not-italic"
-                        style={{ color: ACENTO }}
-                    >
-                        Solicitar acceso
-                        <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                <p className="text-[12px] text-zinc-500 font-medium not-italic">
+                    ¿No tienes cuenta?{' '}
+                    <Link to="/register" className="font-black hover:brightness-125 transition-all" style={{ color: ACENTO }}>
+                        Regístrate
                     </Link>
-                </>
+                </p>
             }
         >
-            <form ref={formulario} onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 <CampoAuth
-                    etiqueta="Usuario o alias"
+                    etiqueta="Usuario"
                     icono={User}
                     acento={ACENTO}
                     nombre="username"
                     valor={formData.username}
                     onChange={handleChange}
-                    placeholder="Guerrero01"
+                    placeholder="Tu usuario"
                     autoComplete="username"
-                    onEnfocar={() => setPulso(p => p + 1)}
                 />
 
                 <CampoAuth
@@ -158,18 +120,11 @@ export default function Login() {
                     placeholder="••••••••"
                     esClave
                     autoComplete="current-password"
-                    onEnfocar={() => setPulso(p => p + 1)}
                 />
 
-                {/* La puerta es una barra de pesas: se agarra el disco y se
-                    levanta hasta el final. Enter en los campos entra igual. */}
-                <BarraDeAcceso
-                    acento={ACENTO}
-                    cargando={loading}
-                    etiqueta="Levanta para entrar"
-                    textoCargando="Levantando…"
-                    onCompletar={() => handleSubmit()}
-                />
+                <BotonAuth cargando={loading} acento={ACENTO} textoCargando="Entrando…">
+                    Entrar
+                </BotonAuth>
             </form>
         </PantallaAuth>
     );
