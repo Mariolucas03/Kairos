@@ -1,6 +1,8 @@
 import { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ChevronRight as Flecha, MapPin, LogOut, Settings, Flame, Zap, CalendarCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronRight as Flecha, MapPin, LogOut, Settings, Flame, Zap, CalendarCheck, Dumbbell, Medal, Shield } from 'lucide-react';
+import MarcoPerfil from '../components/common/MarcoPerfil';
+import IconoRango from '../components/gym/IconoRango';
 import useSWR from 'swr';
 import api from '../services/api';
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -82,6 +84,18 @@ export default function Profile() {
     // Misma clave que usa el mapa de constancia, así que SWR reaprovecha su
     // respuesta y esto no cuesta ni una petición más.
     const { data: actividad } = useSWR('/daily/actividad?dias=182', fetcher);
+    // Lo que te hace fuerte: los tres grupos con mas rango y tu mejor serie.
+    // Las dos claves ya las usan el Gym y las estadisticas: van de cache.
+    const { data: rangos } = useSWR('/gym/muscle-ranks', fetcher);
+    const { data: marcas } = useSWR('/gym/marcas', fetcher);
+    const { data: resumen } = useSWR('/gym/resumen', fetcher);
+    const puntosFuertes = Object.entries(rangos?.ranks || {})
+        .filter(([, r]) => r.isGroup !== false && r.points > 0)
+        .sort((a, b) => b[1].points - a[1].points)
+        .slice(0, 3);
+    const mejorMarca = marcas?.marcas?.[0] || null;
+    // El acento de la ficha: el del mejor rango, o el dorado de siempre.
+    const acento = puntosFuertes[0]?.[1]?.rankColor || '#eab308';
 
     /**
      * ⚠️ TIENE que pasar por logout() del store, no por setUser(null).
@@ -167,42 +181,74 @@ export default function Profile() {
     return (
         <div className="pb-24 pt-4 px-4 min-h-screen animate-in fade-in select-none bg-black">
 
-            {/* QUIÉN ERES */}
-            <div className="mb-5">
-                <div className="flex items-center gap-4 px-1">
-                    <div className="w-16 h-16 rounded-full bg-[#0a0a0c] border border-white/[0.07] flex items-center justify-center text-xl font-black text-zinc-500 overflow-hidden shrink-0">
-                        {user?.avatar
-                            ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-                            : (user?.username || 'U').charAt(0).toUpperCase()}
+            {/* QUIÉN ERES: la ficha de tu personaje.
+                Antes era un avatar pelado (sin tu marco ni tu mascota), el
+                nombre y una barra: un formulario de datos. Ahora es la ficha
+                que se ve en un juego: el avatar con el anillo de XP y tu marco,
+                el titulo, el nivel, tus cifras en pastillas, tus puntos fuertes
+                (los grupos con mas rango) y tu mejor serie. */}
+            <div className="relative -mx-4 px-4 pt-3 pb-5 mb-5 overflow-hidden rounded-b-[2rem] border-b border-white/[0.07]">
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse at 15% 0%, ${acento}33 0%, transparent 55%), radial-gradient(ellipse at 100% 100%, ${acento}14 0%, transparent 50%)` }} />
+
+                <div className="relative flex items-center gap-4">
+                    <div className="relative shrink-0" style={{ width: 96, height: 96 }}>
+                        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full -rotate-90">
+                            <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+                            <circle cx="50" cy="50" r="46" fill="none" stroke={acento} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(porcentajeXP / 100) * 289} 289`} />
+                        </svg>
+                        <div className="absolute inset-[9px] rounded-full bg-[#0a0a0c] flex items-center justify-center text-2xl font-black text-zinc-500 border border-white/10 overflow-hidden">
+                            {user?.avatar
+                                ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                                : (user?.username || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="absolute inset-[9px]"><MarcoPerfil marco={user?.frame} tamano={100} desborde={11} /></div>
+                        {user?.pet && <img src={user.pet} className="absolute -bottom-1 -right-1 w-8 h-8 object-contain z-30 drop-shadow-md" alt="" />}
+                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-30 text-[10px] font-black px-2 py-0.5 rounded-full border bg-black text-white not-italic whitespace-nowrap" style={{ borderColor: acento }}>
+                            Lvl {user?.level ?? 1}
+                        </span>
                     </div>
-                    <div className="min-w-0 flex-1">
+
+                    <div className="flex-1 min-w-0">
                         <h1 className="text-2xl font-black text-white uppercase tracking-tighter not-italic truncate leading-none">
                             {user?.username || '—'}
                         </h1>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-yellow-500 mt-1.5">
+                        <p className="text-[11px] font-black uppercase tracking-[0.14em] mt-1.5 not-italic" style={{ color: acento }}>
                             {user?.title || 'Novato'}
                         </p>
-                        {/* Cuánto te falta para el siguiente nivel. Estaba en la
-                            cabecera de la app, pero no en tu propio perfil. */}
-                        <div className="mt-2">
-                            <div className="h-1 w-full bg-[#18181b] rounded-full overflow-hidden">
-                                <div className="h-full bg-yellow-500 rounded-full transition-all duration-500" style={{ width: porcentajeXP + '%' }} />
-                            </div>
-                            <p className="text-[9px] text-zinc-600 mt-1 font-bold">{xpActual} / {xpNecesario} XP</p>
-                        </div>
+                        {user?.clan?.name && (
+                            <p className="text-[10px] font-bold text-zinc-400 mt-1.5 flex items-center gap-1 not-italic truncate"><Shield size={10} className="shrink-0" /> {user.clan.icon} {user.clan.name}</p>
+                        )}
+                        <p className="text-[10px] text-zinc-500 font-bold mt-1.5 tabular-nums not-italic">{xpActual} / {xpNecesario} XP para el {(user?.level ?? 1) + 1}</p>
                     </div>
                 </div>
 
-                <div className="flex gap-2 mt-4">
-                    <Cifra icono={Zap} valor={user?.level ?? 1} etiqueta="Nivel" color="text-yellow-500" />
+                <div className="relative grid grid-cols-4 gap-2 mt-4">
                     <Cifra icono={Flame} valor={user?.streak?.current ?? 0} etiqueta="Racha" color="text-orange-500" />
-                    <Cifra
-                        icono={CalendarCheck}
-                        valor={actividad?.activos ?? '—'}
-                        etiqueta="Días activos"
-                        color="text-green-500"
-                    />
+                    <Cifra icono={CalendarCheck} valor={actividad?.activos ?? '—'} etiqueta="Días" color="text-green-500" />
+                    <Cifra icono={Dumbbell} valor={resumen?.entrenos ?? '—'} etiqueta="Entrenos" color="text-yellow-500" />
+                    <Cifra icono={Zap} valor={resumen?.volumen ? (resumen.volumen >= 1000 ? `${(resumen.volumen / 1000).toFixed(1)}t` : resumen.volumen) : '—'} etiqueta="Movido" color="text-cyan-400" />
                 </div>
+
+                {(puntosFuertes.length > 0 || mejorMarca) && (
+                    <div className="relative mt-3 flex flex-col gap-2">
+                        {puntosFuertes.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.14em] mr-1 not-italic">Puntos fuertes</span>
+                                {puntosFuertes.map(([grupo, r]) => (
+                                    <button key={grupo} type="button" onClick={() => navigate('/gym?tab=body')} className="flex items-center gap-1 text-[10px] font-black uppercase px-2 py-1 rounded-lg border not-italic active:scale-95 transition-transform" style={{ color: r.rankColor, borderColor: r.rankColor + '55', background: r.rankColor + '14' }}>
+                                        <IconoRango rango={r.rank} color={r.rankColor} tamano={12} /> {grupo} · {r.rankLabel}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {mejorMarca && (
+                            <p className="text-[11px] text-zinc-300 font-bold flex items-center gap-1.5 not-italic">
+                                <Medal size={13} className="text-yellow-500 shrink-0" />
+                                <span className="truncate">Mejor serie: <span className="text-white">{mejorMarca.ejercicio}</span> {mejorMarca.peso} × {mejorMarca.reps}</span>
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
 
             <Seccion titulo="Tu progreso">

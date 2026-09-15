@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import useSWR from 'swr';
 import { useNavigate } from 'react-router-dom';
 import { Flame, X, Dumbbell, Target, CalendarCheck, TrendingUp } from 'lucide-react';
@@ -287,15 +288,19 @@ export default function MapaActividad({ semanas = 26 }) {
                 </div>
             </WidgetCard>
 
-            {/* ── EL DETALLE ─────────────────────────────────────────────── */}
-            {abierto && (
+            {/* ── EL DETALLE ───────────────────────────────────────────────
+                ⚠️ En un PORTAL, como los demas widgets. Se pintaba aqui dentro
+                y `fixed` no vale dentro de un ancestro con `transform` (el
+                envoltorio de arrastrar de la rejilla lo tiene): la ventana se
+                quedaba encajada en la tarjeta y salia cortada. */}
+            {abierto && createPortal(
                 <div
-                    className="fixed inset-0 flex items-center justify-center p-4 animate-in fade-in"
-                    style={{ zIndex: Z.modal }}
+                    className="fixed left-0 right-0 flex items-center justify-center p-4 animate-in fade-in"
+                    style={{ zIndex: Z.modal, top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }}
                 >
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setAbierto(false)} />
 
-                    <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-white/10 rounded-3xl p-5 shadow-2xl shadow-black/70 max-h-[85vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200">
+                    <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-white/10 rounded-3xl p-5 shadow-2xl shadow-black/70 max-h-[88%] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200">
 
                         <div className="flex items-start justify-between mb-4">
                             <div>
@@ -374,7 +379,7 @@ export default function MapaActividad({ semanas = 26 }) {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
         </>
     );
 }

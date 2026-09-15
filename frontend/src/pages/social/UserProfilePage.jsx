@@ -3,14 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
     Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
-    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X, WifiOff, RefreshCw, Medal
+    Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X, WifiOff, RefreshCw
 } from 'lucide-react';
-import IconoRango from '../../components/gym/IconoRango';
 import api from '../../services/api';
 import BackButton from '../../components/common/BackButton';
 import WorkoutPostCard from '../../components/social/WorkoutPostCard';
 import BodyMap from '../../components/body/BodyMap';
-import { customAnimationsStyle } from '../../utils/socialHelpers';
+import { getLevelStyle, customAnimationsStyle } from '../../utils/socialHelpers';
 import MarcoPerfil from '../../components/common/MarcoPerfil';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
@@ -357,10 +356,6 @@ export default function UserProfilePage() {
 
     const profile = profileData?.profile || {};
     const counts = profileData?.counts || { workouts: 0, followers: 0, following: 0 };
-    const puntosFuertes = profileData?.puntosFuertes || [];
-    const mejorSerie = profileData?.mejorSerie || null;
-    // El acento de la ficha: el del mejor rango de esta persona, o el dorado.
-    const acento = puntosFuertes[0]?.rankColor || '#eab308';
     const level = profile.level || 1;
     const xpPercent = Math.min(((profile.currentXP || 0) / (profile.nextLevelXP || 100)) * 100, 100);
 
@@ -403,83 +398,35 @@ export default function UserProfilePage() {
                 <h1 className="text-lg font-black text-white uppercase tracking-tight truncate">{profile.username}</h1>
             </div>
 
-            {/* --- LA FICHA DE ESTA PERSONA.
-                Antes era la cabecera de Instagram calcada: avatar, tres
-                contadores, nombre, barra. Correcta y de nadie. Ahora es una
-                ficha de personaje: el avatar con el anillo de nivel, el titulo
-                grande, sus puntos fuertes (los musculos con mas rango), su
-                mejor serie, y lo que lleva este mes. Lo que hace a alguien. */}
-            <div className="relative -mx-4 px-4 pt-4 pb-5 mb-4 overflow-hidden rounded-b-[2rem] border-b border-white/[0.07]">
-                <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse at 20% 0%, ${acento}33 0%, transparent 55%), radial-gradient(ellipse at 100% 100%, ${acento}14 0%, transparent 50%)` }} />
-
-                <div className="relative flex items-center gap-4">
-                    {/* El avatar con el anillo de XP alrededor */}
-                    <div className="relative shrink-0" style={{ width: 96, height: 96 }}>
-                        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full -rotate-90">
-                            <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
-                            <circle cx="50" cy="50" r="46" fill="none" stroke={acento} strokeWidth="4" strokeLinecap="round"
-                                strokeDasharray={`${(xpPercent / 100) * 289} 289`} />
-                        </svg>
-                        <div className="absolute inset-[9px] rounded-full bg-zinc-900 flex items-center justify-center text-2xl font-black text-zinc-500 border border-white/10 overflow-hidden">
-                            {profile.avatar
-                                ? <img src={profile.avatar} className="w-full h-full object-cover" alt="avatar" />
-                                : profile.username?.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="absolute inset-[9px]"><MarcoPerfil marco={profile.frame} tamano={100} desborde={11} /></div>
-                        {profile.pet && <img src={profile.pet} className="absolute -bottom-1 -right-1 w-8 h-8 object-contain z-30 drop-shadow-md" alt="" />}
-                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-30 text-[10px] font-black px-2 py-0.5 rounded-full border bg-black text-white not-italic" style={{ borderColor: acento }}>
-                            Lvl {level}
-                        </span>
+            {/* --- CABECERA ESTILO IG: avatar a la izquierda, contadores a la derecha --- */}
+            <div className="flex items-center gap-5 mb-5">
+                <div className="relative shrink-0">
+                    <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center text-2xl font-black text-zinc-500 border-2 border-zinc-800 overflow-hidden">
+                        {profile.avatar
+                            ? <img src={profile.avatar} className="w-full h-full object-cover" alt="avatar" />
+                            : profile.username?.charAt(0).toUpperCase()}
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                        <h2 className="text-xl font-black text-white uppercase tracking-tight truncate not-italic leading-none">{profile.username}</h2>
-                        <p className="text-[11px] font-black tracking-[0.14em] uppercase mt-1.5 not-italic" style={{ color: acento }}>{profile.title || 'Novato'}</p>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {profile.streak?.current > 0 && (
-                                <span className="text-[10px] font-black text-orange-400 flex items-center gap-1 not-italic"><Flame size={11} fill="currentColor" /> {profile.streak.current} {profile.streak.current === 1 ? 'día' : 'días'}</span>
-                            )}
-                            <span className="text-[10px] font-bold text-zinc-500 not-italic">{profile.currentXP || 0}/{profile.nextLevelXP || 100} XP</span>
-                        </div>
-                    </div>
+                    <MarcoPerfil marco={profile.frame} tamano={104} desborde={12} />
+                    {profile.pet && <img src={profile.pet} className="absolute -bottom-1 -right-1 w-7 h-7 object-contain z-30 drop-shadow-md" />}
                 </div>
 
-                {/* Los contadores, en una fila de pastillas */}
-                <div className="relative grid grid-cols-3 gap-2 mt-4">
+                <div className="flex-1 grid grid-cols-3 gap-1">
                     {STATS.map(s => (
-                        <div key={s.label} className="rounded-2xl border border-white/[0.07] bg-black/40 py-2 text-center">
-                            <div className="text-lg font-black text-white leading-none tabular-nums not-italic">{s.value.toLocaleString()}</div>
-                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide mt-1 not-italic">{s.label}</div>
+                        <div key={s.label} className="text-center">
+                            <div className="text-lg font-black text-white leading-none">{s.value.toLocaleString()}</div>
+                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide mt-1">{s.label}</div>
                         </div>
                     ))}
                 </div>
-
-                {/* Lo que le hace fuerte, y su mejor serie */}
-                {(puntosFuertes.length > 0 || mejorSerie) && (
-                    <div className="relative mt-3 flex flex-col gap-2">
-                        {puntosFuertes.length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.14em] mr-1 not-italic">Puntos fuertes</span>
-                                {puntosFuertes.map(p => (
-                                    <span key={p.grupo} className="flex items-center gap-1 text-[10px] font-black uppercase px-2 py-1 rounded-lg border not-italic" style={{ color: p.rankColor, borderColor: p.rankColor + '55', background: p.rankColor + '14' }}>
-                                        <IconoRango rango={p.rank} color={p.rankColor} tamano={12} /> {p.grupo}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        {mejorSerie && (
-                            <p className="text-[11px] text-zinc-300 font-bold flex items-center gap-1.5 not-italic">
-                                <Medal size={13} className="text-yellow-500" />
-                                Mejor serie: <span className="text-white">{mejorSerie.ejercicio}</span> {mejorSerie.peso} × {mejorSerie.reps}
-                                {counts.entrenosMes > 0 && <span className="text-zinc-500">· {counts.entrenosMes} {counts.entrenosMes === 1 ? 'entreno' : 'entrenos'} este mes</span>}
-                            </p>
-                        )}
-                    </div>
-                )}
             </div>
 
-            {/* --- INFO --- */}
+            {/* --- INFO / NIVEL / XP --- */}
             <div className="mb-6">
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-black text-white uppercase truncate">{profile.username}</span>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase shrink-0 ${getLevelStyle(level)}`}>Lvl {level}</span>
+                </div>
+                <p className="text-[10px] text-yellow-500/80 not-italic font-bold tracking-wider uppercase mb-1">{profile.title || 'Novato'}</p>
 
                 {/* El clan va en su propia línea, no apretado junto al nombre */}
                 {profile.clan && (
@@ -495,6 +442,16 @@ export default function UserProfilePage() {
                 {profile.bio && (
                     <p className="text-xs text-zinc-300 leading-snug whitespace-pre-line mb-2">{profile.bio}</p>
                 )}
+                {profile.streak?.current > 0 && (
+                    <p className="text-[10px] text-orange-400 font-bold flex items-center gap-1 mb-2">
+                        <Flame size={11} /> {profile.streak.current} {profile.streak.current === 1 ? 'día' : 'días'} de racha
+                    </p>
+                )}
+
+                <div className="relative w-full h-2 bg-zinc-900 rounded-full border border-zinc-800 overflow-hidden mt-2">
+                    <div className="h-full transition-all duration-500" style={{ width: `${xpPercent}%`, background: '#3b82f6' }} />
+                </div>
+                <p className="text-[9px] text-zinc-600 font-bold mt-1 text-right">{profile.currentXP || 0}/{profile.nextLevelXP || 100} XP</p>
 
                 {/* --- ACCIÓN PRINCIPAL (como el botón Seguir/Editar de IG) --- */}
                 <div className="mt-4">
