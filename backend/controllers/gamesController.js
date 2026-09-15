@@ -270,9 +270,11 @@ const playScratch = asyncHandler(async (req, res) => {
  * eso las de pago NO tienen limite diario; la gratis si, porque es dinero
  * regalado y sin limite seria una fuente infinita.
  *
- * `t: 'c'` son fichas; `t: 'xp'` es experiencia. La rueda de XP es la unica
- * que no se mide en fichas y por eso su unica regla es ser modesta: comprar
- * niveles a golpe de ruleta no es lo que la app quiere premiar.
+ * `t: 'c'` son fichas; `t: 'xp'` es experiencia; `t: 'hp'` es vida (se cura
+ * hasta el maximo, nunca por encima). Las ruedas que no pagan en fichas no
+ * pueden medirse al 85%, y su regla es ser MODESTAS: comprar niveles o vida a
+ * golpe de ruleta no es lo que la app quiere premiar. La de mezcla paga en
+ * las tres cosas, y su parte en fichas sola no puede pasar del 85%.
  */
 const RUEDAS = [
     {
@@ -315,6 +317,21 @@ const RUEDAS = [
         descripcion: 'Paga en XP, no en fichas.',
         // 730 / 8 = 91 XP de media. Modesta: un entreno da mas.
         premios: [30, 60, 100, 150, 250, 20, 80, 40].map(v => ({ v, t: 'xp' }))
+    },
+    {
+        id: 'vida', nombre: 'Vida', coste: 30, acento: '#f43f5e',
+        descripcion: 'Te cura. Paga en vida, hasta el máximo.',
+        // 155 / 8 = 19 de vida de media por 30 fichas.
+        premios: [5, 10, 20, 30, 50, 0, 15, 25].map(v => ({ v, t: 'hp' }))
+    },
+    {
+        id: 'mezcla', nombre: 'De todo', coste: 60, acento: '#f97316',
+        descripcion: 'Fichas, XP o vida. Nunca sabes qué toca.',
+        // En fichas: 360 / 8 = 45 -> 75% de 60. El resto va en XP y vida.
+        premios: [
+            { v: 0, t: 'c' }, { v: 40, t: 'c' }, { v: 20, t: 'hp' }, { v: 80, t: 'xp' },
+            { v: 120, t: 'c' }, { v: 10, t: 'hp' }, { v: 150, t: 'xp' }, { v: 200, t: 'c' }
+        ]
     }
 ];
 
@@ -509,6 +526,13 @@ const playFortuneWheel = asyncHandler(async (req, res) => {
     let finalUser = req.user;
     if (winObj.v > 0) {
         if (winObj.t === 'xp') finalUser = await User.findByIdAndUpdate(req.user._id, { $inc: { currentXP: winObj.v } }, { new: true });
+        // La vida se cura hasta el maximo y ni una mas: una tuberia de
+        // actualizacion, para que el tope se aplique en la misma escritura.
+        else if (winObj.t === 'hp') finalUser = await User.findByIdAndUpdate(
+            req.user._id,
+            [{ $set: { hp: { $min: [{ $add: [{ $ifNull: ['$hp', 0] }, winObj.v] }, { $ifNull: ['$maxHp', 100] }] } } }],
+            { new: true }
+        );
         else finalUser = await payPrize(req.user._id, winObj.v);
     }
 
@@ -704,9 +728,23 @@ const playBlackjack = asyncHandler(async (req, res) => {
 // se multiplica; puedes retirarte cuando quieras. Si pisas la trampa, se pierde
 // todo lo acumulado. El estado (dónde están las trampas) va CIFRADO igual que en
 // el blackjack: el cliente no puede leerlo ni fabricarlo.
-const TOWER_FLOORS = 8;
+//
+// LA ULTIMA PLANTA ES DISTINTA: cuatro losas y DOS trampas (una de dos). Y
+// solo ahi se puede comprar una PISTA, que destapa una de las dos trampas y
+// deja la planta en una de tres, como las demas. La pista cuesta una parte
+// del premio final: lo justo por pasar de 1/2 a 2/3 seria 1/6 del premio, y se
+// cobra un poco mas (18%) para que la casa no pierda con ella.
+//
+// `traps[i]` es la lista de losas trampa de la planta i: una en las normales,
+// dos en la ultima.
+const TOWER_FLOORS = 12;
 const TOWER_TILES = 3;
-const TOWER_MULTIPLIERS = [1.4, 2.0, 2.8, 3.9, 5.5, 7.7, 10.8, 15.0];
+const TOWER_ULTIMA = { tiles: 4, traps: 2 };
+const TOWER_MULTIPLIERS = [1.4, 2.0, 2.8, 3.9, 5.5, 7.7, 10.8, 15.0, 21, 29, 40, 70];
+const TOWER_PISTA = 0.18;   // parte del premio final que cuesta la pista
+
+const losasDe = (floor) => (floor === TOWER_FLOORS - 1 ? TOWER_ULTIMA.tiles : TOWER_TILES);
+const costeDePista = (bet) => Math.ceil(bet * TOWER_MULTIPLIERS[TOWER_FLOORS - 1] * TOWER_PISTA);
 
 const playTower = asyncHandler(async (req, res) => {
     const { action, bet, token, choice } = req.body;
@@ -722,13 +760,22 @@ const playTower = asyncHandler(async (req, res) => {
         await User.findByIdAndUpdate(req.user._id, { activeGameToken: gameId });
 
         // Una trampa por planta, elegida con aleatoriedad criptográfica
-        const traps = Array.from({ length: TOWER_FLOORS }, () => crypto.randomInt(TOWER_TILES));
-        const state = { gameId, bet: amount, traps, floor: 0 };
+        // Una por planta; dos distintas en la ultima.
+        const traps = Array.from({ length: TOWER_FLOORS }, (_, i) => {
+            if (i < TOWER_FLOORS - 1) return [crypto.randomInt(TOWER_TILES)];
+            const a = crypto.randomInt(TOWER_ULTIMA.tiles);
+            let b = crypto.randomInt(TOWER_ULTIMA.tiles - 1);
+            if (b >= a) b += 1;
+            return [a, b];
+        });
+        const state = { gameId, bet: amount, traps, floor: 0, pista: null };
 
         return res.json({
             token: encryptState(state),
             floor: 0,
             multipliers: TOWER_MULTIPLIERS,
+            ultima: TOWER_ULTIMA,
+            pistaCoste: costeDePista(amount),
             status: 'playing'
         });
     }
@@ -773,17 +820,38 @@ const playTower = asyncHandler(async (req, res) => {
         return res.json({ status: 'cashed', payout, floor: state.floor, traps: state.traps, user: finalUser, token: null });
     }
 
+    // --- LA PISTA: solo en la ultima planta, y solo una ---
+    if (action === 'hint') {
+        if (state.floor !== TOWER_FLOORS - 1) { res.status(400); throw new Error('La pista solo se puede comprar en la última planta'); }
+        if (state.pista !== null && state.pista !== undefined) { res.status(400); throw new Error('Ya tienes la pista'); }
+        const coste = costeDePista(state.bet);
+        // Se cobra con candado de saldo, como cualquier apuesta.
+        let usuario;
+        try { usuario = await chargeAndValidate(req.user._id, coste); }
+        catch (e) { res.status(400); throw new Error('No te llegan las fichas para la pista'); }
+        const trampas = state.traps[state.floor];
+        state.pista = trampas[crypto.randomInt(trampas.length)];
+        return res.json({
+            status: 'playing',
+            floor: state.floor,
+            pista: state.pista,
+            pistaCoste: coste,
+            user: usuario,
+            token: encryptState(state)
+        });
+    }
+
     // --- ELEGIR LOSA ---
     if (action === 'pick') {
         const tile = Number(choice);
-        if (!Number.isInteger(tile) || tile < 0 || tile >= TOWER_TILES) { res.status(400); throw new Error('Losa inválida'); }
+        if (!Number.isInteger(tile) || tile < 0 || tile >= losasDe(state.floor)) { res.status(400); throw new Error('Losa inválida'); }
 
-        const trapTile = state.traps[state.floor];
+        const trapTiles = state.traps[state.floor];
         const floorJugada = state.floor;
 
-        if (tile === trapTile) {
+        if (trapTiles.includes(tile)) {
             const finalUser = exigirCierre(await cerrarPartida(0));
-            return res.json({ status: 'lost', trapTile, floor: floorJugada, traps: state.traps, payout: 0, user: finalUser, token: null });
+            return res.json({ status: 'lost', trapTiles, floor: floorJugada, traps: state.traps, payout: 0, user: finalUser, token: null });
         }
 
         state.floor += 1;
@@ -792,14 +860,15 @@ const playTower = asyncHandler(async (req, res) => {
         if (state.floor >= TOWER_FLOORS) {
             const payout = Math.round(state.bet * TOWER_MULTIPLIERS[TOWER_FLOORS - 1]);
             const finalUser = exigirCierre(await cerrarPartida(payout));
-            return res.json({ status: 'won', trapTile, floor: state.floor, traps: state.traps, payout, user: finalUser, token: null });
+            return res.json({ status: 'won', trapTiles, floor: state.floor, traps: state.traps, payout, user: finalUser, token: null });
         }
 
         return res.json({
             status: 'playing',
-            trapTile,
+            trapTiles,
             floor: state.floor,
             potential: Math.round(state.bet * TOWER_MULTIPLIERS[state.floor - 1]),
+            pistaCoste: costeDePista(state.bet),
             token: encryptState(state)
         });
     }
@@ -813,6 +882,6 @@ module.exports = {
     RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS,
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
     premioDelRasca
 };

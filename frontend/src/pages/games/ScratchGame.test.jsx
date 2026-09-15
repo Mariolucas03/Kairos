@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, vi } from 'vitest';
@@ -66,11 +66,12 @@ describe('ScratchGame', () => {
         const user = userEvent.setup();
         pintar();
 
-        await user.click(screen.getByRole('button', { name: '100' }));
+        // Se echa una ficha de 100 encima de las 10 de partida.
+        await user.click(screen.getByRole('button', { name: 'Echar una ficha de 100' }));
         await user.click(screen.getByRole('button', { name: /comprar cartón/i }));
 
         await waitFor(() => {
-            expect(api.post).toHaveBeenCalledWith('/games/scratch', { bet: 100 });
+            expect(api.post).toHaveBeenCalledWith('/games/scratch', { bet: 110 });
         });
     });
 
@@ -116,8 +117,10 @@ describe('ScratchGame', () => {
         expect(screen.getByText('×1,5')).toBeTruthy();
         expect(screen.getByText('75 XP')).toBeTruthy();
 
-        // Y ni rastro de los numeros viejos
-        expect(screen.queryByText('500')).toBeNull();
+        // Y ni rastro de los numeros viejos en la tabla (la ficha de 500 del
+        // selector de apuesta es otra cosa: es un dibujo, no un premio)
+        const tabla = screen.getByText('×15').closest('[role="dialog"], div');
+        expect(within(tabla).queryByText('500')).toBeNull();
         expect(screen.queryByText('200 XP')).toBeNull();
     });
 

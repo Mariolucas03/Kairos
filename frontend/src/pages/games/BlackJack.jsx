@@ -12,6 +12,9 @@ import { haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
 // Milisegundos entre carta y carta al repartir. Un crupier reparte a este
 // ritmo; mas rapido es una rafaga, mas lento aburre.
 const ENTRE_CARTAS = 160;
+// Lo que se deja la mesa a la vista, con todas las cartas boca arriba, antes
+// de que salga el resultado.
+const LEER_LA_MESA = 1700;
 
 // --- LA CARA DE UNA CARTA (lo que se ve cuando esta boca arriba) ---
 const CaraCarta = ({ card, small }) => {
@@ -27,10 +30,12 @@ const CaraCarta = ({ card, small }) => {
 };
 
 // --- EL DORSO ---
+// ⚠️ La imagen del dorso ES la carta: trae su marco cromado y su radio. Antes
+// se le ponia un borde y un radio encima y se recortaba con `object-cover`
+// (la imagen era casi cuadrada y la carta 2:3): se veian dos bordes que no
+// cuadraban. `reverso-carta-23.png` esta ya a 2:3, y no se le pone nada.
 const Dorso = () => (
-    <div className="w-full h-full rounded-xl overflow-hidden border-2 border-white/20 bg-black" style={{ boxShadow: '0 6px 14px rgba(0,0,0,0.45)' }}>
-        <img src="/assets/images/reverso-carta.png" alt="" className="w-full h-full object-cover" draggable="false" />
-    </div>
+    <img src="/assets/images/reverso-carta-23.png" alt="" className="w-full h-full block" draggable="false" style={{ filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.5))' }} />
 );
 
 /**
@@ -38,8 +43,9 @@ const Dorso = () => (
  * destaparse. `indice` escalona el reparto.
  */
 const Card = ({ card, hidden, small, indice = 0, zapatoRef, sonido }) => {
+    // Siempre 2:3, que es la proporcion de la imagen del dorso.
     const ancho = small ? 48 : 64;
-    const alto = small ? 68 : 96;
+    const alto = small ? 72 : 96;
     return (
         <CartaAnimada
             cara={<CaraCarta card={card} small={small} />}
@@ -164,7 +170,9 @@ export default function BlackJack() {
                     else s?.perder();
                     // El tiempo que tardan en llegar las cartas nuevas del crupier
                     // mas el volteo: el modal no puede salir con cartas en el aire.
-                }, 600 + ((state.dHand?.length || 0) - (cartasAntes.current.d || 0)) * ENTRE_CARTAS + 480);
+                    // Y despues, TIEMPO DE LEER LA MESA: salia en cuanto caia la
+                    // ultima carta y no daba tiempo a ver que tenia el crupier.
+                }, 600 + ((state.dHand?.length || 0) - (cartasAntes.current.d || 0)) * ENTRE_CARTAS + 480 + LEER_LA_MESA);
             }
 
         } catch (error) {
@@ -242,12 +250,10 @@ export default function BlackJack() {
                     {/* EL ZAPATO: de aqui salen las cartas. Un taco de dorsos en
                         la esquina, con el canto visible. DENTRO de la mesa: colgaba
                         fuera del borde y se montaba con la cabecera. */}
-                    <div ref={zapatoRef} className="absolute top-3 right-3 z-20 pointer-events-none" style={{ width: 52, height: 76 }}>
+                    <div ref={zapatoRef} className="absolute top-3 right-3 z-20 pointer-events-none" style={{ width: 48, height: 72 }}>
                         {[0, 1, 2, 3].map(i => (
-                            <div key={i} className="absolute inset-0 rounded-lg overflow-hidden border border-white/15 bg-black"
-                                style={{ transform: `translate(${-i * 1.5}px, ${-i * 1.5}px)`, boxShadow: '0 2px 4px rgba(0,0,0,0.6)' }}>
-                                <img src="/assets/images/reverso-carta.png" alt="" className="w-full h-full object-cover opacity-90" draggable="false" />
-                            </div>
+                            <img key={i} src="/assets/images/reverso-carta-23.png" alt="" className="absolute inset-0 w-full h-full" draggable="false"
+                                style={{ transform: `translate(${-i * 1.5}px, ${-i * 1.5}px)`, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.6))' }} />
                         ))}
                     </div>
 

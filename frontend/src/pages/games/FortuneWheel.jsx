@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { Gift, Flame, Diamond, Lock, X, Volume2, VolumeX, Coins, Star, Crown, Zap, Loader2 } from 'lucide-react';
+import { Gift, Flame, Diamond, Lock, X, Volume2, VolumeX, Coins, Star, Crown, Zap, Loader2, Heart, Sparkles } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
@@ -64,7 +64,17 @@ const CoinsRain = () => {
  * `GET /games/fortune` —nombre, coste, color, premios— y aqui solo se decide
  * como pintarlo. No queda nada que pueda quedarse viejo.
  */
-const ICONOS = { daily: Gift, bronce: Coins, hardcore: Flame, plata: Star, oro: Crown, jackpot: Diamond, xp: Zap };
+const ICONOS = { daily: Gift, bronce: Coins, hardcore: Flame, plata: Star, oro: Crown, jackpot: Diamond, xp: Zap, vida: Heart, mezcla: Sparkles };
+
+/** En que paga cada tipo de premio, para decirlo con palabras. */
+const UNIDAD = { c: 'fichas', xp: 'XP', hp: 'vida' };
+const unidadDe = (t) => UNIDAD[t] || 'fichas';
+/** "fichas", "XP" o "fichas, XP y vida" segun lo que reparta la rueda. */
+const enQuePaga = (premios) => {
+    const tipos = [...new Set(premios.filter(p => p.v > 0).map(p => p.t))].map(unidadDe);
+    if (tipos.length <= 1) return tipos[0] || 'fichas';
+    return `${tipos.slice(0, -1).join(', ')} y ${tipos[tipos.length - 1]}`;
+};
 
 /** "1K", "2.4K", "250", o un punto para el cero. */
 const etiquetaDe = (v) => {
@@ -92,6 +102,7 @@ const cunasDe = (rueda) => {
     const base = [rueda.acento, '#1f1f24', tono(rueda.acento, 0.65), '#2a2a31'];
     return rueda.premios.map((p, i) => ({
         label: etiquetaDe(p.v),
+        tipo: p.t,
         color: p.v === 0 ? '#111114' : p.v === maximo && maximo > 0 ? '#c9a33f' : base[i % base.length]
     }));
 };
@@ -115,6 +126,8 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
     const [spinning, setSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
     const [winData, setWinData] = useState(null);
+    // La cuña que acaba de tocar: se enciende al parar la rueda.
+    const [ganadora, setGanadora] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
 
     // ⚠️ EL GIRO NO PASA POR REACT. Cada frame escribe el transform del disco
@@ -153,7 +166,7 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
         // fichas de las que tenías hasta recargar la app. El saldo bueno lo manda
         // el servidor al terminar el giro, así que no hace falta tocarlo.
         setErrorMsg(null);
-        setSpinning(true); setWinData(null);
+        setSpinning(true); setWinData(null); setGanadora(null);
 
         try {
             // Llamada al Backend Inhackeable
@@ -188,6 +201,7 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                 setRotation(tr.giroFinal);
 
                 setSpinning(false);
+                setGanadora(winIndex);
                 setWinData(serverPrize);
                 // Se sincroniza SIEMPRE, gane o no: si el premio era 0 antes no se
                 // actualizaba y el saldo se quedaba sin reflejar el coste del tiro.
@@ -249,14 +263,20 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
 
     return (
         <div className="flex flex-col items-center w-full max-w-sm mx-auto">
-            {winData && winData.v > 0 && winData.t !== 'xp' && <CoinsRain />}
+            {winData && winData.v > 0 && winData.t === 'c' && <CoinsRain />}
             {errorMsg && (
                 <div onClick={() => setErrorMsg(null)} className="w-full mb-4 bg-red-950/70 border border-red-500/40 text-red-300 text-[11px] font-bold uppercase tracking-wide px-4 py-2.5 rounded-2xl text-center cursor-pointer">
                     {errorMsg}
                 </div>
             )}
-            <div className="relative w-[330px] h-[340px] mb-6 drop-shadow-[0_18px_40px_rgba(0,0,0,0.9)]">
-                <RuedaFortuna ref={ruedaRef} premios={prizes} rotacion={rotation} iconoCentro={config.icon} />
+            {/* ⚠️ SIN `drop-shadow` AQUI. Era un filtro CSS sobre el padre de la
+                rueda, y un filtro obliga a re-rasterizar TODO lo que hay debajo
+                en cada frame en que algo se mueve: la rueda giraba a tirones en
+                el movil. La sombra va en un circulo aparte, con box-shadow, que
+                no se recalcula al girar. */}
+            <div className="relative w-[330px] h-[340px] mb-6">
+                <div className="absolute rounded-full pointer-events-none" style={{ left: 8, top: 18, width: 314, height: 314, boxShadow: '0 18px 40px rgba(0,0,0,0.9), 0 0 60px rgba(234,179,8,0.10)' }} />
+                <RuedaFortuna ref={ruedaRef} premios={prizes} rotacion={rotation} iconoCentro={config.icon} girando={spinning} ganadora={ganadora} />
             </div>
             <div className="w-full flex items-center gap-2">
                 <button onClick={handleSpin} disabled={spinning} className={`flex-1 py-5 rounded-2xl font-black text-lg uppercase tracking-widest transition-all active:scale-95 shadow-xl ${spinning ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-200'}`}>
@@ -276,15 +296,17 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                     <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-4xl p-8 text-center shadow-2xl">
                         <div className="mb-6 flex justify-center">
                             {winData.v > 0 ? (
-                                <div className="w-24 h-24 bg-yellow-500/20 rounded-full flex items-center justify-center animate-bounce border border-yellow-500/30">
-                                    <img src="/assets/icons/ficha.png" className="w-14 h-14 object-contain" alt="Win" />
+                                <div className={`w-24 h-24 rounded-full flex items-center justify-center animate-bounce border ${winData.t === 'hp' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' : winData.t === 'xp' ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-300' : 'bg-yellow-500/20 border-yellow-500/30'}`}>
+                                    {winData.t === 'hp' ? <Heart size={44} fill="currentColor" />
+                                        : winData.t === 'xp' ? <Zap size={44} fill="currentColor" />
+                                            : <img src="/assets/icons/ficha.png" className="w-14 h-14 object-contain" alt="Win" />}
                                 </div>
                             ) : (
                                 <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20"><X className="w-10 h-10 text-red-500" /></div>
                             )}
                         </div>
                         <h2 className={`text-3xl font-black uppercase not-italic mb-2 ${winData.v > 0 ? 'text-yellow-400' : 'text-white'}`}>{winData.v > 0 ? '¡GANASTE!' : 'MALA SUERTE'}</h2>
-                        <p className="text-sm text-zinc-400 mb-8 font-medium">{winData.v > 0 ? `Has conseguido ${winData.v.toLocaleString('es-ES')} ${winData.t === 'xp' ? 'XP' : 'fichas'}.` : 'No has ganado nada esta vez.'}</p>
+                        <p className="text-sm text-zinc-400 mb-8 font-medium">{winData.v > 0 ? `Has conseguido ${winData.v.toLocaleString('es-ES')} ${winData.t === 'hp' ? 'de vida' : unidadDe(winData.t)}.` : 'No has ganado nada esta vez.'}</p>
                         <button onClick={() => { setWinData(null); if (config.cost === 0) onBack(); }} className="w-full bg-white text-black font-black py-4 rounded-xl uppercase tracking-widest hover:bg-zinc-200 shadow-lg">
                             {winData.v > 0 ? 'RECOGER' : 'CONTINUAR'}
                         </button>
@@ -325,7 +347,11 @@ export default function FortuneWheel() {
     const handleSpinComplete = () => { mutate(); };
 
     return (
-        <div className={`flex flex-col h-full animate-in fade-in select-none px-4 pb-20 ${selectedMode ? 'pt-24' : 'pt-4'}`}>
+        // `min-h-full`, no `h-full`: con la altura clavada a la de la pantalla, la
+        // lista de siete ruedas se salia del contenedor y el scroll no llegaba
+        // abajo del todo (el relleno de abajo quedaba dentro de la caja, no
+        // despues de la ultima rueda).
+        <div className={`flex flex-col min-h-full animate-in fade-in select-none px-4 pb-24 ${selectedMode ? 'pt-24' : 'pt-4'}`}>
             <div className="flex items-center mb-6">
                 <BackButton onClick={() => selectedMode ? setSelectedMode(null) : navigate('/games')} />
                 <h1 className="ml-4 text-xl font-black not-italic uppercase text-white tracking-tight">{ruedaAbierta ? ruedaAbierta.nombre : 'Ruleta de la Fortuna'}</h1>
@@ -346,7 +372,8 @@ export default function FortuneWheel() {
                         // Solo la gratis se bloquea, y solo si ya se uso hoy.
                         const bloqueada = esGratis && diariaUsadaHoy;
                         const maximo = Math.max(...rueda.premios.map(p => p.v));
-                        const enXp = rueda.premios[0]?.t === 'xp';
+                        const paga = enQuePaga(rueda.premios);
+                        const mezclada = rueda.premios.some(p => p.t !== rueda.premios[0].t);
                         return (
                             <button
                                 key={rueda.id}
@@ -370,7 +397,7 @@ export default function FortuneWheel() {
                                             mismo catalogo que paga, asi que no puede mentir. */}
                                         {!bloqueada && maximo > 0 && (
                                             <p className="text-[10px] font-black mt-1 tabular-nums" style={{ color: rueda.acento }}>
-                                                hasta {maximo.toLocaleString('es-ES')} {enXp ? 'XP' : 'fichas'}
+                                                {mezclada ? `paga en ${paga}` : `hasta ${maximo.toLocaleString('es-ES')} ${paga === 'vida' ? 'de vida' : paga}`}
                                             </p>
                                         )}
                                     </div>

@@ -2,7 +2,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
 const {
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA
 } = require('../controllers/gamesController');
 const { premioDeCofre } = require('../controllers/shopController');
 const { premioDelRasca } = require('../controllers/gamesController');
@@ -117,7 +117,8 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         // Se recorren las que haya, no una lista escrita aqui: el dia que se
         // añada una rueda queda vigilada sin tocar la prueba. Las de XP no se
         // miden en fichas y van aparte.
-        const dePago = Object.keys(FORTUNE_COSTS).filter(m => FORTUNE_COSTS[m] > 0 && FORTUNE_PRIZES[m][0].t === 'c');
+        const soloFichas = (m) => FORTUNE_PRIZES[m].every(p => p.t === 'c');
+        const dePago = Object.keys(FORTUNE_COSTS).filter(m => FORTUNE_COSTS[m] > 0 && soloFichas(m));
         assert.ok(dePago.length >= 4, 'tiene que haber varias ruedas de pago');
         for (const modo of dePago) {
             const coste = FORTUNE_COSTS[modo];
@@ -138,7 +139,7 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         // fichas de la app. Redondeo de 1% por los enteros de los premios.
         for (const modo of Object.keys(FORTUNE_COSTS)) {
             const coste = FORTUNE_COSTS[modo];
-            if (coste === 0 || FORTUNE_PRIZES[modo][0].t !== 'c') continue;
+            if (coste === 0 || !FORTUNE_PRIZES[modo].every(p => p.t === 'c')) continue;
             const premios = FORTUNE_PRIZES[modo].map(p => p.v);
             const media = premios.reduce((a, b) => a + b, 0) / premios.length;
             assert.ok(Math.abs(media / coste - 0.85) < 0.01,
@@ -147,12 +148,40 @@ describe('Casino: ningun juego puede regalar dinero', () => {
     });
 
     test('la rueda de experiencia es modesta: un entreno da mas', () => {
-        const xp = Object.keys(FORTUNE_PRIZES).filter(m => FORTUNE_PRIZES[m][0].t === 'xp');
+        const xp = Object.keys(FORTUNE_PRIZES).filter(m => FORTUNE_PRIZES[m].every(p => p.t === 'xp'));
         for (const modo of xp) {
             const premios = FORTUNE_PRIZES[modo].map(p => p.v);
             const media = premios.reduce((a, b) => a + b, 0) / premios.length;
             assert.ok(media <= 100, `La rueda "${modo}" da ${media} XP de media: comprar niveles a golpe de ruleta`);
             assert.ok(FORTUNE_COSTS[modo] > 0, 'la de XP no puede ser gratis');
+        }
+    });
+
+    test('la rueda de vida es modesta y de pago: la vida no se compra a golpe de ruleta', () => {
+        const vida = Object.keys(FORTUNE_PRIZES).filter(m => FORTUNE_PRIZES[m].every(p => p.t === 'hp'));
+        assert.ok(vida.length >= 1, 'tiene que haber una rueda de vida');
+        for (const modo of vida) {
+            const premios = FORTUNE_PRIZES[modo].map(p => p.v);
+            const media = premios.reduce((a, b) => a + b, 0) / premios.length;
+            assert.ok(media <= 25, `La rueda "${modo}" da ${media} de vida de media: demasiado`);
+            assert.ok(FORTUNE_COSTS[modo] > 0, 'la de vida no puede ser gratis');
+        }
+    });
+
+    test('en las ruedas mezcladas, la parte en fichas sola no llega al 85%', () => {
+        // Si las fichas solas ya devolvieran el 85%, lo demas (XP, vida) seria
+        // regalo encima: la rueda saldria mejor que cualquier otra.
+        const mezcladas = Object.keys(FORTUNE_PRIZES).filter(m => {
+            const tipos = new Set(FORTUNE_PRIZES[m].map(p => p.t));
+            return tipos.size > 1;
+        });
+        assert.ok(mezcladas.length >= 1, 'tiene que haber una rueda de mezcla');
+        for (const modo of mezcladas) {
+            const coste = FORTUNE_COSTS[modo];
+            const fichas = FORTUNE_PRIZES[modo].filter(p => p.t === 'c').map(p => p.v);
+            const media = fichas.reduce((a, b) => a + b, 0) / FORTUNE_PRIZES[modo].length;
+            assert.ok(media / coste < 0.85, `La rueda "${modo}" devuelve el ${(media / coste * 100).toFixed(0)}% solo en fichas, y encima da XP y vida`);
+            assert.ok(media / coste > 0.5, `La rueda "${modo}" casi no da fichas`);
         }
     });
 
@@ -163,7 +192,7 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         for (const r of RUEDAS) {
             assert.ok(r.id && r.nombre && r.acento && r.descripcion, `rueda incompleta: ${JSON.stringify(r).slice(0, 60)}`);
             assert.ok(r.premios.length >= 6 && r.premios.length <= 8, `${r.id}: entre 6 y 8 premios, para que se lean`);
-            for (const p of r.premios) assert.ok(typeof p.v === 'number' && ['c', 'xp'].includes(p.t));
+            for (const p of r.premios) assert.ok(typeof p.v === 'number' && ['c', 'xp', 'hp'].includes(p.t));
         }
         const ids = RUEDAS.map(r => r.id);
         assert.strictEqual(new Set(ids).size, ids.length, 'dos ruedas con el mismo id');
@@ -224,11 +253,15 @@ describe('Casino: ningun juego puede regalar dinero', () => {
 
     test('en la torre, cuanto mas subes peor te sale (ninguna planta regala)', () => {
         const PROBABILIDAD_DE_ACERTAR = 2 / 3;   // 3 casillas, 1 trampa
+        // La ultima planta tiene sus propias losas y trampas.
+        const ULTIMA = (TOWER_ULTIMA.tiles - TOWER_ULTIMA.traps) / TOWER_ULTIMA.tiles;
+        const esLaUltima = (i) => i === TOWER_MULTIPLIERS.length - 1;
 
         let anterior = Infinity;
         TOWER_MULTIPLIERS.forEach((multiplicador, i) => {
             const planta = i + 1;
-            const devuelve = Math.pow(PROBABILIDAD_DE_ACERTAR, planta) * multiplicador * 100;
+            const acertarHastaAqui = Math.pow(PROBABILIDAD_DE_ACERTAR, esLaUltima(i) ? planta - 1 : planta) * (esLaUltima(i) ? ULTIMA : 1);
+            const devuelve = acertarHastaAqui * multiplicador * 100;
 
             assert.ok(devuelve < TOPE_SANO,
                 `La planta ${planta} de la torre devuelve el ${devuelve.toFixed(1)}%: REGALA dinero`);
@@ -238,6 +271,16 @@ describe('Casino: ningun juego puede regalar dinero', () => {
                 `La planta ${planta} paga mejor que la anterior: subir deberia ser mas arriesgado, no mas rentable`);
             anterior = devuelve;
         });
+    });
+
+    test('la pista de la torre no es un regalo: cuesta mas de lo que vale', () => {
+        // Pasar de 1/2 a 2/3 de acertar vale (2/3 - 1/2) = 1/6 del premio final.
+        // Si se cobrara menos, comprar la pista seria ganar dinero a la casa.
+        const sinPista = (TOWER_ULTIMA.tiles - TOWER_ULTIMA.traps) / TOWER_ULTIMA.tiles;
+        const conPista = (TOWER_ULTIMA.tiles - TOWER_ULTIMA.traps) / (TOWER_ULTIMA.tiles - 1);
+        const valeDeVerdad = conPista - sinPista;
+        assert.ok(TOWER_PISTA > valeDeVerdad, `La pista cuesta el ${(TOWER_PISTA * 100).toFixed(0)}% del premio y vale el ${(valeDeVerdad * 100).toFixed(1)}%: REGALA dinero`);
+        assert.ok(TOWER_PISTA < valeDeVerdad * 1.5, 'La pista es tan cara que nadie la compraria');
     });
 });
 

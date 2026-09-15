@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, RotateCcw } from 'lucide-react';
+import { Ficha } from './Ficha';
 
 /**
  * CUÁNTO APUESTAS.
@@ -13,7 +14,8 @@ import { Minus, Plus } from 'lucide-react';
  * porque subir era demasiado trabajo.
  *
  * Aquí se escribe el número y ya. Los botones de −/+ se quedan para el toque de
- * ajuste, y debajo hay cuatro atajos con las cantidades de siempre.
+ * ajuste, y debajo hay fichas de verdad que se echan al círculo, como en una
+ * mesa: cada una suma lo que vale.
  *
  * ⚠️ EL TOPE SE APLICA AL TECLEAR; EL MÍNIMO, AL SALIR.
  *
@@ -97,16 +99,19 @@ export default function SelectorApuesta({
 
     const alSalir = () => fijar(parseInt(texto, 10) || minimo);
 
-    // ⚠️ CUATRO ATAJOS. NI UNO MÁS.
+    // ⚠️ LAS FICHAS SUMAN, NO FIJAN.
     //
-    // La primera versión traía seis cantidades más la mitad, el doble y el todo:
-    // nueve botones debajo de una casilla en la que ya puedes escribir cualquier
-    // número. Eso no es dar opciones, es tapar la que importa. Si vas a apostar
-    // 250 lo escribes; los atajos son para los toques de siempre.
+    // Antes eran cuatro atajos que ponian la apuesta a 10, 25, 50 o 100. En una
+    // mesa de verdad no se "pone 100": se van echando fichas al circulo. Tocar
+    // una ficha la echa encima de lo que hay; para empezar de cero esta la de
+    // borrar. Y sigue pudiendose escribir el numero tocandolo.
     //
-    // Solo los que caben en tu saldo: enseñar "100" a quien tiene 60 fichas es
-    // enseñarle un botón que no puede pulsar.
-    const rapidos = [10, 25, 50, 100].filter(v => v >= minimo && v <= tope);
+    // Solo las que caben en lo que te queda: enseñar la de 500 a quien tiene
+    // 60 fichas es enseñarle una ficha que no puede coger.
+    const FICHAS = [10, 25, 50, 100, 500];
+    const actual = parseInt(texto, 10) || minimo;
+    const fichas = FICHAS.filter(v => v >= minimo && actual + v <= tope);
+    const echar = (v) => fijar(actual + v);
 
     const noLlega = saldo < minimo;
 
@@ -119,51 +124,82 @@ export default function SelectorApuesta({
                 </span>
             </div>
 
-            <div className="flex items-center gap-2 bg-black border border-white/[0.07] rounded-2xl p-1.5">
+            {/* EL CIRCULO DE APUESTA: el tapete con el aro donde se echan las
+                fichas. El numero de dentro se toca y se escribe. */}
+            <div
+                className="relative rounded-2xl border border-white/[0.07] px-2 py-2 flex items-center gap-2"
+                style={{
+                    background: 'radial-gradient(ellipse at 50% 30%, #14532d 0%, #0b3b1f 60%, #072a16 100%)',
+                    boxShadow: 'inset 0 0 24px rgba(0,0,0,0.6), 0 6px 16px rgba(0,0,0,0.5)'
+                }}
+            >
                 <button
                     type="button"
-                    onClick={() => fijar((parseInt(texto, 10) || minimo) - paso)}
+                    onClick={() => fijar(actual - paso)}
                     aria-label="Bajar la apuesta"
-                    className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform hover:text-white"
+                    className="w-10 h-10 shrink-0 rounded-full bg-black/40 border border-white/10 text-zinc-200 flex items-center justify-center active:scale-90 transition-transform"
                 >
-                    <Minus size={18} />
+                    <Minus size={16} />
                 </button>
 
-                <input
-                    type="text"
-                    inputMode="numeric"
-                    value={texto}
-                    onChange={alEscribir}
-                    onBlur={alSalir}
-                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                    onFocus={(e) => e.target.select()}
-                    aria-label="Cantidad apostada"
-                    className="flex-1 min-w-0 bg-transparent text-center text-2xl font-black text-yellow-500 tabular-nums outline-none py-1"
-                />
+                <div
+                    className="flex-1 min-w-0 h-14 rounded-full flex items-center justify-center gap-2"
+                    style={{ border: '2px dashed rgba(234,179,8,0.55)', boxShadow: 'inset 0 0 18px rgba(0,0,0,0.45)' }}
+                >
+                    <Ficha valor={actual} tamano={30} className="shrink-0" />
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        value={texto}
+                        onChange={alEscribir}
+                        onBlur={alSalir}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        onFocus={(e) => e.target.select()}
+                        aria-label="Cantidad apostada"
+                        size={Math.max(2, texto.length)}
+                        className="min-w-0 bg-transparent text-center text-[26px] font-black text-yellow-400 tabular-nums outline-none leading-none"
+                        style={{ width: `${Math.max(2, texto.length) + 0.5}ch`, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                    />
+                </div>
 
                 <button
                     type="button"
-                    onClick={() => fijar((parseInt(texto, 10) || minimo) + paso)}
+                    onClick={() => fijar(actual + paso)}
                     aria-label="Subir la apuesta"
-                    className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-300 flex items-center justify-center active:scale-90 transition-transform hover:text-white"
+                    className="w-10 h-10 shrink-0 rounded-full bg-black/40 border border-white/10 text-zinc-200 flex items-center justify-center active:scale-90 transition-transform"
                 >
-                    <Plus size={18} />
+                    <Plus size={16} />
                 </button>
             </div>
 
-            <div className="grid grid-cols-4 gap-1.5 mt-2">
-                {rapidos.map(v => (
-                    <button
-                        key={v}
-                        type="button"
-                        onClick={() => fijar(v)}
-                        className={`py-2 rounded-xl border text-xs font-black tabular-nums transition-colors ${valor === v
-                            ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-500'
-                            : 'bg-zinc-900 border-white/[0.07] text-zinc-400 hover:text-white'}`}
-                    >
-                        {v}
-                    </button>
-                ))}
+            {/* LAS FICHAS: se echan al circulo. */}
+            <div className="flex items-center justify-between mt-2 px-1">
+                <div className="flex items-center gap-1.5">
+                    {FICHAS.map(v => {
+                        const cabe = fichas.includes(v);
+                        return (
+                            <button
+                                key={v}
+                                type="button"
+                                onClick={() => cabe && echar(v)}
+                                disabled={!cabe}
+                                aria-label={`Echar una ficha de ${v}`}
+                                className={`rounded-full transition-transform ${cabe ? 'active:scale-90 hover:-translate-y-0.5' : 'opacity-25 grayscale'}`}
+                            >
+                                <Ficha valor={v} tamano={38} />
+                            </button>
+                        );
+                    })}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => fijar(minimo)}
+                    disabled={actual <= minimo}
+                    aria-label="Quitar las fichas"
+                    className="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 text-zinc-400 flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30"
+                >
+                    <RotateCcw size={15} />
+                </button>
             </div>
 
             {noLlega && (

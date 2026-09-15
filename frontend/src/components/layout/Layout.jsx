@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import useSWR, { preload } from 'swr';
 import Header from './Header';
 import Footer from './Footer';
@@ -142,6 +142,15 @@ function LayoutContent() {
         setIsUiHidden
     }), [user, setUser, setIsUiHidden]);
 
+    // ⚠️ El scroll vive en <main>, que es el MISMO nodo para todas las pantallas.
+    // Al cambiar de ruta se quedaba donde estaba: entrabas al poquer desde la
+    // mitad del casino y aparecias por la mitad de la pagina. Cada pantalla
+    // nueva empieza arriba.
+    const mainRef = useRef(null);
+    useEffect(() => {
+        mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, [location.pathname]);
+
     // Pantalla de Muerte
     if (user?.stats?.hp <= 0 || user?.hp <= 0) {
         return <RedemptionScreen user={user} setUser={setUser} />;
@@ -192,7 +201,7 @@ function LayoutContent() {
                 salga hay que arreglarlo en su sitio, o queda inalcanzable.
                 Los hijos con su propio scroll horizontal (el mapa de
                 constancia) siguen funcionando igual. */}
-            <main className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-md mx-auto relative overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pt-28 pb-safe-content px-4'}`}>
+            <main ref={mainRef} className={`flex-1 overflow-y-auto overflow-x-hidden no-scrollbar w-full max-w-md mx-auto relative overscroll-contain ${isUiHidden ? 'pt-0 pb-0' : routeHidesChrome ? 'pt-0 pb-safe-content px-4' : 'pt-28 pb-safe-content px-4'}`}>
                 {/* Pasamos el contexto memoizado a las páginas temporalmente */}
                 <Outlet context={contextValue} />
             </main>

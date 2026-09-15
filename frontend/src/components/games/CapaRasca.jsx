@@ -118,6 +118,14 @@ export default function CapaRasca({ activa, reveladas, celda, onRevelar, onRasca
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activa]);
 
+    // Las casillas que el JUEGO da por reveladas (el boton de "desvelar todo")
+    // se limpian aqui: el dedo limpia las suyas al pasar, pero estas llegan
+    // por el estado y la plata se quedaba encima de un simbolo ya contado.
+    useEffect(() => {
+        reveladas.forEach((r, i) => { if (r) limpiarCelda(i); });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reveladas]);
+
     /** Cuánto queda destapado de una casilla: se muestrea 1 de cada 4 píxeles. */
     const fraccionDestapada = (i) => {
         const canvas = canvasRef.current;

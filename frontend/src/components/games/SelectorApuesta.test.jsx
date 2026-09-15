@@ -120,28 +120,32 @@ describe('SelectorApuesta', () => {
         expect(visto).toHaveLength(0);
     });
 
-    test('los atajos son cuatro, y solo los que caben en tu saldo', async () => {
+    test('las fichas son cinco, y solo se pueden coger las que caben en tu saldo', async () => {
         const { rerender } = render(<ConPadre saldo={12000} />);
-        for (const v of [10, 25, 50, 100]) {
-            expect(screen.getByRole('button', { name: String(v) })).toBeTruthy();
+        for (const v of [10, 25, 50, 100, 500]) {
+            expect(screen.getByRole('button', { name: `Echar una ficha de ${v}` }).disabled).toBe(false);
         }
 
-        // Con 60 fichas, ensenar un boton de 100 es ensenar uno que no se puede
-        // pulsar.
+        // Con 60 fichas y 10 ya apostadas, la de 100 no cabe: se ve apagada y
+        // no se puede coger. La de 50 si (10 + 50 = 60).
         rerender(<ConPadre saldo={60} />);
-        expect(screen.queryByRole('button', { name: '100' })).toBeNull();
-        expect(screen.getByRole('button', { name: '50' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Echar una ficha de 100' }).disabled).toBe(true);
+        expect(screen.getByRole('button', { name: 'Echar una ficha de 50' }).disabled).toBe(false);
     });
 
-    test('el atajo pone su cantidad', async () => {
+    test('cada ficha SUMA lo que vale, como en una mesa; la de borrar vuelve al minimo', async () => {
         const user = userEvent.setup();
         const visto = [];
         render(<ConPadre saldo={12000} alCambiar={v => visto.push(v)} />);
 
-        await user.click(screen.getByRole('button', { name: '100' }));
+        await user.click(screen.getByRole('button', { name: 'Echar una ficha de 100' }));
+        expect(visto.at(-1)).toBe(110);   // 10 de partida + 100
+        await user.click(screen.getByRole('button', { name: 'Echar una ficha de 25' }));
+        expect(visto.at(-1)).toBe(135);
+        expect(casilla().value).toBe('135');
 
-        expect(visto.at(-1)).toBe(100);
-        expect(casilla().value).toBe('100');
+        await user.click(screen.getByRole('button', { name: 'Quitar las fichas' }));
+        expect(visto.at(-1)).toBe(10);
     });
 
     test('los botones de -/+ se mueven de paso en paso y respetan los limites', async () => {

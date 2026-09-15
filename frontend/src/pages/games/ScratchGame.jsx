@@ -169,6 +169,14 @@ export default function ScratchGame() {
     const reveladasRef = useRef(revealed);
     reveladasRef.current = revealed;
 
+    // Desvela las que falten, una cada 140 ms, como una mano rapida. La ultima
+    // dispara el resultado igual que si la hubiera rascado el dedo.
+    const desvelarTodo = () => {
+        if (!isPlaying) return;
+        const pendientes = reveladasRef.current.map((r, i) => (r ? -1 : i)).filter(i => i >= 0);
+        pendientes.forEach((i, k) => setTimeout(() => reveal(i), k * 140));
+    };
+
     const reveal = (i) => {
         // ⚠️ LA VERDAD ESTA EN EL REF, Y LOS EFECTOS FUERA DEL ESTADO.
         //
@@ -351,20 +359,23 @@ export default function ScratchGame() {
                                     />
                                 </div>
 
+                                {/* Con el carton pagado, el boton pasa a DESVELAR TODO:
+                                    rasca las casillas que queden, una tras otra, para
+                                    quien no quiere frotar nueve veces. */}
                                 <button
-                                    onClick={play}
-                                    disabled={isPlaying || currentFichas < apuesta}
+                                    onClick={isPlaying ? desvelarTodo : play}
+                                    disabled={!isPlaying && currentFichas < apuesta}
                                     className={`
                                         w-full py-4 rounded-xl font-black text-lg uppercase tracking-widest shadow-lg transition-all active:scale-95 border-b-4
                                         ${isPlaying
-                                            ? 'bg-zinc-800 text-zinc-500 border-zinc-900 cursor-default'
+                                            ? 'bg-zinc-100 hover:bg-white text-black border-zinc-400'
                                             : currentFichas < apuesta
                                                 ? 'bg-zinc-800 text-zinc-500 border-zinc-900 cursor-not-allowed'
                                                 : 'bg-yellow-500 hover:bg-yellow-400 text-black border-yellow-700'
                                         }
                                     `}
                                 >
-                                    {isPlaying ? '¡RASCA LAS CASILLAS!' : (
+                                    {isPlaying ? 'DESVELAR TODO' : (
                                         <div className="flex items-center justify-center gap-2">
                                             <span>COMPRAR CARTÓN</span>
                                             <div className="flex items-center bg-black/20 px-2 py-0.5 rounded text-sm">

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Trophy, Frown, Paintbrush, Handshake, Pencil, Check, Volume2, VolumeX } from 'lucide-react';
+import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Paintbrush, Pencil, Check, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../../store/useAuthStore';
 import RuedaRuleta from '../../components/games/RuedaRuleta';
+import MesaRuleta from '../../components/games/MesaRuleta';
+import { Ficha } from '../../components/games/Ficha';
 import { trayectoria, separadoresCruzados, RADIO_PISTA, RADIO_CASILLA, RADIO_DEFLECTORES } from '../../utils/fisicaRuleta';
 import { crearSonidoRuleta, haySonidoRuleta, cambiarSonidoRuleta } from '../../utils/sonidoRuleta';
 
@@ -21,12 +22,6 @@ const VELOCIDAD_MAXIMA = 0.95;
 // Por debajo de este radio la bola ya roza los separadores, y cada uno que
 // cruza es un clac. En la pista de fuera no toca ninguno.
 const RADIO_DONDE_HAY_SEPARADORES = 72;
-
-const TABLE_ROWS = [
-    [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
-    [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
-    [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
-];
 
 // --- LLUVIA DE FICHAS ---
 const ChipRain = ({ isFading }) => {
@@ -46,7 +41,6 @@ export default function Roulette() {
     const user = useAuthStore(state => state.user);
     const setUser = useAuthStore(state => state.setUser);
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
-    const navigate = useNavigate();
 
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
@@ -173,7 +167,6 @@ export default function Roulette() {
         }
     };
     const handleInteractionEnd = () => { setIsPointerDown(false); lastPaintedNumber.current = null; };
-    const handleNumberClick = (num) => !paintMode && placeBet('number', num, [num], 36);
 
     // --- JUGAR (BACKEND CONECTADO) ---
     const spin = async () => {
@@ -326,39 +319,9 @@ export default function Roulette() {
     };
 
     // --- ESTILOS ---
-    const getNumColor = (n) => {
-        if (n === 0) return 'bg-green-700 border-green-500';
-        const isRed = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n);
-        return isRed ? 'bg-red-700 border-red-500' : 'bg-zinc-800 border-zinc-600';
-    };
 
-    const getChipColorStyle = (val) => {
-        if (val === 10) return 'bg-red-600 border-red-400 text-white';
-        if (val === 20) return 'bg-blue-600 border-blue-400 text-white';
-        if (val === 50) return 'bg-green-600 border-green-400 text-white';
-        if (val === 100) return 'bg-zinc-900 border-zinc-500 text-white';
-        if (val === 500) return 'bg-yellow-500 border-yellow-300 text-black';
-        return 'bg-zinc-700';
-    };
 
-    const getConsolidatedChipBgColor = (totalValue) => {
-        if (totalValue >= 500) return 'bg-yellow-500 text-black';
-        if (totalValue >= 100) return 'bg-zinc-900 text-white';
-        if (totalValue >= 50) return 'bg-green-600 text-white';
-        if (totalValue >= 20) return 'bg-blue-600 text-white';
-        return 'bg-red-600 text-white';
-    };
 
-    const renderBoardChip = (filterFn) => {
-        const chipsOnSpot = bets.filter(filterFn);
-        if (chipsOnSpot.length === 0) return null;
-        const totalOnSpot = chipsOnSpot.reduce((acc, bet) => acc + bet.amount, 0);
-        return (
-            <div className={`absolute z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full border border-white shadow-lg flex items-center justify-center text-[9px] font-black leading-none ${getConsolidatedChipBgColor(totalOnSpot)} pointer-events-none animate-in zoom-in duration-200`}>
-                {totalOnSpot}
-            </div>
-        );
-    };
 
     return (
         <div className="fixed inset-0 bg-black flex flex-col items-center pt-20 overflow-hidden select-none font-sans" onMouseUp={handleInteractionEnd} onMouseLeave={handleInteractionEnd} onTouchEnd={handleInteractionEnd} onTouchMove={handleInteractionMove}>
@@ -483,16 +446,24 @@ export default function Roulette() {
                             <button onClick={() => setEditandoFicha(false)} className="p-2 rounded-xl bg-zinc-800 border border-zinc-600 text-zinc-400"><X size={18} /></button>
                         </div>
                     ) : (
-                        <div className="flex-1 flex items-center justify-center gap-1.5 overflow-x-auto no-scrollbar">
-                            {CHIP_VALUES.map((val) => (
-                                <button
-                                    key={val}
-                                    onClick={() => setSelectedChip(val)}
-                                    disabled={spinning || visualBalance < val}
-                                    aria-label={`Ficha de ${val}`}
-                                    className={`w-11 h-11 rounded-full border-2 shadow-md flex items-center justify-center font-black text-[11px] shrink-0 transition-all ${getChipColorStyle(val)} ${selectedChip === val ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-zinc-900 z-10' : 'opacity-60'} ${visualBalance < val ? 'opacity-20 grayscale' : ''}`}
-                                >{val}</button>
-                            ))}
+                        /* Las fichas, DIBUJADAS y repartidas a lo ancho: antes
+                           iban en una fila con scroll y en el movil la ultima
+                           salia cortada. La elegida se levanta de la mesa. */
+                        <div className="flex-1 flex items-center justify-between px-1">
+                            {CHIP_VALUES.map((val) => {
+                                const elegida = selectedChip === val;
+                                return (
+                                    <button
+                                        key={val}
+                                        onClick={() => setSelectedChip(val)}
+                                        disabled={spinning || visualBalance < val}
+                                        aria-label={`Ficha de ${val}`}
+                                        className={`rounded-full transition-transform disabled:opacity-25 disabled:grayscale ${elegida ? '-translate-y-1.5 scale-110 ring-2 ring-yellow-300 ring-offset-2 ring-offset-zinc-900' : 'active:scale-90'}`}
+                                    >
+                                        <Ficha valor={val} tamano={42} />
+                                    </button>
+                                );
+                            })}
 
                             {/* La de cantidad libre. Enseña su valor cuando ya lo
                                 tiene, para no perder de vista con cuánto juegas. */}
@@ -500,67 +471,33 @@ export default function Roulette() {
                                 onClick={() => { setTextoFicha(fichaLibre ? String(fichaLibre) : ''); setEditandoFicha(true); }}
                                 disabled={spinning}
                                 aria-label="Ficha de cantidad libre"
-                                className={`w-11 h-11 rounded-full border-2 border-dashed shadow-md flex items-center justify-center shrink-0 transition-all ${fichaLibre && selectedChip === fichaLibre
-                                    ? 'bg-yellow-500 border-yellow-200 text-black scale-110 ring-2 ring-white ring-offset-2 ring-offset-zinc-900 z-10'
-                                    : 'bg-zinc-800 border-zinc-500 text-zinc-300 opacity-70'}`}
+                                className={`rounded-full transition-transform ${fichaLibre && selectedChip === fichaLibre ? '-translate-y-1.5 scale-110 ring-2 ring-yellow-300 ring-offset-2 ring-offset-zinc-900' : 'active:scale-90'}`}
                             >
                                 {fichaLibre
-                                    ? <span className="font-black text-[10px] tabular-nums leading-none px-0.5">{fichaLibre >= 1000 ? `${Math.round(fichaLibre / 100) / 10}k` : fichaLibre}</span>
-                                    : <Pencil size={15} />}
+                                    ? <Ficha valor={fichaLibre} tamano={42} />
+                                    : <span className="w-[42px] h-[42px] rounded-full border-2 border-dashed border-zinc-500 bg-zinc-800 text-zinc-300 flex items-center justify-center"><Pencil size={15} /></span>}
                             </button>
                         </div>
                     )}
                 </div>
 
+                {/* LA MESA: un SVG que se estira al ancho que haya (ver
+                    MesaRuleta). Se abre de 0 a su altura. */}
                 <div
-                    className={`overflow-hidden relative flex items-center justify-center bg-zinc-950/50 transition-all duration-500 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                    style={{ height: isTableOpen ? '42vh' : 0 }}
+                    className={`overflow-hidden relative bg-zinc-950/50 transition-all duration-500 ${isTableOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                    style={{ height: isTableOpen ? 'min(42vh, 210px)' : 0 }}
                 >
-                    {/* La mesa mide 600px y se encoge. A 0,65 salian 390px: en un
-                        movil de 375 el CERO quedaba cortado por la izquierda y la
-                        columna 2:1 por la derecha. A 0,6 son 360 y cabe entera. */}
-                    <div className="transform scale-[0.6] origin-center w-full flex flex-col items-center">
-                        <div className="grid grid-cols-[50px_1fr_40px] gap-1 select-none min-w-[600px]">
-                            <button onMouseDown={() => !paintMode && placeBet('number', 0, [0], 36)} onPointerDown={() => paintMode && handleInteractionStart(0)} onMouseEnter={(e) => paintMode && isPointerDown && handleInteractionMove(e)} data-number="0" className="rounded-l-lg border border-green-700 bg-green-900/60 flex items-center justify-center text-white font-black text-xl hover:bg-green-800 relative touch-none" style={{ gridRow: '1 / span 3' }}>
-                                <span className="-rotate-90">0</span>{renderBoardChip(b => b.value === 0)}
-                            </button>
-                            <div className="grid grid-cols-12 grid-rows-3 gap-[1px]">
-                                {TABLE_ROWS.map((row) => row.map((num) => (
-                                    <button key={num} onMouseDown={() => !paintMode && handleNumberClick(num)} onPointerDown={() => paintMode && handleInteractionStart(num)} onMouseEnter={(e) => paintMode && isPointerDown && handleInteractionMove(e)} data-number={num} className={`h-12 border flex items-center justify-center text-white font-bold text-lg relative ${getNumColor(num)} hover:brightness-125 touch-none`}>
-                                        {num}{renderBoardChip(b => b.type === 'number' && b.value === num)}
-                                    </button>
-                                )))}
-                            </div>
-                            <div className="grid grid-rows-3 gap-[1px]">
-                                {[3, 2, 1].map((colNum, i) => (
-                                    <button key={i} onClick={() => placeBet('column', colNum, TABLE_ROWS[i], 3)} className="border border-zinc-600 bg-zinc-800/50 text-[10px] text-zinc-300 font-bold hover:bg-zinc-700 flex items-center justify-center relative rounded-r-lg">
-                                        <span className="-rotate-90">2:1</span>{renderBoardChip(b => b.type === 'column' && b.value === colNum)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="mt-1 grid grid-cols-[50px_1fr_40px] gap-1 min-w-[600px]">
-                            <div></div>
-                            <div className="grid grid-rows-2 gap-1">
-                                <div className="grid grid-cols-3 gap-1">
-                                    {[1, 2, 3].map((d) => (
-                                        <button key={d} onClick={() => placeBet('dozen', d, Array.from({ length: 12 }, (_, i) => i + 1 + (d - 1) * 12), 3)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-xs font-bold text-white hover:bg-zinc-700 relative">{d === 1 ? '1st 12' : d === 2 ? '2nd 12' : '3rd 12'} {renderBoardChip(b => b.type === 'dozen' && b.value === d)}</button>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-6 gap-1">
-                                    <button onClick={() => placeBet('low', 'low', Array.from({ length: 18 }, (_, i) => i + 1), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">1-18 {renderBoardChip(b => b.type === 'low')}</button>
-                                    <button onClick={() => placeBet('even', 'even', WHEEL_NUMBERS.filter(n => n !== 0 && n % 2 === 0), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">PAR {renderBoardChip(b => b.type === 'even')}</button>
-                                    <button onClick={() => placeBet('color', 'red', [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36], 2)} className="h-10 bg-red-700 border border-red-500 rounded text-[10px] font-bold text-white relative">ROJO {renderBoardChip(b => b.type === 'color' && b.value === 'red')}</button>
-                                    <button onClick={() => placeBet('color', 'black', [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35], 2)} className="h-10 bg-black border border-zinc-600 rounded text-[10px] font-bold text-white relative">NEGRO {renderBoardChip(b => b.type === 'color' && b.value === 'black')}</button>
-                                    <button onClick={() => placeBet('odd', 'odd', WHEEL_NUMBERS.filter(n => n !== 0 && n % 2 !== 0), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">IMPAR {renderBoardChip(b => b.type === 'odd')}</button>
-                                    <button onClick={() => placeBet('high', 'high', Array.from({ length: 18 }, (_, i) => i + 19), 2)} className="h-10 bg-zinc-800 border border-zinc-600 rounded text-[10px] font-bold text-white relative">19-36 {renderBoardChip(b => b.type === 'high')}</button>
-                                </div>
-                            </div>
-                            <div></div>
-                        </div>
+                    <div className="px-2 pt-2 pb-1 mx-auto" style={{ maxWidth: 440 }}>
+                        <MesaRuleta
+                            bets={bets}
+                            onApostar={placeBet}
+                            modoPintar={paintMode}
+                            onInicioPintar={handleInteractionStart}
+                            ganador={resultModal?.num ?? null}
+                            deshabilitada={spinning}
+                        />
                     </div>
                 </div>
-
 
                 <div className="px-4 pb-6 pt-2 flex gap-3 items-center bg-zinc-900 mt-auto">
                     <div className="flex gap-1">

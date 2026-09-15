@@ -33,7 +33,26 @@ const cuna = (rFuera, rDentro, a0, a1) => {
     return `M ${x0} ${y0} A ${rFuera} ${rFuera} 0 0 1 ${x1} ${y1} L ${x2} ${y2} A ${rDentro} ${rDentro} 0 0 0 ${x3} ${y3} Z`;
 };
 
-const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, iconoCentro = null }, ref) {
+/** El icono de un premio segun en que paga: ficha, rayo de XP o corazon. */
+const IconoPremio = ({ tipo }) => {
+    if (tipo === 'xp') {
+        return (
+            <g transform="translate(0 -91)">
+                <path d="M 3 -11 L -7 2 L -1 2 L -3 11 L 7 -2 L 1 -2 Z" fill="#22d3ee" stroke="#0e7490" strokeWidth="0.8" strokeLinejoin="round" />
+            </g>
+        );
+    }
+    if (tipo === 'hp') {
+        return (
+            <g transform="translate(0 -91)">
+                <path d="M 0 9 C -12 0 -12 -10 -6 -10 C -3 -10 -1 -8 0 -6 C 1 -8 3 -10 6 -10 C 12 -10 12 0 0 9 Z" fill="#f43f5e" stroke="#9f1239" strokeWidth="0.8" />
+            </g>
+        );
+    }
+    return <image href="/assets/icons/ficha.png" x="-13" y="-104" width="26" height="26" />;
+};
+
+const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, iconoCentro = null, girando = false, ganadora = null }, ref) {
     const discoRef = useRef(null);
     const lenguetaRef = useRef(null);
 
@@ -46,6 +65,14 @@ const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, i
 
     return (
         <svg viewBox="-200 -215 400 415" className="w-full h-full" style={{ overflow: 'visible' }}>
+            <style>{`
+                /* Las bombillas se persiguen mientras gira, y parpadean cuando toca. */
+                @keyframes rfBombilla { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+                .rf-bombilla-on { animation: rfBombilla 0.5s ease-in-out infinite; }
+                @keyframes rfGanadora { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.75; } }
+                .rf-ganadora { animation: rfGanadora 0.55s ease-in-out infinite; }
+                @media (prefers-reduced-motion: reduce) { .rf-bombilla-on, .rf-ganadora { animation: none; opacity: 0.7; } }
+            `}</style>
             <defs>
                 <radialGradient id="rf-aro" cx="40%" cy="30%" r="80%">
                     <stop offset="0%" stopColor="#8b1a1a" />
@@ -88,11 +115,15 @@ const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, i
 
             {/* ── LO QUE NO GIRA: el aro y las bombillas ─────────────────── */}
             <circle r="200" fill="url(#rf-aro)" stroke="#1a0404" strokeWidth="3" />
-            {bombillas.map(a => {
+            {bombillas.map((a, i) => {
                 const [x, y] = punto(193, a);
+                // Girando: se persiguen (cada una con su retraso). Parada: todas
+                // encendidas a medias, y si hay ganadora, parpadean a la vez.
+                const clase = girando || ganadora !== null ? 'rf-bombilla-on' : '';
+                const retraso = girando ? `${(i % 3) * 0.16}s` : '0s';
                 return (
                     <g key={a}>
-                        <circle cx={x} cy={y} r="6.5" fill="#ffd54a" opacity="0.25" />
+                        <circle cx={x} cy={y} r="6.5" fill="#ffd54a" opacity="0.25" className={clase} style={{ animationDelay: retraso }} />
                         <circle cx={x} cy={y} r="4" fill="url(#rf-bombilla)" stroke="#6b4a00" strokeWidth="0.5" />
                     </g>
                 );
@@ -110,6 +141,10 @@ const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, i
                     <path key={`c${i}`} d={cuna(180, 40, i * seg, (i + 1) * seg)} fill={p.color} stroke="#000" strokeWidth="0.8" />
                 ))}
                 <circle r="180" fill="url(#rf-hondo)" pointerEvents="none" />
+                {/* La cuña que ha tocado, encendida */}
+                {ganadora !== null && premios[ganadora] && (
+                    <path d={cuna(180, 40, ganadora * seg, (ganadora + 1) * seg)} fill="#fff" className="rf-ganadora" pointerEvents="none" />
+                )}
 
                 {/* Las rayas entre premios, de latón */}
                 {premios.map((_, i) => {
@@ -118,7 +153,12 @@ const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, i
                     return <line key={`r${i}`} x1={xf} y1={yf} x2={xd} y2={yd} stroke="url(#rf-laton)" strokeWidth="2.5" />;
                 })}
 
-                {/* Las etiquetas, con la cabeza hacia fuera */}
+                {/* Las etiquetas, con la cabeza hacia fuera.
+                    ⚠️ SIN FILTROS DE SOMBRA: iban con `feDropShadow` y un filtro
+                    dentro del grupo que gira se recalcula en cada frame, ocho
+                    veces por vuelta de reloj. En el movil era el tiron del giro.
+                    El relieve se hace con un trazo oscuro por debajo del texto
+                    (`paint-order: stroke`), que no cuesta nada. */}
                 {premios.map((p, i) => {
                     const a = i * seg + seg / 2;
                     return (
@@ -128,10 +168,10 @@ const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, i
                                 textAnchor="middle"
                                 dominantBaseline="middle"
                                 fill="#fff"
-                                filter="url(#rf-sombra)"
-                                style={{ font: '900 30px ui-sans-serif, system-ui, sans-serif', letterSpacing: '-1px' }}
+                                stroke="#000" strokeWidth="5" strokeLinejoin="round"
+                                style={{ font: '900 30px ui-sans-serif, system-ui, sans-serif', letterSpacing: '-1px', paintOrder: 'stroke' }}
                             >{p.label}</text>
-                            <image href="/assets/icons/ficha.png" x="-13" y="-104" width="26" height="26" filter="url(#rf-sombra)" />
+                            <IconoPremio tipo={p.tipo} />
                         </g>
                     );
                 })}
@@ -166,7 +206,7 @@ const RuedaFortuna = forwardRef(function RuedaFortuna({ premios, rotacion = 0, i
             <g transform="translate(0 -206)">
                 <g ref={lenguetaRef} style={{ transformOrigin: '0px 0px', willChange: 'transform' }}>
                     {/* La pestaña: de goma roja con canto claro, y apunta hacia abajo */}
-                    <path d="M -9 0 L 9 0 L 3 40 L 0 46 L -3 40 Z" fill="#e11d48" stroke="#7f0d2a" strokeWidth="1.2" filter="url(#rf-sombra)" />
+                    <path d="M -9 0 L 9 0 L 3 40 L 0 46 L -3 40 Z" fill="#e11d48" stroke="#7f0d2a" strokeWidth="1.2" />
                     <path d="M -6 4 L -2 36" stroke="#fff" strokeWidth="1.2" opacity="0.35" strokeLinecap="round" />
                 </g>
                 {/* El tornillo */}

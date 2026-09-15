@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bomb, Coins, Loader2, TrendingUp, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { Bomb, Coins, Loader2, TrendingUp, Trophy, Volume2, VolumeX, Lightbulb } from 'lucide-react';
 import { crearSonidoTorre } from '../../utils/sonidoTorre';
 import { haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
 
 // Lo que tarda en saberse si la losa aguanta, como MINIMO. El servidor
-// contesta en el acto, y eso mata la tension: pisas y ya. Medio segundo con la
-// losa hundida bajo el pie, sin saber, es el juego entero.
-const SUSPENSE = 520;
+// contesta en el acto, y eso mata la tension: pisas y ya. Un momento con la
+// losa hundida bajo el pie, sin saber, es el juego entero. Era 520 y se
+// sentia como lag: el servidor ya tarda lo suyo desde el movil.
+const SUSPENSE = 380;
 import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
@@ -40,7 +41,13 @@ export default function TowerGame() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
     const [result, setResult] = useState(null);       // { status, payout }
-    const [revealed, setRevealed] = useState({});      // { [planta]: losaTrampa }
+    const [revealed, setRevealed] = useState({});      // { [planta]: [losasTrampa] }
+    // La ultima planta: cuantas losas y cuantas trampas. Lo manda el servidor.
+    const [ultima, setUltima] = useState({ tiles: 4, traps: 2 });
+    // La pista: la trampa de la ultima planta que el servidor ha destapado, y
+    // lo que cuesta comprarla (tambien del servidor: sale del premio final).
+    const [pista, setPista] = useState(null);
+    const [pistaCoste, setPistaCoste] = useState(0);
     // La losa que se esta pisando ahora mismo, hundida y sin resolver.
     const [pisando, setPisando] = useState(null);      // { planta, tile }
     // Que losa pisaste en cada planta superada. `revealed` solo guarda donde
@@ -65,6 +72,13 @@ export default function TowerGame() {
     };
 
     const jugando = !!token;
+
+    // Con doce plantas la torre no cabe: la planta en la que estas se trae al
+    // centro segun subes.
+    const filaActualRef = useRef(null);
+    useEffect(() => {
+        filaActualRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    }, [floor, jugando]);
     const acumulado = floor > 0 && multipliers.length ? Math.round(bet * multipliers[floor - 1]) : 0;
     const siguiente = multipliers.length ? Math.round(bet * multipliers[Math.min(floor, multipliers.length - 1)]) : 0;
 
@@ -77,11 +91,13 @@ export default function TowerGame() {
     const empezar = async () => {
         if (busy) return;
         if (bet > fichas) { setError('No te llegan las fichas'); return; }
-        setBusy(true); setError(null); setResult(null); setRevealed({}); setRota(null); setPisando(null); setPisadas({});
+        setBusy(true); setError(null); setResult(null); setRevealed({}); setRota(null); setPisando(null); setPisadas({}); setPista(null);
         try {
             const res = await api.post('/games/tower', { action: 'start', bet });
             setToken(res.data.token);
             setMultipliers(res.data.multipliers);
+            if (res.data.ultima) setUltima(res.data.ultima);
+            setPistaCoste(res.data.pistaCoste || 0);
             setFloor(0);
             // El cobro lo hace el servidor: reflejamos el saldo al momento
             setUser(prev => {
@@ -115,7 +131,7 @@ export default function TowerGame() {
             if (falta > 0) await new Promise(r => setTimeout(r, falta));
 
             setPisando(null);
-            setRevealed(prev => ({ ...prev, [plantaActual]: d.trapTile }));
+            setRevealed(prev => ({ ...prev, [plantaActual]: d.trapTiles }));
             setPisadas(prev => ({ ...prev, [plantaActual]: tile }));
 
             if (d.status === 'playing') {
@@ -143,6 +159,22 @@ export default function TowerGame() {
         } finally { setBusy(false); }
     };
 
+    // La pista: solo en la ultima planta. Destapa una de las dos trampas.
+    const comprarPista = async () => {
+        if (busy || !token || pista !== null) return;
+        if (fichas < pistaCoste) { setError('No te llegan las fichas para la pista'); return; }
+        setBusy(true); setError(null);
+        try {
+            const res = await api.post('/games/tower', { action: 'hint', token });
+            setToken(res.data.token);
+            setPista(res.data.pista);
+            sincronizar(res.data.user);
+            sonidoRef.current?.aguanta(floor);
+        } catch (e) {
+            setError(e.response?.data?.message || 'No se pudo comprar la pista');
+        } finally { setBusy(false); }
+    };
+
     const retirarse = async () => {
         if (busy || !token || floor === 0) return;
         setBusy(true); setError(null);
@@ -158,7 +190,9 @@ export default function TowerGame() {
         } finally { setBusy(false); }
     };
 
-    const plantas = multipliers.length ? multipliers : [1.4, 2.0, 2.8, 3.9, 5.5, 7.7, 10.8, 15.0];
+    const plantas = multipliers.length ? multipliers : [1.4, 2.0, 2.8, 3.9, 5.5, 7.7, 10.8, 15.0, 21, 29, 40, 70];
+    const laUltima = plantas.length - 1;
+    const enLaUltima = jugando && floor === laUltima;
 
     return (
         <div className="fixed inset-0 bg-black flex flex-col items-center pt-28 overflow-hidden select-none">
@@ -187,7 +221,7 @@ export default function TowerGame() {
             <div className="w-full max-w-sm px-5 flex-1 flex flex-col min-h-0">
                 <h1 className="text-3xl font-black text-white not-italic uppercase tracking-tighter text-center">LA TORRE</h1>
                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest text-center mt-1 mb-3">
-                    Sube sin pisar la trampa · retírate cuando quieras
+                    Sube sin pisar la trampa · arriba hay dos, y una pista
                 </p>
 
                 <style>{`
@@ -199,11 +233,11 @@ export default function TowerGame() {
                         60%  { transform: translateY(-2px); }
                         100% { transform: translateY(0); }
                     }
-                    /* Se rompe: se raja, se ladea y cae. */
+                    /* Se rompe: se raja, se ladea y cae. La perspectiva va aqui. */
                     @keyframes torreRomper {
-                        0%   { transform: translateY(4px) rotateX(0deg); opacity: 1; }
-                        25%  { transform: translateY(6px) rotateX(-8deg) rotateZ(2deg); }
-                        100% { transform: translateY(70px) rotateX(-70deg) rotateZ(-6deg); opacity: 0.18; }
+                        0%   { transform: perspective(700px) translateY(4px) rotateX(0deg); opacity: 1; }
+                        25%  { transform: perspective(700px) translateY(6px) rotateX(-8deg) rotateZ(2deg); }
+                        100% { transform: perspective(700px) translateY(70px) rotateX(-70deg) rotateZ(-6deg); opacity: 0.18; }
                     }
                     /* Y la torre entera tiembla. */
                     @keyframes torreTemblor {
@@ -222,25 +256,36 @@ export default function TowerGame() {
                     }
                 `}</style>
 
-                {/* TORRE: de la planta más alta a la más baja */}
-                <div className={`flex-1 overflow-y-auto no-scrollbar flex flex-col-reverse gap-1.5 pb-3 ${rota !== null ? 'torre-tiembla' : ''}`} style={{ perspective: 700 }}>
+                {/* TORRE: de la planta más alta a la más baja.
+                    ⚠️ Sin `perspective` ni `will-change` en todas las losas: eran
+                    36 capas compuestas en un contenedor con scroll, y en el movil
+                    el toque tardaba en responder. La perspectiva de la losa que
+                    se rompe va en su propio transform. */}
+                <div className={`flex-1 overflow-y-auto no-scrollbar flex flex-col-reverse gap-1.5 pb-3 ${rota !== null ? 'torre-tiembla' : ''}`}>
                     {plantas.map((mult, planta) => {
                         const esActual = jugando && planta === floor;
                         const superada = planta < floor;
-                        const trampa = revealed[planta];
+                        const trampas = revealed[planta];
+                        const esLaUltima = planta === laUltima;
+                        const losas = esLaUltima ? ultima.tiles : TILES;
 
                         return (
-                            <div key={planta} className={`flex items-center gap-2 transition-opacity ${esActual || superada || result ? 'opacity-100' : 'opacity-35'}`}>
+                            <div key={planta} ref={esActual ? filaActualRef : undefined} className={`flex items-center gap-2 transition-opacity ${esActual || superada || result ? 'opacity-100' : 'opacity-35'}`}>
                                 <span className={`w-12 shrink-0 text-right text-[10px] font-black tabular-nums ${esActual ? 'text-emerald-400' : 'text-zinc-600'}`}>
                                     x{mult}
                                 </span>
-                                <div className="flex-1 grid grid-cols-3 gap-1.5">
-                                    {Array.from({ length: TILES }).map((_, tile) => {
-                                        const esTrampaRevelada = trampa !== undefined && tile === trampa;
-                                        const esSegura = trampa !== undefined && tile !== trampa;
+                                <div className={`flex-1 grid gap-1.5 ${losas === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                                    {Array.from({ length: losas }).map((_, tile) => {
+                                        // La pista destapa una trampa de la ultima planta
+                                        // antes de pisar nada.
+                                        const marcadaPorPista = esLaUltima && esActual && pista === tile;
+                                        const esTrampaRevelada = (trampas !== undefined && trampas.includes(tile)) || marcadaPorPista;
+                                        const esSegura = trampas !== undefined && !trampas.includes(tile);
                                         const laPisada = superada && pisadas[planta] === tile && !pisando;
                                         const hundida = pisando?.planta === planta && pisando?.tile === tile;
-                                        const seRompe = esTrampaRevelada && rota === planta;
+                                        // Se rompe SOLO la que pisaste: arriba hay dos trampas
+                                        // y la otra se ve, pero no se cae.
+                                        const seRompe = rota === planta && pisadas[planta] === tile;
 
                                         // Losas de piedra con su canto: la cara de arriba mas clara,
                                         // el borde de abajo mas oscuro. Es lo que las hace pisables.
@@ -262,10 +307,10 @@ export default function TowerGame() {
                                         return (
                                             <button
                                                 key={tile}
-                                                disabled={!esActual || busy}
+                                                disabled={!esActual || busy || marcadaPorPista}
                                                 onClick={() => pisar(tile)}
                                                 className={`h-11 rounded-xl font-black text-sm flex items-center justify-center disabled:cursor-default ${clase} ${animacion}`}
-                                                style={{ ...estilo, willChange: 'transform' }}
+                                                style={hundida || seRompe ? { ...estilo, willChange: 'transform' } : estilo}
                                             >
                                                 {esTrampaRevelada ? <Bomb size={16} /> : esSegura && superada ? <Coins size={16} /> : esActual ? '?' : ''}
                                             </button>
@@ -300,6 +345,18 @@ export default function TowerGame() {
                                 <p className="text-2xl font-black text-white leading-none mt-1">{siguiente}</p>
                             </div>
                         </div>
+                        {enLaUltima && (
+                            <button
+                                onClick={comprarPista}
+                                disabled={busy || pista !== null || fichas < pistaCoste}
+                                className={`w-full mb-2 py-3 rounded-2xl font-black uppercase tracking-widest text-xs border-b-4 active:scale-95 transition-transform flex items-center justify-center gap-2 ${pista !== null
+                                    ? 'bg-zinc-800 text-zinc-500 border-zinc-900'
+                                    : 'bg-yellow-400 text-black border-yellow-700 disabled:opacity-40'}`}
+                            >
+                                <Lightbulb size={15} />
+                                {pista !== null ? 'Pista comprada: una trampa menos' : `Pista: destapa una trampa · ${pistaCoste}`}
+                            </button>
+                        )}
                         <button
                             onClick={retirarse}
                             disabled={busy || floor === 0}
