@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
 import BodyMap from '../body/BodyMap';
 import ZoomableImage from './ZoomableImage';
 import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy, BookmarkPlus, Check, Trash2 } from 'lucide-react';
@@ -10,6 +11,16 @@ import ConfirmDialog from '../common/ConfirmDialog';
 import MarcoPerfil from '../common/MarcoPerfil';
 import { loQueHasLevantado } from '../../utils/loQueHasLevantado';
 import CancionDelPost from './CancionDelPost';
+
+const fetcher = (url) => api.get(url).then(r => r.data);
+
+/** El texto de un comentario con los @nombres resaltados. */
+const TextoConMenciones = ({ texto }) => {
+    const trozos = String(texto || '').split(/(@[a-zA-Z0-9_.-]{2,30})/g);
+    return trozos.map((t, i) => t.startsWith('@')
+        ? <span key={i} className="text-blue-400 font-black">{t}</span>
+        : <span key={i}>{t}</span>);
+};
 
 // --- HELPER: TIEMPO RELATIVO ---
 // Hasta una semana se cuenta en relativo ("hace 3 h"); a partir de ahí se pone
@@ -151,10 +162,27 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
         if (linkProfile && author._id) navigate(`/social/user/${author._id}`);
     };
 
+    // El corazon late al darle, y el grande sale al doble toque sobre la foto.
+    const [latiendo, setLatiendo] = useState(false);
+    const [corazonGrande, setCorazonGrande] = useState(false);
+    const ultimoToque = useRef(0);
+    const dobleToque = () => {
+        const ahora = Date.now();
+        if (ahora - ultimoToque.current < 320) {
+            ultimoToque.current = 0;
+            setCorazonGrande(true);
+            setTimeout(() => setCorazonGrande(false), 900);
+            if (!liked) handleLike();
+        } else {
+            ultimoToque.current = ahora;
+        }
+    };
+
     const handleLike = async () => {
         if (likeBusy) return;
         setLikeBusy(true);
         const nextLiked = !liked;
+        if (nextLiked) { setLatiendo(true); setTimeout(() => setLatiendo(false), 500); }
         setLiked(nextLiked);
         setLikesCount(c => c + (nextLiked ? 1 : -1));
         try {
@@ -197,6 +225,24 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
     /** ¿Puedo quitar este comentario? El mío, o cualquiera si el post es mío. */
     const puedoBorrarComentario = (c) =>
         soyElAutor || (yo?._id && c.user?._id && String(yo._id) === String(c.user._id));
+
+    // LAS SUGERENCIAS DE @: se piden los amigos solo cuando abres los
+    // comentarios (una vez, en cache), y se filtran por lo que hay detras de la
+    // ultima arroba escrita.
+    const { data: amigosData } = useSWR(showComments ? '/social/friends' : null, fetcher);
+    const arrobaAbierta = useMemo(() => {
+        const m = commentText.match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
+        return m ? m[1].toLowerCase() : null;
+    }, [commentText]);
+    const sugerencias = useMemo(() => {
+        if (arrobaAbierta === null) return [];
+        const amigos = amigosData?.friends || [];
+        return amigos.filter(a => a.username?.toLowerCase().startsWith(arrobaAbierta)).slice(0, 5);
+    }, [arrobaAbierta, amigosData]);
+    const mencionar = (nombre) => {
+        setCommentText(t => t.replace(/@([a-zA-Z0-9_.-]*)$/, `@${nombre} `));
+    };
+
 
     const handleAddComment = async () => {
         const text = commentText.trim();
@@ -320,9 +366,14 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                     >
                         {slides.map((slide, i) => (
                             // Formato cuadrado y a pantalla completa, como una publicación de IG
-                            <div key={i} className="min-w-full aspect-square snap-center relative">
+                            <div key={i} className="min-w-full aspect-square snap-center relative" onClick={dobleToque}>
                                 {slide === 'photo' && (
                                     <ZoomableImage src={post.photo} alt="Foto del entreno" />
+                                )}
+                                {corazonGrande && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                                        <Heart size={96} className="text-white fill-white corazon-grande drop-shadow-[0_6px_20px_rgba(0,0,0,0.6)]" />
+                                    </div>
                                 )}
 
                                 {slide === 'body' && (
@@ -474,20 +525,35 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                 </div>
             )}
 
-            {/* ACCIONES */}
-            <div className="flex items-center gap-5 px-4 pt-3">
-                <button onClick={handleLike} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-                    <Heart size={24} className={liked ? 'text-red-500 fill-red-500' : 'text-white'} />
-                    <span className={`text-xs font-black ${liked ? 'text-red-500' : 'text-zinc-400'}`}>{likesCount}</span>
+            {/* ACCIONES. Botones con cuerpo: pastillas con fondo, el corazon
+                late al darle, y el contador cambia de color con el estado. */}
+            <style>{`
+                @keyframes latido { 0% { transform: scale(1); } 30% { transform: scale(1.45); } 55% { transform: scale(0.9); } 100% { transform: scale(1); } }
+                .corazon-late { animation: latido 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+                @keyframes corazonGrande { 0% { transform: scale(0.3); opacity: 0; } 25% { transform: scale(1.15); opacity: 1; } 70% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.1); opacity: 0; } }
+                .corazon-grande { animation: corazonGrande 0.9s ease-out forwards; }
+            `}</style>
+            <div className="flex items-center gap-2 px-4 pt-3">
+                <button
+                    onClick={handleLike}
+                    aria-label={liked ? 'Quitar me gusta' : 'Me gusta'}
+                    aria-pressed={liked}
+                    className={`flex items-center gap-1.5 h-9 px-3 rounded-full border transition-all active:scale-90 ${liked ? 'bg-red-500/15 border-red-500/40 text-red-400' : 'bg-white/[0.04] border-white/[0.08] text-white'}`}
+                >
+                    <Heart size={19} className={`${liked ? 'fill-red-500 text-red-500' : ''} ${latiendo ? 'corazon-late' : ''}`} />
+                    <span className="text-xs font-black tabular-nums not-italic">{likesCount}</span>
                 </button>
-                <button onClick={() => setShowComments(s => !s)} className="flex items-center gap-1.5 active:scale-90 transition-transform">
-                    <MessageCircle size={24} className={showComments ? 'text-blue-400' : 'text-white'} />
+                <button
+                    onClick={() => setShowComments(s => !s)}
+                    aria-label="Comentarios"
+                    aria-expanded={showComments}
+                    className={`flex items-center gap-1.5 h-9 px-3 rounded-full border transition-all active:scale-90 ${showComments ? 'bg-blue-500/15 border-blue-500/40 text-blue-400' : 'bg-white/[0.04] border-white/[0.08] text-white'}`}
+                >
+                    <MessageCircle size={19} />
                     {/* El feed manda solo los ultimos 20 comentarios, asi que la
                         cuenta sale del total que envia el servidor. Si no, un post
                         con 300 comentarios ensenaria un 20. */}
-                    <span className={`text-xs font-black ${showComments ? 'text-blue-400' : 'text-zinc-400'}`}>
-                        {Math.max(totalComentarios, comments.length)}
-                    </span>
+                    <span className="text-xs font-black tabular-nums not-italic">{Math.max(totalComentarios, comments.length)}</span>
                 </button>
 
                 {/* Copiar este entreno a mis rutinas */}
@@ -496,14 +562,14 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                         onClick={guardarComoRutina}
                         disabled={guardando || guardada}
                         aria-label="Guardar este entreno en mis rutinas"
-                        className="ml-auto flex items-center gap-1.5 active:scale-90 transition-transform disabled:opacity-100"
+                        className={`ml-auto flex items-center gap-1.5 h-9 px-3 rounded-full border transition-all active:scale-90 disabled:opacity-100 ${guardada ? 'bg-green-500/15 border-green-500/40 text-green-400' : 'bg-white/[0.04] border-white/[0.08] text-white'}`}
                     >
                         {guardando
-                            ? <Loader2 size={22} className="animate-spin text-zinc-400" />
+                            ? <Loader2 size={17} className="animate-spin" />
                             : guardada
-                                ? <Check size={22} className="text-green-500" />
-                                : <BookmarkPlus size={22} className="text-white" />}
-                        <span className={`text-[10px] font-black uppercase tracking-wide ${guardada ? 'text-green-500' : 'text-zinc-400'}`}>
+                                ? <Check size={17} />
+                                : <BookmarkPlus size={17} />}
+                        <span className="text-[10px] font-black uppercase tracking-wide not-italic">
                             {guardada ? 'Guardada' : 'Guardar'}
                         </span>
                     </button>
@@ -520,12 +586,16 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                     {comments.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Sé el primero en comentar.</p>}
                     {comments.map((c, i) => (
                         <div key={c._id || i} className="flex items-start gap-2">
-                            <div className="w-7 h-7 rounded-full bg-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500 border border-white/10 shrink-0 overflow-hidden">
-                                {c.user?.avatar ? <img src={c.user.avatar} className="w-full h-full object-cover" /> : c.user?.username?.charAt(0)}
+                            {/* El avatar con SU marco, como en todas partes */}
+                            <div className="relative shrink-0 mt-0.5">
+                                <div className="w-7 h-7 rounded-full bg-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500 border border-white/10 overflow-hidden">
+                                    {c.user?.avatar ? <img src={c.user.avatar} className="w-full h-full object-cover" alt="" /> : c.user?.username?.charAt(0)}
+                                </div>
+                                <MarcoPerfil marco={c.user?.frame} tamano={36} desborde={4} />
                             </div>
                             <div className="bg-zinc-900 rounded-2xl px-3 py-2 flex-1 min-w-0">
                                 <span className="text-[11px] font-black text-white mr-1">{c.user?.username}</span>
-                                <span className="text-[11px] text-zinc-300 break-words">{c.text}</span>
+                                <span className="text-[11px] text-zinc-300 break-words"><TextoConMenciones texto={c.text} /></span>
                             </div>
 
                             {/* El corazón del comentario. Va fuera de la burbuja y a
@@ -561,13 +631,32 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                         </div>
                     ))}
 
+                    {/* Al escribir @, los amigos que encajan: un toque y se mete
+                        el nombre. Mencionar a alguien le avisa en su buzon. */}
+                    {sugerencias.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                            {sugerencias.map(a => (
+                                <button
+                                    key={a._id}
+                                    type="button"
+                                    onClick={() => mencionar(a.username)}
+                                    className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px] font-black active:scale-95 transition-transform"
+                                >
+                                    <span className="w-5 h-5 rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center text-[9px] text-zinc-400">
+                                        {a.avatar ? <img src={a.avatar} className="w-full h-full object-cover" alt="" /> : a.username?.charAt(0)}
+                                    </span>
+                                    @{a.username}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex items-center gap-2 pt-1">
                         <input
                             type="text"
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                            placeholder="Escribe un comentario..."
+                            onKeyDown={(e) => e.key === 'Enter' && sugerencias.length === 0 && handleAddComment()}
+                            placeholder="Escribe un comentario... @ para mencionar"
                             maxLength={300}
                             className="flex-1 bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2 text-xs text-white outline-none focus:border-blue-500/50 placeholder:text-zinc-600"
                         />

@@ -41,7 +41,7 @@ class AudioFalso {
 let observadores = [];
 
 class ObservadorFalso {
-    constructor(cb) { this.cb = cb; observadores.push(this); }
+    constructor(cb, opciones) { this.cb = cb; this.opciones = opciones; observadores.push(this); }
     observe(nodo) { this.nodo = nodo; }
     disconnect() { observadores = observadores.filter(o => o !== this); }
     /** Simula que la tarjeta entra o sale de la pantalla. */
@@ -199,15 +199,33 @@ describe('Al pasar de largo', () => {
         expect(sonando.pausas).toBe(1);
     });
 
-    test('verse a medias no basta para arrancar', async () => {
-        // Con menos de la mitad visible, bajando rápido se disparaban y se
-        // cortaban cinco canciones seguidas y sonaba a avería.
+    test('se vigila la publicacion entera y suena la que cruza el centro de la pantalla', () => {
+        // La barrita de la cancion mide 32 px y va al pie: vigilandose a si
+        // misma, la cancion arrancaba cuando ya mirabas la foto de la SIGUIENTE
+        // y se cortaba con la tuya aun a la vista. Se vigila el <article> y
+        // la franja central, como en Instagram.
+        cambiarSonido(true);
+        render(<article><CancionDelPost cancion={CANCION} /></article>);
+
+        expect(observadores[0].nodo.tagName).toBe('ARTICLE');
+        expect(observadores[0].opciones.rootMargin).toMatch(/-40%/);
+    });
+
+    test('al volver a la publicacion, retoma donde iba en vez de quedarse muda', async () => {
+        // `arrancar` salia sin hacer nada si ya habia reproductor (pausado):
+        // pasabas de largo, volvias, y la cancion no sonaba nunca mas.
         cambiarSonido(true);
         render(<CancionDelPost cancion={CANCION} />);
+        await entraEnPantalla();
+        expect(reproductores[0].reproducciones).toBe(1);
 
-        await act(async () => { observadores.forEach(o => o.ver(0.3)); });
+        await act(async () => { observadores.forEach(o => o.ver(0)); });
+        expect(reproductores[0].pausas).toBe(1);
 
-        expect(reproductores).toHaveLength(0);
+        reproductores[0].paused = true;
+        await entraEnPantalla();
+        expect(reproductores).toHaveLength(1);
+        expect(reproductores[0].reproducciones).toBe(2);
     });
 });
 

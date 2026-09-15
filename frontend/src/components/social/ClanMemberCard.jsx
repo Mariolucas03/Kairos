@@ -1,4 +1,5 @@
-import { Crown, ChevronDown, Trash2, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { Crown, Trash2, Shield, MoreHorizontal, X } from 'lucide-react';
 import { getLevelStyle, RANK_CONFIG } from '../../utils/socialHelpers';
 import MarcoPerfil from '../common/MarcoPerfil';
 
@@ -20,6 +21,11 @@ export default function ClanMemberCard({
     maxContribution = 0,
     unit = ''
 }) {
+    // Los controles del lider van ESCONDIDOS detras de un boton pequeño: antes
+    // cada miembro llevaba una fila entera con un desplegable y la lista del
+    // clan era el doble de alta para el lider que para los demas.
+    const [gestionando, setGestionando] = useState(false);
+
     if (!member) return null;
 
     const rankData = RANK_CONFIG[member.clanRank || 'esclavo'];
@@ -102,29 +108,40 @@ export default function ClanMemberCard({
                 </div>
             </div>
 
-            {/* Controles del líder */}
+            {/* Controles del líder: un boton pequeño, y solo al abrirlo los rangos */}
             {canManage && (
-                <div className="flex items-center justify-end gap-2 mt-2.5 pt-2.5 border-t border-white/[0.07]">
-                    <div className="relative">
-                        <select
-                            className="bg-zinc-900 text-[9px] text-zinc-300 font-bold py-1 pl-2 pr-5 rounded-lg border border-zinc-700 outline-none appearance-none"
-                            value={member.clanRank || 'esclavo'}
-                            onChange={(e) => onUpdateRank(member._id, e.target.value)}
-                        >
-                            {availableOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt.toUpperCase()}</option>
-                            ))}
-                        </select>
-                        <ChevronDown size={10} className="absolute right-1 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-                    </div>
+                <>
                     <button
-                        onClick={() => onKick(member)}
-                        className="bg-red-900/20 p-1.5 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
-                        title="Expulsar"
+                        onClick={() => setGestionando(g => !g)}
+                        aria-label={gestionando ? 'Cerrar' : `Gestionar a ${member.username}`}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-lg bg-black/60 border border-white/10 text-zinc-400 flex items-center justify-center active:scale-90 transition-transform"
                     >
-                        <Trash2 size={12} />
+                        {gestionando ? <X size={12} /> : <MoreHorizontal size={12} />}
                     </button>
-                </div>
+                    {gestionando && (
+                        <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-white/[0.07] flex-wrap">
+                            {availableOptions.map(opt => {
+                                const r = RANK_CONFIG[opt];
+                                const activo = (member.clanRank || 'esclavo') === opt;
+                                return (
+                                    <button
+                                        key={opt}
+                                        onClick={() => { onUpdateRank(member._id, opt); setGestionando(false); }}
+                                        className={`text-[9px] font-black px-2 py-1 rounded-lg border uppercase tracking-wider transition-all active:scale-95 ${activo ? r.color : 'text-zinc-500 border-white/[0.07] bg-white/[0.02]'}`}
+                                    >
+                                        {r.label}
+                                    </button>
+                                );
+                            })}
+                            <button
+                                onClick={() => onKick(member)}
+                                className="ml-auto flex items-center gap-1 text-[9px] font-black uppercase px-2 py-1 rounded-lg border border-red-500/30 bg-red-900/20 text-red-400 active:scale-95 transition-transform"
+                            >
+                                <Trash2 size={11} /> Expulsar
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

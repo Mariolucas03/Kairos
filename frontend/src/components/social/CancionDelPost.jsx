@@ -24,11 +24,6 @@ import { haySonido, cambiarSonido, suscribirseAlSonido } from '../../utils/sonid
  */
 const AVISO = 'kairos:cancion-sonando';
 
-// Cuánto tiene que verse la tarjeta para que arranque. La mitad: con menos, al
-// bajar rápido se disparan y se cortan cinco canciones seguidas, que suena a
-// avería.
-const VISIBLE_MINIMO = 0.55;
-
 export default function CancionDelPost({ cancion }) {
     const conSonido = useSyncExternalStore(suscribirseAlSonido, haySonido, () => false);
 
@@ -59,7 +54,18 @@ export default function CancionDelPost({ cancion }) {
     };
 
     const arrancar = () => {
-        if (!cancion?.preview || audio.current) return;
+        if (!cancion?.preview) return;
+
+        // Ya habia reproductor, pausado (te fuiste de la app y has vuelto, o
+        // pasaste de largo y volviste): se retoma donde iba. Antes esto salia
+        // sin hacer nada y la cancion no volvia a sonar nunca.
+        if (audio.current) {
+            if (audio.current.paused) {
+                window.dispatchEvent(new CustomEvent(AVISO, { detail: mio.current }));
+                audio.current.play().then(() => setSonando(true)).catch(() => setSonando(false));
+            }
+            return;
+        }
 
         window.dispatchEvent(new CustomEvent(AVISO, { detail: mio.current }));
 
@@ -76,12 +82,17 @@ export default function CancionDelPost({ cancion }) {
         // una vez y luego la intro para siempre. Se vuelve al punto elegido.
         a.loop = false;
         a.onended = () => { a.currentTime = desde; a.play().catch(() => setSonando(false)); };
-        a.onerror = () => setSonando(false);
-        a.play().then(() => setSonando(true)).catch(() => {
-            // El navegador aún no da permiso (no has tocado nada todavía).
-            // No se insiste: en cuanto le des al altavoz, arranca.
-            audio.current = null;
-            setSonando(false);
+        a.onerror = () => { if (audio.current === a) setSonando(false); };
+        a.play().then(() => { if (audio.current === a) setSonando(true); }).catch(() => {
+            // El navegador aún no da permiso (no has tocado nada todavía), o
+            // se paro antes de arrancar (pasaste de largo).
+            //
+            // ⚠️ SOLO SI SIGUE SIENDO ESTE. Bajando rapido, se creaba un
+            // reproductor, se paraba antes de que `play()` resolviera, y este
+            // `catch` llegaba TARDE y ponia a null el reproductor NUEVO que ya
+            // estaba sonando: se quedaba sonando sin que nadie pudiera pararlo,
+            // y encima arrancaba otro encima. Era la musica "rara" del feed.
+            if (audio.current === a) { audio.current = null; setSonando(false); }
         });
         audio.current = a;
     };
@@ -91,13 +102,23 @@ export default function CancionDelPost({ cancion }) {
         const nodo = caja.current;
         if (!nodo || !cancion?.preview) return;
 
+        // ⚠️ SE VIGILA LA PUBLICACION ENTERA, NO ESTA BARRITA.
+        //
+        // Esto mide 32 px y va al pie de la tarjeta: se vigilaba a si misma, y
+        // asi la cancion arrancaba solo cuando la barrita asomaba por abajo (o
+        // sea, cuando ya estabas mirando la foto de la SIGUIENTE) y se cortaba
+        // en cuanto la barrita salia por arriba, con la foto aun a la vista. A
+        // veces sonaba, a veces no, y a veces la de otra. Como en Instagram,
+        // suena la publicacion que ocupa el CENTRO de la pantalla: la tarjeta
+        // esta "a la vista" mientras cruza la franja central.
+        const tarjeta = nodo.closest('article') || nodo;
         const vigilante = new IntersectionObserver(([e]) => {
-            aLaVista.current = e.isIntersecting && e.intersectionRatio >= VISIBLE_MINIMO;
+            aLaVista.current = e.isIntersecting;
             if (aLaVista.current && haySonido()) arrancar();
-            else if (!aLaVista.current) parar();
-        }, { threshold: [0, VISIBLE_MINIMO, 1] });
+            else if (!aLaVista.current) pausar();
+        }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
 
-        vigilante.observe(nodo);
+        vigilante.observe(tarjeta);
         return () => vigilante.disconnect();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cancion?.preview]);

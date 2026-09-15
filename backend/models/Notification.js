@@ -17,7 +17,8 @@ const notificationSchema = new mongoose.Schema({
     // 'reto' = alguien te ha desafiado. 'duelo' = un duelo ha terminado. Son
     // dos avisos distintos y por eso son dos tipos: el primero pide que hagas
     // algo (aceptar o pasar) y el segundo solo cuenta lo que ha pasado.
-    type: { type: String, enum: ['like', 'comment', 'duelo', 'reto'], required: true },
+    // 'mencion' = alguien te ha nombrado (@tu_nombre) en un comentario.
+    type: { type: String, enum: ['like', 'comment', 'duelo', 'reto', 'mencion'], required: true },
 
     // Entreno sobre el que se actúa
     workout: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutLog' },
@@ -37,6 +38,10 @@ const notificationSchema = new mongoose.Schema({
 
 // Consulta principal: "mis notificaciones, de la más nueva a la más vieja"
 notificationSchema.index({ user: 1, createdAt: -1 });
+// EL BUZON SE VACIA SOLO: a los 45 dias la notificacion desaparece. Es un
+// indice TTL de Mongo, que borra en segundo plano; sin esto el buzon crecia
+// sin limite y lo de hace un año seguia ahi.
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 45 });
 // Para el contador de no leídas
 notificationSchema.index({ user: 1, read: 1 });
 

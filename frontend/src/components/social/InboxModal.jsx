@@ -128,12 +128,14 @@ export default function InboxModal({
                                                         // dos personas distintas. Aqui se dice lo neutro y el
                                                         // resultado esta a un toque.
                                                         ? ' y tú habéis terminado un duelo'
-                                                        : ' ha comentado tu entreno'}
+                                                        : n.type === 'mencion'
+                                                            ? ' te ha mencionado en un comentario'
+                                                            : ' ha comentado tu entreno'}
                                             {n.type !== 'duelo' && n.type !== 'reto' && n.workoutName
                                                 ? <span className="text-zinc-500"> "{n.workoutName}"</span>
                                                 : null}
                                         </p>
-                                        {n.type === 'comment' && n.text && (
+                                        {(n.type === 'comment' || n.type === 'mencion') && n.text && (
                                             <p className="text-[10px] text-zinc-500 not-italic truncate mt-0.5">"{n.text}"</p>
                                         )}
                                     </div>

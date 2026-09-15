@@ -129,6 +129,42 @@ const notifyOwner = async ({ ownerId, actorId, type, workout, actor, text = '' }
     }
 };
 
+/** Los @nombres de un texto, sin repetir y sin la arroba. */
+const nombresMencionados = (texto) => {
+    const vistos = new Set();
+    for (const m of String(texto || '').matchAll(/@([a-zA-Z0-9_.-]{2,30})/g)) vistos.add(m[1].toLowerCase());
+    return [...vistos].slice(0, 10);
+};
+
+/**
+ * Avisa a cada persona nombrada con @ en un comentario. Solo a quien existe,
+ * no al dueño (ya tiene la del comentario) y no a uno mismo.
+ */
+const avisarMencionados = async ({ text, actor, workout, ownerId }) => {
+    try {
+        const nombres = nombresMencionados(text);
+        if (nombres.length === 0) return;
+        const usuarios = await User.find({ username: { $in: nombres.map(n => new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) } })
+            .select('_id username pushSubscriptions');
+        for (const u of usuarios) {
+            if (u._id.toString() === actor._id.toString()) continue;
+            if (ownerId && u._id.toString() === ownerId.toString()) continue;
+            await Notification.create({
+                user: u._id, actor: actor._id, type: 'mencion',
+                workout: workout._id, workoutName: workout.routineName || '', text: text.slice(0, 120)
+            });
+            await sendPushToUser(u, {
+                title: '💬 ' + (actor.username || 'Alguien') + ' te ha mencionado',
+                body: text.slice(0, 80),
+                icon: '/assets/icons/icon-192x192.png',
+                url: `/social/entreno/${workout._id}`
+            });
+        }
+    } catch (error) {
+        console.error('No se pudo avisar de la mencion:', error.message);
+    }
+};
+
 // @desc    Feed de entrenos de tus amigos (estilo IG)
 // @route   GET /api/social/feed?page=1
 const getFeed = async (req, res) => {
@@ -164,7 +200,7 @@ const getFeed = async (req, res) => {
             .skip((page - 1) * FEED_PAGE_SIZE)
             .limit(FEED_PAGE_SIZE + 1) // Pedimos uno de más para saber si hay más páginas
             .populate('user', 'username avatar frame level title')
-            .populate('comments.user', 'username avatar')
+            .populate('comments.user', 'username avatar frame')
             .lean();
 
         const hasMore = logs.length > FEED_PAGE_SIZE;
@@ -399,12 +435,17 @@ const addComment = async (req, res) => {
             text
         });
 
+        // LAS MENCIONES: cada @nombre del comentario avisa a esa persona. Al
+        // dueño del entreno no se le avisa dos veces (ya tiene la del
+        // comentario), y a uno mismo tampoco.
+        await avisarMencionados({ text, actor: req.user, workout, ownerId: workout.user });
+
         res.status(201).json({
             comment: {
                 _id: savedComment._id,
                 text: savedComment.text,
                 createdAt: savedComment.createdAt,
-                user: { _id: userId, username: req.user.username, avatar: req.user.avatar },
+                user: { _id: userId, username: req.user.username, avatar: req.user.avatar, frame: req.user.frame },
                 likesCount: 0,
                 likedByMe: false
             }
@@ -452,6 +493,39 @@ const getFriendProfile = async (req, res) => {
         // ¿Ya le he mandado solicitud? Sirve para pintar "Solicitud enviada"
         const requestSent = (profile.friendRequests || []).some(r => r.toString() === viewerId.toString());
 
+        // LO QUE HACE A ESTA PERSONA: sus tres grupos mas fuertes (por rango y
+        // puntos), su mejor serie y cuanto ha entrenado este mes. Es lo que
+        // convierte una ficha de contadores en un perfil de alguien. Solo si
+        // deja ver el cuerpo y los entrenos.
+        let puntosFuertes = [];
+        let mejorSerie = null;
+        let entrenosMes = 0;
+        if (canView) {
+            const cuerpoVisible = isMe || profile.visibility?.body !== false;
+            const entrenosVisibles = isMe || profile.visibility?.workouts !== false;
+            const hace30 = new Date(); hace30.setDate(hace30.getDate() - 30);
+            const [ranks, mejor, mes] = await Promise.all([
+                cuerpoVisible ? getMuscleRanks(userId).catch(() => null) : null,
+                entrenosVisibles ? WorkoutLog.aggregate([
+                    { $match: { user: profile._id, type: 'gym' } },
+                    { $unwind: '$exercises' }, { $unwind: '$exercises.sets' },
+                    { $match: { 'exercises.sets.weight': { $gt: 0 }, 'exercises.esPesoCorporal': { $ne: true } } },
+                    { $sort: { 'exercises.sets.weight': -1, 'exercises.sets.reps': -1 } }, { $limit: 1 },
+                    { $project: { _id: 0, ejercicio: '$exercises.name', peso: '$exercises.sets.weight', reps: '$exercises.sets.reps' } }
+                ]).then(r => r[0] || null) : null,
+                entrenosVisibles ? WorkoutLog.countDocuments({ user: profile._id, date: { $gte: hace30 } }) : 0
+            ]);
+            if (ranks) {
+                puntosFuertes = Object.entries(ranks)
+                    .filter(([, r]) => r.isGroup && r.points > 0)
+                    .sort((a, b) => b[1].points - a[1].points)
+                    .slice(0, 3)
+                    .map(([grupo, r]) => ({ grupo, rank: r.rank, rankColor: r.rankColor, points: r.points }));
+            }
+            mejorSerie = mejor;
+            entrenosMes = mes || 0;
+        }
+
         res.json({
             profile: {
                 _id: profile._id,
@@ -482,8 +556,11 @@ const getFriendProfile = async (req, res) => {
                 workouts: workoutsCount,
                 followers: friendsCount,
                 following: friendsCount,
-                missions: missionsAggregate[0]?.total || 0
+                missions: missionsAggregate[0]?.total || 0,
+                entrenosMes
             },
+            puntosFuertes,
+            mejorSerie,
             isMe,
             isFriend,
             requestSent,
@@ -526,7 +603,7 @@ const getProfileItems = async (req, res) => {
                 .skip(skip)
                 .limit(FEED_PAGE_SIZE + 1)
                 .populate('user', 'username avatar frame level title')
-                .populate('comments.user', 'username avatar')
+                .populate('comments.user', 'username avatar frame')
                 .lean();
 
             return res.json({
@@ -999,5 +1076,6 @@ module.exports = {
     getPublicacion,
     searchUsers, sendFriendRequest, getFriends, respondToRequest, getRequests, getLeaderboard,
     getFeed, toggleLike, addComment, toggleLikeComentario, borrarMiEntreno, borrarComentarioPropio, getFriendProfile, getProfileItems, getMonthlyLeaderboard,
+    nombresMencionados,
     removeFriend, getNotifications, markNotificationsRead, getBadge, heartbeat
 };
