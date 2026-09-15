@@ -26,6 +26,7 @@ export default function BodyTab() {
 
     const ranks = ranksData?.ranks || {};
     const escala = ranksData?.tiers || null;
+    const general = ranksData?.general || null;
 
     const { data: progreso, isLoading: cargandoProgreso } = useSWR(
         ejercicio ? `/gym/progress/${encodeURIComponent(ejercicio)}` : null,
@@ -56,6 +57,30 @@ export default function BodyTab() {
 
     return (
         <div className="space-y-6 pb-24">
+            {/* --- TU RANGO GENERAL, como el "Symmetry Rank": la media de los
+                ocho grupos, con el escalon grande, y entre que parte de la
+                gente estas. Encima del cuerpo, que es lo primero que se mira. */}
+            {general && (
+                <div className="relative overflow-hidden rounded-3xl border p-4 flex items-center gap-4" style={{ borderColor: general.rankColor + '55', background: `linear-gradient(135deg, ${general.rankColor}22, #09090b 60%)` }}>
+                    <div className="relative shrink-0 w-16 h-16 flex items-center justify-center rounded-2xl" style={{ background: general.rankColor + '1a', boxShadow: `0 0 30px ${general.rankColor}44` }}>
+                        <IconoRango rango={general.rank} color={general.rankColor} tamano={44} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] not-italic">Tu rango</p>
+                        <p className="text-2xl font-black uppercase tracking-tight leading-none mt-1 not-italic" style={{ color: general.rankColor }}>{general.rankLabel}</p>
+                        <p className="text-[11px] text-zinc-400 font-bold mt-1.5 not-italic">
+                            {general.percentil !== null && general.percentil !== undefined
+                                ? <>Estás entre el <span className="text-white">{general.percentil}%</span> más fuerte de Kairos</>
+                                : `${miles(general.total)} kg movidos en total`}
+                        </p>
+                        <div className="mt-2 h-1.5 bg-black/60 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${general.progress || 0}%`, background: general.rankColor }} />
+                        </div>
+                        <p className="text-[9px] text-zinc-600 font-bold mt-1 not-italic">{general.nextRankLabel ? `Media de tus grupos · faltan ${miles(general.pointsToNext)} kg para ${general.nextRankLabel}` : 'Escalón máximo'}</p>
+                    </div>
+                </div>
+            )}
+
             {/* --- EL CUERPO --- */}
             <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4">
                 <BodyMap levels={ranks} dual mujer={mujer} selected={muscleSel} onSelectMuscle={(g) => setMuscleSel(g === muscleSel ? null : g)} />

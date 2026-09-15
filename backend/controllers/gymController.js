@@ -232,7 +232,7 @@ const { canViewSection } = require('../utils/privacidad');
 // scripts/generateExerciseCatalog.js; aquí sólo se lee.
 const EXERCISE_CATALOG = require('../data/exercises.json');
 const { SPORTS, getSport, estimateCalories } = require('../utils/sportCatalog');
-const { getMuscleRanks, getExerciseProgress, RANKS } = require('../services/muscleRankService');
+const { getMuscleRanks, getExerciseProgress, RANKS, getRankForPoints } = require('../services/muscleRankService');
 const { revisarSubidasDeRango } = require('../services/rankUpService');
 
 // ==========================================
@@ -570,7 +570,28 @@ const getMuscleRanksController = async (req, res) => {
         // Con los ejercicios de cada musculo: es la pantalla del cuerpo, donde
         // al tocar un musculo se ve con que lo has subido.
         const ranks = await getMuscleRanks(req.user._id, { conEjercicios: true });
-        res.json({ ranks, tiers: RANKS });
+
+        // TU RANGO GENERAL, como el "Symmetry Rank": la media de los ocho grupos
+        // (asi un cuerpo descompensado no es Oro por una sola pierna) y en que
+        // parte de la gente estas por kilos movidos en total.
+        const grupos = Object.values(ranks).filter(r => r.isGroup);
+        const media = grupos.length ? Math.round(grupos.reduce((a, r) => a + (r.points || 0), 0) / grupos.length) : 0;
+        const miTotal = grupos.reduce((a, r) => a + (r.points || 0), 0);
+        let percentil = null;
+        try {
+            const totales = await WorkoutLog.aggregate([
+                { $match: { type: 'gym' } },
+                { $unwind: '$exercises' }, { $unwind: '$exercises.sets' },
+                { $group: { _id: '$user', volumen: { $sum: { $multiply: [{ $ifNull: ['$exercises.sets.weight', 0] }, { $ifNull: ['$exercises.sets.reps', 0] }] } } } }
+            ]);
+            if (totales.length >= 2) {
+                const porDebajo = totales.filter(t => t.volumen < miTotal).length;
+                // "Estas entre el X% mas fuerte": los que te superan mas tu
+                percentil = Math.max(1, Math.round(((totales.length - porDebajo) / totales.length) * 100));
+            }
+        } catch { /* sin percentil no pasa nada */ }
+
+        res.json({ ranks, tiers: RANKS, general: { puntos: media, total: miTotal, percentil, ...getRankForPoints(media) } });
     } catch (error) {
         console.error('Error en getMuscleRanks:', error);
         res.status(500).json({ message: 'Error calculando los rangos musculares' });
