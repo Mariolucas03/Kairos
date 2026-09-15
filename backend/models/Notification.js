@@ -38,11 +38,19 @@ const notificationSchema = new mongoose.Schema({
 
 // Consulta principal: "mis notificaciones, de la más nueva a la más vieja"
 notificationSchema.index({ user: 1, createdAt: -1 });
-// EL BUZON SE VACIA SOLO: a los 45 dias la notificacion desaparece. Es un
+// EL BUZON SE VACIA SOLO: a los 7 dias la notificacion desaparece. Es un
 // indice TTL de Mongo, que borra en segundo plano; sin esto el buzon crecia
-// sin limite y lo de hace un año seguia ahi.
-notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 45 });
+// sin limite y lo de hace un mes seguia ahi.
+//
+// ⚠️ Si se cambia el plazo hay que cambiarlo tambien en Mongo: un indice TTL
+// que ya existe con otro `expireAfterSeconds` no se actualiza solo al
+// arrancar (Mongoose lo intenta crear, choca con el que hay y avisa). Se
+// arregla en server.js al conectar, con collMod.
+const DIAS_EN_EL_BUZON = 7;
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * DIAS_EN_EL_BUZON });
 // Para el contador de no leídas
 notificationSchema.index({ user: 1, read: 1 });
 
-module.exports = mongoose.model('Notification', notificationSchema);
+const Notification = mongoose.model('Notification', notificationSchema);
+Notification.DIAS_EN_EL_BUZON = DIAS_EN_EL_BUZON;
+module.exports = Notification;
