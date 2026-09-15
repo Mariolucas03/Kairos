@@ -1,6 +1,20 @@
-import { useId, useState } from 'react';
+import { useId, useState, useMemo } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { BODY_IMAGE, BODY_IMAGE_SIZE, VIEW_BOX, MUSCLE_SHAPES, GROUPS_BY_VIEW, GROUP_OF_MUSCLE, MUSCLES_OF_GROUP } from './bodyPaths';
+import { deformarPath, IMAGEN_MUJER } from './siluetaMujer';
+
+// Las zonas de cada vista deformadas a las proporciones de mujer, calculadas
+// una sola vez: son cincuenta polígonos y no cambian.
+const cacheMujer = {};
+const formasDe = (view, mujer) => {
+    if (!mujer) return MUSCLE_SHAPES[view] || {};
+    if (!cacheMujer[view]) {
+        cacheMujer[view] = Object.fromEntries(
+            Object.entries(MUSCLE_SHAPES[view] || {}).map(([g, paths]) => [g, paths.map(d => deformarPath(d, view))])
+        );
+    }
+    return cacheMujer[view];
+};
 
 /**
  * Expande una lista que puede venir con grupos grandes ('Pierna') o con
@@ -49,8 +63,8 @@ const expandirNiveles = (levels) => {
  */
 
 // Una figura: la lámina recortada + las zonas de color encima
-function Figura({ view, getFill, onSelectMuscle, marcado }) {
-    const shapes = MUSCLE_SHAPES[view] || {};
+function Figura({ view, getFill, onSelectMuscle, marcado, mujer = false }) {
+    const shapes = useMemo(() => formasDe(view, mujer), [view, mujer]);
     const idBase = useId();
     const recorte = `recorte-${view}-${idBase}`;
     const [vx, vy, vw, vh] = VIEW_BOX[view].split(' ').map(Number);
@@ -74,7 +88,7 @@ function Figura({ view, getFill, onSelectMuscle, marcado }) {
                     que si no recortaba cada figura en un rectángulo más claro
                     que la pantalla. */}
                 <image
-                    href={BODY_IMAGE}
+                    href={mujer ? IMAGEN_MUJER : BODY_IMAGE}
                     x="0"
                     y="0"
                     width={BODY_IMAGE_SIZE.width}
@@ -147,6 +161,8 @@ export default function BodyMap({
     onSelectMuscle = null,
     // Grupo actualmente seleccionado, para dibujarle el contorno
     selected = null,
+    // El cuerpo de mujer: la misma lámina con otras proporciones (siluetaMujer.js)
+    mujer = false,
     className = ''
 }) {
     const [view, setView] = useState('front');
@@ -182,7 +198,7 @@ export default function BodyMap({
             <div className={`w-full flex items-stretch justify-center gap-1 ${className}`}>
                 {['front', 'back'].map(v => (
                     <div key={v} className="flex-1 min-w-0 flex flex-col items-center">
-                        <Figura view={v} getFill={getFill} onSelectMuscle={onSelectMuscle} marcado={selected} />
+                        <Figura view={v} getFill={getFill} onSelectMuscle={onSelectMuscle} marcado={selected} mujer={mujer} />
                         {/* En miniatura (la rejilla del perfil) las etiquetas solo estorban */}
                         {labels && (
                             <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-0.5">
@@ -204,7 +220,7 @@ export default function BodyMap({
     return (
         <div className={`relative w-full flex flex-col items-center ${className}`}>
             <div className="w-full flex-1 min-h-0 flex justify-center">
-                <Figura view={view} getFill={getFill} onSelectMuscle={onSelectMuscle} marcado={selected} />
+                <Figura view={view} getFill={getFill} onSelectMuscle={onSelectMuscle} marcado={selected} mujer={mujer} />
             </div>
 
             {/* Girar el cuerpo */}

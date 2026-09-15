@@ -199,7 +199,7 @@ const invitar = asyncHandler(async (req, res) => {
     await mesa.save();
 
     notificarA(amigoId, {
-        title: '♠️ Te invitan a una mesa de póquer',
+        title: 'Te invitan a una mesa de póquer',
         body: `${yo.username} monta una mesa. Ciegas ${Math.floor(mesa.ciegaGrande / 2)}/${mesa.ciegaGrande}.`,
         icon: '/assets/icons/icon-192x192.png',
         url: '/games/poker'
@@ -244,7 +244,7 @@ const responderInvitacion = asyncHandler(async (req, res) => {
     await mesa.save();
 
     notificarA(mesa.lider, {
-        title: '♠️ Se han sentado',
+        title: 'Se han sentado',
         body: `${yo.username} entra en tu mesa.`,
         icon: '/assets/icons/icon-192x192.png',
         url: '/games/poker'
@@ -299,7 +299,7 @@ const empezar = asyncHandler(async (req, res) => {
     for (const j of mesa.jugadores) {
         if (j.user && j.user.toString() !== req.user._id.toString()) {
             notificarA(j.user, {
-                title: '♠️ Empieza la partida',
+                title: 'Empieza la partida',
                 body: 'Ya se reparten cartas.',
                 icon: '/assets/icons/icon-192x192.png',
                 url: '/games/poker'
@@ -555,7 +555,7 @@ const levantarse = asyncHandler(async (req, res) => {
         for (const j of mesa.jugadores) {
             if (j.user && j.user.toString() !== req.user._id.toString()) {
                 notificarA(j.user, {
-                    title: '♠️ Mesa cerrada',
+                    title: 'Mesa cerrada',
                     body: 'El líder ha cerrado la mesa.',
                     icon: '/assets/icons/icon-192x192.png',
                     url: '/games/poker'

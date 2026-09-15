@@ -371,10 +371,10 @@ export default function TowerGame() {
                             <div className={`mb-3 p-3 rounded-2xl border text-center ${result.status === 'lost' ? 'bg-red-950/50 border-red-500/40' : 'bg-emerald-950/50 border-emerald-500/40'}`}>
                                 <p className={`text-sm font-black uppercase tracking-tight ${result.status === 'lost' ? 'text-red-400' : 'text-emerald-400'}`}>
                                     {result.status === 'lost'
-                                        ? '💣 Has pisado la trampa'
+                                        ? 'Has pisado la trampa'
                                         : result.status === 'won'
-                                            ? '🏆 ¡Torre completada!'
-                                            : '✅ Te has retirado a tiempo'}
+                                            ? '¡Torre completada!'
+                                            : 'Te has retirado a tiempo'}
                                 </p>
                                 {result.payout > 0 && (
                                     <p className="text-2xl font-black text-white mt-1 flex items-center justify-center gap-2">

@@ -4,7 +4,8 @@ import { Lock, User, ArrowRight, Swords, UserCheck } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
 import PantallaAuth from '../components/auth/PantallaAuth';
-import { CampoAuth, BotonAuth } from '../components/auth/CampoAuth';
+import { CampoAuth } from '../components/auth/CampoAuth';
+import BarraDeAcceso from '../components/auth/BarraDeAcceso';
 
 const ACENTO = '#eab308'; // oro
 
@@ -19,6 +20,8 @@ export default function Login() {
 
     // Para poder cancelar el salto si la pantalla se desmonta antes de tiempo
     const temporizador = useRef(null);
+    // El formulario, para que la barra lo envie al levantarla
+    const formulario = useRef(null);
 
     // Si ya hay sesión, salta el login
     useEffect(() => {
@@ -45,7 +48,13 @@ export default function Login() {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        e?.preventDefault?.();
+        if (loading) return false;
+        // Sin las dos cosas escritas no se levanta nada: se dice y ya.
+        if (!formData.username.trim() || !formData.password) {
+            setError('Escribe tu usuario y tu contraseña, y levanta la barra.');
+            return false;
+        }
         setLoading(true);
         setError(null);
 
@@ -106,7 +115,7 @@ export default function Login() {
                 </>
             }
         >
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form ref={formulario} onSubmit={handleSubmit} className="space-y-4">
                 <CampoAuth
                     etiqueta="Usuario o alias"
                     icono={User}
@@ -130,9 +139,15 @@ export default function Login() {
                     autoComplete="current-password"
                 />
 
-                <BotonAuth cargando={loading} acento={ACENTO} textoCargando="Autenticando...">
-                    Entrar
-                </BotonAuth>
+                {/* La puerta es una barra de pesas: se agarra el disco y se
+                    levanta hasta el final. Enter en los campos entra igual. */}
+                <BarraDeAcceso
+                    acento={ACENTO}
+                    cargando={loading}
+                    etiqueta="Levanta para entrar"
+                    textoCargando="Levantando…"
+                    onCompletar={() => handleSubmit()}
+                />
             </form>
         </PantallaAuth>
     );

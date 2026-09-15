@@ -201,12 +201,12 @@ export default function Gym() {
     };
 
     const handleEditRoutine = (r) => {
-        if (activeRoutine && activeRoutine._id === r._id) return showToast("⚠️ En curso: Finaliza para editar.", "error");
+        if (activeRoutine && activeRoutine._id === r._id) return showToast("En curso: finaliza para editar.", "error");
         openCreateRoutine(r);
     };
 
     const pedirBorrado = (routine) => {
-        if (activeRoutine && activeRoutine._id === routine._id) return showToast("⚠️ En curso: No se puede borrar.", "error");
+        if (activeRoutine && activeRoutine._id === routine._id) return showToast("En curso: no se puede borrar.", "error");
         setRoutineToDelete(routine);
     };
 

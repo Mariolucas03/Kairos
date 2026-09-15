@@ -380,6 +380,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                     // Fija: ni scroll ni giro, se ven las dos caras a la vez
                                     <div className="w-full h-full bg-black flex flex-col items-center justify-center px-2 overflow-hidden">
                                         <BodyMap
+                                            mujer={author?.physicalStats?.gender === 'female'}
                                             highlight={post.musclesWorked}
                                             secondary={post.secondaryMuscles}
                                             showToggle={false}

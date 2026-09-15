@@ -479,7 +479,7 @@ const joinClan = asyncHandler(async (req, res) => {
     // al que le sirve de algo enterarse en el momento.
     if (clanUpdate.leader && clanUpdate.leader.toString() !== userId.toString()) {
         notificarA(clanUpdate.leader, {
-            title: '🛡️ Nuevo miembro en el clan',
+            title: 'Nuevo miembro en el clan',
             body: (user.username || 'Alguien') + ' se ha unido a ' + clanUpdate.name + '.',
             icon: '/assets/icons/icon-192x192.png',
             url: '/social/clans'

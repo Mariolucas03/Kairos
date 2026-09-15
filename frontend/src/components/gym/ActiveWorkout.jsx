@@ -6,6 +6,7 @@ import {
     SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell
 } from 'lucide-react';
 import api from '../../services/api';
+import { useAuthStore } from '../../store/useAuthStore';
 import { invalidarDiario } from '../../utils/cacheDiario';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
@@ -1149,6 +1150,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                     Frente y espalda a la vez, igual que en el post del feed. */}
                                 <div className="h-60 flex items-center justify-center">
                                     <BodyMap
+                                        mujer={useAuthStore.getState().user?.physicalStats?.gender === 'female'}
                                         highlight={resumen.musculos}
                                         secondary={resumen.secundarios}
                                         showToggle={false}

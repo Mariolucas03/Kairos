@@ -504,7 +504,7 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
                     <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
                         {mode === 'review' && (
                             <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-3xl mb-2">
-                                <p className="text-xs font-bold text-green-400 text-center">✅ ¡Análisis completado! Revisa y asigna carpeta.</p>
+                                <p className="text-xs font-bold text-green-400 text-center">¡Análisis completado! Revisa y asigna carpeta.</p>
                             </div>
                         )}
 

@@ -5,12 +5,15 @@ import api from '../../services/api';
 import BodyMap from '../body/BodyMap';
 import ProgressChart from './ProgressChart';
 import IconoRango from './IconoRango';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
 const miles = (n) => (n || 0).toLocaleString('es-ES');
 
 export default function BodyTab() {
+    // El cuerpo que se pinta: el de mujer si asi se dijo al crear el personaje.
+    const mujer = useAuthStore(state => state.user?.physicalStats?.gender === 'female');
     const { data: ranksData, isLoading } = useSWR('/gym/muscle-ranks', fetcher);
     const { data: entrenados } = useSWR('/gym/progress', fetcher);
 
@@ -55,7 +58,7 @@ export default function BodyTab() {
         <div className="space-y-6 pb-24">
             {/* --- EL CUERPO --- */}
             <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4">
-                <BodyMap levels={ranks} dual selected={muscleSel} onSelectMuscle={(g) => setMuscleSel(g === muscleSel ? null : g)} />
+                <BodyMap levels={ranks} dual mujer={mujer} selected={muscleSel} onSelectMuscle={(g) => setMuscleSel(g === muscleSel ? null : g)} />
 
                 {/* Mini leyenda de rangos: sin ella los colores del cuerpo no
                     significan nada. Los tramos los manda el servidor (tiers),

@@ -54,7 +54,7 @@ const avisarCierreRanking = async () => {
 
         const premio = MONTHLY_PRIZES[i];
         await sendPushToUser(user, {
-            title: '🏆 Vas ' + (i + 1) + 'º en el ranking',
+            title: 'Vas ' + (i + 1) + 'º en el ranking',
             body: premio
                 ? 'Quedan ' + dias + ' días de mes. Aguanta el puesto y son ' + premio + ' fichas.'
                 : 'Quedan ' + dias + ' días de mes. Entrar en el podio son ' + podio + ' fichas.',
@@ -104,7 +104,7 @@ const mensajeDeDuelo = ({ mio, suyo, unidad, contra, bote }) => {
     // que el duelo esta sin empezar.
     if (mio === suyo) {
         return {
-            title: mio === 0 ? '⚔️ Ultimo dia y no ha empezado nadie' : '⚔️ Ultimo dia y vais empatados',
+            title: mio === 0 ? 'Ultimo dia y no ha empezado nadie' : 'Ultimo dia y vais empatados',
             body: `Lo que hagas hoy decide el duelo contra ${rival}. El bote son ${bote} fichas.`,
             icon: '/assets/icons/ficha.png',
             url: '/social/duelos'
@@ -114,8 +114,8 @@ const mensajeDeDuelo = ({ mio, suyo, unidad, contra, bote }) => {
     const voyGanando = mio > suyo;
     return {
         title: voyGanando
-            ? `⚔️ Ultimo dia: ganas por ${diferencia}`
-            : `⚔️ Ultimo dia: pierdes por ${diferencia}`,
+            ? `Ultimo dia: ganas por ${diferencia}`
+            : `Ultimo dia: pierdes por ${diferencia}`,
         body: voyGanando
             ? `El duelo contra ${rival} se cierra esta noche. No te lo dejes quitar.`
             : `Todavia te da tiempo a remontar a ${rival}. El bote son ${bote} fichas.`,
@@ -189,7 +189,7 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         const diasFuera = Math.floor((ahora - new Date(user.lastActive || 0).getTime()) / 86400000);
         if (diasFuera === 3) {
             await sendPushToUser(user, {
-                title: '👀 Llevas 3 días sin entrar',
+                title: 'Llevas 3 días sin entrar',
                 body: 'Tus misiones siguen ahí y la racha ya está a cero. Empieza otra vez.',
                 icon: '/assets/icons/icon-192x192.png',
                 url: '/home'
@@ -260,8 +260,8 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
 
             await sendPushToUser(user, {
                 title: rachaEnJuego
-                    ? '🔥 Tu racha de ' + racha + ' días peligra'
-                    : '⚠️ ' + frase,
+                    ? 'Tu racha de ' + racha + ' días peligra'
+                    : '' + frase,
                 body: cuerpo,
                 icon: '/assets/icons/corazon.png',
                 url: '/missions'
@@ -274,7 +274,7 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         //    a medianoche.
         if (diariaPendiente) {
             await sendPushToUser(user, {
-                title: racha >= 3 ? '🔥 Tu racha de ' + racha + ' días peligra' : '🎁 Recompensa diaria sin recoger',
+                title: racha >= 3 ? 'Tu racha de ' + racha + ' días peligra' : 'Recompensa diaria sin recoger',
                 body: racha >= 3 ? 'Si no la recoges antes de medianoche, mañana empiezas por el día 1.' : 'Caduca a medianoche. Entra y recógela.',
                 icon: '/assets/icons/moneda.png',
                 url: '/home'
@@ -350,7 +350,7 @@ const mensajeDeEntreno = (rutinas) => {
         const ultima = desdeCuando(r.lastPerformed);
 
         return {
-            title: `💪 Hoy toca ${r.name}`,
+            title: `Hoy toca ${r.name}`,
             // Dos frases, no una lista: van detras de un punto y por tanto
             // empiezan en mayuscula. "5 ejercicios. la ultima fue ayer" se lee
             // como un descuido, y una notificacion es de lo poco que TODO el
@@ -368,7 +368,7 @@ const mensajeDeEntreno = (rutinas) => {
     // se queda viendo media palabra. Se nombran dos y se dice cuantas hay.
     const nombres = rutinas.map(r => r.name);
     return {
-        title: `💪 Hoy toca ${nombres.slice(0, 2).join(' o ')}`,
+        title: `Hoy toca ${nombres.slice(0, 2).join(' o ')}`,
         body: `Tienes ${nombres.length} rutinas para hoy. Elige una y empieza.`,
         icon: '/assets/icons/icon-192x192.png',
         url: '/gym'
@@ -543,7 +543,7 @@ const runMonthlyRankingRewards = async (targetPeriod = null) => {
             awarded++;
 
             await sendPushToUser(claimed, {
-                title: `🏆 ¡Premio Mensual Ranking #${i + 1}!`,
+                title: `¡Premio Mensual Ranking #${i + 1}!`,
                 body: `¡Felicidades! Has ganado ${prize} Fichas por quedar #${i + 1} en ${period}.`,
                 icon: "/assets/icons/ficha.png",
                 url: "/social/ranking"
@@ -698,12 +698,12 @@ const runNightlyMaintenance = async ({ forzar = false } = {}) => {
                     const cuantas = data.failedItems.length;
                     const plural = cuantas === 1 ? 'misión' : 'misiones';
                     await sendPushToUser(user, newHp === 0 ? {
-                        title: '💀 Te has quedado sin vida',
+                        title: 'Te has quedado sin vida',
                         body: 'Fallaste ' + cuantas + ' ' + plural + ' y has perdido todo el HP.',
                         icon: '/assets/icons/corazon.png',
                         url: '/missions'
                     } : {
-                        title: '💔 Has perdido ' + data.damage + ' HP',
+                        title: 'Has perdido ' + data.damage + ' HP',
                         body: cuantas + ' ' + plural + ' sin cumplir. Te quedan ' + newHp + ' HP.',
                         icon: '/assets/icons/corazon.png',
                         url: '/missions'

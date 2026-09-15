@@ -114,7 +114,7 @@ const notifyOwner = async ({ ownerId, actorId, type, workout, actor, text = '' }
         if (owner) {
             const nombre = actor?.username || 'Alguien';
             await sendPushToUser(owner, {
-                title: type === 'like' ? '❤️ Nuevo me gusta' : '💬 Nuevo comentario',
+                title: type === 'like' ? 'Nuevo me gusta' : 'Nuevo comentario',
                 body: type === 'like'
                     ? `A ${nombre} le gusta tu entreno "${workout.routineName || ''}"`
                     : `${nombre}: ${text.slice(0, 60)}`,
@@ -154,7 +154,7 @@ const avisarMencionados = async ({ text, actor, workout, ownerId }) => {
                 workout: workout._id, workoutName: workout.routineName || '', text: text.slice(0, 120)
             });
             await sendPushToUser(u, {
-                title: '💬 ' + (actor.username || 'Alguien') + ' te ha mencionado',
+                title: (actor.username || 'Alguien') + ' te ha mencionado',
                 body: text.slice(0, 80),
                 icon: '/assets/icons/icon-192x192.png',
                 url: `/social/entreno/${workout._id}`
@@ -199,7 +199,7 @@ const getFeed = async (req, res) => {
             .sort({ date: -1 })
             .skip((page - 1) * FEED_PAGE_SIZE)
             .limit(FEED_PAGE_SIZE + 1) // Pedimos uno de más para saber si hay más páginas
-            .populate('user', 'username avatar frame level title')
+            .populate('user', 'username avatar frame level title physicalStats.gender')
             .populate('comments.user', 'username avatar frame')
             .lean();
 
@@ -467,7 +467,7 @@ const getFriendProfile = async (req, res) => {
         // Antes esto devolvía 403 si no erais amigos y ni siquiera podías ver
         // quién era la persona para mandarle solicitud.
         const profile = await User.findById(userId)
-            .select('username avatar frame pet level title bio isPrivate visibility currentXP nextLevelXP streak friends friendRequests clan clanRank')
+            .select('username avatar frame pet level title bio isPrivate visibility currentXP nextLevelXP streak friends friendRequests clan clanRank physicalStats.gender')
             .populate('clan', 'name icon')
             .lean();
 
@@ -542,6 +542,8 @@ const getFriendProfile = async (req, res) => {
                 streak: profile.streak,
                 clan: profile.clan,
                 clanRank: profile.clanRank,
+                // Para pintar su cuerpo (hombre o mujer) en el mapa muscular
+                gender: profile.physicalStats?.gender || null,
                 // Qué pestañas tiene sentido enseñar (en tu propio perfil, todas)
                 visibility: isMe
                     ? { workouts: true, food: true, missions: true, body: true }
@@ -602,7 +604,7 @@ const getProfileItems = async (req, res) => {
                 .sort({ date: -1 })
                 .skip(skip)
                 .limit(FEED_PAGE_SIZE + 1)
-                .populate('user', 'username avatar frame level title')
+                .populate('user', 'username avatar frame level title physicalStats.gender')
                 .populate('comments.user', 'username avatar frame')
                 .lean();
 
@@ -730,7 +732,7 @@ const sendFriendRequest = async (req, res) => {
         // la app por casualidad. No se espera con await: que el push tarde no
         // debe retrasar la respuesta a quien la envia.
         notificarA(targetId, {
-            title: '👋 Nueva solicitud de amistad',
+            title: 'Nueva solicitud de amistad',
             body: (req.user.username || 'Alguien') + ' quiere ser tu amigo.',
             icon: '/assets/icons/icon-192x192.png',
             url: '/social/friends'
@@ -836,7 +838,7 @@ const respondToRequest = async (req, res) => {
             // El que la mando no tenia forma de enterarse de que le habian dicho
             // que si, salvo mirando su lista de amigos de vez en cuando.
             notificarA(requesterId, {
-                title: '✅ Ya sois amigos',
+                title: 'Ya sois amigos',
                 body: (req.user.username || 'Alguien') + ' ha aceptado tu solicitud.',
                 icon: '/assets/icons/icon-192x192.png',
                 url: '/social/friends'

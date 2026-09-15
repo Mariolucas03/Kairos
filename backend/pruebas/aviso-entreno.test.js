@@ -27,7 +27,7 @@ describe('El texto del aviso de entreno', () => {
             lastPerformed: haceDias(6)
         }]);
 
-        assert.strictEqual(m.title, '💪 Hoy toca Pierna');
+        assert.strictEqual(m.title, 'Hoy toca Pierna');
         assert.strictEqual(m.body, '5 ejercicios. La última fue hace 6 días.');
         assert.strictEqual(m.url, '/gym');
     });
@@ -57,7 +57,7 @@ describe('El texto del aviso de entreno', () => {
             { name: 'Tiron', exercises: [{}] }
         ]);
 
-        assert.strictEqual(m.title, '💪 Hoy toca Pierna o Empuje');
+        assert.strictEqual(m.title, 'Hoy toca Pierna o Empuje');
         assert.ok(m.body.includes('3 rutinas'), m.body);
         // El tercero no cabe en el titulo, pero el cuerpo dice que existe.
         assert.ok(!m.title.includes('Tiron'));

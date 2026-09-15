@@ -10,7 +10,10 @@ const registerSchema = Joi.object({
     }),
     password: Joi.string().min(6).required().messages({
         'string.min': 'La contraseña debe tener al menos 6 caracteres'
-    })
+    }),
+    // El cuerpo que se pinta en el mapa muscular. Opcional: quien no lo diga
+    // ve el de siempre.
+    gender: Joi.string().valid('male', 'female').optional()
 });
 
 // 🔥 ESTA ES LA PARTE IMPORTANTE QUE DEBES CAMBIAR

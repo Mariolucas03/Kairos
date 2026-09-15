@@ -210,7 +210,7 @@ const createChallenge = asyncHandler(async (req, res) => {
         if (!persona) return;
         const medida = MEDIDAS[type] || MEDIDAS.gym;
         await sendPushToUser(persona, {
-            title: `⚔️ ${req.user.username} te ha retado`,
+            title: `${req.user.username} te ha retado`,
             body: `${medida.etiqueta} durante ${DUELO_DIAS} días, ${apuesta} fichas cada uno. Acepta o pasa.`,
             icon: '/assets/icons/ficha.png',
             url: '/social/duelos'

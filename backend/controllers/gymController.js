@@ -208,7 +208,7 @@ const avisarAmigosDelEntreno = async (autorId, nombreEntreno) => {
         }).select('username pushSubscriptions');
 
         await Promise.allSettled(amigos.map(amigo => sendPushToUser(amigo, {
-            title: '💪 ' + autor.username + ' ha entrenado',
+            title: autor.username + ' ha entrenado',
             body: (nombreEntreno || 'Entreno') + '. Míralo en el feed.',
             icon: '/assets/icons/icon-192x192.png',
             url: '/social'

@@ -159,7 +159,7 @@ const createMission = asyncHandler(async (req, res) => {
         // Una invitacion coop sin aceptar bloquea la mision para los dos, asi
         // que cuanto antes se entere el invitado, mejor.
         notificarA(friendId, {
-            title: '🤝 Te invitan a una misión',
+            title: 'Te invitan a una misión',
             body: (req.user.username || 'Alguien') + ': "' + title.trim().slice(0, 60) + '"',
             icon: '/assets/icons/icon-192x192.png',
             url: '/missions'
@@ -427,7 +427,7 @@ const deleteMission = asyncHandler(async (req, res) => {
     if (mission.isCoop) {
         for (const id of otros) {
             notificarA(id, {
-                title: '🎯 Misión compartida cancelada',
+                title: 'Misión compartida cancelada',
                 body: `${req.user.username} ha borrado "${mission.title}".`,
                 url: '/missions'
             });
@@ -480,7 +480,7 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
         await mission.save();
 
         notificarA(creador, {
-            title: '🤝 Misión aceptada',
+            title: 'Misión aceptada',
             body: quien + ' se une a "' + (mission.title || '').slice(0, 60) + '".',
             icon: '/assets/icons/icon-192x192.png',
             url: '/missions'
@@ -491,7 +491,7 @@ const respondMissionInvite = asyncHandler(async (req, res) => {
         await Mission.findByIdAndDelete(missionId);
 
         notificarA(creador, {
-            title: '🙅 Invitación rechazada',
+            title: 'Invitación rechazada',
             body: quien + ' no acepta "' + (mission.title || '').slice(0, 60) + '". La misión se ha borrado.',
             icon: '/assets/icons/icon-192x192.png',
             url: '/missions'

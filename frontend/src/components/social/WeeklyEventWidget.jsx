@@ -137,8 +137,8 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                                                 {/* Premio exacto que entrega el servidor */}
                                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                                     <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">+{m.xp} XP</span>
-                                                    <span className="text-[9px] font-black text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded">+{m.coins} 🪙</span>
-                                                    <span className="text-[9px] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded">+{m.chips} 🎰</span>
+                                                    <span className="text-[9px] font-black text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded">+{m.coins} <img src="/assets/icons/moneda.png" className="inline w-3 h-3 object-contain align-[-2px]" alt="monedas" /></span>
+                                                    <span className="text-[9px] font-black text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded">+{m.chips} <img src="/assets/icons/ficha.png" className="inline w-3 h-3 object-contain align-[-2px]" alt="fichas" /></span>
                                                 </div>
                                             </div>
                                         </div>

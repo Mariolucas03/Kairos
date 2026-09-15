@@ -15,7 +15,7 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
     try {
-        const { username, email, password } = req.body;
+        const { username, email, password, gender } = req.body;
 
         const userExists = await User.findOne({ email });
         if (userExists) return res.status(400).json({ message: 'El email ya existe' });
@@ -32,7 +32,10 @@ const registerUser = async (req, res) => {
             level: 1,
             hp: 100,
             lives: 100,
-            streak: { current: 1, lastLogDate: new Date() }
+            // Hombre o mujer, elegido al crear el personaje: decide que
+            // cuerpo se pinta en el mapa muscular. Solo si se dijo.
+            ...(gender === 'male' || gender === 'female' ? { physicalStats: { gender } } : {}),
+            streak: { current: 0, lastLogDate: new Date(0) }
         });
 
         if (user) {

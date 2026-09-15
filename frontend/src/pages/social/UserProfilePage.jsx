@@ -23,7 +23,7 @@ const TABS = [
 ];
 
 // --- PESTAÑA CUERPO: mapa + nivel de cada grupo muscular ---
-function BodyTab({ ranks }) {
+function BodyTab({ ranks, mujer = false }) {
     // Qué grupo está desplegado (solo uno a la vez)
     const [grupoAbierto, setGrupoAbierto] = useState(null);
 
@@ -51,7 +51,7 @@ function BodyTab({ ranks }) {
         <div className="pb-4">
             {/* Frente y espalda a la vez, sin tener que girar nada */}
             <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4 mb-4">
-                <BodyMap levels={ranks} dual />
+                <BodyMap levels={ranks} dual mujer={mujer} />
             </div>
 
             {conActividad.length === 0 && (
@@ -207,7 +207,7 @@ function MissionDayCard({ item }) {
 // el detalle completo se abre al tocarlos. Antes cada entrada era una tarjeta
 // enorme y había que hacer scroll eterno para ver tres entrenos.
 // ==========================================
-function CuadroEntreno({ item, onOpen }) {
+function CuadroEntreno({ item, onOpen, mujer = false }) {
     const musculos = item.musclesWorked || [];
     return (
         <button onClick={onOpen} className="relative aspect-square bg-black border border-white/[0.07] overflow-hidden active:opacity-70 transition-opacity">
@@ -217,7 +217,7 @@ function CuadroEntreno({ item, onOpen }) {
                 <img src={item.photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
                 <div className="absolute inset-0 p-1 pb-4">
-                    <BodyMap highlight={musculos} secondary={item.secondaryMuscles} showToggle={false} dual labels={false} className="h-full" />
+                    <BodyMap mujer={mujer} highlight={musculos} secondary={item.secondaryMuscles} showToggle={false} dual labels={false} className="h-full" />
                 </div>
             )}
 
@@ -576,7 +576,7 @@ export default function UserProfilePage() {
                     </button>
                 </div>
             ) : tab === 'body' ? (
-                <BodyTab ranks={itemsData?.ranks} />
+                <BodyTab ranks={itemsData?.ranks} mujer={profile.gender === 'female'} />
             ) : items.length === 0 ? (
                 <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
                     {tab === 'workouts' && <><Dumbbell className="mx-auto mb-3 opacity-50" size={32} /><p className="text-xs">Sin entrenos publicados.</p></>}
@@ -588,7 +588,7 @@ export default function UserProfilePage() {
                     {/* Rejilla de 3 columnas a sangre, como el perfil de Instagram */}
                     <div className="grid grid-cols-3 gap-[2px] -mx-4">
                         {items.map(item => (
-                            tab === 'workouts' ? <CuadroEntreno key={item._id} item={item} onOpen={() => setDetalle(item)} />
+                            tab === 'workouts' ? <CuadroEntreno key={item._id} item={item} onOpen={() => setDetalle(item)} mujer={profile.gender === 'female'} />
                                 : tab === 'food' ? <CuadroComida key={item._id} item={item} onOpen={() => setDetalle(item)} />
                                     : <CuadroMisiones key={item._id} item={item} onOpen={() => setDetalle(item)} />
                         ))}

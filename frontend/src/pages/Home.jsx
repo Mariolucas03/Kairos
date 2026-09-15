@@ -412,7 +412,7 @@ export default function Home() {
                                 </button>
                             </div>
                             <div className="p-4 border border-white/[0.07] rounded-3xl bg-zinc-900/50 flex justify-between items-center">
-                                <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">🔔 Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
+                                <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
                                 <div className="flex gap-2 shrink-0">
                                     {/* ⚠️ registerPush ya no devuelve true/false sino el MOTIVO:
                                         antes, cuando no iba, el aviso decia siempre "revisa los
