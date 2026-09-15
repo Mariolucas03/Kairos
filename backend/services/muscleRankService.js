@@ -29,42 +29,77 @@ const SECONDARY_FACTOR = 0.4;
 // El cardio no tiene kg: puntúa por minutos
 const CARDIO_POINTS_PER_MINUTE = 25;
 
-// Diez rangos. Los dos primeros escalones son los que pidió el usuario
-// (10.000 → Madera, 20.000 → Bronce) y a partir de ahí cada uno cuesta
-// alrededor de un 70% más que el anterior.
+/**
+ * DIEZ RANGOS, Y CADA UNO EN TRES: Madera 1, Madera 2, Madera 3, Bronce 1...
+ *
+ * ⚠️ REEQUILIBRADO. Con los umbrales de antes (Madera a 10.000, Leyenda a
+ * un millon por grupo) subir el primer rango costaba semanas y Leyenda no lo
+ * iba a ver nadie. Una sesion normal deja entre 1.000 y 3.000 kg en un
+ * grupo: Madera a 3.000 se saca en la primera semana, Bronce (12.000) en un
+ * mes, Oro (110.000) en un año largo de constancia y Leyenda (800.000) es
+ * cosa de años. Con los tres escalones de dentro, cada pocas sesiones pasa
+ * algo.
+ *
+ * ⚠️ COLORES QUE SE DISTINGUEN. Madera, bronce y oro eran tres marrones
+ * amarillentos, hierro y plata dos grises, platino y diamante dos azules: en
+ * el mapa del cuerpo no se sabia cual era cual. Ahora cada uno tiene un tono
+ * propio: marron, naranja, acero, blanco, amarillo, turquesa, azul, morado,
+ * rojo.
+ *
+ * `min` es donde EMPIEZA el rango (su escalon 1); los escalones 2 y 3 parten
+ * el tramo hasta el siguiente rango en tres partes iguales.
+ */
 const RANKS = [
-    { key: 'novato', label: 'Novato', min: 0, color: '#71717a' },
-    { key: 'madera', label: 'Madera', min: 10000, color: '#a16207' },
-    { key: 'bronce', label: 'Bronce', min: 20000, color: '#c2703a' },
-    { key: 'hierro', label: 'Hierro', min: 40000, color: '#64748b' },
-    { key: 'plata', label: 'Plata', min: 75000, color: '#cbd5e1' },
-    { key: 'oro', label: 'Oro', min: 130000, color: '#eab308' },
-    { key: 'platino', label: 'Platino', min: 220000, color: '#22d3ee' },
-    { key: 'diamante', label: 'Diamante', min: 380000, color: '#60a5fa' },
-    { key: 'maestro', label: 'Maestro', min: 650000, color: '#a855f7' },
-    { key: 'leyenda', label: 'Leyenda', min: 1000000, color: '#ef4444' }
+    { key: 'novato', label: 'Novato', min: 0, color: '#a8a29e' },
+    { key: 'madera', label: 'Madera', min: 3000, color: '#8b5e34' },
+    { key: 'bronce', label: 'Bronce', min: 12000, color: '#f97316' },
+    { key: 'hierro', label: 'Hierro', min: 30000, color: '#5b6b7f' },
+    { key: 'plata', label: 'Plata', min: 60000, color: '#f1f5f9' },
+    { key: 'oro', label: 'Oro', min: 110000, color: '#facc15' },
+    { key: 'platino', label: 'Platino', min: 190000, color: '#2dd4bf' },
+    { key: 'diamante', label: 'Diamante', min: 320000, color: '#3b82f6' },
+    { key: 'maestro', label: 'Maestro', min: 520000, color: '#a855f7' },
+    { key: 'leyenda', label: 'Leyenda', min: 800000, color: '#ef4444' }
 ];
+const SUBRANGOS = 3;
+// Donde "acabaria" Leyenda, solo para partirla en tres: no hay nada encima.
+const TOPE_LEYENDA = 2000000;
 
-/** Devuelve el rango alcanzado y el progreso hacia el siguiente (0-100). */
+/** Los treinta escalones, planos: { key, base, tier, label, min, color, indice }. */
+const ESCALONES = RANKS.flatMap((r, i) => {
+    const fin = RANKS[i + 1]?.min ?? TOPE_LEYENDA;
+    const tramo = (fin - r.min) / SUBRANGOS;
+    return Array.from({ length: SUBRANGOS }, (_, t) => ({
+        key: r.key, base: r.label, tier: t + 1,
+        label: `${r.label} ${t + 1}`,
+        min: Math.round(r.min + tramo * t),
+        color: r.color,
+        indice: i * SUBRANGOS + t
+    }));
+});
+
+/** Devuelve el escalon alcanzado y el progreso hacia el siguiente (0-100). */
 const getRankForPoints = (points) => {
     let index = 0;
-    for (let i = RANKS.length - 1; i >= 0; i--) {
-        if (points >= RANKS[i].min) { index = i; break; }
+    for (let i = ESCALONES.length - 1; i >= 0; i--) {
+        if (points >= ESCALONES[i].min) { index = i; break; }
     }
 
-    const current = RANKS[index];
-    const next = RANKS[index + 1] || null;
+    const current = ESCALONES[index];
+    const next = ESCALONES[index + 1] || null;
 
     const progress = next
         ? Math.min(100, Math.round(((points - current.min) / (next.min - current.min)) * 100))
         : 100;
 
     return {
-        rank: current.key,
-        rankLabel: current.label,
+        rank: current.key,          // 'madera': el rango, para el icono y el color
+        rankBase: current.base,     // 'Madera'
+        tier: current.tier,         // 1, 2 o 3
+        rankLabel: current.label,   // 'Madera 2'
         rankColor: current.color,
-        rankIndex: index,
-        maxRankIndex: RANKS.length - 1,
+        rankIndex: index,           // 0..29, para detectar subidas
+        maxRankIndex: ESCALONES.length - 1,
         nextRankLabel: next ? next.label : null,
         pointsToNext: next ? Math.max(0, next.min - points) : 0,
         progress
@@ -86,7 +121,7 @@ const getWeekKey = (date) => {
  * Calcula los rangos de los 8 grupos musculares de un usuario.
  * @returns {Promise<Object>} { Pecho: { points, volume, weeks, sets, rank... }, ... }
  */
-const getMuscleRanks = async (userId) => {
+const getMuscleRanks = async (userId, opciones = {}) => {
     const [logs, exercises] = await Promise.all([
         WorkoutLog.find({ user: userId }).select('type date duration exercises').lean(),
         Exercise.find({ $or: [{ user: userId }, { isCustom: false }, { user: null }] })
@@ -108,6 +143,21 @@ const getMuscleRanks = async (userId) => {
             isCardio: !!ex.isCardio
         };
     });
+
+    // LO QUE HA HECHO CADA EJERCICIO POR CADA MUSCULO, para el detalle del
+    // mapa: al tocar un musculo se ve con que ejercicios lo has subido, cuantas
+    // veces y cuanto volumen le ha dejado cada uno.
+    //   porEjercicio[musculo][nombreEjercicio] = { volumen, sesiones:Set, mejorPeso, ultima }
+    const porEjercicio = {};
+    const anotarEjercicio = (musculo, nombre, parte, fecha, mejorPeso) => {
+        if (!nombre || parte <= 0) return;
+        const m = (porEjercicio[musculo] = porEjercicio[musculo] || {});
+        const e = (m[nombre] = m[nombre] || { volumen: 0, sesiones: new Set(), mejorPeso: 0, ultima: null });
+        e.volumen += parte;
+        e.sesiones.add(new Date(fecha).toISOString().slice(0, 10));
+        if (mejorPeso > e.mejorPeso) e.mejorPeso = mejorPeso;
+        if (!e.ultima || new Date(fecha) > new Date(e.ultima)) e.ultima = fecha;
+    };
 
     // Acumuladores: los 8 grupos de siempre MÁS cada músculo concreto.
     // Se devuelven los dos: el grupo lo siguen usando el ranking y los eventos
@@ -172,6 +222,7 @@ const getMuscleRanks = async (userId) => {
 
                     const esPrincipal = musculo === info.detail || musculo === info.muscle;
                     addVolume(musculo, parte, weekKey, esPrincipal ? nSeries : 0, esPrincipal ? repeticiones : 0, esPrincipal ? mejorPeso : 0);
+                    anotarEjercicio(musculo, ex.name, parte, log.date, mejorPeso);
 
                     const grupo = resolveMuscleGroup(musculo, null);
                     if (grupo && grupo !== musculo) porGrupo[grupo] = (porGrupo[grupo] || 0) + parte;
@@ -180,15 +231,21 @@ const getMuscleRanks = async (userId) => {
                 Object.entries(porGrupo).forEach(([grupo, parte]) => {
                     const esPrincipal = grupo === info.muscle;
                     addVolume(grupo, parte, weekKey, esPrincipal ? nSeries : 0, esPrincipal ? repeticiones : 0, esPrincipal ? mejorPeso : 0);
+                    anotarEjercicio(grupo, ex.name, parte, log.date, mejorPeso);
                 });
             } else {
                 // REPARTO ANTIGUO, para los ejercicios que aún no tienen porcentajes
                 addVolume(info.muscle, volumen, weekKey, nSeries, repeticiones, mejorPeso);
+                anotarEjercicio(info.muscle, ex.name, volumen, log.date, mejorPeso);
                 if (info.detail) {
                     addVolume(info.detail, volumen, weekKey, nSeries, repeticiones, mejorPeso);
+                    anotarEjercicio(info.detail, ex.name, volumen, log.date, mejorPeso);
                 }
                 info.secondary.forEach(sec => {
-                    if (sec !== info.muscle) addVolume(sec, volumen * SECONDARY_FACTOR, weekKey);
+                    if (sec !== info.muscle) {
+                        addVolume(sec, volumen * SECONDARY_FACTOR, weekKey);
+                        anotarEjercicio(sec, ex.name, volumen * SECONDARY_FACTOR, log.date, mejorPeso);
+                    }
                 });
             }
         });
@@ -213,6 +270,27 @@ const getMuscleRanks = async (userId) => {
             ...getRankForPoints(points)
         };
     });
+
+    // Los ejercicios de cada musculo, de mas a menos volumen, con su propio
+    // escalon (misma escala que los musculos: lo que un ejercicio le ha dejado
+    // a ese musculo). No se mandan por defecto —el ranking y los eventos de
+    // clan solo quieren los grupos—: se piden con `conEjercicios`.
+    if (opciones.conEjercicios) {
+        Object.entries(porEjercicio).forEach(([musculo, lista]) => {
+            if (!result[musculo]) return;
+            result[musculo].ejercicios = Object.entries(lista)
+                .map(([nombre, e]) => ({
+                    nombre,
+                    volumen: Math.round(e.volumen),
+                    sesiones: e.sesiones.size,
+                    mejorPeso: e.mejorPeso,
+                    ultima: e.ultima,
+                    ...getRankForPoints(Math.round(e.volumen))
+                }))
+                .sort((a, b) => b.volumen - a.volumen)
+                .slice(0, 10);
+        });
+    }
 
     return result;
 };
@@ -270,4 +348,4 @@ const getExerciseProgress = async (userId, exerciseName) => {
     };
 };
 
-module.exports = { getMuscleRanks, getExerciseProgress, getRankForPoints, RANKS };
+module.exports = { getMuscleRanks, getExerciseProgress, getRankForPoints, RANKS, ESCALONES, SUBRANGOS };

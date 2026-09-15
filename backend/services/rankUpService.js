@@ -17,11 +17,16 @@ const { getMuscleRanks } = require('./muscleRankService');
  * Con 8 grupos y 9 escalones, un jugador reparte ~54.000 monedas a lo largo de
  * anos, que es el orden de magnitud del catalogo entero de la tienda.
  */
-const MONEDAS_POR_ESCALON = 150;
+// Ahora los escalones son treinta (tres por rango): el premio por escalon
+// crece con el RANGO, no con el escalon, para que subir de Madera 1 a Madera 2
+// pague lo mismo que de Madera 2 a Madera 3 y no se dispare por el camino.
+const MONEDAS_POR_ESCALON = 50;
+const SUBRANGOS = 3;
+const ESCALA_ACTUAL = 2;
 
 const premioPorSubir = (desde, hasta) => {
     let total = 0;
-    for (let r = desde + 1; r <= hasta; r++) total += r * MONEDAS_POR_ESCALON;
+    for (let r = desde + 1; r <= hasta; r++) total += (Math.floor(r / SUBRANGOS) + 1) * MONEDAS_POR_ESCALON;
     return total;
 };
 
@@ -31,15 +36,18 @@ const premioPorSubir = (desde, hasta) => {
  * @returns {{ subidas: Array, monedas: number }} subidas vacio si no hay nada
  */
 const revisarSubidasDeRango = async (userId) => {
-    const usuario = await User.findById(userId).select('muscleRanks coins');
+    const usuario = await User.findById(userId).select('muscleRanks muscleRanksEscala coins');
     if (!usuario) return { subidas: [], monedas: 0 };
 
     const ranks = await getMuscleRanks(userId);
 
     // ⚠️ Primera vez: el campo no existe todavia. Se anota el estado actual SIN
     // pagar nada. Si no, un usuario con meses de historial cobraria de golpe
-    // todos los rangos que ya tenia ganados.
-    const esPrimeraVez = !usuario.muscleRanks || usuario.muscleRanks.size === 0;
+    // todos los rangos que ya tenia ganados. Y lo mismo si los indices
+    // guardados son de OTRA ESCALA (la de diez rangos): se vuelven a anotar
+    // con la nueva sin pagar.
+    const esPrimeraVez = !usuario.muscleRanks || usuario.muscleRanks.size === 0
+        || (usuario.muscleRanksEscala || 1) !== ESCALA_ACTUAL;
 
     const anteriores = usuario.muscleRanks || new Map();
     const subidas = [];
@@ -69,7 +77,7 @@ const revisarSubidasDeRango = async (userId) => {
 
     // Se guarda SIEMPRE el estado nuevo, aunque no haya premio: es lo que evita
     // que la proxima llamada vuelva a detectar la misma subida.
-    const cambio = { $set: { muscleRanks: nuevos } };
+    const cambio = { $set: { muscleRanks: nuevos, muscleRanksEscala: ESCALA_ACTUAL } };
     if (monedas > 0) cambio.$inc = { coins: monedas };
 
     const actualizado = await User.findByIdAndUpdate(userId, cambio, { new: true });

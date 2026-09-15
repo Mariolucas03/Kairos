@@ -567,7 +567,9 @@ const createCustomExercise = async (req, res) => {
 // @route GET /api/gym/muscle-ranks
 const getMuscleRanksController = async (req, res) => {
     try {
-        const ranks = await getMuscleRanks(req.user._id);
+        // Con los ejercicios de cada musculo: es la pantalla del cuerpo, donde
+        // al tocar un musculo se ve con que lo has subido.
+        const ranks = await getMuscleRanks(req.user._id, { conEjercicios: true });
         res.json({ ranks, tiers: RANKS });
     } catch (error) {
         console.error('Error en getMuscleRanks:', error);

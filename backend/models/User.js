@@ -50,6 +50,10 @@ const userSchema = new mongoose.Schema({
     // el anterior no hay forma de saber que acabas de subir. Esto es lo que
     // permite lanzar el aviso y pagar el premio una sola vez.
     muscleRanks: { type: Map, of: Number, default: undefined },
+    // Con que escala se apuntaron esos indices. La 2 es la de treinta escalones
+    // (tres por rango): al cambiar de escala, la primera revision solo anota,
+    // no paga, o cada usuario cobraria de golpe veinte "subidas" que no son.
+    muscleRanksEscala: { type: Number, default: 1 },
 
     // --- Administracion ---
     // No existia ningun concepto de administrador: no habia forma de banear a

@@ -84,19 +84,81 @@ export default function BodyTab() {
                     </div>
                 )}
 
-                {muscleSel && ranks[muscleSel] && (
-                    <div className="mt-3 bg-black border border-white/10 rounded-2xl p-3 animate-in fade-in">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-white uppercase">{muscleSel}</span>
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded" style={{ color: ranks[muscleSel].rankColor, backgroundColor: ranks[muscleSel].rankColor + '22' }}>
-                                {ranks[muscleSel].rankLabel}
-                            </span>
+                {/* EL DETALLE DEL MUSCULO, como en Symmetry: su escalon, lo que
+                    falta para el siguiente, y CON QUE lo has subido: cada
+                    ejercicio, cuantas veces, cuanto le ha dejado y su propio
+                    escalon. Es lo que convierte un color en una explicacion. */}
+                {muscleSel && ranks[muscleSel] && (() => {
+                    const m = ranks[muscleSel];
+                    return (
+                        <div className="mt-3 bg-black border border-white/10 rounded-2xl p-3 animate-in fade-in">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <IconoRango rango={m.rank} color={m.rankColor} tamano={26} />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-black text-white uppercase truncate not-italic">{muscleSel}</p>
+                                        <p className="text-[10px] font-black uppercase not-italic" style={{ color: m.rankColor }}>{m.rankLabel}</p>
+                                    </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <p className="text-[11px] font-black text-white tabular-nums not-italic">{miles(m.volume)} kg</p>
+                                    <p className="text-[9px] text-zinc-500 font-bold not-italic">{m.sets} series</p>
+                                </div>
+                            </div>
+                            <div className="mt-2 h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${m.progress || 0}%`, background: m.rankColor }} />
+                            </div>
+                            <p className="text-[9px] text-zinc-500 font-bold mt-1 not-italic">
+                                {m.nextRankLabel ? `Faltan ${miles(m.pointsToNext)} kg para ${m.nextRankLabel}` : 'Escalón máximo'}
+                            </p>
+
+                            {m.ejercicios && m.ejercicios.length > 0 ? (
+                                <>
+                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.14em] mt-3 mb-1.5 not-italic">Con qué lo has subido</p>
+                                    <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-3 px-3 pb-1">
+                                        {m.ejercicios.map(e => (
+                                            <button
+                                                key={e.nombre}
+                                                type="button"
+                                                onClick={() => setEjercicio(e.nombre)}
+                                                className="shrink-0 w-[132px] text-left rounded-2xl border p-2.5 active:scale-[0.98] transition-transform"
+                                                style={{ borderColor: e.rankColor + '55', background: e.rankColor + '0f' }}
+                                            >
+                                                <div className="flex items-center gap-1.5">
+                                                    <IconoRango rango={e.rank} color={e.rankColor} tamano={16} />
+                                                    <span className="text-[9px] font-black uppercase not-italic truncate" style={{ color: e.rankColor }}>{e.rankLabel}</span>
+                                                </div>
+                                                <p className="text-[11px] font-black text-white leading-tight mt-1.5 line-clamp-2 not-italic">{e.nombre}</p>
+                                                <p className="text-[9px] text-zinc-400 font-bold mt-1 not-italic">{e.sesiones} {e.sesiones === 1 ? 'vez' : 'veces'} · {miles(e.volumen)} kg</p>
+                                                {e.mejorPeso > 0 && <p className="text-[9px] text-zinc-600 font-bold not-italic">mejor {e.mejorPeso} kg</p>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-[10px] text-zinc-600 font-bold mt-3 not-italic">Todavía ningún ejercicio ha trabajado este músculo.</p>
+                            )}
+
+                            {/* La grafica del ejercicio tocado, aqui mismo */}
+                            {ejercicio && (
+                                <div className="mt-3 rounded-2xl border border-white/[0.07] bg-zinc-950 p-3 animate-in fade-in">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className="text-[11px] font-black text-white uppercase truncate not-italic">{ejercicio}</p>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            {[['bestWeight', 'Peso'], ['volume', 'Volumen']].map(([k, t]) => (
+                                                <button key={k} type="button" onClick={() => setMetrica(k)} className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${metrica === k ? 'text-yellow-500 border-yellow-500/50 bg-yellow-500/10' : 'text-zinc-500 border-white/[0.07]'}`}>{t}</button>
+                                            ))}
+                                            <button type="button" onClick={() => setEjercicio(null)} aria-label="Cerrar" className="text-zinc-500 text-[10px] font-black px-1.5">✕</button>
+                                        </div>
+                                    </div>
+                                    {cargandoProgreso
+                                        ? <div className="h-32 animate-pulse bg-zinc-900 rounded-xl" />
+                                        : <ProgressChart points={progreso?.points || []} metric={metrica} color={m.rankColor} unit="kg" />}
+                                </div>
+                            )}
                         </div>
-                        <p className="text-[10px] text-zinc-500 mt-1">
-                            {miles(ranks[muscleSel].volume)} kg movidos · {ranks[muscleSel].sets} series
-                        </p>
-                    </div>
-                )}
+                    );
+                })()}
 
                 <p className="text-[9px] text-zinc-600 text-center mt-2">
                     Toca un músculo para ver su detalle
@@ -122,6 +184,7 @@ export default function BodyTab() {
                             cada serie suma <span className="text-white font-bold">peso × repeticiones</span>.
                             Si un ejercicio trabaja varios músculos, el principal se lleva todo y cada
                             secundario un <span className="text-white font-bold">40%</span>.
+                            Cada rango tiene <span className="text-white font-bold">tres escalones</span> (Madera 1, 2 y 3) antes del siguiente.
                         </p>
                         {escala && (
                             <div className="grid grid-cols-2 gap-1.5">
