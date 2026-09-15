@@ -83,7 +83,7 @@ export default function Header() {
     };
 
     return (
-        <header ref={cabecera} className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-md border-b border-zinc-800/50 safe-top pb-2 px-3 shadow-2xl select-none transition-all duration-300">
+        <header ref={cabecera} className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-zinc-800/50 safe-top pb-2 px-3 select-none">
             <style>{customAnimationsStyle}</style>
             <div className="max-w-4xl mx-auto flex justify-between items-center relative h-14 sm:h-16">
 

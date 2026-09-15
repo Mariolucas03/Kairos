@@ -765,7 +765,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     if (isMinimized) {
         return createPortal(
-            <div onClick={maximizeWorkout} className="fixed bottom-[70px] left-4 right-4 z-[90] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/50 rounded-2xl p-3 flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10">
+            <div onClick={maximizeWorkout} className="fixed bottom-[70px] left-4 right-4 z-[90] bg-zinc-900 border border-yellow-500/50 rounded-2xl p-3 flex justify-between items-center cursor-pointer animate-in slide-in-from-bottom-10">
                 <div className="flex items-center gap-3">
                     <div className="relative w-10 h-10 flex items-center justify-center bg-black rounded-xl border border-yellow-500/20">
                         {restTargetTime ? <span className="text-xs font-black text-blue-400 animate-pulse"><Timer size={16} /></span> : <div className="w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>}

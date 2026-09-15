@@ -203,7 +203,7 @@ export default function Shop() {
             </div>
 
             {/* TABS FLOTANTES (STICKY) */}
-            <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md pt-4 pb-4 px-4 border-b border-zinc-900/50">
+            <div className="sticky top-0 z-30 bg-black pt-4 pb-4 px-4 border-b border-zinc-900/50">
                 <div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-zinc-800">
                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'inventory' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`} />
                     <button onClick={() => setActiveTab('shop')} className={`flex-1 z-10 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'shop' ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}>
@@ -221,7 +221,7 @@ export default function Shop() {
                 {activeTab === 'shop' && !selectedCategory && (
                     <div onClick={() => setShowExchange(true)} className="mb-5 relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 flex items-center justify-between cursor-pointer active:scale-[0.985] transition-all">
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
-                        <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
+                        <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
                         <div className="flex items-center gap-4 relative z-10">
                             <div className="w-12 h-12 rounded-2xl bg-[#18181b] border border-white/[0.07] flex items-center justify-center" style={{ color: ACENTO_FICHAS }}>
                                 <ArrowRightLeft size={22} />
@@ -308,7 +308,7 @@ export default function Shop() {
                                             {/* Halo suave del mismo color, al 11% como el resto */}
                                             {item.rarity && item.rarity !== 'comun' && (
                                                 <div
-                                                    className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none"
+                                                    className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
                                                     style={{ background: rarity.accent, opacity: 0.11 }}
                                                 />
                                             )}
@@ -370,7 +370,7 @@ export default function Shop() {
                             style={{ background: `linear-gradient(90deg, ${rarezaSel.accent}, transparent)` }}
                         />
                         <div
-                            className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none"
+                            className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
                             style={{ background: rarezaSel.accent, opacity: 0.11 }}
                         />
 
@@ -475,7 +475,7 @@ export default function Shop() {
                         {/* Acento y halo de la casa de cambio: morado, el color de
                             las fichas, que es lo que entregas aquí. */}
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
-                        <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
+                        <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
 
                         <div className="flex justify-between items-center mb-7 relative z-10">
                             <h3 className="text-[20px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Casa de cambio</h3>

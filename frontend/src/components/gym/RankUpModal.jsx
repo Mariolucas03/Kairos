@@ -26,7 +26,7 @@ export default function RankUpModal({ subidas = [], monedas = 0, onClose }) {
                     style={{ background: `linear-gradient(90deg, ${subidas[0].color}, transparent)` }}
                 />
                 <div
-                    className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none"
+                    className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
                     style={{ background: subidas[0].color, opacity: 0.11 }}
                 />
 

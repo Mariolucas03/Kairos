@@ -3,7 +3,7 @@ import { Calendar } from 'lucide-react';
 export default function MonthlyRewardsBanner() {
     return (
         <div className="bg-zinc-900/80 border border-purple-500/20 rounded-3xl p-4 mb-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-12 bg-purple-600/10 blur-3xl rounded-full -mr-6 -mt-6 pointer-events-none"></div>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-purple-600/10 halo -mr-6 -mt-6 pointer-events-none"></div>
             <div className="flex items-center justify-between relative z-10">
                 <div className="self-start pt-2">
                     <h3 className="text-white font-black uppercase not-italic text-sm flex items-center gap-2 mb-1">

@@ -152,7 +152,7 @@ export default function ClansPage() {
                 <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 relative overflow-hidden mb-6">
                     {/* Acento y halo del sistema, en vez del borron morado */}
                     <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${RANK_CONFIG[myRank].hex || '#a855f7'}, transparent)` }} />
-                    <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none" style={{ background: RANK_CONFIG[myRank].hex || '#a855f7', opacity: 0.11 }} />
+                    <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none" style={{ background: RANK_CONFIG[myRank].hex || '#a855f7', opacity: 0.11 }} />
 
                     <div className="relative z-10 mb-5">
                         {/* Estandarte CENTRADO con el nombre debajo, como en los

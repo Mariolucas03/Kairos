@@ -135,6 +135,22 @@ body {
     user-select: none;
 }
 /* ═══════════════════════════════════════════════════════════════════════════
+   EL HALO DE LAS TARJETAS
+
+   Era un circulo con `filter: blur(30px)` en cada tarjeta. Un filtro de
+   desenfoque obliga al navegador a rasterizar esa capa aparte y a volver a
+   componerla en cada frame de scroll: con diez tarjetas a la vista, el movil
+   iba a tirones. Esto es el mismo halo dibujado con un degradado radial
+   recortado por una mascara: ni un filtro. El color sigue viniendo del
+   `background` inline de cada tarjeta.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.halo {
+    border-radius: 9999px;
+    -webkit-mask-image: radial-gradient(closest-side, #000 10%, transparent 100%);
+    mask-image: radial-gradient(closest-side, #000 10%, transparent 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    PANTALLAS DE ACCESO (login y registro)
 
    Solo tres cosas se mueven, y en CSS: la entrada suave de la pantalla, el

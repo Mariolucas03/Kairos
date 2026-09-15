@@ -67,7 +67,7 @@ export default function Footer() {
         <>
             {/* --- OVERLAY GLOBAL OSCURO PARA EL BOTÓN + --- */}
             <div
-                className={`fixed inset-0 z-40 bg-black/80 backdrop-blur-sm transition-all duration-400 ease-out ${isFabOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                className={`fixed inset-0 z-40 bg-black/85 transition-opacity duration-300 ease-out ${isFabOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 onClick={() => setIsFabOpen(false)}
             />
 
@@ -104,7 +104,7 @@ export default function Footer() {
                 rompia la silueta de la pastilla y volvia a leerse como una
                 barra clasica con un boton encima. */}
             <nav className="fixed footer-flotante left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-50">
-                <div className="flex items-center justify-around gap-1 px-2 py-2 bg-[#0a0a0c]/60 backdrop-blur-2xl border border-white/[0.07] rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.65)]">
+                <div className="flex items-center justify-around gap-1 px-2 py-2 bg-[#0a0a0c] border border-white/[0.07] rounded-3xl shadow-[0_6px_20px_rgba(0,0,0,0.6)]">
 
                     {navItemsLeft.map(renderItem)}
 

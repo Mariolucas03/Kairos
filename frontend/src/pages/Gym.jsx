@@ -111,7 +111,7 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLock
                 {/* Línea de acento arriba */}
                 <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${acento}, transparent)` }} />
                 {/* Halo difuso */}
-                <div className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] opacity-[0.11] pointer-events-none" style={{ background: acento }} />
+                <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo opacity-[0.11] pointer-events-none" style={{ background: acento }} />
 
                 <div className="flex items-center gap-4 pointer-events-none relative z-10 min-w-0">
                     <div

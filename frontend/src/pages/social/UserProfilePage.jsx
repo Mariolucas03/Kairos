@@ -489,7 +489,7 @@ export default function UserProfilePage() {
             {/* --- PESTAÑAS ESTILO IG ---
                 Solo salen las secciones que esta persona ha decidido enseñar
                 (en Ajustes). Si tiene la comida apagada, esa pestaña no existe. */}
-            <div className="flex border-t border-white/10 -mx-4 mb-4 sticky top-0 bg-black/95 backdrop-blur-md z-20">
+            <div className="flex border-t border-white/10 -mx-4 mb-4 sticky top-0 bg-black z-20">
                 {TABS.filter(t => profile.visibility ? profile.visibility[t.key] !== false : true)
                     .map(({ key, label, icon: Icon }) => {
                         const active = tab === key;

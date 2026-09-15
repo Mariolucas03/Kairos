@@ -78,7 +78,7 @@ export default function ChestModal({ isOpen, onClose, reward }) {
                             onClick={abrir}
                             className={`w-44 h-44 flex items-center justify-center cursor-pointer relative ${fase === 'cerrado' ? 'cofre-flota' : 'cofre-tiembla'}`}
                         >
-                            <div className="absolute inset-4 rounded-full blur-2xl opacity-40" style={{ background: rarezaCofre.color }} />
+                            <div className="absolute inset-4 halo opacity-40" style={{ background: rarezaCofre.color }} />
                             <div className="relative"><Icono icono={cofre.icono} /></div>
                         </div>
                         <p className="mt-2 text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: rarezaCofre.color }}>{cofre.nombre || 'Cofre'}</p>
@@ -89,7 +89,7 @@ export default function ChestModal({ isOpen, onClose, reward }) {
                 ) : (
                     <div className="flex flex-col items-center cofre-sale w-full">
                         <div className="relative w-36 h-36 flex items-center justify-center mb-5">
-                            <div className="absolute inset-0 rounded-full blur-3xl opacity-50" style={{ background: color }} />
+                            <div className="absolute inset-0 halo opacity-50" style={{ background: color }} />
                             <div className="relative w-28 h-28 rounded-3xl flex items-center justify-center border" style={{ background: `${color}22`, borderColor: `${color}66` }}>
                                 {reward?.tipo === 'objeto' || reward?.duplicado
                                     ? <Icono icono={objeto?.sprite || objeto?.icon} clase="text-6xl" />

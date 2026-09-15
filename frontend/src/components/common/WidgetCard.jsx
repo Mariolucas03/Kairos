@@ -39,7 +39,7 @@ export default function WidgetCard({
             {/* Halo */}
             {glow && (
                 <div
-                    className="absolute -right-7 -bottom-9 w-[130px] h-[130px] rounded-full blur-[30px] pointer-events-none"
+                    className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
                     style={{ background: accent, opacity: 0.11 }}
                 />
             )}
