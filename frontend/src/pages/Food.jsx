@@ -10,6 +10,7 @@ import {
     Plus, Trash2, ToggleLeft, ToggleRight, Save
 } from 'lucide-react';
 import api from '../services/api';
+import { invalidarDiario } from '../utils/cacheDiario';
 import FoodSearchModal from '../components/food/FoodSearchModal';
 import Toast from '../components/common/Toast';
 import ConfirmDialog from '../components/common/ConfirmDialog';
@@ -114,6 +115,7 @@ export default function Food() {
         // Petición en segundo plano
         try {
             await api.delete(`/food/log/${mealId}/${foodItemId}`);
+            invalidarDiario();
             mutateLog(); // Sincronizamos silenciosamente
         } catch (error) {
             console.error(error);

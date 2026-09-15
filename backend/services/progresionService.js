@@ -208,7 +208,18 @@ const sugerirSiguiente = (config = {}, ultimas = [], anteriores = []) => {
     // Se cuenta hacia atrás y se para en cuanto algo rompe la racha: una sesión
     // con otro peso (entonces no es la misma pared), o una que sí sacaste. Una
     // sesión vacía también corta: no dice nada y encadenarla sería inventar.
+    // ⚠️ Y "ATASCADO" ES NO MEJORAR, NO "MISMO PESO".
+    //
+    // Antes contaba sesiones al mismo peso sin llegar al objetivo. Con un rango
+    // 8-12 eso castigaba a quien PROGRESA: 80 x 8, luego 80 x 9, luego 80 x 10
+    // son tres sesiones al mismo peso sin llegar a 12, y la app bajaba a 72 a
+    // alguien que iba subiendo una repeticion por semana. Solo cuenta como
+    // pared si la MEDIA de repeticiones no mejoro respecto a la sesion
+    // anterior (la media y no la peor serie: 10-10-6 y luego 8-8-7 no es
+    // mejorar aunque la peor haya subido de 6 a 7).
+    const mediaDe = (lista) => lista.reduce((a, s) => a + (Number(s.reps) || 0), 0) / lista.length;
     let atascado = 1;   // la de hoy ya cuenta
+    let mediaDeLaSiguiente = mediaDe(validas);
     for (let i = anteriores.length - 1; i >= 0; i--) {
         // Con el MISMO criterio que la de hoy: si aquí se contaran todas las
         // series y arriba solo las de trabajo, una sesión con calentamiento
@@ -217,9 +228,14 @@ const sugerirSiguiente = (config = {}, ultimas = [], anteriores = []) => {
         if (previas.length === 0) break;
 
         if (pesoPrevio !== peso) break;
-        if (Math.min(...previas.map(s => Number(s.reps) || 0)) >= objetivo) break;
+        const peorPrevia = Math.min(...previas.map(s => Number(s.reps) || 0));
+        if (peorPrevia >= objetivo) break;
+        // La sesion de despues hizo MAS que esta: eso es avanzar, no una pared.
+        const mediaPrevia = mediaDe(previas);
+        if (mediaDeLaSiguiente > mediaPrevia + 0.01) break;
 
         atascado++;
+        mediaDeLaSiguiente = mediaPrevia;
     }
 
     if (atascado >= SESIONES_PARA_BAJAR) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, X, ToggleLeft, ToggleRight, Move, Lock, Unlock, CalendarDays, RotateCcw } from 'lucide-react';
+import useSWR from 'swr';
 import api from '../services/api';
 import { getMadridDateString } from '../utils/dateHelpers';
 import DayCalendarModal from '../components/common/DayCalendarModal';
@@ -143,6 +144,8 @@ export default function Home() {
 
     // Volumen semanal: ahora se pinta dentro de RUTINA GYM
     const { stats: weeklyStats } = useWeeklyStats();
+    // Las pesadas, para la linea del widget de peso. Se recarga al apuntar una.
+    const { data: pesadas, mutate: recargarPesadas } = useSWR(user && !isHistory ? '/daily/history' : null, (u) => api.get(u).then(r => r.data));
 
     const DEFAULTS_ORDER = ['streak', 'food', 'missions', 'sport', 'training', 'steps', 'sleep', 'weight', 'kcalBalance', 'mood', 'constancia'];
     const DEFAULTS_CONFIG = { streak: true, food: true, missions: true, sport: true, training: true, steps: true, sleep: true, weight: true, kcalBalance: true, mood: true, constancia: true };
@@ -280,7 +283,7 @@ export default function Home() {
             case 'sleep': return <div className={readOnlyClass}><SleepWidget hours={data.sleepHours} onUpdate={(v) => save('sleepHours', v)} /></div>;
             case 'steps': return <div className={readOnlyClass}><StepsWidget steps={data.steps} onUpdate={(v) => save('steps', v)} /></div>;
             case 'mood': return <div className={readOnlyClass}><MoodWidget mood={data.mood} onUpdate={(v) => save('mood', v)} /></div>;
-            case 'weight': return <div className={`${readOnlyClass} flex flex-col cursor-pointer`}><WeightWidget initialWeight={data.weight} history={[]} onUpdate={(v) => save('weight', v)} /></div>;
+            case 'weight': return <div className={`${readOnlyClass} flex flex-col cursor-pointer`}><WeightWidget initialWeight={data.weight} history={pesadas || []} onUpdate={(v) => { save('weight', v); setTimeout(() => recargarPesadas(), 800); }} /></div>;
             case 'kcalBalance': {
                 const burned = (data.sportWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0) + (data.gymWorkouts?.reduce((a, c) => a + (c.caloriesBurned || 0), 0) || 0);
                 return (<div className={wrapperClass}><KcalBalanceWidget intake={intake} burned={burned} weight={data.weight} /></div>);

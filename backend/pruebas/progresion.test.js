@@ -169,6 +169,22 @@ describe('Que toca hoy: lo que propone para la proxima sesion', () => {
         assert.strictEqual(r.descarga, false);
     });
 
+    test('subir repeticiones al mismo peso NO es estar atascado', () => {
+        const a = (...reps) => reps.map(r => ({ weight: 80, reps: r }));
+
+        // Tres sesiones a 80 sin llegar a 12, pero cada una mejor que la
+        // anterior: 8, 9, 10. Eso es progresar una repeticion por semana, y
+        // antes la app bajaba a 72 justo aqui.
+        const r = sugerirSiguiente({ reps: '8-12' }, a(10, 10, 10), [a(8, 8, 8), a(9, 9, 9)]);
+        assert.strictEqual(r.peso, 80, 'Iba mejorando: no se baja');
+        assert.strictEqual(r.descarga, false);
+        assert.strictEqual(r.reps, 11);
+
+        // Y si se estanca de verdad (la peor serie no sube), entonces si.
+        const clavado = sugerirSiguiente({ reps: '8-12' }, a(10, 10, 9), [a(10, 10, 9), a(10, 10, 9)]);
+        assert.strictEqual(clavado.descarga, true);
+    });
+
     test('cambiar de peso rompe la racha: no es la misma pared', () => {
         const en = (kg, ...reps) => reps.map(r => ({ weight: kg, reps: r }));
 

@@ -1977,7 +1977,102 @@ const chatRoutineGenerator = async (req, res) => {
     });
 };
 
+/**
+ * TUS MARCAS: la mejor serie de cada ejercicio, y cuales son de este mes.
+ *
+ * Una lista de records dice mas de como vas que cualquier total: "press
+ * banca 90 x 5, el 3 de septiembre" es algo que uno recuerda y quiere batir.
+ * Se ordena por 1RM estimado (Epley), que es lo que permite comparar 90 x 5
+ * con 100 x 1.
+ *
+ * @route GET /api/gym/marcas
+ */
+const getMarcas = async (req, res) => {
+    try {
+        const hace30 = new Date(); hace30.setDate(hace30.getDate() - 30);
+        const filas = await WorkoutLog.aggregate([
+            { $match: { user: req.user._id, type: 'gym' } },
+            { $unwind: '$exercises' },
+            { $unwind: '$exercises.sets' },
+            { $match: { 'exercises.sets.weight': { $gt: 0 }, 'exercises.sets.reps': { $gt: 0 }, 'exercises.esPesoCorporal': { $ne: true } } },
+            {
+                $project: {
+                    fecha: '$date', ejercicio: '$exercises.name',
+                    peso: '$exercises.sets.weight', reps: '$exercises.sets.reps',
+                    // Epley: 1RM = peso x (1 + reps/30). Con reps > 12 se
+                    // desmadra, asi que se recorta a 12 para estimar.
+                    rm1: { $multiply: ['$exercises.sets.weight', { $add: [1, { $divide: [{ $min: ['$exercises.sets.reps', 12] }, 30] }] }] }
+                }
+            },
+            { $sort: { rm1: -1, peso: -1 } },
+            {
+                $group: {
+                    _id: '$ejercicio',
+                    peso: { $first: '$peso' }, reps: { $first: '$reps' }, rm1: { $first: '$rm1' }, fecha: { $first: '$fecha' }
+                }
+            },
+            { $sort: { rm1: -1 } },
+            { $limit: 12 }
+        ]);
+        const marcas = filas.map(f => ({ ejercicio: f._id, peso: f.peso, reps: f.reps, rm1: Math.round(f.rm1), fecha: f.fecha }));
+        res.json({
+            marcas,
+            recientes: marcas.filter(m => new Date(m.fecha) >= hace30).length
+        });
+    } catch (error) {
+        console.error('Error en getMarcas:', error);
+        res.status(500).json({ message: 'Error cargando las marcas' });
+    }
+};
+
+/**
+ * VOLUMEN POR SEMANA: las ultimas N semanas, y si vas a mas o a menos.
+ *
+ * Los totales de siempre no dicen si esta semana has entrenado mas que
+ * hace un mes. Esto si: barras por semana (lunes a domingo) y la comparacion
+ * de las ultimas cuatro con las cuatro anteriores.
+ *
+ * @route GET /api/gym/volumen-semanal?semanas=8
+ */
+const getVolumenSemanal = async (req, res) => {
+    try {
+        const semanas = Math.min(Math.max(parseInt(req.query.semanas) || 8, 4), 26);
+        const hoy = new Date();
+        const lunesDeHoy = new Date(hoy); lunesDeHoy.setHours(0, 0, 0, 0);
+        lunesDeHoy.setDate(lunesDeHoy.getDate() - ((lunesDeHoy.getDay() + 6) % 7));
+        const desde = new Date(lunesDeHoy); desde.setDate(desde.getDate() - (semanas - 1) * 7);
+
+        const logs = await WorkoutLog.find({ user: req.user._id, type: 'gym', date: { $gte: desde } })
+            .select('date exercises.sets.weight exercises.sets.reps duration').lean();
+
+        const filas = Array.from({ length: semanas }, (_, i) => {
+            const inicio = new Date(desde); inicio.setDate(desde.getDate() + i * 7);
+            return { inicio: inicio.toISOString().slice(0, 10), volumen: 0, entrenos: 0, minutos: 0 };
+        });
+        for (const l of logs) {
+            const i = Math.floor((new Date(l.date) - desde) / (7 * 86400000));
+            if (i < 0 || i >= semanas) continue;
+            const vol = (l.exercises || []).reduce((t, ex) => t + (ex.sets || []).reduce((s, x) => s + (x.weight || 0) * (x.reps || 0), 0), 0);
+            filas[i].volumen += vol;
+            filas[i].entrenos += 1;
+            filas[i].minutos += Math.round((l.duration || 0) / 60);
+        }
+        filas.forEach(f => { f.volumen = Math.round(f.volumen); });
+
+        // Las ultimas cuatro contra las cuatro de antes, en volumen.
+        const ultimas = filas.slice(-4).reduce((a, f) => a + f.volumen, 0);
+        const previas = filas.slice(-8, -4).reduce((a, f) => a + f.volumen, 0);
+        const cambio = previas > 0 ? Math.round(((ultimas - previas) / previas) * 100) : null;
+
+        res.json({ semanas: filas, ultimasCuatro: ultimas, cuatroAnteriores: previas, cambio });
+    } catch (error) {
+        console.error('Error en getVolumenSemanal:', error);
+        res.status(500).json({ message: 'Error cargando el volumen semanal' });
+    }
+};
+
 module.exports = {
+    getMarcas, getVolumenSemanal,
     // Se exporta para poder sincronizar el catálogo en el arranque del servidor
     // (server.js), y no solo cuando el primer usuario abre la lista.
     syncExerciseCatalog,

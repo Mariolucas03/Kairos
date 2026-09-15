@@ -4,6 +4,7 @@ import {
     SortAsc, Filter, ArrowRight, BrainCircuit, Save, Flame, Wheat, Droplet, Leaf, Folder
 } from 'lucide-react';
 import api from '../../services/api';
+import { invalidarDiario } from '../../utils/cacheDiario';
 import { encolar, esFalloDeRed, nuevaMarca } from '../../utils/colaEnvios';
 import ScanAnimation from './ScanAnimation';
 
@@ -186,6 +187,7 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
         // 2. Operación real en segundo plano
         try {
             await api.post(`/food/log/${mealId}`, foodData);
+            invalidarDiario();
             if (onBackgroundSync) onBackgroundSync(); // Recarga silencioca para asentar los IDs de la base de datos
         } catch (error) {
             // Sin cobertura no se pierde: se manda solo cuando vuelva. Antes
@@ -297,6 +299,7 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
         // 2. Background Sync
         try {
             await api.post(`/food/log/${mealId}`, foodData);
+            invalidarDiario();
             if (onBackgroundSync) onBackgroundSync();
         } catch (e) {
             if (esFalloDeRed(e)) {

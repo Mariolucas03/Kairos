@@ -20,6 +20,8 @@ const {
     getRepartoMuscular,
     getConstanciaPorDia,
     getFuerzaRelativa,
+    getMarcas,
+    getVolumenSemanal,
     buscarMusica,
     chatRoutineGenerator,
     getMuscleCatalog,
@@ -96,6 +98,8 @@ router.get('/reparto', protect, getRepartoMuscular);
 router.get('/constancia', protect, getConstanciaPorDia);
 // Cuantas veces tu propio peso mueves en cada ejercicio.
 router.get('/fuerza-relativa', protect, getFuerzaRelativa);
+router.get('/marcas', protect, getMarcas);
+router.get('/volumen-semanal', protect, getVolumenSemanal);
 // Buscar una cancion para ponerle al entreno. Va por el servidor y no directo
 // desde el movil: ver el comentario del controlador.
 router.get('/musica', protect, buscarMusica);

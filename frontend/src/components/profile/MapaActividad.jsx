@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import useSWR from 'swr';
+import { useNavigate } from 'react-router-dom';
 import { Flame, X, Dumbbell, Target, CalendarCheck, TrendingUp } from 'lucide-react';
 import api from '../../services/api';
 import WidgetCard from '../common/WidgetCard';
@@ -104,6 +105,34 @@ export default function MapaActividad({ semanas = 26 }) {
 
     const totalActivos = data?.activos || 0;
 
+    // LAS ULTIMAS CUATRO SEMANAS, EN GRANDE Y SIN SCROLL.
+    //
+    // La tarjeta pintaba las 26 semanas en cuadraditos de 12px con scroll
+    // horizontal: se veia como una alfombra y no se leia nada sin arrastrar.
+    // Lo que quieres ver de un vistazo es el ultimo mes: cuatro filas de
+    // siete, con el numero del dia, hoy marcado, y cada dia se puede tocar
+    // para verlo entero (el home tiene calendario). Los seis meses siguen en
+    // el detalle.
+    const navigate = useNavigate();
+    const semanasRecientes = useMemo(() => {
+        const filas = [];
+        const hoyDia = (hoy.getDay() + 6) % 7;             // 0 = lunes
+        const inicio = new Date(hoy);
+        inicio.setDate(hoy.getDate() - hoyDia - 21);        // el lunes de hace tres semanas
+        for (let s = 0; s < 4; s++) {
+            const fila = [];
+            for (let d = 0; d < 7; d++) {
+                const f = new Date(inicio);
+                f.setDate(inicio.getDate() + s * 7 + d);
+                const clave = claveDe(f);
+                fila.push({ clave, dia: f.getDate(), futuro: f > hoy, esHoy: clave === claveDe(hoy), info: porFecha[clave] });
+            }
+            filas.push(fila);
+        }
+        return filas;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data]);
+
     /**
      * Las cifras que el mapa insinúa pero no dice.
      *
@@ -204,10 +233,37 @@ export default function MapaActividad({ semanas = 26 }) {
                 </div>
 
                 {isLoading
-                    ? <div className="h-[110px] rounded-xl bg-zinc-900/50 animate-pulse" />
+                    ? <div className="h-[150px] rounded-xl bg-zinc-900/50 animate-pulse" />
                     : (
                         <div className="relative z-10">
-                            {rejilla(carril, 12)}
+                            <div className="grid grid-cols-7 gap-1 mb-1">
+                                {DIAS_SEMANA.map((d, i) => (
+                                    <span key={i} className="text-[9px] text-zinc-600 font-black text-center not-italic">{d}</span>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-7 gap-1">
+                                {semanasRecientes.flat().map(dia => {
+                                    const nivel = dia.info?.nivel || 0;
+                                    const encendido = nivel > 0;
+                                    return (
+                                        <button
+                                            key={dia.clave}
+                                            type="button"
+                                            disabled={dia.futuro}
+                                            onClick={(e) => { e.stopPropagation(); if (!dia.futuro) navigate(`/home?dia=${dia.clave}`); }}
+                                            aria-label={`Ver el ${dia.clave}`}
+                                            className={`h-[30px] rounded-lg flex items-center justify-center text-[11px] font-black tabular-nums not-italic transition-transform active:scale-90 ${dia.futuro ? 'opacity-25' : ''}`}
+                                            style={{
+                                                backgroundColor: dia.futuro ? '#111114' : COLORES[nivel],
+                                                color: nivel >= 2 ? '#1a1200' : encendido ? '#e4e4e7' : '#52525b',
+                                                boxShadow: dia.esHoy ? `0 0 0 2px ${ACENTO}` : 'none'
+                                            }}
+                                        >
+                                            {dia.dia}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                             {/* Una rejilla entera en gris no dice "aun no has
                                 empezado": dice "esto esta roto". */}
                             {!error && totalActivos === 0 && (
@@ -219,21 +275,16 @@ export default function MapaActividad({ semanas = 26 }) {
                         </div>
                     )}
 
-                {/* La leyenda en su propia linea. Compartiendo fila con "Toca
-                    para ver mas" no cabia en un movil de 375: las dos etiquetas
-                    salian cortadas ("N..." y "DIA COMP..."), que es peor que no
-                    ponerlas. */}
-                <div className="relative z-10 flex items-center justify-center gap-1.5 mt-3">
-                    <span className="text-[9px] text-zinc-600 font-bold uppercase mr-0.5">Nada</span>
-                    {COLORES.map((c, i) => (
-                        <div key={i} className="w-[10px] h-[10px] rounded-[2px] shrink-0" style={{ backgroundColor: c }} />
-                    ))}
-                    <span className="text-[9px] text-zinc-600 font-bold uppercase ml-0.5">Día completo</span>
+                <div className="relative z-10 flex items-center justify-between mt-3">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] text-zinc-600 font-bold uppercase mr-0.5">Nada</span>
+                        {COLORES.map((c, i) => (
+                            <div key={i} className="w-[10px] h-[10px] rounded-[2px] shrink-0" style={{ backgroundColor: c }} />
+                        ))}
+                        <span className="text-[9px] text-zinc-600 font-bold uppercase ml-0.5">Todo</span>
+                    </div>
+                    <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-wide">Aquí, 6 meses</span>
                 </div>
-
-                <p className="relative z-10 text-[9px] text-zinc-700 font-bold uppercase tracking-wide text-center mt-1.5">
-                    Toca para ver más
-                </p>
             </WidgetCard>
 
             {/* ── EL DETALLE ─────────────────────────────────────────────── */}

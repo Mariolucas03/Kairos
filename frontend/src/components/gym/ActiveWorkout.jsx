@@ -6,6 +6,7 @@ import {
     SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell
 } from 'lucide-react';
 import api from '../../services/api';
+import { invalidarDiario } from '../../utils/cacheDiario';
 import Toast from '../common/Toast';
 import { useWorkout } from '../../context/WorkoutContext';
 import ExerciseSelector from './ExerciseSelector';
@@ -656,6 +657,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
             };
 
             const res = await api.post('/gym/log', logData);
+            invalidarDiario();
 
             // ⚠️ Esto REESCRIBIA la rutina con solo cuatro campos, asi que cada
             // entreno terminado borraba su configuracion: el rango de

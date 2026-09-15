@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import useSWR from 'swr';
-import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame, History, PieChart, CalendarCheck, Scale, Target } from 'lucide-react';
+import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame, History, PieChart, CalendarCheck, Scale, Target, Medal, BarChart3 } from 'lucide-react';
 import api from '../../services/api';
 import ProgressChart from './ProgressChart';
 import { loQueHasLevantado } from '../../utils/loQueHasLevantado';
@@ -27,6 +27,8 @@ export default function EstadisticasTab() {
     const { data: reparto } = useSWR('/gym/reparto?dias=90', fetcher);
     const { data: constancia } = useSWR('/gym/constancia?semanas=8', fetcher);
     const { data: fuerza } = useSWR('/gym/fuerza-relativa', fetcher);
+    const { data: marcas } = useSWR('/gym/marcas', fetcher);
+    const { data: volumenSemanal } = useSWR('/gym/volumen-semanal?semanas=8', fetcher);
 
     const [ejercicio, setEjercicio] = useState(null);
     const [metrica, setMetrica] = useState('bestWeight');
@@ -181,6 +183,86 @@ export default function EstadisticasTab() {
                                 </p>
                             );
                         })()}
+                    </div>
+                </div>
+            )}
+
+            {/* --- SEMANA A SEMANA ---
+
+                Los totales no dicen si esta semana has hecho mas que hace un
+                mes. Ocho barras si, y la comparacion de las ultimas cuatro
+                con las cuatro anteriores lo dice con un numero. */}
+            {volumenSemanal && volumenSemanal.semanas.some(s => s.volumen > 0) && (() => {
+                const filas = volumenSemanal.semanas;
+                const tope = Math.max(...filas.map(s => s.volumen), 1);
+                const cambio = volumenSemanal.cambio;
+                return (
+                    <div>
+                        <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest mb-3 px-1 flex items-center gap-2">
+                            <BarChart3 size={13} /> Semana a semana
+                        </h3>
+                        <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4">
+                            <div className="flex items-end gap-1.5 h-24">
+                                {filas.map((s, i) => {
+                                    const esta = i === filas.length - 1;
+                                    const alto = Math.max(3, Math.round((s.volumen / tope) * 100));
+                                    return (
+                                        <div key={s.inicio} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                                            <span className="text-[8px] font-black text-zinc-500 tabular-nums not-italic">{s.volumen >= 1000 ? `${(s.volumen / 1000).toFixed(1)}t` : s.volumen ? `${s.volumen}` : ''}</span>
+                                            <div className="w-full rounded-t-md" style={{ height: `${alto}%`, background: esta ? '#eab308' : s.volumen ? '#52525b' : '#27272a' }} />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="flex justify-between mt-1.5 text-[9px] font-bold text-zinc-600 not-italic">
+                                <span>hace {filas.length} semanas</span>
+                                <span className="text-yellow-500">esta semana</span>
+                            </div>
+                            {cambio !== null && cambio !== undefined && (
+                                <p className="text-[11px] text-zinc-400 font-bold mt-3 leading-snug">
+                                    Las últimas cuatro semanas:{' '}
+                                    <span className={cambio >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{cambio > 0 ? '+' : ''}{cambio}%</span>
+                                    {' '}de volumen respecto a las cuatro anteriores
+                                    {cambio >= 15 ? '. Vas a más.' : cambio <= -15 ? '. Ojo, vas a menos.' : '.'}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* --- TUS MARCAS ---
+
+                La mejor serie de cada ejercicio, con su fecha. Es lo que uno
+                recuerda y quiere batir. Ordenadas por 1RM estimado, que es lo
+                que permite comparar 90 x 5 con 100 x 1. */}
+            {marcas && marcas.marcas.length > 0 && (
+                <div>
+                    <h3 className="text-yellow-500 text-xs font-black uppercase tracking-widest mb-3 px-1 flex items-center gap-2">
+                        <Medal size={13} /> Tus marcas
+                        {marcas.recientes > 0 && (
+                            <span className="ml-auto text-[9px] font-black text-emerald-400 normal-case tracking-normal">{marcas.recientes} {marcas.recientes === 1 ? 'nueva este mes' : 'nuevas este mes'}</span>
+                        )}
+                    </h3>
+                    <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-2">
+                        {marcas.marcas.slice(0, 8).map((m, i) => {
+                            const reciente = (Date.now() - new Date(m.fecha)) < 30 * 86400000;
+                            return (
+                                <div key={m.ejercicio} className="flex items-center gap-3 px-2.5 py-2">
+                                    <span className={`w-5 shrink-0 text-center text-[11px] font-black tabular-nums not-italic ${i < 3 ? 'text-yellow-500' : 'text-zinc-600'}`}>{i + 1}</span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[12px] font-black text-white uppercase tracking-tight truncate not-italic">{m.ejercicio}</p>
+                                        <p className="text-[9px] text-zinc-600 font-bold tabular-nums">
+                                            {new Date(m.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })} · 1RM {m.rm1} kg
+                                            {reciente && <span className="text-emerald-400"> · nueva</span>}
+                                        </p>
+                                    </div>
+                                    <span className="shrink-0 text-[15px] font-black text-white tabular-nums not-italic">
+                                        {m.peso}<span className="text-[9px] text-zinc-500 mx-0.5">×</span>{m.reps}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}

@@ -10,11 +10,13 @@ const {
 } = require('../controllers/dailyController');
 
 const protect = require('../middleware/authMiddleware');
-const { checkStreak } = require('../middleware/streakMiddleware');
 
 // RUTAS
 // La ruta es '/' porque en index.js ya definimos '/api/daily'
-router.get('/', protect, checkStreak, getDailyLog);
+// Sin `checkStreak`: la racha ya no sube por entrar, sube al RECOGER la
+// recompensa diaria (userController.claimDailyReward). Con tres sitios
+// tocando la misma racha, el numero bailaba.
+router.get('/', protect, getDailyLog);
 router.put('/', protect, updateDailyLog);
 router.get('/specific', protect, getDailyLogByDate);
 router.get('/history', protect, getWeightHistory);

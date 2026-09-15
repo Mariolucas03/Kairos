@@ -7,6 +7,7 @@ import {
     Trash2, Plus, Check, X, Target, Users, Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
 } from 'lucide-react';
 import api from '../services/api';
+import { invalidarDiario } from '../utils/cacheDiario';
 import { encolar, esFalloDeRed, nuevaMarca } from '../utils/colaEnvios';
 import Toast from '../components/common/Toast';
 import ConfirmDialog from '../components/common/ConfirmDialog';
@@ -465,7 +466,7 @@ export default function Missions() {
         if (newMission.isCoop && !newMission.friendId) return showToast("Falta amigo", "error");
         const payload = { title: newMission.title.trim(), frequency: newMission.frequency || 'daily', type: newMission.type || 'habit', difficulty: newMission.difficulty || 'easy', target: parseInt(newMission.target) || 1, unit: newMission.unit ? newMission.unit.trim() : undefined, isCoop: !!newMission.isCoop, specificDays: newMission.frequency === 'daily' ? selectedDays : [] };
         if (payload.isCoop) payload.friendId = newMission.friendId;
-        try { await api.post('/missions', payload); handleCloseCreator(); mutateMissions(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
+        try { await api.post('/missions', payload); handleCloseCreator(); mutateMissions(); invalidarDiario(); showToast("Creada", "success"); } catch (error) { showToast("Error", "error"); }
     };
 
     // 🔥 OPTIMISTIC UI CON SWR
@@ -502,6 +503,7 @@ export default function Missions() {
 
         try {
             const res = await api.put(`/missions/${mission._id}/progress`, envio);
+            invalidarDiario();
             if (res.data.progressOnly) { mutateMissions(); return; }
             if (res.data.user) setUser(res.data.user);
             mutateMissions();
@@ -526,7 +528,7 @@ export default function Missions() {
     // Misión pendiente de confirmar borrado (se muestra con ConfirmDialog)
     const handleDelete = async (id) => {
         mutateMissions(prev => prev.filter(m => m._id !== id), false);
-        try { await api.delete(`/missions/${id}`); showToast("Eliminada", "info"); mutateMissions(); } catch (e) { mutateMissions(); }
+        try { await api.delete(`/missions/${id}`); showToast("Eliminada", "info"); mutateMissions(); invalidarDiario(); } catch (e) { mutateMissions(); }
     };
 
     const openEditModal = (mission) => {

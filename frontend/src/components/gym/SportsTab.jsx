@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import useSWR from 'swr';
 import { X, Timer, MapPin, Flame, Save, Loader2, Search, Watch, Sparkles, Activity } from 'lucide-react';
 import api from '../../services/api';
+import { invalidarDiario } from '../../utils/cacheDiario';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -58,6 +59,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
             const nota = origen === 'reloj' ? '(las tuyas)' : origen === 'ia' ? '(calculadas por IA)' : '(estimadas)';
             showToast(`${res.data.log.caloriesBurned} kcal ${nota}`, 'success');
             setElegido(null);
+            invalidarDiario();
             onSaved?.(res.data);
         } catch (e) {
             showToast(e.response?.data?.message || 'No se pudo registrar', 'error');
