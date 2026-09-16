@@ -1,6 +1,9 @@
 // v1.1: se sube la versión para que la activación borre las cachés viejas, que
 // pueden traer GIFs del CDN guardados por la regla de imágenes de antes.
-const CACHE_VERSION = 'kairos-v1.1';
+// v1.2: las imagenes se han encogido (iconos de 2048 px que se veian a 16 px,
+// una portada de 6 MB); sin subir la version, la cache seguiria sirviendo las
+// gordas para siempre.
+const CACHE_VERSION = 'kairos-v1.2';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 
