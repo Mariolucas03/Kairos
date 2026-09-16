@@ -184,9 +184,12 @@ export default function BodyMap({
         if (nivelesPorMusculo && nivelesPorMusculo[group]) {
             const info = nivelesPorMusculo[group];
             if (!info.points) return { fill: '#000000', opacity: 0 };
-            // La intensidad crece con el progreso dentro del rango, para que se
-            // note el avance aunque no hayas cambiado de nivel todavía
-            return { fill: info.rankColor || accent, opacity: 0.4 + (info.progress / 100) * 0.55 };
+            // ⚠️ A plena intensidad, siempre. Antes la opacidad crecia con el
+            // progreso dentro del rango (del 40% al 95%), y un Oro al 40% sobre
+            // la lamina gris se veia marron: todo parecia Bronce o Madera, y
+            // el cuerpo no cuadraba con la leyenda de debajo. El progreso ya lo
+            // dicen los escalones I, II y III; el color es solo el rango.
+            return { fill: info.rankColor || accent, opacity: 0.88 };
         }
 
         return { fill: '#000000', opacity: 0 };

@@ -105,42 +105,45 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
 
                 {/* EL CAMINO */}
                 <div className="relative z-10 mt-3 overflow-x-auto no-scrollbar" style={{ scrollSnapType: 'x proximity' }}>
-                    <div className="flex items-end gap-0 px-6 py-5 min-w-max">
+                    <div className="flex items-center gap-0 px-6 py-5 min-w-max">
                         {tramo.map((p, i) => {
                             const estado = estadoDe(p.dia);
                             const esHoy = estado === 'hoy' || estado === 'hecho-hoy';
                             const hecho = estado === 'hecho' || estado === 'hecho-hoy';
                             const color = COLOR[p.tipo] || ACENTO;
-                            const tam = esHoy ? 66 : p.hito ? 54 : 44;
+                            // Cada dia es una FICHA: una tarjeta vertical con el
+                            // dia arriba, el premio en medio y lo que da abajo,
+                            // todo dentro. La de hoy, mas grande y encendida.
+                            const ancho = esHoy ? 78 : 64;
+                            const alto = esHoy ? 96 : 84;
+                            const bordeColor = hecho ? ACENTO : esHoy ? color : p.hito ? `${COLOR.cofre}88` : 'rgba(255,255,255,0.09)';
                             return (
                                 <div key={p.dia} className="flex items-center" ref={esHoy ? hoyRef : undefined} style={{ scrollSnapAlign: esHoy ? 'center' : 'none' }}>
-                                    <div className="flex flex-col items-center" style={{ width: esHoy ? 84 : 66 }}>
-                                        <span className={`text-[10px] font-black uppercase tracking-wider mb-1.5 not-italic ${esHoy ? 'text-white' : hecho ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                                    <div
+                                        className={`relative rounded-2xl flex flex-col items-center justify-between py-2 px-1 transition-all ${esHoy && !cobradoHoy ? 'animate-pulse' : ''}`}
+                                        style={{
+                                            width: ancho, height: alto,
+                                            background: hecho ? `${ACENTO}` : esHoy ? '#18181b' : '#0f0f12',
+                                            border: `${esHoy ? 2 : 1.5}px solid ${bordeColor}`,
+                                            boxShadow: esHoy ? `0 0 26px ${color}55` : hecho ? `0 0 12px ${ACENTO}44` : 'none',
+                                            opacity: estado === 'futuro' && !p.hito ? 0.6 : 1
+                                        }}
+                                    >
+                                        <span className={`text-[9px] font-black uppercase tracking-wider not-italic ${hecho ? 'text-black/70' : esHoy ? 'text-white' : 'text-zinc-500'}`}>
                                             {esHoy ? 'Hoy' : `Día ${p.dia}`}
                                         </span>
-                                        <div
-                                            className={`relative rounded-full flex items-center justify-center transition-all ${esHoy && !cobradoHoy ? 'animate-pulse' : ''}`}
-                                            style={{
-                                                width: tam, height: tam,
-                                                background: hecho ? `${ACENTO}` : esHoy ? '#18181b' : '#0f0f12',
-                                                border: `${esHoy ? 3 : 2}px solid ${hecho ? ACENTO : esHoy ? color : p.hito ? `${COLOR.cofre}88` : 'rgba(255,255,255,0.08)'}`,
-                                                boxShadow: esHoy ? `0 0 26px ${color}66` : hecho ? `0 0 12px ${ACENTO}55` : 'none',
-                                                opacity: estado === 'futuro' && !p.hito ? 0.55 : 1
-                                            }}
-                                        >
-                                            {hecho
-                                                ? <Check size={esHoy ? 30 : 20} color="#fff" strokeWidth={3} />
-                                                : <IconoPremio tipo={p.tipo} tamano={esHoy ? 30 : p.hito ? 24 : 18} color={color} />}
-                                            {p.hito && !hecho && (
-                                                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black" style={{ background: COLOR.cofre }}>★</span>
-                                            )}
-                                        </div>
-                                        <span className={`mt-1.5 text-[9px] font-black text-center leading-tight not-italic ${esHoy ? 'text-white' : 'text-zinc-500'}`} style={{ color: esHoy ? color : undefined }}>
+                                        {hecho
+                                            ? <Check size={esHoy ? 30 : 24} color="#fff" strokeWidth={3} />
+                                            : <IconoPremio tipo={p.tipo} tamano={esHoy ? 28 : 22} color={color} />}
+                                        <span className={`text-[9px] font-black text-center leading-[1.1] not-italic line-clamp-2 w-full ${hecho ? 'text-black/80' : 'text-zinc-500'}`} style={{ color: !hecho && esHoy ? color : undefined }}>
                                             {p.etiqueta}
                                         </span>
+                                        {p.hito && !hecho && (
+                                            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black" style={{ background: COLOR.cofre }}>★</span>
+                                        )}
                                     </div>
                                     {i < tramo.length - 1 && (
-                                        <div className="h-[3px] w-4 -mx-2 rounded-full mb-5" style={{ background: p.dia < dia || (p.dia === dia && cobradoHoy) ? ACENTO : 'rgba(255,255,255,0.08)' }} />
+                                        <div className="h-[3px] w-3 rounded-full" style={{ background: p.dia < dia || (p.dia === dia && cobradoHoy) ? ACENTO : 'rgba(255,255,255,0.08)' }} />
                                     )}
                                 </div>
                             );

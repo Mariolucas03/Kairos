@@ -229,7 +229,7 @@ export default function Gym() {
     if (!isSmoothMounted || isFirstLoad) return <LoadingScreen message="Preparando zona de entreno..." />;
 
     return (
-        <div className="animate-in fade-in pb-6 relative w-full max-w-full overflow-x-hidden bg-black min-h-screen select-none">
+        <div className="animate-in fade-in pb-6 relative w-full max-w-full bg-black min-h-screen select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {routineToDelete && (
@@ -252,7 +252,7 @@ export default function Gym() {
             </div>
 
             {/* PESTAÑAS: Gym · Cuerpo · Otros */}
-            <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-1 sticky top-0 z-30">
+            <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-1 sticky z-30" style={{ top: 'var(--alto-cabecera, 116px)' }}>
                 {PESTANAS.map(({ id, label, icon: Icon }) => {
                     const activa = tab === id;
                     return (

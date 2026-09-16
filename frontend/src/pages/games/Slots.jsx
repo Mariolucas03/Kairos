@@ -17,7 +17,7 @@ const FILAS = 4;
 const VELOCIDAD_MAXIMA = 0.045;
 
 // --- IMAGEN DE PORTADA ---
-const SLOT_COVER_IMG = '/assets/images/neon-cover.png';
+const SLOT_COVER_IMG = '/assets/images/neon-cover.jpg';
 
 // --- LLUVIA DE FICHAS ---
 const ChipRain = ({ isFading }) => {

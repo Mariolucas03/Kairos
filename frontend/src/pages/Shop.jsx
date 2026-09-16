@@ -203,7 +203,7 @@ export default function Shop() {
             </div>
 
             {/* TABS FLOTANTES (STICKY) */}
-            <div className="sticky top-0 z-30 bg-black pt-4 pb-4 px-4 border-b border-zinc-900/50">
+            <div className="sticky z-30 bg-black pt-4 pb-4 px-4 border-b border-zinc-900/50" style={{ top: 'var(--alto-cabecera, 116px)' }}>
                 <div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-zinc-800">
                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'inventory' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`} />
                     <button onClick={() => setActiveTab('shop')} className={`flex-1 z-10 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'shop' ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}>
