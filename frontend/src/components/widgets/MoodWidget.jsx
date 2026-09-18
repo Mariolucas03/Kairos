@@ -6,11 +6,12 @@ export default function MoodWidget({ mood = null, onUpdate }) {
     const accent = WIDGET_ACCENTS.mood;
 
     const MOODS = [
-        { value: 1, label: 'TERRIBLE', icon: HeartCrack, color: 'text-red-500' },
-        { value: 2, label: 'MAL', icon: Frown, color: 'text-orange-500' },
-        { value: 3, label: 'NORMAL', icon: Meh, color: 'text-zinc-400' },
-        { value: 4, label: 'BIEN', icon: Smile, color: 'text-blue-500' },
-        { value: 5, label: 'INCREÍBLE', icon: Laugh, color: 'text-violet-400' },
+        // Cada carita con su color, de siempre: se ve de un vistazo cual es cual
+        { value: 1, label: 'TERRIBLE', icon: HeartCrack, color: '#ef4444' },
+        { value: 2, label: 'MAL', icon: Frown, color: '#f97316' },
+        { value: 3, label: 'NORMAL', icon: Meh, color: '#a1a1aa' },
+        { value: 4, label: 'BIEN', icon: Smile, color: '#3b82f6' },
+        { value: 5, label: 'INCREÍBLE', icon: Laugh, color: '#a78bfa' },
     ];
 
     // ⚠️ En la base de datos `mood` es String (DailyLog), así que llega como "5",
@@ -25,7 +26,8 @@ export default function MoodWidget({ mood = null, onUpdate }) {
         onUpdate(moodValue === val ? null : val);
     };
 
-    const activeLabel = MOODS.find((m) => m.value === moodValue)?.label;
+    const activa = MOODS.find((m) => m.value === moodValue);
+    const activeLabel = activa?.label;
 
     return (
         <WidgetCard accent={accent} padding="px-[18px] py-4" className="h-full">
@@ -36,7 +38,7 @@ export default function MoodWidget({ mood = null, onUpdate }) {
                     </span>
                     <span
                         className="mt-2 block text-[9px] font-black uppercase tracking-[0.1em] leading-none not-italic truncate"
-                        style={{ color: activeLabel ? accent : '#52525b' }}
+                        style={{ color: activa ? activa.color : '#52525b' }}
                     >
                         {activeLabel || 'SIN REGISTRAR'}
                     </span>
@@ -52,15 +54,16 @@ export default function MoodWidget({ mood = null, onUpdate }) {
                                 onClick={(e) => { e.stopPropagation(); handleSelect(m.value); }}
                                 className="relative w-[34px] h-[34px] rounded-full flex items-center justify-center transition-colors active:scale-90"
                                 style={{
-                                    background: active ? 'rgba(254,144,175,0.12)' : '#111113',
-                                    color: active ? accent : '#3f3f46'
+                                    background: active ? m.color + '26' : '#111113',
+                                    color: m.color,
+                                    opacity: active || moodValue === null ? 1 : 0.45
                                 }}
                             >
                                 <m.icon size={19} />
                                 {active && (
                                     <span
                                         className="absolute -inset-[3px] rounded-full border-2"
-                                        style={{ borderColor: accent }}
+                                        style={{ borderColor: m.color }}
                                     />
                                 )}
                             </button>

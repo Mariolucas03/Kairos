@@ -567,7 +567,7 @@ export default function Missions() {
                 />
             )}
 
-            <div className="sticky z-30 bg-black pt-[18px] pb-3 px-4" style={{ top: 'var(--alto-cabecera, 116px)' }}>
+            <div className="bg-black pt-[18px] pb-3 px-4">
                 {/* CABECERA DE PÁGINA */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

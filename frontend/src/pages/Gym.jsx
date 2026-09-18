@@ -252,7 +252,7 @@ export default function Gym() {
             </div>
 
             {/* PESTAÑAS: Gym · Cuerpo · Otros */}
-            <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-1 sticky z-30" style={{ top: 'var(--alto-cabecera, 116px)' }}>
+            <div className="flex gap-1 mt-[18px] bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-1">
                 {PESTANAS.map(({ id, label, icon: Icon }) => {
                     const activa = tab === id;
                     return (

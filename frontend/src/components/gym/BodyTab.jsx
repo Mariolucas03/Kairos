@@ -74,8 +74,8 @@ export default function BodyTab() {
                 ocho grupos, con el escalon grande, y entre que parte de la
                 gente estas. Encima del cuerpo, que es lo primero que se mira. */}
             {general && (
-                <div className="relative overflow-hidden rounded-3xl border p-4 flex items-center gap-4" style={{ borderColor: general.rankColor + '55', background: `linear-gradient(135deg, ${general.rankColor}22, #09090b 60%)` }}>
-                    <div className="relative shrink-0 w-16 h-16 flex items-center justify-center rounded-2xl" style={{ background: general.rankColor + '1a', boxShadow: `0 0 30px ${general.rankColor}44` }}>
+                <div className="relative overflow-hidden rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-4 flex items-center gap-4">
+                    <div className="relative shrink-0 w-16 h-16 flex items-center justify-center rounded-2xl" style={{ background: general.rankColor + '1a' }}>
                         <IconoRango rango={general.rank} color={general.rankColor} tamano={44} />
                     </div>
                     <div className="min-w-0 flex-1">
