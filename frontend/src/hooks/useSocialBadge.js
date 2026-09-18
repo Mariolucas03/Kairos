@@ -27,6 +27,7 @@ export default function useSocialBadge() {
         missions: data?.missions || 0,
         cartas: data?.cartas || 0,
         poker: data?.poker || 0,
+        clan: data?.clan || 0,
         refreshBadge: mutate
     };
 }

@@ -1002,10 +1002,11 @@ const getNotifications = async (req, res) => {
 // @route   POST /api/social/notifications/read
 const markNotificationsRead = async (req, res) => {
     try {
-        await Notification.updateMany(
-            { user: req.user._id, read: false },
-            { $set: { read: true } }
-        );
+        // Con `type` en el cuerpo se marcan solo las de ese tipo: la pantalla
+        // del clan apaga las suyas sin tocar las del buzon.
+        const filtro = { user: req.user._id, read: false };
+        if (typeof req.body?.type === 'string') filtro.type = req.body.type;
+        await Notification.updateMany(filtro, { $set: { read: true } });
         res.json({ message: 'Notificaciones marcadas como leídas' });
     } catch (error) {
         console.error('Error en markNotificationsRead:', error);
@@ -1048,8 +1049,10 @@ const getBadge = async (req, res) => {
         const CartaAlta = require('../models/CartaAlta');
         const Poker = require('../models/Poker');
 
-        const [actividad, usuario, cartas, poker] = await Promise.all([
-            Notification.countDocuments({ user: req.user._id, read: false }),
+        const [actividad, clan, usuario, cartas, poker] = await Promise.all([
+            Notification.countDocuments({ user: req.user._id, read: false, type: { $ne: 'clan' } }),
+            // Los avisos del clan encienden el punto rojo de "Clan", no el del buzon
+            Notification.countDocuments({ user: req.user._id, read: false, type: 'clan' }),
             User.findById(req.user._id).select('friendRequests missionRequests challengeRequests').lean(),
             CartaAlta.countDocuments({ invitados: req.user._id, estado: 'sala' }),
             Poker.countDocuments({ invitados: req.user._id, estado: 'sala' })
@@ -1066,7 +1069,8 @@ const getBadge = async (req, res) => {
             challenges: retos,
             cartas,
             poker,
-            total: actividad + solicitudes + misiones + retos + cartas + poker
+            clan,
+            total: actividad + solicitudes + misiones + retos + cartas + poker + clan
         });
     } catch (error) {
         console.error('Error en getBadge:', error);

@@ -5,7 +5,8 @@ const WorkoutLog = require('../models/WorkoutLog');
 const DailyLog = require('../models/DailyLog');
 const levelService = require('../services/levelService');
 const { getMadridDateString } = require('../utils/dateHelpers');
-const { notificarA } = require('./pushController');
+const { notificarA, sendPushToUser } = require('./pushController');
+const Notification = require('../models/Notification');
 
 // --- CONFIGURACIÓN DE ROTACIÓN ---
 const EVENT_ROTATION = ['volume', 'missions', 'calories', 'xp'];
@@ -82,6 +83,105 @@ const EVENT_REWARDS = {
     3: { xp: 500, coins: 1000, chips: 2000 },
     4: { xp: 1000, coins: 2500, chips: 5000 },
     5: { xp: 2500, coins: 5000, chips: 10000 }
+};
+
+// Como se llama cada evento cuando se avisa de el
+const NOMBRE_EVENTO = {
+    volume: 'kilos levantados',
+    missions: 'misiones completadas',
+    calories: 'calorías quemadas',
+    xp: 'experiencia ganada'
+};
+
+/**
+ * AVISAR A TODO EL CLAN: una notificacion en el buzon de cada miembro (que
+ * enciende el punto rojo de "Clan") y un push a quien lo tenga activado.
+ */
+const avisarAlClan = async (clan, { texto, titulo, cuerpo }) => {
+    const ids = (clan.members || []).map(m => m._id || m);
+    if (ids.length === 0) return;
+    await Notification.insertMany(ids.map(user => ({ user, type: 'clan', clan: clan._id, text: texto })));
+    const gente = await User.find({ _id: { $in: ids }, 'pushSubscriptions.0': { $exists: true } }).select('username pushSubscriptions');
+    await Promise.all(gente.map(u => sendPushToUser(u, { title: titulo, body: cuerpo, icon: '/assets/icons/icon-192x192.png', url: '/social/clans' }).catch(() => {})));
+};
+
+/**
+ * EL EVENTO DE LA SEMANA, AL DIA.
+ *
+ * Reinicia el evento si ha cambiado la semana y avisa UNA vez de que empieza.
+ * La marca `avisado` se pone con una escritura atomica condicionada: si dos
+ * miembros abren el clan a la vez, solo uno la consigue y solo uno avisa.
+ */
+const ponerAlDiaElEvento = async (clan) => {
+    const weekStart = getCurrentWeekStart();
+    const eventType = getCurrentEventType(weekStart);
+
+    if (!clan.weeklyEvent || !clan.weeklyEvent.startDate || new Date(clan.weeklyEvent.startDate).getTime() !== weekStart.getTime()) {
+        clan.weeklyEvent = { startDate: weekStart, type: eventType, claims: [], avisado: false, hitosAvisados: [] };
+        await clan.save();
+    }
+
+    const reserva = await Clan.updateOne(
+        { _id: clan._id, 'weeklyEvent.startDate': weekStart, 'weeklyEvent.avisado': { $ne: true } },
+        { $set: { 'weeklyEvent.avisado': true } }
+    );
+    if (reserva.modifiedCount === 1) {
+        clan.weeklyEvent.avisado = true;
+        await avisarAlClan(clan, {
+            texto: `Empieza el evento de la semana: ${NOMBRE_EVENTO[eventType]}. Todo lo que hagáis hasta el domingo cuenta.`,
+            titulo: 'Evento de clan',
+            cuerpo: `Esta semana: ${NOMBRE_EVENTO[eventType]}. Lo que haga cada uno suma para todos.`
+        });
+    }
+
+    return { weekStart, eventType };
+};
+
+/**
+ * LOS ESCALONES ALCANZADOS: si el clan ha llegado a uno nuevo, se avisa de que
+ * hay premio que reclamar. Solo del mas alto que se acabe de alcanzar (si en
+ * un dia se pasan dos, un aviso y no dos), pero se marcan todos.
+ */
+const avisarHitos = async (clan, weekStart, tiers, total) => {
+    const alcanzados = tiers.filter(t => total >= t.target).map(t => t.tier);
+    if (alcanzados.length === 0) return null;
+    const reserva = await Clan.findOneAndUpdate(
+        { _id: clan._id, 'weeklyEvent.startDate': weekStart, 'weeklyEvent.hitosAvisados': { $not: { $all: alcanzados } } },
+        { $addToSet: { 'weeklyEvent.hitosAvisados': { $each: alcanzados } } },
+        { new: false }
+    ).select('weeklyEvent.hitosAvisados').lean();
+    if (!reserva) return null;
+    const yaAvisados = new Set(reserva.weeklyEvent?.hitosAvisados || []);
+    const nuevos = alcanzados.filter(t => !yaAvisados.has(t));
+    if (nuevos.length === 0) return null;
+    const hito = tiers.find(t => t.tier === Math.max(...nuevos));
+    await avisarAlClan(clan, {
+        texto: `¡El clan ha llegado a ${hito.label}! Tienes ${hito.chips} fichas, ${hito.coins} monedas y ${hito.xp} XP para reclamar.`,
+        titulo: `Clan: escalón ${hito.label}`,
+        cuerpo: `Hay premio para reclamar: ${hito.chips} fichas, ${hito.coins} monedas y ${hito.xp} XP.`
+    });
+    return hito.tier;
+};
+
+/**
+ * EL REPASO DIARIO DE TODOS LOS CLANES, desde el cron: reinicia la semana y
+ * avisa del evento nuevo (los lunes) y de los escalones alcanzados, aunque
+ * nadie haya abierto la pantalla del clan.
+ */
+const runAvisosDeClan = async () => {
+    const clanes = await Clan.find({ 'members.0': { $exists: true } }).select('name members weeklyEvent');
+    let hitos = 0;
+    for (const clan of clanes) {
+        try {
+            const { weekStart, eventType } = await ponerAlDiaElEvento(clan);
+            const goal = getEventGoal(eventType, clan.members.length);
+            const { clanTotal } = await getClanMetrics(clan.members, weekStart, eventType);
+            if (await avisarHitos(clan, weekStart, buildTiers(goal), clanTotal)) hitos++;
+        } catch (e) {
+            console.error('Aviso de clan fallido (' + clan.name + '):', e.message);
+        }
+    }
+    return { clanes: clanes.length, hitos };
 };
 
 const buildTiers = (goal) => Object.keys(TIER_FACTORS).map(t => {
@@ -266,15 +366,9 @@ const getMyClan = asyncHandler(async (req, res) => {
 
     if (!clan) return res.json(null);
 
-    const weekStart = getCurrentWeekStart();
-    const eventType = getCurrentEventType(weekStart);
+    // Reinicia la semana si toca y avisa del evento nuevo (una sola vez)
+    const { weekStart, eventType } = await ponerAlDiaElEvento(clan);
     const goal = getEventGoal(eventType, clan.members.length);
-
-    // Resetear si cambió la semana (Operación Segura)
-    if (!clan.weeklyEvent || !clan.weeklyEvent.startDate || new Date(clan.weeklyEvent.startDate).getTime() !== weekStart.getTime()) {
-        clan.weeklyEvent = { startDate: weekStart, type: eventType, claims: [] };
-        await clan.save();
-    }
 
     // El poder, al día. Los miembros ya vienen con su nivel, así que sale de lo
     // que ya está cargado; solo se guarda si el número que había era otro.
@@ -286,6 +380,10 @@ const getMyClan = asyncHandler(async (req, res) => {
 
     const memberIds = clan.members.map(m => m._id);
     const { memberStats, clanTotal } = await getClanMetrics(memberIds, weekStart, eventType);
+
+    // Si con lo de hoy se ha llegado a un escalon nuevo, se avisa a todos
+    const tiers = buildTiers(goal);
+    await avisarHitos(clan, weekStart, tiers, clanTotal);
 
     const clanObj = clan.toObject();
 
@@ -302,7 +400,7 @@ const getMyClan = asyncHandler(async (req, res) => {
         goal: goal,
         // Los escalones los manda el servidor para que la pantalla no pueda
         // enseñar metas ni premios distintos de los que se van a entregar
-        tiers: buildTiers(goal),
+        tiers,
         myClaims: clan.weeklyEvent.claims
             .filter(c => c.user.toString() === req.user._id.toString())
             .map(c => c.tier)
@@ -665,6 +763,8 @@ const previewClan = getClanDetails;
 module.exports = {
     getMyClan, createClan, searchClans, joinClan, leaveClan, updateMemberRank, kickMember, claimEventReward,
     getClanDetails, previewClan, updateClan,
+    // El repaso diario desde el cron
+    runAvisosDeClan,
     // Para las pruebas
-    poderDe, PODER_POR_NIVEL
+    poderDe, PODER_POR_NIVEL, ponerAlDiaElEvento, avisarHitos, buildTiers, getCurrentWeekStart
 };

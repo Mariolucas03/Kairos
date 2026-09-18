@@ -12,6 +12,14 @@ const Routine = require('../models/Routine');
 const WorkoutLog = require('../models/WorkoutLog');
 const Challenge = require('../models/Challenge');
 const { resolverDuelos, marcadorEnVivo } = require('../services/duelosService');
+const { runAvisosDeClan } = require('../controllers/clanController');
+
+// Los avisos de clan (evento nuevo, escalon alcanzado) se repasan con los
+// dos avisos del dia. Nunca tumban el aviso principal si fallan.
+const repasarClanes = async () => {
+    try { return await runAvisosDeClan(); }
+    catch (e) { console.error('Repaso de clanes fallido:', e.message); return null; }
+};
 
 // Clave donde se anota el ULTIMO dia ya castigado, para no castigar dos veces
 const CLAVE_NOCTURNO = 'nightly-maintenance';
@@ -300,7 +308,8 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         ' por la diaria, ' + informe.vuelve + ' de vuelta, ' + ranking + ' del ranking (de ' +
         usuarios.length + ' con notificaciones activas).');
 
-    return { success: true, dia: hoy, ...informe, ranking, candidatos: usuarios.length };
+    const clanes = await repasarClanes();
+    return { success: true, dia: hoy, ...informe, ranking, candidatos: usuarios.length, clanes };
 };
 
 // --- AVISO DE LA MANANA: QUE TOCA HOY ---
@@ -488,7 +497,8 @@ const runMorningReminder = async ({ forzar = false } = {}) => {
     console.log('🏋️ Aviso de entreno: ' + avisados + ' avisados, ' +
         saltadosPorHaberEntrenado + ' ya habian entrenado (de ' + usuarios.length + ' con rutina hoy).');
 
-    return { success: true, dia: hoy, avisados, yaEntrenados: saltadosPorHaberEntrenado, candidatos: usuarios.length };
+    const clanes = await repasarClanes();
+    return { success: true, dia: hoy, avisados, yaEntrenados: saltadosPorHaberEntrenado, candidatos: usuarios.length, clanes };
 };
 
 // --- PREMIOS MENSUALES RANKING ---

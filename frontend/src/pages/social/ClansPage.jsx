@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import {
@@ -13,6 +13,7 @@ import ClanMemberCard from '../../components/social/ClanMemberCard';
 import WeeklyEventWidget from '../../components/social/WeeklyEventWidget';
 import ClanPreviewModal from '../../components/social/ClanPreviewModal';
 import { useAuthStore } from '../../store/useAuthStore';
+import useSocialBadge from '../../hooks/useSocialBadge';
 import { customAnimationsStyle, RANK_CONFIG, EVENT_CONFIG } from '../../utils/socialHelpers';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
@@ -24,6 +25,15 @@ export default function ClansPage() {
     const currentUserId = user?._id;
 
     const { data: myClan, mutate: mutateMyClan } = useSWR('/clans/me', fetcher);
+
+    // Al entrar aqui se apagan los avisos del clan (el punto rojo de "Clan"):
+    // ya has visto lo que habia que ver. Los del buzon no se tocan.
+    const { clan: avisosClan, refreshBadge } = useSocialBadge();
+    useEffect(() => {
+        if (!avisosClan) return;
+        api.post('/social/notifications/read', { type: 'clan' }).then(() => refreshBadge()).catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [avisosClan]);
     const { data: clansList, mutate: mutateClansList } = useSWR('/clans', fetcher);
 
     const [toast, setToast] = useState(null);

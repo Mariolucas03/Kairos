@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, Check, Heart, MessageCircle, Swords, Club } from 'lucide-react';
+import { Bell, X, Check, Heart, MessageCircle, Swords, Club, Shield } from 'lucide-react';
 
 // Tiempo relativo corto para la lista de avisos
 const hace = (fecha) => {
@@ -105,18 +105,24 @@ export default function InboxModal({
                                         // notificacion habla de un duelo, lo que
                                         // quieres ver es el resultado.
                                         if (n.type === 'duelo' || n.type === 'reto') navigate('/social/duelos');
+                                        else if (n.type === 'clan') navigate('/social/clans');
                                         else if (n.workout) navigate(`/social/entreno/${n.workout}`);
                                         else if (n.actor?._id) navigate(`/social/user/${n.actor._id}`);
                                     }}
                                     className={`w-full text-left p-3 rounded-2xl border flex items-center gap-3 mb-2 transition-colors ${n.read ? 'bg-black border-zinc-800' : 'bg-pink-900/10 border-pink-500/20'}`}
                                 >
                                     <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] font-black text-zinc-500 overflow-hidden shrink-0">
-                                        {n.actor?.avatar
-                                            ? <img src={n.actor.avatar} className="w-full h-full object-cover" alt="av" />
-                                            : n.actor?.username?.charAt(0)}
+                                        {n.type === 'clan'
+                                            ? <Shield size={14} className="text-purple-400" />
+                                            : n.actor?.avatar
+                                                ? <img src={n.actor.avatar} className="w-full h-full object-cover" alt="av" />
+                                                : n.actor?.username?.charAt(0)}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[11px] text-zinc-300 leading-tight">
+                                            {n.type === 'clan'
+                                                ? <><span className="font-black text-white">Tu clan</span> · {n.text}</>
+                                                : <>
                                             <span className="font-black text-white">{n.actor?.username || 'Alguien'}</span>
                                             {n.type === 'like'
                                                 ? ' le ha dado me gusta a tu entreno'
@@ -134,6 +140,7 @@ export default function InboxModal({
                                             {n.type !== 'duelo' && n.type !== 'reto' && n.workoutName
                                                 ? <span className="text-zinc-500"> "{n.workoutName}"</span>
                                                 : null}
+                                                </>}
                                         </p>
                                         {(n.type === 'comment' || n.type === 'mencion') && n.text && (
                                             <p className="text-[10px] text-zinc-500 not-italic truncate mt-0.5">"{n.text}"</p>
@@ -144,7 +151,9 @@ export default function InboxModal({
                                             ? <Heart size={14} className="text-red-500 fill-red-500" />
                                             : (n.type === 'duelo' || n.type === 'reto')
                                                 ? <Swords size={14} className="text-yellow-500" />
-                                                : <MessageCircle size={14} className="text-blue-400" />}
+                                                : n.type === 'clan'
+                                                    ? <Shield size={14} className="text-purple-400" />
+                                                    : <MessageCircle size={14} className="text-blue-400" />}
                                         <span className="text-[9px] text-zinc-600 font-bold">{hace(n.createdAt)}</span>
                                     </div>
                                 </button>

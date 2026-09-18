@@ -64,7 +64,7 @@ export default function Social() {
     const unreadNotifs = notifData?.unread || 0;
 
     // Mismo contador que el punto rojo del footer, para que no se contradigan
-    const { total: totalNotifications, refreshBadge } = useSocialBadge();
+    const { total: totalNotifications, clan: avisosClan, refreshBadge } = useSocialBadge();
 
     // Al abrir el buzón damos por leídas las notificaciones de actividad
     const openInbox = async () => {
@@ -178,7 +178,7 @@ export default function Social() {
         { key: 'search', icon: Search, label: 'Buscar', onClick: () => setSearchOpen(true) },
         { key: 'friends', icon: Users, label: 'Amigos', onClick: () => navigate('/social/friends') },
         { key: 'duelos', icon: Swords, label: 'Duelos', onClick: () => navigate('/social/duelos') },
-        { key: 'clan', icon: Shield, label: 'Clan', onClick: () => navigate('/social/clans') },
+        { key: 'clan', icon: Shield, label: 'Clan', onClick: () => navigate('/social/clans'), badge: avisosClan },
         { key: 'ranking', icon: Trophy, label: 'Ranking', onClick: () => navigate('/social/ranking') },
         { key: 'inbox', icon: Mail, label: 'Buzón', onClick: openInbox, badge: totalNotifications }
     ];

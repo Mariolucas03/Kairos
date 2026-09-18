@@ -45,6 +45,13 @@ const clanSchema = new mongoose.Schema({
             default: 'volume'
         },
 
+        // Avisos ya mandados esta semana, para no repetirlos: el de "empieza
+        // el evento" y los escalones alcanzados (1..5). Se marcan con una
+        // escritura atomica ANTES de avisar, asi dos miembros abriendo el
+        // clan a la vez no mandan el mismo aviso dos veces.
+        avisado: { type: Boolean, default: false },
+        hitosAvisados: { type: [Number], default: [] },
+
         // Registro de quién ha reclamado premios esta semana para evitar duplicados
         claims: [{
             user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

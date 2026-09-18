@@ -11,14 +11,20 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
     // Quién la recibe
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    // Quién la provoca
-    actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // Quién la provoca. Los avisos del clan (empieza el evento, hay premio)
+    // los manda el sistema: no tienen actor.
+    actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
     // 'reto' = alguien te ha desafiado. 'duelo' = un duelo ha terminado. Son
     // dos avisos distintos y por eso son dos tipos: el primero pide que hagas
     // algo (aceptar o pasar) y el segundo solo cuenta lo que ha pasado.
     // 'mencion' = alguien te ha nombrado (@tu_nombre) en un comentario.
-    type: { type: String, enum: ['like', 'comment', 'duelo', 'reto', 'mencion'], required: true },
+    // 'clan' = aviso de tu clan: empieza el evento de la semana, o habeis
+    // llegado a un escalon y hay premio que reclamar. El texto va en `text`.
+    type: { type: String, enum: ['like', 'comment', 'duelo', 'reto', 'mencion', 'clan'], required: true },
+
+    // Clan del que se avisa (solo en los de tipo 'clan')
+    clan: { type: mongoose.Schema.Types.ObjectId, ref: 'Clan' },
 
     // Entreno sobre el que se actúa
     workout: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutLog' },
