@@ -63,4 +63,4 @@ export const deformarPath = (d, vista) =>
         return `${nx.toFixed(1)},${ny}`;
     });
 
-export const IMAGEN_MUJER = '/body/muscles-mujer.jpg?v=3';
+export const IMAGEN_MUJER = '/body/muscles-mujer.png?v=4';

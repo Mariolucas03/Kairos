@@ -83,28 +83,17 @@ function Figura({ view, getFill, onSelectMuscle, marcado, mujer = false }) {
             </defs>
 
             <g clipPath={`url(#${recorte})`}>
-                {/* La lámina completa; el viewBox enseña solo esta cara.
-                    ⚠️ SIN filtro CSS encima. Llevaba contrast(1.7) para aplastar
-                    a negro el gris del fondo, y Safari (iPhone) pinta una
-                    <image> con filtro en una capa aparte que no sigue bien el
-                    viewBox: la lámina salía desplazada y escalada respecto a
-                    los músculos, que se veían "descuadrados". El contraste va
-                    horneado en el propio JPG. */}
-                <image
-                    href={mujer ? IMAGEN_MUJER : BODY_IMAGE}
-                    x="0"
-                    y="0"
-                    width={BODY_IMAGE_SIZE.width}
-                    height={BODY_IMAGE_SIZE.height}
-                    preserveAspectRatio="none"
-                />
-
-                {/* Zonas musculares. Con mezcla "screen" el relleno tiñe el interior
-                    oscuro del músculo pero deja intactas las líneas blancas del dibujo. */}
-                <g style={{ mixBlendMode: 'screen' }}>
+                {/* ⚠️ ORDEN: primero los colores, encima la lámina.
+                    La lámina es un PNG con SOLO las líneas blancas (el
+                    interior es transparente), así que las zonas de color van
+                    debajo y las líneas se ven encima sin ninguna mezcla.
+                    Antes era un JPG opaco con los colores encima en
+                    mix-blend-mode: screen, y Safari (iPhone) pintaba ese
+                    grupo en una capa aparte que no seguía el viewBox: todo
+                    salía corrido ~1 mm respecto al dibujo. */}
+                <g>
                     {Object.entries(shapes).map(([group, paths]) => {
                         const { fill, opacity } = getFill(group);
-                        const esteMarcado = marcado === group;
                         return (
                             <g
                                 key={group}
@@ -115,38 +104,42 @@ function Figura({ view, getFill, onSelectMuscle, marcado, mujer = false }) {
                                 {paths.map((d, i) => (
                                     <path key={i} d={d} fill={fill} fillOpacity={opacity} />
                                 ))}
-                                {/* Contorno intermitente sobre el musculo pulsado.
-                                    Al tocar una zona solo cambiaba un texto debajo:
-                                    en un cuerpo lleno de colores no habia forma de
-                                    saber cual habias dado. El trazo va SIN relleno y
-                                    encima, para no alterar el color de la zona.
-
-                                    ⚠️ El color NO puede ser blanco, que es lo que
-                                    era: el propio dibujo del cuerpo ya lleva lineas
-                                    blancas y el rango Plata es casi blanco (#cbd5e1),
-                                    asi que la marca se perdia justo encima de los
-                                    musculos mas trabajados. Este rosa no lo usa
-                                    ningun rango —van del gris al rojo pasando por
-                                    marron, dorado, cian, azul y morado—, asi que no
-                                    se puede confundir con un nivel: si lo ves, es lo
-                                    que acabas de tocar. */}
-                                {esteMarcado && paths.map((d, i) => (
-                                    <path
-                                        key={'marca-' + i}
-                                        d={d}
-                                        fill="none"
-                                        stroke="#ff2d95"
-                                        strokeWidth="3.5"
-                                        strokeLinejoin="round"
-                                        className="animate-pulse"
-                                        style={{ vectorEffect: 'non-scaling-stroke' }}
-                                    />
-                                ))}
                                 <title>{group}</title>
                             </g>
                         );
                     })}
                 </g>
+
+                <image
+                    href={mujer ? IMAGEN_MUJER : BODY_IMAGE}
+                    x="0"
+                    y="0"
+                    width={BODY_IMAGE_SIZE.width}
+                    height={BODY_IMAGE_SIZE.height}
+                    preserveAspectRatio="none"
+                    style={{ pointerEvents: 'none' }}
+                />
+
+                {/* Contorno intermitente sobre el musculo pulsado, por encima
+                    de todo. Al tocar una zona solo cambiaba un texto debajo:
+                    en un cuerpo lleno de colores no habia forma de saber cual
+                    habias dado.
+
+                    ⚠️ El color NO puede ser blanco: el dibujo ya lleva lineas
+                    blancas y el rango Plata es casi blanco. Este rosa no lo
+                    usa ningun rango: si lo ves, es lo que acabas de tocar. */}
+                {marcado && shapes[marcado] && shapes[marcado].map((d, i) => (
+                    <path
+                        key={'marca-' + i}
+                        d={d}
+                        fill="none"
+                        stroke="#ff2d95"
+                        strokeWidth="3.5"
+                        strokeLinejoin="round"
+                        className="animate-pulse"
+                        style={{ vectorEffect: 'non-scaling-stroke', pointerEvents: 'none' }}
+                    />
+                ))}
             </g>
         </svg>
     );

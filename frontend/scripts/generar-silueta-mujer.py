@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Genera public/body/muscles-mujer.jpg a partir de public/body/muscles.jpg.
+Genera public/body/muscles-mujer.png a partir de public/body/muscles.png.
 
-Es la MISMA deformacion que aplica src/components/body/siluetaMujer.js a los
-poligonos: fila a fila, cada figura se ensancha o se estrecha alrededor de su
-eje segun `anchura(y)`. Si se cambia la tabla de control, hay que cambiarla
-en los dos sitios y volver a ejecutar esto:
+La lamina es un PNG con solo las lineas blancas (alfa = intensidad); los
+colores de los musculos se pintan DEBAJO en la app. Es la MISMA deformacion
+que aplica src/components/body/siluetaMujer.js a los poligonos: fila a fila,
+cada figura se ensancha o se estrecha alrededor de su eje segun `anchura(y)`.
+Si se cambia la tabla de control, hay que cambiarla en los dos sitios y
+volver a ejecutar esto:
 
     python scripts/generar-silueta-mujer.py
 """
 import math
 from PIL import Image
+import numpy as np
 
 EJE = {'front': 314, 'back': 857}
 CONTROL = [
@@ -30,29 +33,20 @@ def anchura(y):
             return f0 + (f1 - f0) * s
     return CONTROL[-1][1]
 
-origen = Image.open('public/body/muscles.jpg').convert('RGB')
-W, H = origen.size
-fondo = origen.getpixel((5, 5))
-salida = Image.new('RGB', (W, H), fondo)
-px_o = origen.load()
-px_s = salida.load()
+origen = np.array(Image.open('public/body/muscles.png').convert('RGBA'))
+H, W = origen.shape[:2]
 MITAD = 585   # donde se parte la lamina en dos figuras
-
+salida = np.zeros_like(origen)
+salida[..., :3] = 255
+xs = np.arange(W)
 for y in range(H):
     f = anchura(y)
-    for x in range(W):
-        vista = 'front' if x < MITAD else 'back'
+    for vista, cond in (('front', xs < MITAD), ('back', xs >= MITAD)):
         eje = EJE[vista]
         # Muestreo inverso: el pixel de salida x viene del pixel de origen xo
-        xo = eje + (x - eje) / f
+        xo = np.rint(eje + (xs - eje) / f).astype(int)
         # Que no se cuele la otra figura al ensanchar
-        if vista == 'front' and xo >= MITAD:
-            px_s[x, y] = fondo; continue
-        if vista == 'back' and xo < MITAD:
-            px_s[x, y] = fondo; continue
-        xi = int(round(xo))
-        if 0 <= xi < W:
-            px_s[x, y] = px_o[xi, y]
-
-salida.save('public/body/muscles-mujer.jpg', quality=92)
-print('ok', salida.size)
+        ok = cond & (xo >= 0) & (xo < W) & ((xo < MITAD) if vista == 'front' else (xo >= MITAD))
+        salida[y, xs[ok], 3] = origen[y, xo[ok], 3]
+Image.fromarray(salida, 'RGBA').save('public/body/muscles-mujer.png', optimize=True)
+print('ok', (W, H))

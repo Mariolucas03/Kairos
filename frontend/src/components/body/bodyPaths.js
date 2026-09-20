@@ -1,7 +1,8 @@
 /**
  * MAPA MUSCULAR
  *
- * La silueta es la lámina de referencia (public/body/muscles.jpg): misma
+ * La silueta es la lámina de referencia (public/body/muscles.png, solo las
+ * líneas blancas con transparencia): misma
  * imagen para el frente y para la espalda, recortada con el viewBox de cada
  * vista, así que se ve exactamente el dibujo original.
  *
@@ -26,7 +27,7 @@
 
 // La '?v=' cambia cuando se retoca la lamina: el service worker y el navegador
 // guardan la imagen, y sin esto seguirian enseñando la vieja.
-export const BODY_IMAGE = '/body/muscles.jpg?v=3';
+export const BODY_IMAGE = '/body/muscles.png?v=4';
 export const BODY_IMAGE_SIZE = { width: 1170, height: 1150 };
 
 /** Recorte de cada figura dentro de la imagen */
