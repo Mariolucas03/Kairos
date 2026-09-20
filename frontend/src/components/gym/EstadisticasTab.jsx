@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import useSWR from 'swr';
-import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame, History, PieChart, CalendarCheck, Scale, Target, Medal, BarChart3 } from 'lucide-react';
+import { TrendingUp, Dumbbell, Trophy, ChevronDown, Timer, Flame, History, PieChart, CalendarCheck, Scale, Target, Medal, BarChart3 } from '../../iconos';
 import api from '../../services/api';
 import ProgressChart from './ProgressChart';
 import { loQueHasLevantado } from '../../utils/loQueHasLevantado';

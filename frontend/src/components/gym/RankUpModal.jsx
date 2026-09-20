@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { TrendingUp, X } from 'lucide-react';
+import { TrendingUp, X } from '../../iconos';
 
 /**
  * Aviso de SUBIDA DE RANGO MUSCULAR.

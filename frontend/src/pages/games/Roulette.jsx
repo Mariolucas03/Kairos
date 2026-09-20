@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Paintbrush, Pencil, Check, Volume2, VolumeX } from 'lucide-react';
+import { Info, X, Trash2, Undo2, RotateCw, ChevronDown, ChevronUp, Paintbrush, Pencil, Check, Volume2, VolumeX } from '../../iconos';
 import confetti from 'canvas-confetti';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';

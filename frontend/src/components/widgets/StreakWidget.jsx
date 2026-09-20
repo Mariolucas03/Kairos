@@ -1,4 +1,4 @@
-import { Flame, Gift, Check } from 'lucide-react';
+import { Flame, Gift, Check } from '../../iconos';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
 /**

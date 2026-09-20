@@ -8,7 +8,7 @@ import {
     Plus, X, ArrowRightLeft,
     Ticket, Heart, User, ScanFace, Palette, Package, PawPrint, Crown,
     ShoppingBag, Backpack, Save, Loader2
-} from 'lucide-react';
+} from '../iconos';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import ChestModal from '../components/common/ChestModal';

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords, Club, Triangle } from 'lucide-react';
+import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords, Club, Triangle } from '../iconos';
 import api from '../services/api';
 import WidgetCard, { WidgetBar } from '../components/common/WidgetCard';
 import { useAuthStore } from '../store/useAuthStore';

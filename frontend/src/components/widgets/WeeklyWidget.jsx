@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { BarChart3, X } from 'lucide-react';
+import { BarChart3, X } from '../../iconos';
 import api from '../../services/api';
 import WidgetCard, { WidgetStat, WIDGET_ACCENTS } from '../common/WidgetCard';
 

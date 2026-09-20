@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, X, Play, Pause, Music, Scissors } from 'lucide-react';
+import { Search, X, Play, Pause, Music, Scissors } from '../../iconos';
 import api from '../../services/api';
 
 /**

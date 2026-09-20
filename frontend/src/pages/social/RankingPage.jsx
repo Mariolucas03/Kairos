@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { Trophy, Calendar, Globe } from 'lucide-react';
+import { Trophy, Calendar, Globe } from '../../iconos';
 import api from '../../services/api';
 import SocialSubHeader from '../../components/social/SocialSubHeader';
 import RankingItem from '../../components/social/RankingItem';

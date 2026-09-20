@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 //
 // Se notaba: abrir tu perfil descargaba 101 kB que ya no se descargan.
 import ProgressChart from '../gym/ProgressChart';
-import { TrendingUp, Activity, Search, Dumbbell, X } from 'lucide-react';
+import { TrendingUp, Activity, Search, Dumbbell, X } from '../../iconos';
 import api from '../../services/api';
 
 export default function ProfileStats({ mini = false, onClick, onCloseExternal }) {

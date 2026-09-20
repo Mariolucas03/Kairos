@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { Target, X, CheckCircle, Star, Coins, Gamepad2, HeartCrack, ChevronRight } from 'lucide-react';
+import { Target, X, CheckCircle, Star, Coins, Gamepad2, HeartCrack, ChevronRight } from '../../iconos';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 import api from '../../services/api';
 

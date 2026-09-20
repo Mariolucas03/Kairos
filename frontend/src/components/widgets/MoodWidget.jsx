@@ -1,5 +1,5 @@
 import React from 'react';
-import { Frown, Meh, Smile, Laugh, HeartCrack } from 'lucide-react';
+import { Frown, Meh, Smile, Laugh, HeartCrack } from '../../iconos';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
 export default function MoodWidget({ mood = null, onUpdate }) {

@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import {
     Shield, Crown, Users, Zap, Edit, LogOut, Globe, Search, ChevronUp, ChevronDown,
     Eye, Lock, X
-} from 'lucide-react';
+} from '../../iconos';
 import api from '../../services/api';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';

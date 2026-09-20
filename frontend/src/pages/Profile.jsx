@@ -1,6 +1,6 @@
 import { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ChevronRight as Flecha, MapPin, LogOut, Settings, Flame, Zap, CalendarCheck, Dumbbell, Medal, Shield } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronRight as Flecha, MapPin, LogOut, Settings, Flame, Zap, CalendarCheck, Dumbbell, Medal, Shield } from '../iconos';
 import MarcoPerfil from '../components/common/MarcoPerfil';
 import IconoRango from '../components/gym/IconoRango';
 import useSWR from 'swr';

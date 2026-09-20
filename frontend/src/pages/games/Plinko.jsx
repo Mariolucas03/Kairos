@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Volume2, VolumeX, Info, X } from 'lucide-react';
+import { Volume2, VolumeX, Info, X } from '../../iconos';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';

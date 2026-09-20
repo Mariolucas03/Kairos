@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, Check, Heart, MessageCircle, Swords, Club, Shield } from 'lucide-react';
+import { Bell, X, Check, Heart, MessageCircle, Swords, Club, Shield } from '../../iconos';
 
 // Tiempo relativo corto para la lista de avisos
 const hace = (fecha) => {

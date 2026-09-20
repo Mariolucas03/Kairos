@@ -1,5 +1,5 @@
 import { useId, useState, useMemo } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw } from '../../iconos';
 import { BODY_IMAGE, BODY_IMAGE_SIZE, VIEW_BOX, MUSCLE_SHAPES, GROUPS_BY_VIEW, GROUP_OF_MUSCLE, MUSCLES_OF_GROUP } from './bodyPaths';
 import { deformarPath, IMAGEN_MUJER } from './siluetaMujer';
 

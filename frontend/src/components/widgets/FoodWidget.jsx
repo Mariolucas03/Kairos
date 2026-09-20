@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Sunrise, Sun, Moon, Coffee, Zap } from 'lucide-react';
+import { X, Sunrise, Sun, Moon, Coffee, Zap } from '../../iconos';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
 export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = {} }) {

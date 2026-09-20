@@ -1,4 +1,4 @@
-import { Crown, Medal } from 'lucide-react';
+import { Crown, Medal } from '../../iconos';
 import { getLevelStyle } from '../../utils/socialHelpers';
 import MarcoPerfil from '../common/MarcoPerfil';
 

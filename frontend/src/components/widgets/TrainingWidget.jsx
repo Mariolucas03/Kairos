@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Activity, Clock, Flame, Dumbbell } from 'lucide-react';
+import { X, Activity, Clock, Flame, Dumbbell } from '../../iconos';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
 /**

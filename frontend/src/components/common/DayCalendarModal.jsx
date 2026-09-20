@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, X, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, CalendarDays } from '../../iconos';
 import { getMadridDateString } from '../../utils/dateHelpers';
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];

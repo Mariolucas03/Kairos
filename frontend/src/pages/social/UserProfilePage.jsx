@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import {
     Dumbbell, Utensils, ScrollText, Loader2, ChevronDown,
     Flame, Shield, Lock, Pencil, Check, UserPlus, PersonStanding, X, WifiOff, RefreshCw
-} from 'lucide-react';
+} from '../../iconos';
 import api from '../../services/api';
 import BackButton from '../../components/common/BackButton';
 import WorkoutPostCard from '../../components/social/WorkoutPostCard';

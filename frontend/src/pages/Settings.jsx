@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Lock, Globe, LogOut, Save, Loader2,
     Dumbbell, User as UserIcon, ChevronRight, Utensils, ScrollText, PersonStanding, Eye, EyeOff, Shield, Trash2, FileText, Download
-} from 'lucide-react';
+} from '../iconos';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import BackButton from '../components/common/BackButton';

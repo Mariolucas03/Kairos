@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import useSWR from 'swr';
-import { TrendingUp, ChevronDown, Dumbbell, Trophy, Info } from 'lucide-react';
+import { TrendingUp, ChevronDown, Dumbbell, Trophy, Info } from '../../iconos';
 import api from '../../services/api';
 import BodyMap from '../body/BodyMap';
 import ProgressChart from './ProgressChart';

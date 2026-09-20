@@ -1,4 +1,4 @@
-import { Shield } from 'lucide-react';
+import { Shield } from '../iconos';
 import BackButton from '../components/common/BackButton';
 
 /**

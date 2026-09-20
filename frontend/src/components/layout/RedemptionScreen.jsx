@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Skull, Lock, CheckCircle, RefreshCcw } from 'lucide-react';
+import { Skull, Lock, CheckCircle, RefreshCcw } from '../../iconos';
 import api from '../../services/api';
 
 export default function RedemptionScreen({ user, setUser }) {

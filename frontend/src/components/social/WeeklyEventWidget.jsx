@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Gift, ChevronUp, ChevronDown, Check, Lock } from 'lucide-react';
+import { X, Gift, ChevronUp, ChevronDown, Check, Lock } from '../../iconos';
 import { cardBaseStyle, EVENT_CONFIG } from '../../utils/socialHelpers';
 import MarcoPerfil from '../common/MarcoPerfil';
 

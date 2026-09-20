@@ -5,7 +5,7 @@ import { useSmoothMount } from '../hooks/useSmoothMount';
 import useSWR from 'swr';
 import {
     Trash2, Plus, Check, X, Target, Users, Loader2, Repeat, Flag, Clock, Eye, EyeOff, Edit, Save
-} from 'lucide-react';
+} from '../iconos';
 import api from '../services/api';
 import { invalidarDiario } from '../utils/cacheDiario';
 import { encolar, esFalloDeRed, nuevaMarca } from '../utils/colaEnvios';

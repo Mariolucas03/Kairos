@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Rss, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home } from 'lucide-react';
+import { Rss, Utensils, Dumbbell, Plus, ShoppingBag, Gamepad2, ScrollText, Home } from '../../iconos';
 import useSocialBadge from '../../hooks/useSocialBadge';
 
 export default function Footer() {

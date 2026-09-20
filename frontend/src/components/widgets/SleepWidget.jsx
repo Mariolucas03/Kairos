@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X } from '../../iconos';
 import WidgetCard, { WidgetStat, WidgetBar, WIDGET_ACCENTS } from '../common/WidgetCard';
 
 export default function SleepWidget({ hours = 0, onUpdate }) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Zap, Maximize2 } from 'lucide-react';
+import { Activity, Zap, Maximize2 } from '../../iconos';
 
 export default function RPGBody({ mini = false, onClick }) {
     const [stats, setStats] = useState({});

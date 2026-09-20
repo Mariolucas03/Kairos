@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bomb, Coins, Loader2, TrendingUp, Trophy, Volume2, VolumeX, Lightbulb } from 'lucide-react';
+import { Bomb, Coins, Loader2, TrendingUp, Trophy, Volume2, VolumeX, Lightbulb } from '../../iconos';
 import { crearSonidoTorre } from '../../utils/sonidoTorre';
 import { haySonidoJuegos, cambiarSonidoJuegos } from '../../utils/sintetizador';
 

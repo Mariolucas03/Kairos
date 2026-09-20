@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Move } from 'lucide-react';
+import { Move } from '../../iconos';
 
 export default function SortableWidget({ id, children, className = '', isDragEnabled = false }) {
     const {

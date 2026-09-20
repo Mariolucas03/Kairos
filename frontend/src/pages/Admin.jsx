@@ -4,7 +4,7 @@ import {
     Shield, Ban, Undo2, Trash2, Send, Loader2, Users, MessageSquare, KeyRound, Copy,
     Activity, Coins, Play, CheckCircle2, AlertTriangle, Search, X, ChevronRight,
     Heart, Flame, Dumbbell, ScrollText, Server, Database, Image, Zap, Bug, EyeOff, RotateCcw
-} from 'lucide-react';
+} from '../iconos';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import BackButton from '../components/common/BackButton';

@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import {
     Mail, Shield, Users, Search, Trophy, X, Loader2, ChevronDown, Dumbbell, UserPlus,
     WifiOff, RefreshCw, Swords
-} from 'lucide-react';
+} from '../iconos';
 import api from '../services/api';
 import Toast from '../components/common/Toast';
 import LoadingScreen from '../components/common/LoadingScreen';

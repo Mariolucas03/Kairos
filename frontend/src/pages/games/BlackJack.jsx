@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Info, X, Trophy, Frown, Handshake, Volume2, VolumeX } from 'lucide-react';
+import { Info, X, Trophy, Frown, Handshake, Volume2, VolumeX } from '../../iconos';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 // 🔥 IMPORTAMOS ZUSTAND

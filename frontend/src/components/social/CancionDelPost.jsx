@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useSyncExternalStore } from 'react';
-import { Volume2, VolumeX, Music } from 'lucide-react';
+import { Volume2, VolumeX, Music } from '../../iconos';
 import { haySonido, cambiarSonido, suscribirseAlSonido } from '../../utils/sonidoDelFeed';
 
 /**

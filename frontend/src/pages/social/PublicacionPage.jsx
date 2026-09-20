@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from '../../iconos';
 import api from '../../services/api';
 import WorkoutPostCard from '../../components/social/WorkoutPostCard';
 

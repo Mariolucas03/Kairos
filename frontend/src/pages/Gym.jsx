@@ -5,7 +5,7 @@ import { useState, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import {
     Plus, Play, Trash2, Dumbbell, Activity, Edit, PersonStanding, Lock, BarChart3
-} from 'lucide-react';
+} from '../iconos';
 
 import api from '../services/api';
 import Toast from '../components/common/Toast';

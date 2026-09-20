@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Dumbbell, Loader2 } from 'lucide-react';
+import { X, Dumbbell, Loader2 } from '../../iconos';
 import api from '../../services/api';
 
 /**

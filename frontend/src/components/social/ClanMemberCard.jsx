@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Crown, Trash2, Shield, MoreHorizontal, X } from 'lucide-react';
+import { Crown, Trash2, Shield, MoreHorizontal, X } from '../../iconos';
 import { getLevelStyle, RANK_CONFIG } from '../../utils/socialHelpers';
 import MarcoPerfil from '../common/MarcoPerfil';
 

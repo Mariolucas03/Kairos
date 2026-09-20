@@ -1,4 +1,4 @@
-import { CloudOff, RefreshCw, Check, Loader2 } from 'lucide-react';
+import { CloudOff, RefreshCw, Check, Loader2 } from '../../iconos';
 import { useColaPendiente } from '../../hooks/useColaPendiente';
 
 /**

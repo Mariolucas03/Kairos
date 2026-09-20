@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from '../../iconos';
 
 /**
  * Piezas del formulario de acceso, compartidas por login y registro.

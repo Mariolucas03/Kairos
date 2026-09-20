@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play, Clock, PersonStanding, MoveHorizontal, Link2, SlidersHorizontal, Repeat } from 'lucide-react';
+import { X, Plus, Save, Trash2, Dumbbell, ArrowUp, ArrowDown, Check, Timer, Hash, Play, Clock, PersonStanding, MoveHorizontal, Link2, SlidersHorizontal, Repeat } from '../../iconos';
 
 // Domingo primero para que coincida con Date.getDay(), pero se PINTA empezando
 // en lunes, que es como se lee una semana aquí.

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
     SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell
-} from 'lucide-react';
+} from '../../iconos';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
 import { invalidarDiario } from '../../utils/cacheDiario';

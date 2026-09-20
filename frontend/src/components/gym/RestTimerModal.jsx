@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SkipForward, Timer } from 'lucide-react';
+import { SkipForward, Timer } from '../../iconos';
 
 /**
  * EL RIR: CUANTAS REPETICIONES TE QUEDABAN.

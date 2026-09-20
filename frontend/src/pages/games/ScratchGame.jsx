@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Info, X, Volume2, VolumeX } from 'lucide-react';
+import { Zap, Info, X, Volume2, VolumeX } from '../../iconos';
 import BackButton from '../../components/common/BackButton';
 import SelectorApuesta from '../../components/games/SelectorApuesta';
 import CapaRasca from '../../components/games/CapaRasca';

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Zap } from 'lucide-react';
+import { Zap } from '../../iconos';
 
 /**
  * ABRIR UN COFRE.

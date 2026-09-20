@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useSWR from 'swr';
-import { Swords, Loader2, Plus, Flag, Check, X, Trophy, Handshake } from 'lucide-react';
+import { Swords, Loader2, Plus, Flag, Check, X, Trophy, Handshake } from '../../iconos';
 
 import api from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';

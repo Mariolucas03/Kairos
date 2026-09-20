@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Zap, Heart, Loader2, Package, Check, Flame } from 'lucide-react';
+import { X, Zap, Heart, Loader2, Package, Check, Flame } from '../../iconos';
 
 /**
  * EL CAMINO DE LA RACHA.

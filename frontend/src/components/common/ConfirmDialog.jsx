@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '../../iconos';
 import { Z } from '../../utils/zLayers';
 
 /**

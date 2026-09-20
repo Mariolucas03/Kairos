@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Cherry, Gem, Star, Crown, Clover, Info, X, Skull, Ghost, Volume2, VolumeX } from 'lucide-react';
+import { Zap, Cherry, Gem, Star, Crown, Clover, Info, X, Skull, Ghost, Volume2, VolumeX } from '../../iconos';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 

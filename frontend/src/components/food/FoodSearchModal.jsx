@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
     Search, Plus, X, Sparkles, Image as ImageIcon, Trash2, Camera,
     SortAsc, Filter, ArrowRight, BrainCircuit, Save, Flame, Wheat, Droplet, Leaf, Folder
-} from 'lucide-react';
+} from '../../iconos';
 import api from '../../services/api';
 import { invalidarDiario } from '../../utils/cacheDiario';
 import { encolar, esFalloDeRed, nuevaMarca } from '../../utils/colaEnvios';

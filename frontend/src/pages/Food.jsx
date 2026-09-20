@@ -8,7 +8,7 @@ import useSWR from 'swr';
 import {
     Settings, X, Bot, Send, ChevronRight,
     Plus, Trash2, ToggleLeft, ToggleRight, Save
-} from 'lucide-react';
+} from '../iconos';
 import api from '../services/api';
 import { invalidarDiario } from '../utils/cacheDiario';
 import FoodSearchModal from '../components/food/FoodSearchModal';

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import useSWR from 'swr';
 import { useNavigate } from 'react-router-dom';
-import { Flame, X, Dumbbell, Target, CalendarCheck, TrendingUp } from 'lucide-react';
+import { Flame, X, Dumbbell, Target, CalendarCheck, TrendingUp } from '../../iconos';
 import api from '../../services/api';
 import WidgetCard from '../common/WidgetCard';
 import { Z } from '../../utils/zLayers';

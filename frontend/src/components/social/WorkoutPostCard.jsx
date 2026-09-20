@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import BodyMap from '../body/BodyMap';
 import ZoomableImage from './ZoomableImage';
-import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy, BookmarkPlus, Check, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Dumbbell, Activity, MapPin, Timer, Flame, Send, Loader2, Trophy, BookmarkPlus, Check, Trash2 } from '../../iconos';
 import api from '../../services/api';
 import { getLevelStyle } from '../../utils/socialHelpers';
 import { useAuthStore } from '../../store/useAuthStore';

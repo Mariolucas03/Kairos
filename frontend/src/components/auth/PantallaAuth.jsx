@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check } from '../../iconos';
 
 /**
  * CHASIS DE LAS PANTALLAS DE ACCESO.

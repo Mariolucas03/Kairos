@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
-import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Play, MapPin } from 'lucide-react';
+import { Search, X, Dumbbell, Plus, CheckCircle2, Save, Play, MapPin } from '../../iconos';
 import api from '../../services/api';
 import ExerciseSheet from './ExerciseSheet';
 import { MUSCLES_OF_GROUP } from '../body/bodyPaths';

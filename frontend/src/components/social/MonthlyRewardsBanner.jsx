@@ -1,4 +1,4 @@
-import { Calendar } from 'lucide-react';
+import { Calendar } from '../../iconos';
 
 export default function MonthlyRewardsBanner() {
     return (

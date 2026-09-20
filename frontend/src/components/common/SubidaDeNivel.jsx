@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Heart, X } from 'lucide-react';
+import { Heart, X } from '../../iconos';
 import { useAuthStore } from '../../store/useAuthStore';
 
 /**

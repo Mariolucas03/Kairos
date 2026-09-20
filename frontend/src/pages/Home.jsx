@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, X, ToggleLeft, ToggleRight, Move, Lock, Unlock, CalendarDays, RotateCcw } from 'lucide-react';
+import { Settings, X, ToggleLeft, ToggleRight, Move, Lock, Unlock, CalendarDays, RotateCcw } from '../iconos';
 import useSWR from 'swr';
 import api from '../services/api';
 import { getMadridDateString } from '../utils/dateHelpers';

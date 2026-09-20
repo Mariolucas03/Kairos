@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Save, Lock, Activity } from 'lucide-react';
+import { Save, Lock, Activity } from '../../iconos';
 import api from '../../services/api';
 
 export default function HealthWidget({ user, setUser }) {

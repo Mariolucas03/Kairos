@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Minus, Plus, TrendingDown, TrendingUp, Scale } from 'lucide-react';
+import { X, Minus, Plus, TrendingDown, TrendingUp, Scale } from '../../iconos';
 import WidgetCard, { WIDGET_ACCENTS } from '../common/WidgetCard';
 
 /**

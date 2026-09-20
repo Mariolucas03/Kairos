@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Share, X } from 'lucide-react';
+import { Share, X } from '../../iconos';
 
 export default function IosInstallPrompt() {
     const [showPrompt, setShowPrompt] = useState(false);

@@ -1,4 +1,4 @@
-import { Dumbbell, Target, Flame, Zap } from 'lucide-react';
+import { Dumbbell, Target, Flame, Zap } from '../iconos';
 
 // Helpers y constantes compartidos por la sección social
 // (feed, amigos, clanes, ranking y perfiles de usuario).

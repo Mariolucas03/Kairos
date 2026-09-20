@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuthStore } from '../../store/useAuthStore';
-import { X, Scale, Flame, Utensils, User, ToggleLeft, ToggleRight, Save, Activity, Edit2 } from 'lucide-react';
+import { X, Scale, Flame, Utensils, User, ToggleLeft, ToggleRight, Save, Activity, Edit2 } from '../../iconos';
 import api from '../../services/api';
 import WidgetCard, { WidgetStat, WIDGET_ACCENTS } from '../common/WidgetCard';
 

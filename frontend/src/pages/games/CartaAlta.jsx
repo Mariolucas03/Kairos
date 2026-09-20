@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import {
     ArrowLeft, Swords, UserPlus, Coins, Loader2, Check, X, Play, Layers,
     Trophy, Crown, Bot, LogOut, UserMinus
-} from 'lucide-react';
+} from '../../iconos';
 import api from '../../services/api';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';

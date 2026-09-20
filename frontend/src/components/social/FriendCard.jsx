@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Trash2, Target, Construction, Heart } from 'lucide-react';
+import { Trash2, Target, Construction, Heart } from '../../iconos';
 import { getLevelStyle, cardBaseStyle } from '../../utils/socialHelpers';
 import MarcoPerfil from '../common/MarcoPerfil';
 

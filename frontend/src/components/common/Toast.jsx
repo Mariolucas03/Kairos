@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { CheckCircle, AlertCircle, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, X } from '../../iconos';
 import { Z } from '../../utils/zLayers';
 
 export default function Toast({ message, type = 'success', onClose }) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Save } from 'lucide-react';
+import { X, Save } from '../../iconos';
 import WidgetCard, { WidgetStat, WidgetBar, WIDGET_ACCENTS } from '../common/WidgetCard';
 
 export default function StepsWidget({ steps = 0, goal = 10000, onUpdate }) {

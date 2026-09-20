@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { X, Loader2, Users, Zap, Lock, Check, DoorOpen } from 'lucide-react';
+import { X, Loader2, Users, Zap, Lock, Check, DoorOpen } from '../../iconos';
 import api from '../../services/api';
 import ClanMemberCard from './ClanMemberCard';
 import WeeklyEventWidget from './WeeklyEventWidget';

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from '../../iconos';
 
 /**
  * Botón de "volver" ÚNICO de la app.

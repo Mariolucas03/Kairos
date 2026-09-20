@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import useSWR from 'swr';
-import { X, Timer, MapPin, Flame, Save, Loader2, Search, Watch, Sparkles, Activity } from 'lucide-react';
+import { X, Timer, MapPin, Flame, Save, Loader2, Search, Watch, Sparkles, Activity } from '../../iconos';
 import api from '../../services/api';
 import { invalidarDiario } from '../../utils/cacheDiario';
 
