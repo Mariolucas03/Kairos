@@ -1,4 +1,5 @@
 const WorkoutLog = require('../models/WorkoutLog');
+const { recordar } = require('../utils/cacheRangos');
 const Exercise = require('../models/Exercise');
 const { MUSCLE_GROUPS, SPECIFIC_MUSCLES, resolveMuscleGroup, isSpecificMuscle } = require('../utils/muscles');
 
@@ -123,7 +124,10 @@ const getWeekKey = (date) => {
  * Calcula los rangos de los 8 grupos musculares de un usuario.
  * @returns {Promise<Object>} { Pecho: { points, volume, weeks, sets, rank... }, ... }
  */
-const getMuscleRanks = async (userId, opciones = {}) => {
+const getMuscleRanks = (userId, opciones = {}) =>
+    recordar(`${userId}:${opciones.conEjercicios ? 1 : 0}`, () => calcularMuscleRanks(userId, opciones));
+
+const calcularMuscleRanks = async (userId, opciones = {}) => {
     const [logs, exercises] = await Promise.all([
         WorkoutLog.find({ user: userId }).select('type date duration exercises').lean(),
         Exercise.find({ $or: [{ user: userId }, { isCustom: false }, { user: null }] })

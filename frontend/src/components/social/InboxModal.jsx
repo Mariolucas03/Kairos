@@ -97,7 +97,7 @@ export default function InboxModal({
                                         <BrainCircuit size={16} style={{ color: '#a855f7' }} className="shrink-0" />
                                         <div className="min-w-0">
                                             <p className="text-white font-bold text-sm truncate">{r.de}</p>
-                                            <p className="text-[10px]" style={{ color: '#a855f7' }}>Te invita a su equipo{r.somos ? ` · ${r.somos} en total` : ''}</p>
+                                            <p className="text-[10px]" style={{ color: '#a855f7' }}>{r.modo === 'duelo' ? `Te reta por ${r.apuesta} fichas` : 'Te invita a su equipo'}{r.somos ? ` · ${r.somos} en total` : ''}</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2 shrink-0">

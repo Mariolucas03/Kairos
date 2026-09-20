@@ -22,7 +22,13 @@ const jugadorSchema = new mongoose.Schema({
     // Nombre y avatar sueltos: si la cuenta se borra, la partida sigue
     // contando quien jugo.
     nombre: { type: String, default: '' },
-    avatar: { type: String, default: '' }
+    avatar: { type: String, default: '' },
+    // Solo en el modo duelo: cada uno lleva lo suyo
+    coronas: { type: [String], default: [] },
+    vidas: { type: Number, default: 3 },
+    eliminado: { type: Boolean, default: false },
+    // Si ya ha puesto su apuesta en el bote (para devolverla si no se juega)
+    pagado: { type: Boolean, default: false }
 }, { _id: false });
 
 const preguntaEnCursoSchema = new mongoose.Schema({
@@ -51,6 +57,13 @@ const jugadaSchema = new mongoose.Schema({
 const sabelotodoSchema = new mongoose.Schema({
     creador: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
+    // 'equipo': todos contra las preguntas, coronas y vidas compartidas.
+    // 'duelo': cada uno lo suyo, con apuesta; el ganador se lleva el bote.
+    modo: { type: String, enum: ['equipo', 'duelo'], default: 'equipo' },
+    apuesta: { type: Number, default: 0 },
+    bote: { type: Number, default: 0 },
+    ganador: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
     // Los que estan dentro (el creador el primero) y los que aun no han
     // contestado a la invitacion. Al aceptar se pasa de una lista a la otra.
     jugadores: { type: [jugadorSchema], default: [] },
@@ -58,7 +71,8 @@ const sabelotodoSchema = new mongoose.Schema({
 
     estado: {
         type: String,
-        enum: ['invitacion', 'activa', 'ganada', 'perdida', 'rechazada', 'abandonada'],
+        // 'terminada' es el final de un duelo (hay ganador); 'ganada'/'perdida' son del equipo
+        enum: ['invitacion', 'activa', 'ganada', 'perdida', 'terminada', 'rechazada', 'abandonada'],
         default: 'invitacion'
     },
 

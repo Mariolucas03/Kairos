@@ -292,9 +292,11 @@ describe('Casino: ningun juego puede regalar dinero', () => {
             assert.strictEqual(PLINKO_MULTIPLICADORES[k], PLINKO_MULTIPLICADORES[n - k], 'el triangulo es simetrico');
         }
         assert.ok(PLINKO_MULTIPLICADORES[centro] < 1, 'en el centro se pierde algo');
-        assert.ok(PLINKO_MULTIPLICADORES[0] >= 10, 'en las puntas hay premio gordo');
+        assert.ok(PLINKO_MULTIPLICADORES[0] >= 5, 'en las puntas hay premio gordo');
         const recuperan = PLINKO_MULTIPLICADORES.reduce((acc, m, k) => acc + (m >= 1 ? comb(n, k) / Math.pow(2, n) : 0), 0);
         assert.ok(recuperan >= 0.33, `solo el ${(recuperan * 100).toFixed(0)}% de las bolas devuelve algo: demasiado dificil`);
+        const ganan = PLINKO_MULTIPLICADORES.reduce((acc, m, k) => acc + (m > 1 ? comb(n, k) / Math.pow(2, n) : 0), 0);
+        assert.ok(ganan >= 0.33, `solo el ${(ganan * 100).toFixed(0)}% de las bolas gana: demasiado dificil`);
     });
 
     test('ruleta: a caballo y esquina solo entre numeros que se tocan en el tapete', () => {

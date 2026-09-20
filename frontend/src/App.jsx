@@ -78,7 +78,13 @@ const CARGADORES = [
     () => import('./pages/games/Roulette'),
     () => import('./pages/games/BlackJack'),
     () => import('./pages/games/Slots'),
-    () => import('./pages/games/TowerGame')
+    () => import('./pages/games/TowerGame'),
+    () => import('./pages/games/CartaAlta'),
+    () => import('./pages/games/Poker'),
+    () => import('./pages/games/Plinko'),
+    () => import('./pages/games/Sabelotodo'),
+    () => import('./pages/social/DuelosPage'),
+    () => import('./pages/social/PublicacionPage')
 ];
 
 // De uno en uno y sólo con el navegador ocioso, para no competir con las

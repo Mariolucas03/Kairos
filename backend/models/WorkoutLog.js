@@ -169,4 +169,13 @@ workoutLogSchema.index({ user: 1, type: 1, date: -1 });
 // 3. Índice para gráficas de ejercicios específicos (ProfileStats)
 workoutLogSchema.index({ user: 1, "exercises.name": 1, date: 1 });
 
+// Un entreno nuevo (o borrado) deja viejos los rangos guardados en memoria
+const { invalidar: invalidarRangos } = require('../utils/cacheRangos');
+workoutLogSchema.post('save', (doc) => { if (doc?.user) invalidarRangos(doc.user); });
+workoutLogSchema.post('deleteOne', { document: true, query: false }, (doc) => { if (doc?.user) invalidarRangos(doc.user); });
+workoutLogSchema.post(['findOneAndDelete', 'findOneAndUpdate', 'updateOne', 'deleteMany', 'updateMany'], function () {
+    const u = this.getQuery?.()?.user;
+    if (u) invalidarRangos(u);
+});
+
 module.exports = mongoose.model('WorkoutLog', workoutLogSchema);

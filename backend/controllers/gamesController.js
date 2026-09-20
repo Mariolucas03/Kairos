@@ -942,8 +942,11 @@ const PLINKO_FILAS = 12;
 // imposible de ganar: solo el 23% de las bolas devolvia mas de lo apostado.
 // Con esta tabla el 39% devuelve la bola entera o mas, y hay x20 en las
 // puntas. El retorno total sigue clavado en el 85%.
-const PLINKO_MULTIPLICADORES = [20, 5, 2.2, 1.4, 1, 0.6, 0.5, 0.6, 1, 1.4, 2.2, 5, 20];
-const PLINKO_MAX_BOLAS = 10;
+// Segunda vuelta: con x20 en las puntas, el 61% de las bolas perdia. Ahora
+// el 39% gana (x1,1 o mas), otro 39% recupera el 80% y solo el 23% del
+// centro pierde de verdad. Retorno total: 85,6%.
+const PLINKO_MULTIPLICADORES = [8, 3, 1.6, 1.3, 1.1, 0.8, 0.3, 0.8, 1.1, 1.3, 1.6, 3, 8];
+const PLINKO_MAX_BOLAS = 30;
 // Cada bola vale lo mismo, siempre: sin selector de apuesta
 const PLINKO_PRECIO_BOLA = 100;
 

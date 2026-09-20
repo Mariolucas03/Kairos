@@ -10,6 +10,9 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import BackButton from '../../components/common/BackButton';
 import MarcoPerfil from '../../components/common/MarcoPerfil';
 import { BADGE_KEY } from '../../hooks/useSocialBadge';
+import SelectorApuesta from '../../components/games/SelectorApuesta';
+import { Ficha } from '../../components/games/Ficha';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -299,7 +302,11 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
         <div className="animate-in fade-in">
             {confirmarSalir && (
                 <ConfirmDialog
-                    message={p.estado === 'invitacion' ? (p.soyCreador ? '¿Cancelar la partida? Se avisa a nadie: simplemente no empieza.' : '¿Salirte del equipo antes de empezar?') : (p.jugadores.length > 2 ? '¿Dejar la partida? Los demás siguen sin ti y tú no cobras.' : '¿Dejar la partida? Se termina para los dos y nadie cobra.')}
+                    message={p.estado === 'invitacion'
+                        ? (p.soyCreador ? '¿Cancelar la partida? No empieza y cada uno recupera lo suyo.' : '¿Salirte antes de empezar? Recuperas tu apuesta si la había.')
+                        : p.modo === 'duelo'
+                            ? `¿Rendirte? Tu apuesta se queda en el bote${p.jugadores.filter(j => !j.eliminado).length <= 2 ? ' y el otro se lo lleva' : ''}.`
+                            : (p.jugadores.length > 2 ? '¿Dejar la partida? Los demás siguen sin ti y tú no cobras.' : '¿Dejar la partida? Se termina para los dos y nadie cobra.')}
                     confirmLabel="Dejarla"
                     onCancel={() => setConfirmarSalir(false)}
                     onConfirm={() => { setConfirmarSalir(false); abandonar(); }}
@@ -310,20 +317,43 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
                 <button onClick={onVolver} aria-label="Volver" className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-2xl text-zinc-400 active:scale-95 shrink-0"><ChevronLeft size={18} /></button>
                 <div className="flex-1 min-w-0">
                     <Equipo jugadores={p.jugadores} pendientes={p.pendientes} />
-                    <p className="text-[10px] text-zinc-500 font-bold not-italic mt-1.5">{p.coronas.length} de 6 coronas · {p.jugadores.length + (p.pendientes?.length || 0)} en el equipo</p>
+                    <p className="text-[10px] text-zinc-500 font-bold not-italic mt-1.5">
+                        {p.modo === 'duelo'
+                            ? <>Bote: <span className="text-white">{p.bote}</span> fichas · {p.apuesta} cada uno</>
+                            : <>{p.coronas.length} de 6 coronas · {p.jugadores.length + (p.pendientes?.length || 0)} en el equipo</>}
+                    </p>
                 </div>
                 <Vidas vidas={p.vidas} max={p.vidasMax} />
             </div>
 
-            <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-4 mb-4">
-                <Coronas coronas={p.coronas} />
-            </div>
+            {p.modo === 'duelo' ? (
+                <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-3 mb-4 space-y-2">
+                    {p.jugadores.map(j => (
+                        <div key={j._id} className={`flex items-center gap-3 rounded-2xl px-2 py-1.5 ${j.esTurno ? 'bg-white/[0.04]' : ''} ${j.eliminado ? 'opacity-40' : ''}`}>
+                            <Avatar persona={j} tamano={30} />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-black text-white truncate not-italic">{j.soyYo ? 'Tú' : j.nombre}{j.eliminado ? ' · fuera' : ''}</p>
+                                <div className="mt-1 w-[150px]"><Coronas coronas={j.coronas || []} tamano={18} /></div>
+                            </div>
+                            <Vidas vidas={j.vidas ?? 3} max={p.vidasMax} />
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-4 mb-4">
+                    <Coronas coronas={p.coronas} />
+                </div>
+            )}
 
             {/* ── LO QUE TOCA ─────────────────────────────────────────── */}
             {p.estado === 'invitacion' && p.soyInvitado && (
                 <div className="rounded-3xl border p-5 text-center" style={{ borderColor: ACENTO + '55', background: ACENTO + '14' }}>
-                    <p className="text-sm font-black text-white not-italic">{p.jugadores[0]?.nombre || 'Alguien'} te invita a su equipo</p>
-                    <p className="text-[11px] text-zinc-400 mt-1">Seis coronas, tres vidas, todos juntos. Os turnáis.</p>
+                    <p className="text-sm font-black text-white not-italic">
+                        {p.modo === 'duelo' ? `${p.jugadores[0]?.nombre || 'Alguien'} te reta por ${p.apuesta} fichas` : `${p.jugadores[0]?.nombre || 'Alguien'} te invita a su equipo`}
+                    </p>
+                    <p className="text-[11px] text-zinc-400 mt-1">
+                        {p.modo === 'duelo' ? 'Cada uno pone lo mismo. El primero en llegar a seis coronas, o el último con vidas, se lleva el bote entero.' : 'Seis coronas, tres vidas, todos juntos. Os turnáis.'}
+                    </p>
                     <div className="flex gap-2 mt-4">
                         <button onClick={() => responder('rechazar')} className="flex-1 h-12 rounded-2xl bg-zinc-900 border border-white/10 text-zinc-300 font-black text-[12px] uppercase tracking-widest">Paso</button>
                         <button onClick={() => responder('aceptar')} className="flex-1 h-12 rounded-2xl text-white font-black text-[12px] uppercase tracking-widest" style={{ background: ACENTO }}>Jugar</button>
@@ -412,6 +442,18 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
                 </div>
             )}
 
+            {p.estado === 'terminada' && (
+                <div className="rounded-3xl border p-6 text-center" style={{ borderColor: (p.ganeYo ? '#22c55e' : '#ef4444') + '55', background: (p.ganeYo ? '#22c55e' : '#ef4444') + '14' }}>
+                    <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center" style={{ background: p.ganeYo ? '#22c55e' : '#ef4444' }}>
+                        <Crown size={26} className={p.ganeYo ? 'text-black' : 'text-white'} />
+                    </div>
+                    <p className="text-lg font-black text-white mt-3 uppercase not-italic">{p.ganeYo ? '¡Te llevas el bote!' : `Ganó ${p.ganador?.nombre || 'otro'}`}</p>
+                    <p className="text-[12px] text-zinc-400 mt-1 flex items-center justify-center gap-1.5">
+                        <Ficha valor={p.bote} tamano={16} /> {p.bote} fichas {p.ganeYo ? 'para ti' : `para ${p.ganador?.nombre || 'quien ganó'}`}
+                    </p>
+                </div>
+            )}
+
             {(p.estado === 'rechazada' || p.estado === 'abandonada') && (
                 <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-6 text-center">
                     <p className="text-sm font-black text-zinc-300 not-italic">{p.estado === 'rechazada' ? 'No aceptó la invitación' : 'La partida se dejó a medias'}</p>
@@ -442,7 +484,7 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
 
             {enJuego && (
                 <button onClick={() => setConfirmarSalir(true)} className="mt-6 w-full text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center justify-center gap-1.5">
-                    <LogOut size={12} /> Dejar la partida
+                    <LogOut size={12} /> {p.modo === 'duelo' ? 'Rendirse' : 'Dejar la partida'}
                 </button>
             )}
         </div>
@@ -456,6 +498,7 @@ const FilaPartida = ({ p, onAbrir }) => {
     if (p.estado === 'invitacion') { estado = p.soyInvitado ? 'Te invita' : 'Invitación enviada'; color = p.soyInvitado ? ACENTO : '#71717a'; }
     else if (p.estado === 'activa') { estado = p.meToca ? 'Te toca' : `Le toca a ${otro?.nombre || '…'}`; color = p.meToca ? '#22c55e' : '#71717a'; }
     else if (p.estado === 'ganada') { estado = 'Ganada'; color = '#22c55e'; }
+    else if (p.estado === 'terminada') { estado = p.ganeYo ? `Ganaste ${p.bote} fichas` : `Ganó ${p.ganador?.nombre || 'otro'}`; color = p.ganeYo ? '#22c55e' : '#ef4444'; }
     else if (p.estado === 'perdida') { estado = 'Perdida'; color = '#ef4444'; }
     else estado = p.estado === 'rechazada' ? 'Rechazada' : 'Abandonada';
     const pide = (p.estado === 'activa' && p.meToca) || (p.estado === 'invitacion' && p.soyInvitado);
@@ -468,7 +511,8 @@ const FilaPartida = ({ p, onAbrir }) => {
                     <p className="text-[14px] font-black text-white truncate not-italic">{(p.jugadores || []).filter(j => !j.soyYo).concat(p.pendientes || []).map(j => j.nombre).join(', ') || 'Sin compañeros'}</p>
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] mt-0.5 not-italic" style={{ color }}>{estado}</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                    {p.modo === 'duelo' && <span className="flex items-center gap-1 text-[10px] font-black text-white tabular-nums"><Ficha valor={p.bote} tamano={12} />{p.bote}</span>}
                     <Vidas vidas={p.vidas} max={p.vidasMax} />
                 </div>
             </div>
@@ -486,6 +530,10 @@ export default function Sabelotodo() {
     const [eligiendo, setEligiendo] = useState(false);
     const [marcados, setMarcados] = useState([]);
     const [creando, setCreando] = useState(null);
+    const [modo, setModo] = useState('equipo');
+    const [apuesta, setApuesta] = useState(100);
+    const user = useAuthStore(s => s.user);
+    const fichas = user?.stats?.gameCoins ?? user?.gameCoins ?? 0;
 
     const { data: partidas, mutate } = useSWR('/sabelotodo', fetcher, { refreshInterval: 15000 });
     const { data: amigosData } = useSWR('/social/friends', fetcher);
@@ -501,7 +549,7 @@ export default function Sabelotodo() {
         (p.pendientes || []).forEach(j => vivasCon.add(j._id));
     });
 
-    const abrirSelector = (modo) => { setMarcados([]); setEligiendo(modo); };
+    const abrirSelector = (que) => { setMarcados([]); setModo('equipo'); setEligiendo(que); };
     const alternar = (id) => setMarcados(m => m.includes(id) ? m.filter(x => x !== id) : (m.length >= 3 ? m : [...m, id]));
 
     const confirmar = async () => {
@@ -509,7 +557,7 @@ export default function Sabelotodo() {
         setCreando(true);
         try {
             if (eligiendo === 'nueva') {
-                const r = await api.post('/sabelotodo', { amigosIds: marcados });
+                const r = await api.post('/sabelotodo', { amigosIds: marcados, modo, apuesta: modo === 'duelo' ? apuesta : 0 });
                 await mutate();
                 setEligiendo(false);
                 setAbierta(r.data._id);
@@ -558,7 +606,7 @@ export default function Sabelotodo() {
 
                     <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-4 mb-5">
                         <p className="text-[12px] text-zinc-300 leading-snug">
-                            De dos a cuatro, <span className="text-white font-black">en el mismo bando</span>. Os turnáis: ruleta, pregunta, y si aciertas te quedas la corona. Fallar quita una vida al equipo. <span className="text-white font-black">Seis coronas</span> y ganáis todos; <span className="text-white font-black">tres fallos</span> y perdéis todos.
+                            De dos a cuatro. <span className="text-white font-black">En equipo</span>: coronas y vidas compartidas, o ganáis todos o perdéis todos. <span className="text-white font-black">A fichas</span>: cada uno pone lo mismo y el primero en seis coronas (o el último con vidas) se lleva el bote entero.
                         </p>
                         <div className="mt-3"><Coronas coronas={CLAVES} tamano={26} /></div>
                     </div>
@@ -570,7 +618,24 @@ export default function Sabelotodo() {
                                     <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 not-italic"><UserPlus size={16} style={{ color: ACENTO }} /> {eligiendo === 'nueva' ? '¿Con quién?' : 'Uno más'}</h2>
                                     <button onClick={() => setEligiendo(false)} className="p-2 rounded-full bg-zinc-900 text-zinc-400"><X size={14} /></button>
                                 </div>
-                                <p className="text-[11px] text-zinc-500 mb-3">{eligiendo === 'nueva' ? 'Hasta tres amigos: seréis cuatro como mucho.' : 'Elige a quién sumar al equipo.'}</p>
+                                <p className="text-[11px] text-zinc-500 mb-3">{eligiendo === 'nueva' ? 'Hasta tres amigos: seréis cuatro como mucho.' : 'Elige a quién sumar.'}</p>
+                                {eligiendo === 'nueva' && (
+                                    <div className="mb-3">
+                                        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-black border border-white/[0.07]">
+                                            {[['equipo', 'En equipo'], ['duelo', 'Duelo a fichas']].map(([id, etiqueta]) => (
+                                                <button key={id} type="button" onClick={() => setModo(id)} className="h-10 rounded-xl text-[11px] font-black uppercase tracking-widest transition-colors not-italic" style={{ background: modo === id ? ACENTO : 'transparent', color: modo === id ? '#fff' : '#a1a1aa' }}>{etiqueta}</button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[10px] text-zinc-500 mt-2">
+                                            {modo === 'duelo' ? 'Cada uno pone la apuesta. Coronas y vidas propias: el primero en seis, o el último en pie, se lleva el bote.' : 'Coronas y vidas compartidas: o ganáis todos o perdéis todos.'}
+                                        </p>
+                                        {modo === 'duelo' && (
+                                            <div className="mt-2">
+                                                <SelectorApuesta valor={apuesta} onChange={setApuesta} saldo={fichas} minimo={10} etiqueta="Apuesta por cabeza" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="overflow-y-auto no-scrollbar space-y-2 flex-1">
                                     {amigos.length === 0 && <p className="text-[11px] text-zinc-500 text-center py-6">Añade amigos en la pestaña IG para poder jugar en equipo.</p>}
                                     {amigos.map(a => {
@@ -588,7 +653,7 @@ export default function Sabelotodo() {
                                     })}
                                 </div>
                                 <button onClick={confirmar} disabled={marcados.length === 0 || !!creando} className="mt-3 w-full h-12 rounded-2xl text-white font-black text-[12px] uppercase tracking-widest disabled:opacity-40 flex items-center justify-center gap-2" style={{ background: ACENTO }}>
-                                    {creando ? <Loader2 size={16} className="animate-spin" /> : <><Plus size={15} /> {eligiendo === 'nueva' ? (marcados.length <= 1 ? 'Invitar' : `Invitar a ${marcados.length}`) : 'Invitar'}</>}
+                                    {creando ? <Loader2 size={16} className="animate-spin" /> : <><Plus size={15} /> {eligiendo === 'nueva' ? (modo === 'duelo' ? `Retar${marcados.length > 1 ? ` a ${marcados.length}` : ''} · ${apuesta}` : (marcados.length <= 1 ? 'Invitar' : `Invitar a ${marcados.length}`)) : 'Invitar'}</>}
                                 </button>
                             </div>
                         </div>

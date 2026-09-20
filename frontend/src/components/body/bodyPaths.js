@@ -26,7 +26,7 @@
 
 // La '?v=' cambia cuando se retoca la lamina: el service worker y el navegador
 // guardan la imagen, y sin esto seguirian enseñando la vieja.
-export const BODY_IMAGE = '/body/muscles.jpg?v=2';
+export const BODY_IMAGE = '/body/muscles.jpg?v=3';
 export const BODY_IMAGE_SIZE = { width: 1170, height: 1150 };
 
 /** Recorte de cada figura dentro de la imagen */

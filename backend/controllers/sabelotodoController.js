@@ -14,6 +14,8 @@ const TIEMPO_MS = 30000;         // el movil enseña 20 s; el servidor da margen
 const MAX_JUGADORES = 4;
 const PREMIO_GANAR = { xp: 250, fichas: 300 };   // para CADA uno
 const PREMIO_PERDER = { xp: 40, fichas: 0 };
+const APUESTA_MIN = 10;
+const APUESTA_MAX = 5000;
 const CLAVES = Object.keys(CATEGORIAS);
 const RUTA = '/games/sabelotodo';
 const PUSH = (body, title = 'Sabelotodo') => ({ title, body, icon: '/assets/icons/icon-192x192.png', url: RUTA });
@@ -27,9 +29,9 @@ const barajar = (lista) => {
     return a;
 };
 
-/** Elige categoria (entre las que faltan) y una pregunta no repetida de ella. */
-const siguientePregunta = (partida) => {
-    const faltan = CLAVES.filter(c => !partida.coronas.includes(c));
+/** Elige categoria (entre las que le faltan a quien juega) y una pregunta no repetida. */
+const siguientePregunta = (partida, coronas = partida.coronas) => {
+    const faltan = CLAVES.filter(c => !coronas.includes(c));
     const categoria = faltan[Math.floor(Math.random() * faltan.length)];
     const usadas = new Set(partida.usadas);
     let candidatas = PREGUNTAS.filter(p => p.categoria === categoria && !usadas.has(p.id));
@@ -50,7 +52,22 @@ const siguientePregunta = (partida) => {
 const mismo = (a, b) => a && b && a.toString() === b.toString();
 const puestoDe = (partida, userId) => partida.jugadores.findIndex(j => mismo(j.user, userId));
 const estaInvitado = (partida, userId) => partida.invitados.some(j => mismo(j.user, userId));
-const persona = (j) => ({ _id: j.user, nombre: j.nombre, avatar: j.avatar });
+const persona = (j) => ({ _id: j.user, nombre: j.nombre, avatar: j.avatar, coronas: j.coronas || [], vidas: j.vidas, eliminado: !!j.eliminado });
+const esDuelo = (p) => p.modo === 'duelo';
+/** En duelo, las coronas y vidas que se enseñan son las de quien mira */
+const loMio = (partida, yo) => esDuelo(partida) && yo ? { coronas: yo.coronas || [], vidas: yo.vidas } : { coronas: partida.coronas, vidas: partida.vidas };
+
+// El bote: cobrar y devolver
+const cobrar = async (userId, fichas) => {
+    if (fichas <= 0) return true;
+    const r = await User.updateOne({ _id: userId, gameCoins: { $gte: fichas } }, { $inc: { gameCoins: -fichas } });
+    return r.modifiedCount === 1;
+};
+const abonar = (userId, fichas) => fichas > 0 ? User.updateOne({ _id: userId }, { $inc: { gameCoins: fichas } }) : Promise.resolve();
+const devolverApuestas = async (partida) => {
+    for (const j of partida.jugadores) if (j.pagado) { await abonar(j.user, partida.apuesta); j.pagado = false; }
+    partida.bote = 0;
+};
 
 /** Lo que ve cada uno. La respuesta correcta de la pregunta en curso NO viaja. */
 const vista = (partida, yoId) => {
@@ -62,9 +79,15 @@ const vista = (partida, yoId) => {
     const e = partida.enCurso;
     const deTurno = partida.estado === 'activa' ? partida.jugadores[partida.turno] : null;
 
+    const mio = loMio(partida, yo);
     return {
         _id: partida._id,
         estado: partida.estado,
+        modo: partida.modo || 'equipo',
+        apuesta: partida.apuesta || 0,
+        bote: partida.bote || 0,
+        ganador: partida.ganador ? persona(partida.jugadores.find(j => mismo(j.user, partida.ganador)) || { user: partida.ganador, nombre: '' }) : null,
+        ganeYo: !!(partida.ganador && mismo(partida.ganador, yoId)),
         soyCreador,
         soyInvitado,
         miPuesto,
@@ -79,8 +102,8 @@ const vista = (partida, yoId) => {
         maxJugadores: MAX_JUGADORES,
         puedeEmpezar: soyCreador && partida.estado === 'invitacion' && partida.jugadores.length >= 2,
         puedeInvitar: soyCreador && partida.estado === 'invitacion' && partida.jugadores.length + partida.invitados.length < MAX_JUGADORES,
-        coronas: partida.coronas,
-        vidas: partida.vidas,
+        coronas: mio.coronas,
+        vidas: mio.vidas,
         vidasMax: VIDAS,
         racha: partida.racha,
         seguidasMax: SEGUIDAS_MAX,
@@ -130,7 +153,10 @@ const amigosValidos = async (res, yo, ids) => {
 
 const avisarInvitados = (partida, gente) => {
     const quien = partida.jugadores[0]?.nombre || 'Alguien';
-    for (const g of gente) notificarA(g._id, PUSH(`${quien} te invita a un Sabelotodo en equipo. Seis coronas, tres vidas, todos juntos.`));
+    const texto = esDuelo(partida)
+        ? `${quien} te reta a un Sabelotodo por ${partida.apuesta} fichas. El que llegue a seis coronas se lleva el bote.`
+        : `${quien} te invita a un Sabelotodo en equipo. Seis coronas, tres vidas, todos juntos.`;
+    for (const g of gente) notificarA(g._id, PUSH(texto));
 };
 
 // ── CREAR E INVITAR ─────────────────────────────────────────────────────────
@@ -138,13 +164,25 @@ const crear = asyncHandler(async (req, res) => {
     const ids = Array.isArray(req.body?.amigosIds) ? req.body.amigosIds : (req.body?.amigoId ? [req.body.amigoId] : []);
     if (ids.length > MAX_JUGADORES - 1) { res.status(400); throw new Error(`Como mucho ${MAX_JUGADORES - 1} invitados`); }
 
-    const yo = await User.findById(req.user._id).select('username avatar friends').lean();
+    const yo = await User.findById(req.user._id).select('username avatar friends gameCoins').lean();
     const gente = await amigosValidos(res, yo, ids);
+
+    // Modo duelo: apuesta por cabeza, y el creador la pone ya
+    const modo = req.body?.modo === 'duelo' ? 'duelo' : 'equipo';
+    let apuesta = 0;
+    if (modo === 'duelo') {
+        apuesta = Math.floor(Number(req.body?.apuesta));
+        if (!Number.isFinite(apuesta) || apuesta < APUESTA_MIN || apuesta > APUESTA_MAX) { res.status(400); throw new Error(`La apuesta va de ${APUESTA_MIN} a ${APUESTA_MAX} fichas`); }
+        if (!(await cobrar(yo._id, apuesta))) { res.status(400); throw new Error('No te llegan las fichas para esa apuesta'); }
+    }
 
     const partida = await Sabelotodo.create({
         creador: yo._id,
-        jugadores: [{ user: yo._id, nombre: yo.username, avatar: yo.avatar || '' }],
-        invitados: gente.map(g => ({ user: g._id, nombre: g.username, avatar: g.avatar || '' })),
+        modo,
+        apuesta,
+        bote: apuesta,
+        jugadores: [{ user: yo._id, nombre: yo.username, avatar: yo.avatar || '', vidas: VIDAS, pagado: modo === 'duelo' }],
+        invitados: gente.map(g => ({ user: g._id, nombre: g.username, avatar: g.avatar || '', vidas: VIDAS })),
         estado: 'invitacion',
         vidas: VIDAS
     });
@@ -194,6 +232,12 @@ const responderInvitacion = asyncHandler(async (req, res) => {
     const creador = partida.jugadores[0];
 
     if (req.body?.respuesta === 'aceptar') {
+        if (esDuelo(partida)) {
+            if (!(await cobrar(req.user._id, partida.apuesta))) { res.status(400); throw new Error(`Te faltan fichas: la apuesta es de ${partida.apuesta}`); }
+            yo.pagado = true;
+            partida.bote = (partida.bote || 0) + partida.apuesta;
+        }
+        yo.vidas = VIDAS;
         partida.jugadores.push(yo);
         if (partida.invitados.length === 0) {
             // Ya ha contestado todo el mundo: se empieza sin esperar a nadie
@@ -203,7 +247,8 @@ const responderInvitacion = asyncHandler(async (req, res) => {
             notificarA(creador.user, PUSH(`${yo.nombre} se apunta. Ya sois ${partida.jugadores.length}; puedes empezar o esperar al resto.`));
         }
     } else if (partida.invitados.length === 0 && partida.jugadores.length < 2) {
-        // Nadie ha querido: no hay partida
+        // Nadie ha querido: no hay partida, y el creador recupera su apuesta
+        await devolverApuestas(partida);
         partida.estado = 'rechazada';
         partida.terminadaEn = new Date();
         await partida.save();
@@ -238,7 +283,7 @@ const girar = asyncHandler(async (req, res) => {
 
     // Si ya hay una en el aire (recarga del movil), se devuelve la misma
     if (!partida.enCurso) {
-        const nueva = siguientePregunta(partida);
+        const nueva = siguientePregunta(partida, esDuelo(partida) ? partida.jugadores[mi].coronas : partida.coronas);
         // Atomico: solo entra si nadie ha servido una mientras tanto
         const r = await Sabelotodo.updateOne(
             { _id: partida._id, estado: 'activa', turno: mi, enCurso: null },
@@ -298,10 +343,30 @@ const contestar = asyncHandler(async (req, res) => {
         correcta: e.opciones[e.correcta]
     });
 
-    const siguiente = (mi + 1) % partida.jugadores.length;
+    // El siguiente que siga en pie (en equipo, nadie queda eliminado)
+    const siguienteVivo = (desde) => {
+        for (let k = 1; k <= partida.jugadores.length; k++) {
+            const idx = (desde + k) % partida.jugadores.length;
+            if (!partida.jugadores[idx].eliminado) return idx;
+        }
+        return desde;
+    };
+    const siguiente = siguienteVivo(mi);
     // A quien avisar y con que: al siguiente cuando cambia el turno; a todos
     // cuando se acaba.
     let aviso = null;
+
+    if (esDuelo(partida)) {
+        const resultadoDuelo = await contestarEnDuelo(partida, mi, e, acierto, siguiente);
+        if (resultadoDuelo.aviso) {
+            const destinatarios = resultadoDuelo.aviso.todos ? partida.jugadores.filter((_, i) => i !== mi) : [partida.jugadores[resultadoDuelo.aviso.a]];
+            for (const d of destinatarios) if (d) notificarA(d.user, PUSH(resultadoDuelo.aviso.texto));
+        }
+        return res.json({
+            ...vista(partida, req.user._id),
+            resultado: { acierto, aTiempo, correcta: e.opciones[e.correcta], elegida: e.opciones[opcion] ?? null, categoria: e.categoria }
+        });
+    }
 
     if (acierto) {
         if (!partida.coronas.includes(e.categoria)) partida.coronas.push(e.categoria);
@@ -341,6 +406,52 @@ const contestar = asyncHandler(async (req, res) => {
     });
 });
 
+/** El duelo se acaba: el ganador se lleva el bote entero. */
+const coronarGanador = async (partida, idx) => {
+    const g = partida.jugadores[idx];
+    partida.estado = 'terminada';
+    partida.ganador = g.user;
+    partida.terminadaEn = new Date();
+    partida.enCurso = null;
+    partida.premio = { xp: 0, fichas: partida.bote };
+    await partida.save();
+    await abonar(g.user, partida.bote);
+};
+
+/**
+ * Una respuesta en modo duelo: coronas y vidas del que contesta. Gana quien
+ * llega a seis coronas, o el ultimo que queda con vidas.
+ */
+const contestarEnDuelo = async (partida, mi, e, acierto, siguiente) => {
+    const yo = partida.jugadores[mi];
+    if (acierto) {
+        if (!yo.coronas.includes(e.categoria)) yo.coronas.push(e.categoria);
+        partida.racha += 1;
+        if (yo.coronas.length >= CLAVES.length) {
+            await coronarGanador(partida, mi);
+            return { aviso: { todos: true, texto: `${yo.nombre} ha llegado a las seis coronas y se lleva ${partida.bote} fichas.` } };
+        }
+        if (partida.racha >= SEGUIDAS_MAX) {
+            partida.turno = siguiente; partida.racha = 0;
+            await partida.save();
+            return { aviso: { a: siguiente, texto: `${yo.nombre} lleva ${yo.coronas.length} coronas. Te toca.` } };
+        }
+        await partida.save();
+        return {};
+    }
+    yo.vidas = Math.max(0, (yo.vidas ?? VIDAS) - 1);
+    partida.racha = 0;
+    if (yo.vidas <= 0) yo.eliminado = true;
+    const vivos = partida.jugadores.map((j, i) => (!j.eliminado ? i : -1)).filter(i => i >= 0);
+    if (vivos.length === 1) {
+        await coronarGanador(partida, vivos[0]);
+        return { aviso: { todos: true, texto: `${partida.jugadores[vivos[0]].nombre} es el último en pie y se lleva ${partida.bote} fichas.` } };
+    }
+    partida.turno = siguiente;
+    await partida.save();
+    return { aviso: { a: siguiente, texto: yo.eliminado ? `${yo.nombre} se ha quedado sin vidas. Te toca.` : `${yo.nombre} ha fallado. Te toca.` } };
+};
+
 /**
  * Dejar la partida. En la sala, el creador la cancela y un invitado se
  * borra sin mas. En marcha, si quedan al menos dos se sigue sin el; si solo
@@ -359,15 +470,33 @@ const abandonar = asyncHandler(async (req, res) => {
 
     if (partida.estado === 'invitacion') {
         if (mismo(partida.creador, req.user._id)) {
-            // Cancelar una sala que no ha empezado no es abandonar nada
+            // Cancelar una sala que no ha empezado no es abandonar nada: cada
+            // uno recupera lo que puso
+            await devolverApuestas(partida);
             partida.estado = 'rechazada';
             partida.invitados = [];
             partida.terminadaEn = new Date();
         } else {
+            if (yo?.pagado) { await abonar(yo.user, partida.apuesta); partida.bote -= partida.apuesta; }
             partida.jugadores = partida.jugadores.filter(j => !mismo(j.user, req.user._id));
             partida.invitados = partida.invitados.filter(j => !mismo(j.user, req.user._id));
         }
         await partida.save();
+        return res.json(vista(partida, req.user._id));
+    }
+
+    if (esDuelo(partida)) {
+        // Irse de un duelo es rendirse: la apuesta se queda en el bote
+        yo.eliminado = true;
+        const vivos = partida.jugadores.map((j, i) => (!j.eliminado ? i : -1)).filter(i => i >= 0);
+        if (vivos.length === 1) {
+            await coronarGanador(partida, vivos[0]);
+            for (const o of otros) notificarA(o.user, PUSH(`${yo.nombre} se ha rendido. ${partida.jugadores[vivos[0]].nombre} se lleva ${partida.bote} fichas.`));
+        } else {
+            if (mi === partida.turno) { partida.enCurso = null; partida.racha = 0; partida.turno = vivos.find(i => i > mi) ?? vivos[0]; }
+            await partida.save();
+            for (const o of otros) notificarA(o.user, PUSH(`${yo.nombre} se ha rendido. Seguís ${vivos.length}.`));
+        }
         return res.json(vista(partida, req.user._id));
     }
 
@@ -417,6 +546,8 @@ const misInvitaciones = asyncHandler(async (req, res) => {
         de: f.jugadores[0]?.nombre || 'Alguien',
         avatar: f.jugadores[0]?.avatar || '',
         somos: f.jugadores.length + f.invitados.length,
+        modo: f.modo || 'equipo',
+        apuesta: f.apuesta || 0,
         creada: f.createdAt
     })));
 });
@@ -434,5 +565,5 @@ const pendientesDe = async (userId) => {
 module.exports = {
     crear, invitar, empezar, responderInvitacion, girar, contestar, abandonar, misPartidas, verPartida, misInvitaciones, pendientesDe,
     // Para las pruebas
-    VIDAS, SEGUIDAS_MAX, MAX_JUGADORES, PREMIO_GANAR, PREMIO_PERDER, TIEMPO_MS, siguientePregunta, vista
+    VIDAS, SEGUIDAS_MAX, MAX_JUGADORES, PREMIO_GANAR, PREMIO_PERDER, TIEMPO_MS, APUESTA_MIN, APUESTA_MAX, siguientePregunta, vista
 };

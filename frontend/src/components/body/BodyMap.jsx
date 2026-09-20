@@ -84,9 +84,12 @@ function Figura({ view, getFill, onSelectMuscle, marcado, mujer = false }) {
 
             <g clipPath={`url(#${recorte})`}>
                 {/* La lámina completa; el viewBox enseña solo esta cara.
-                    El contraste aplasta a negro el gris del fondo del dibujo,
-                    que si no recortaba cada figura en un rectángulo más claro
-                    que la pantalla. */}
+                    ⚠️ SIN filtro CSS encima. Llevaba contrast(1.7) para aplastar
+                    a negro el gris del fondo, y Safari (iPhone) pinta una
+                    <image> con filtro en una capa aparte que no sigue bien el
+                    viewBox: la lámina salía desplazada y escalada respecto a
+                    los músculos, que se veían "descuadrados". El contraste va
+                    horneado en el propio JPG. */}
                 <image
                     href={mujer ? IMAGEN_MUJER : BODY_IMAGE}
                     x="0"
@@ -94,7 +97,6 @@ function Figura({ view, getFill, onSelectMuscle, marcado, mujer = false }) {
                     width={BODY_IMAGE_SIZE.width}
                     height={BODY_IMAGE_SIZE.height}
                     preserveAspectRatio="none"
-                    style={{ filter: 'contrast(1.7)' }}
                 />
 
                 {/* Zonas musculares. Con mezcla "screen" el relleno tiñe el interior

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Zap, Heart, Loader2, Package, Check, Flame } from '../../iconos';
 
@@ -23,6 +23,8 @@ const COLOR = {
     hp: '#f43f5e',
     cofre: '#eab308'
 };
+
+const nombreTipo = (tipo) => ({ fichas: 'Fichas', xp: 'Experiencia', hp: 'Vida', cofre: 'Cofre' })[tipo] || 'Premio';
 
 const IconoPremio = ({ tipo, tamano = 22, color }) => {
     if (tipo === 'fichas') return <img src="/assets/icons/ficha.png" alt="" className="object-contain" style={{ width: tamano, height: tamano }} draggable="false" />;
@@ -57,9 +59,13 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
     // Lo que se enseña: la racha visible, el color del premio de hoy, los
     // siete dias a partir de hoy y el proximo hito con cofre.
     const rachaVisible = cobradoHoy ? dia : Math.max(0, dia - 1);
-    const hoyColor = COLOR[hoy?.tipo] || ACENTO;
-    const proximos = tramo.filter(p => p.dia >= dia).slice(0, 7);
     const proximoHito = tramo.find(p => p.dia > dia && p.hito) || null;
+
+    // La carta de hoy, al centro, nada mas abrir
+    const hoyRef = useRef(null);
+    useEffect(() => {
+        hoyRef.current?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+    }, [camino?.dia]);
 
     return createPortal(
         <div
@@ -82,60 +88,68 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
                     </span>
                 </div>
 
-                {/* EL PREMIO DE HOY, en el centro */}
-                <div className="px-5 pt-5 pb-4 flex flex-col items-center text-center relative z-10">
-                    <div
-                        className="w-24 h-24 rounded-full flex items-center justify-center border-2"
-                        style={{ background: (hoyColor) + '1a', borderColor: cobradoHoy ? ACENTO : hoyColor, boxShadow: cobradoHoy ? 'none' : `0 0 40px ${hoyColor}44` }}
-                    >
-                        {cobradoHoy || premioRecogido
-                            ? <Check size={44} color={ACENTO} strokeWidth={3} />
-                            : <IconoPremio tipo={hoy?.tipo} tamano={44} color={hoyColor} />}
-                    </div>
-                    <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500 not-italic">Día {dia}</p>
-                    <p className="mt-1 text-[26px] font-black text-white leading-none not-italic">
-                        {premioRecogido ? premioRecogido.etiqueta : hoy?.etiqueta || '—'}
-                    </p>
-                    <p className="mt-2 text-[12px] text-zinc-400 font-medium max-w-[260px]">
-                        {premioRecogido
-                            ? (premioRecogido.tipo === 'cofre' ? 'Ya está en tu mochila, en la tienda. Ábrelo cuando quieras.' : 'Recogido. Mañana te espera el siguiente.')
-                            : cobradoHoy
-                                ? `Ya lo tienes. Mañana toca el día ${dia + 1}.`
-                                : dia === 1
-                                    ? 'Hoy empieza. Cada día que entres, un premio distinto; si fallas uno, vuelves al 1.'
-                                    : 'Si un día no entras, vuelves al 1.'}
-                    </p>
-                </div>
-
-                {/* LA SEMANA QUE VIENE: siete casillas, la de hoy primero */}
-                <div className="px-5 pb-4 relative z-10">
-                    <div className="grid grid-cols-7 gap-1.5">
-                        {proximos.map(p => {
+                {/* LAS CARTAS: una por dia, el premio en grande. La de hoy en medio */}
+                <div className="relative z-10 mt-4 overflow-x-auto no-scrollbar" style={{ scrollSnapType: 'x mandatory' }}>
+                    <div className="flex items-stretch gap-3 px-5 py-3 min-w-max">
+                        {tramo.map(p => {
                             const esHoy = p.dia === dia;
+                            const pasado = p.dia < dia;
+                            const hecho = pasado || (esHoy && (cobradoHoy || !!premioRecogido));
                             const color = COLOR[p.tipo] || ACENTO;
-                            const hecho = esHoy && cobradoHoy;
                             return (
-                                <div key={p.dia} className="flex flex-col items-center gap-1">
+                                <div
+                                    key={p.dia}
+                                    ref={esHoy ? hoyRef : undefined}
+                                    className={`relative shrink-0 rounded-3xl border flex flex-col items-center justify-between px-3 py-4 transition-all ${esHoy && !hecho ? 'animate-pulse' : ''}`}
+                                    style={{
+                                        width: esHoy ? 168 : 138,
+                                        height: esHoy ? 236 : 208,
+                                        scrollSnapAlign: 'center',
+                                        background: hecho ? '#0f0f12' : esHoy ? `linear-gradient(180deg, ${color}2e 0%, #0f0f12 70%)` : '#0c0c0e',
+                                        borderColor: esHoy ? (hecho ? ACENTO : color) : hecho ? 'rgba(255,255,255,0.06)' : p.hito ? COLOR.cofre + '66' : 'rgba(255,255,255,0.09)',
+                                        borderWidth: esHoy ? 2 : 1,
+                                        boxShadow: esHoy && !hecho ? `0 0 40px ${color}44` : 'none',
+                                        opacity: pasado ? 0.55 : 1
+                                    }}
+                                >
+                                    <span className={`text-[10px] font-black uppercase tracking-[0.2em] not-italic ${esHoy ? 'text-white' : 'text-zinc-500'}`}>
+                                        {esHoy ? 'Hoy' : `Día ${p.dia}`}
+                                    </span>
+
                                     <div
-                                        className="w-full aspect-square rounded-xl flex items-center justify-center border relative"
-                                        style={{
-                                            background: hecho ? ACENTO : esHoy ? color + '26' : p.hito ? COLOR.cofre + '14' : '#0f0f12',
-                                            borderColor: esHoy ? (hecho ? ACENTO : color) : p.hito ? COLOR.cofre + '66' : 'rgba(255,255,255,0.08)'
-                                        }}
+                                        className="rounded-full flex items-center justify-center"
+                                        style={{ width: esHoy ? 92 : 72, height: esHoy ? 92 : 72, background: hecho ? 'rgba(255,255,255,0.05)' : color + '22', border: `2px solid ${hecho ? 'rgba(255,255,255,0.08)' : color}` }}
                                     >
-                                        {hecho ? <Check size={16} color="#fff" strokeWidth={3} /> : <IconoPremio tipo={p.tipo} tamano={p.hito ? 20 : 17} color={color} />}
+                                        {hecho
+                                            ? <Check size={esHoy ? 40 : 30} color={ACENTO} strokeWidth={3} />
+                                            : <IconoPremio tipo={p.tipo} tamano={esHoy ? 48 : 36} color={color} />}
                                     </div>
-                                    <span className={`text-[9px] font-black tabular-nums not-italic ${esHoy ? 'text-white' : p.hito ? 'text-yellow-500' : 'text-zinc-500'}`}>{p.dia}</span>
+
+                                    <div className="text-center">
+                                        <p className={`font-black leading-tight not-italic ${esHoy ? 'text-[19px] text-white' : 'text-[14px] text-zinc-200'}`}>{p.etiqueta}</p>
+                                        <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] not-italic" style={{ color: hecho ? '#71717a' : color }}>
+                                            {hecho ? 'Recogido' : p.hito ? 'Hito' : nombreTipo(p.tipo)}
+                                        </p>
+                                    </div>
+
+                                    {p.hito && !hecho && (
+                                        <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black text-black" style={{ background: COLOR.cofre }}>★</span>
+                                    )}
                                 </div>
                             );
                         })}
                     </div>
-                    {proximoHito && (
-                        <p className="mt-2 text-center text-[10px] text-zinc-500 font-bold not-italic">
-                            Día {proximoHito.dia}: <span className="text-yellow-500">{proximoHito.etiqueta}</span>
-                        </p>
-                    )}
                 </div>
+
+                <p className="relative z-10 px-5 pb-3 text-center text-[11px] text-zinc-400 font-medium">
+                    {premioRecogido
+                        ? (premioRecogido.tipo === 'cofre' ? 'El cofre ya está en tu mochila, en la tienda.' : `Recogido. Mañana, el día ${dia + 1}.`)
+                        : cobradoHoy
+                            ? `Ya lo tienes. Mañana toca el día ${dia + 1}${proximoHito ? ` · día ${proximoHito.dia}: ${proximoHito.etiqueta}` : ''}.`
+                            : dia === 1
+                                ? 'Hoy empieza. Cada día un premio; si fallas uno, vuelves al 1.'
+                                : `Si un día no entras, vuelves al 1${proximoHito ? ` · día ${proximoHito.dia}: ${proximoHito.etiqueta}` : ''}.`}
+                </p>
 
                 {/* EL BOTON */}
                 <div className="px-5 pb-5 relative z-10">
@@ -150,7 +164,7 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
                             className="w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-sm text-black active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
                             style={{ background: ACENTO }}
                         >
-                            {claiming ? <Loader2 className="animate-spin" size={18} /> : 'Recoger'}
+                            {claiming ? <Loader2 className="animate-spin" size={18} /> : <>Recoger · {hoy.etiqueta}</>}
                         </button>
                     ) : (
                         <button onClick={onClose} className="w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-sm bg-zinc-900 border border-white/[0.07] text-zinc-300 active:scale-95 transition-transform">

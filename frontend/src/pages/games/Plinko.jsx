@@ -31,14 +31,15 @@ const ANCHO = 340;
 const ALTURA = ARRIBA + FILAS * ALTO + 44;
 // Sin el servidor aun (la primera vez), para pintar el tablero. Se sustituye
 // por lo que mande el servidor en cuanto se tira.
-const MULTIPLICADORES_DE_PARTIDA = [20, 5, 2.2, 1.4, 1, 0.6, 0.5, 0.6, 1, 1.4, 2.2, 5, 20];
+const MULTIPLICADORES_DE_PARTIDA = [8, 3, 1.6, 1.3, 1.1, 0.8, 0.3, 0.8, 1.1, 1.3, 1.6, 3, 8];
+const MAX_BOLAS = 30;
 const PRECIO_BOLA = 100;
 
 /** El color de una casilla segun lo que paga: rojo pierde, dorado gana. */
 const colorDeCasilla = (m) => {
-    if (m >= 10) return { fondo: '#facc15', tinta: '#1a1200' };
-    if (m >= 2) return { fondo: '#c9a33f', tinta: '#1a1200' };
-    if (m >= 1) return { fondo: '#b45309', tinta: '#fff' };
+    if (m >= 5) return { fondo: '#facc15', tinta: '#1a1200' };
+    if (m >= 1.5) return { fondo: '#c9a33f', tinta: '#1a1200' };
+    if (m > 1) return { fondo: '#b45309', tinta: '#fff' };
     if (m >= 0.6) return { fondo: '#9a3412', tinta: '#fff' };
     return { fondo: '#7f1d1d', tinta: '#fecaca' };
 };
@@ -306,6 +307,23 @@ export default function Plinko() {
                                         : 'bg-black border-white/[0.07] text-zinc-400'}`}
                                 >{n}</button>
                             ))}
+                            {/* Las que tu quieras, hasta el tope */}
+                            <input
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                max={MAX_BOLAS}
+                                value={OPCIONES_BOLAS.includes(bolas) ? '' : bolas}
+                                placeholder="Otra"
+                                disabled={tirando}
+                                onChange={(e) => {
+                                    const v = parseInt(e.target.value, 10);
+                                    if (Number.isFinite(v)) setBolas(Math.max(1, Math.min(MAX_BOLAS, v)));
+                                }}
+                                className={`w-14 h-9 rounded-xl border text-sm font-black tabular-nums text-center bg-black outline-none placeholder:text-zinc-600 ${!OPCIONES_BOLAS.includes(bolas)
+                                    ? 'border-amber-500/50 text-amber-400'
+                                    : 'border-white/[0.07] text-zinc-400'}`}
+                            />
                         </div>
                     </div>
 
@@ -331,7 +349,7 @@ export default function Plinko() {
                         <h3 className="text-xl font-black text-white text-center mb-4 uppercase not-italic">Cómo va</h3>
                         <p className="text-xs text-zinc-300 leading-relaxed">
                             Cada bola vale 100 fichas y cae por doce filas de clavos rebotando a un lado o a otro. Abajo, cada casilla
-                            multiplica las 100: <span className="text-amber-400 font-bold">en las puntas x20</span>, y cuanto más al centro, menos.
+                            multiplica las 100: <span className="text-amber-400 font-bold">en las puntas x8</span>, y cuanto más al centro, menos.
                             Solo eliges cuántas tiras.
                         </p>
                         <div className="mt-4 grid grid-cols-7 gap-1">

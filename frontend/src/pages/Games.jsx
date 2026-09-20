@@ -33,7 +33,7 @@ const MESAS = [
 
 // En el mismo bando: no se le gana a nadie, se gana con alguien
 const EN_PAREJA = [
-    { id: 'sabelotodo', name: 'Sabelotodo', desc: 'Trivial en pareja: seis coronas', accent: '#a855f7', Icon: BrainCircuit }
+    { id: 'sabelotodo', name: 'Sabelotodo', desc: 'Trivial: en equipo, o a fichas', accent: '#a855f7', Icon: BrainCircuit }
 ];
 
 const MAQUINAS = [
@@ -44,7 +44,7 @@ const MAQUINAS = [
     { id: 'scratch', name: 'Rasca', desc: 'Rasca con el dedo', accent: '#a855f7', Icon: Ticket },
     { id: 'tower', name: 'La Torre', desc: 'Sube o piérdelo', accent: '#10b981', Icon: Building2 },
     { id: 'fortune-wheel', name: 'Fortuna', desc: 'Nueve ruedas', accent: '#eab308', Icon: CircleDollarSign },
-    { id: 'plinko', name: 'Plinko', desc: '100 la bola, x20 en las puntas', accent: '#f59e0b', Icon: Triangle }
+    { id: 'plinko', name: 'Plinko', desc: '100 la bola, x8 en las puntas', accent: '#f59e0b', Icon: Triangle }
 ];
 
 /**
@@ -278,8 +278,8 @@ export default function Games() {
             />
 
             <Grupo
-                titulo="En pareja"
-                pie="Los dos en el mismo bando: o ganáis juntos o perdéis juntos."
+                titulo="Con amigos"
+                pie="De dos a cuatro: en equipo contra las preguntas, o cada uno por su bote."
                 juegos={EN_PAREJA}
                 avisos={{ sabelotodo: avisosSabelotodo }}
                 ancha
