@@ -44,7 +44,7 @@ const MAQUINAS = [
     { id: 'scratch', name: 'Rasca', desc: 'Rasca con el dedo', accent: '#a855f7', Icon: Ticket },
     { id: 'tower', name: 'La Torre', desc: 'Sube o piérdelo', accent: '#10b981', Icon: Building2 },
     { id: 'fortune-wheel', name: 'Fortuna', desc: 'Nueve ruedas', accent: '#eab308', Icon: CircleDollarSign },
-    { id: 'plinko', name: 'Plinko', desc: 'Al centro se gana', accent: '#f59e0b', Icon: Triangle }
+    { id: 'plinko', name: 'Plinko', desc: '100 la bola, x20 en las puntas', accent: '#f59e0b', Icon: Triangle }
 ];
 
 /**

@@ -62,15 +62,17 @@ const llamar = async (fn, { user, params = {}, body = {} }) => {
 };
 
 describe('La partida en pareja', () => {
-    let a, b;
+    let a, b, c;
     before(async () => { await arrancar(); });
     after(async () => { await parar(); });
     beforeEach(async () => {
         await limpiar();
         a = await User.create({ username: 'ana', email: 'ana@k.test', password: 'x', gameCoins: 0, currentXP: 0 });
         b = await User.create({ username: 'bea', email: 'bea@k.test', password: 'x', gameCoins: 0, currentXP: 0 });
-        await User.updateOne({ _id: a._id }, { $set: { friends: [b._id] } });
-        await User.updateOne({ _id: b._id }, { $set: { friends: [a._id] } });
+        c = await User.create({ username: 'cai', email: 'cai@k.test', password: 'x', gameCoins: 0, currentXP: 0 });
+        await User.updateOne({ _id: a._id }, { $set: { friends: [b._id, c._id] } });
+        await User.updateOne({ _id: b._id }, { $set: { friends: [a._id, c._id] } });
+        await User.updateOne({ _id: c._id }, { $set: { friends: [a._id, b._id] } });
     });
 
     const empezar = async () => {
@@ -91,7 +93,7 @@ describe('La partida en pareja', () => {
     };
 
     test('solo se invita a amigos, y una partida viva por pareja', async () => {
-        const otro = await User.create({ username: 'cai', email: 'cai@k.test', password: 'x' });
+        const otro = await User.create({ username: 'dan', email: 'dan@k.test', password: 'x' });
         const mal = await llamar(ctrl.crear, { user: a, body: { amigoId: otro._id.toString() } });
         assert.strictEqual(mal.estado, 400);
         const id = await empezar();
@@ -186,6 +188,69 @@ describe('La partida en pareja', () => {
         assert.strictEqual(tarde.dato.resultado.acierto, false);
         assert.strictEqual(tarde.dato.resultado.aTiempo, false);
         assert.strictEqual(tarde.dato.vidas, 2);
+    });
+
+    test('en equipo de tres: se empieza cuando todos han contestado y el turno va rotando', async () => {
+        const cr = await llamar(ctrl.crear, { user: a, body: { amigosIds: [b._id.toString(), c._id.toString()] } });
+        assert.strictEqual(cr.estado, 201, cr.error);
+        assert.strictEqual(cr.dato.pendientes.length, 2);
+        assert.strictEqual(cr.dato.puedeEmpezar, false, 'sin nadie dentro no se puede empezar');
+
+        const r1 = await llamar(ctrl.responderInvitacion, { user: b, params: { id: cr.dato._id }, body: { respuesta: 'aceptar' } });
+        assert.strictEqual(r1.dato.estado, 'invitacion', 'falta cai por contestar');
+        const vistaA = await llamar(ctrl.verPartida, { user: a, params: { id: cr.dato._id } });
+        assert.strictEqual(vistaA.dato.puedeEmpezar, true, 'con dos dentro, ana ya puede arrancar sin esperar');
+
+        const r2 = await llamar(ctrl.responderInvitacion, { user: c, params: { id: cr.dato._id }, body: { respuesta: 'aceptar' } });
+        assert.strictEqual(r2.dato.estado, 'activa', 'al contestar el ultimo, arranca sola');
+        assert.strictEqual(r2.dato.jugadores.length, 3);
+
+        // Turno: ana -> bea -> cai -> ana
+        const id = cr.dato._id;
+        const quienToca = async () => (await Sabelotodo.findById(id).lean()).turno;
+        assert.strictEqual(await quienToca(), 0);
+        await llamar(ctrl.girar, { user: a, params: { id } });
+        await contestar(id, a, false);
+        assert.strictEqual(await quienToca(), 1);
+        await llamar(ctrl.girar, { user: b, params: { id } });
+        await contestar(id, b, true); await llamar(ctrl.girar, { user: b, params: { id } });
+        await contestar(id, b, true); await llamar(ctrl.girar, { user: b, params: { id } });
+        await contestar(id, b, true);
+        assert.strictEqual(await quienToca(), 2, 'tras tres seguidas de bea le toca a cai');
+        await llamar(ctrl.girar, { user: c, params: { id } });
+        await contestar(id, c, false);
+        assert.strictEqual(await quienToca(), 0, 'y de cai vuelve a ana');
+    });
+
+    test('si uno de tres se va, los otros dos siguen; si sois dos, se acaba', async () => {
+        const cr = await llamar(ctrl.crear, { user: a, body: { amigosIds: [b._id.toString(), c._id.toString()] } });
+        const id = cr.dato._id;
+        await llamar(ctrl.responderInvitacion, { user: b, params: { id }, body: { respuesta: 'aceptar' } });
+        await llamar(ctrl.responderInvitacion, { user: c, params: { id }, body: { respuesta: 'aceptar' } });
+        // Le toca a ana y tiene una pregunta en el aire: se va
+        await llamar(ctrl.girar, { user: a, params: { id } });
+        const fuera = await llamar(ctrl.abandonar, { user: a, params: { id } });
+        assert.strictEqual(fuera.dato.estado, 'activa');
+        const p = await Sabelotodo.findById(id).lean();
+        assert.strictEqual(p.jugadores.length, 2);
+        assert.strictEqual(p.jugadores[p.turno].nombre, 'bea', 'el turno pasa al siguiente');
+        assert.strictEqual(p.enCurso, null, 'la pregunta en el aire se descarta');
+        assert.strictEqual(p.vidas, 3, 'sin castigo');
+        const fuera2 = await llamar(ctrl.abandonar, { user: b, params: { id } });
+        assert.strictEqual(fuera2.dato.estado, 'abandonada');
+    });
+
+    test('el creador arranca sin esperar, y los que no contestaron se quedan fuera', async () => {
+        const cr = await llamar(ctrl.crear, { user: a, body: { amigosIds: [b._id.toString(), c._id.toString()] } });
+        const id = cr.dato._id;
+        const pronto = await llamar(ctrl.empezar, { user: a, params: { id } });
+        assert.strictEqual(pronto.estado, 400, 'sin nadie dentro, no');
+        await llamar(ctrl.responderInvitacion, { user: b, params: { id }, body: { respuesta: 'aceptar' } });
+        const ya = await llamar(ctrl.empezar, { user: a, params: { id } });
+        assert.strictEqual(ya.dato.estado, 'activa');
+        assert.strictEqual(ya.dato.jugadores.length, 2);
+        assert.strictEqual(ya.dato.pendientes.length, 0);
+        assert.strictEqual(await ctrl.pendientesDe(c._id), 0, 'a cai ya no le cuenta la invitacion');
     });
 
     test('los pendientes cuentan invitaciones y partidas en las que te toca', async () => {

@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 /**
  * SABELOTODO — el trivial en pareja.
  *
- * Como el Preguntados, pero COOPERATIVO: dos personas, un solo equipo. Se
- * turnan; en cada turno se gira la ruleta, sale una categoria y una pregunta.
- * Acertar da la corona de esa categoria; fallar quita una vida AL EQUIPO. Con
- * las seis coronas, ganais los dos; con las tres vidas perdidas, perdeis los
- * dos. No hay nada que ganarle al otro: o salis juntos o no salis.
+ * Como el Preguntados, pero COOPERATIVO: de dos a cuatro personas, un solo
+ * equipo. Se turnan; en cada turno se gira la ruleta, sale una categoria y
+ * una pregunta. Acertar da la corona de esa categoria; fallar quita una vida
+ * AL EQUIPO. Con las seis coronas ganan todos; con las tres vidas perdidas,
+ * pierden todos. No hay nada que ganarle a nadie: o salis juntos o no salis.
  *
- * Como los duelos, se pueden tener varias a la vez: una con cada amigo.
+ * Como los duelos, se pueden tener varias a la vez.
  *
  * ⚠️ LA RESPUESTA CORRECTA NO SALE DEL SERVIDOR.
  * `enCurso.correcta` es la posicion de la buena entre las opciones ya
@@ -35,7 +35,10 @@ const preguntaEnCursoSchema = new mongoose.Schema({
 }, { _id: false });
 
 const jugadaSchema = new mongoose.Schema({
-    jugador: { type: Number, required: true },      // indice en `jugadores`
+    // Quien contesto, por id y por nombre: si alguien deja la partida los
+    // indices de `jugadores` se mueven, y esto no puede depender de ellos.
+    usuario: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    nombre: { type: String, default: '' },
     preguntaId: { type: String, required: true },
     categoria: { type: String, required: true },
     texto: { type: String, default: '' },
@@ -47,10 +50,11 @@ const jugadaSchema = new mongoose.Schema({
 
 const sabelotodoSchema = new mongoose.Schema({
     creador: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    // A quien se ha invitado y aun no ha contestado. Se vacia al aceptar.
-    invitado: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 
+    // Los que estan dentro (el creador el primero) y los que aun no han
+    // contestado a la invitacion. Al aceptar se pasa de una lista a la otra.
     jugadores: { type: [jugadorSchema], default: [] },
+    invitados: { type: [jugadorSchema], default: [] },
 
     estado: {
         type: String,
@@ -77,6 +81,6 @@ const sabelotodoSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 sabelotodoSchema.index({ 'jugadores.user': 1, updatedAt: -1 });
-sabelotodoSchema.index({ invitado: 1, estado: 1 });
+sabelotodoSchema.index({ 'invitados.user': 1, estado: 1 });
 
 module.exports = mongoose.model('Sabelotodo', sabelotodoSchema);

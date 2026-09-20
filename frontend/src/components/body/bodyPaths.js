@@ -24,7 +24,9 @@
  * Coordenadas en píxeles de la imagen original (1170x1150).
  */
 
-export const BODY_IMAGE = '/body/muscles.jpg';
+// La '?v=' cambia cuando se retoca la lamina: el service worker y el navegador
+// guardan la imagen, y sin esto seguirian enseñando la vieja.
+export const BODY_IMAGE = '/body/muscles.jpg?v=2';
 export const BODY_IMAGE_SIZE = { width: 1170, height: 1150 };
 
 /** Recorte de cada figura dentro de la imagen */
@@ -136,9 +138,12 @@ export const MUSCLE_SHAPES = {
             'M772,222L792,236L798,249L800,275L794,291L788,297L778,300L765,298L756,294L744,285L745,273L742,262L743,258L756,251L766,241L772,223Z',
             'M939,222L919,236L913,249L911,275L917,291L923,297L933,300L946,298L955,294L967,285L966,273L969,262L968,258L955,251L945,241L939,223Z'
         ],
+        // Sin la muesca de la "lagrima" blanca del dibujo: se pinto oscura en la
+        // lamina, porque con la mezcla screen el color no la tapaba y parecia
+        // que el triceps estaba descuadrado.
         'Tríceps': [
-            'M726,261L730,262L732,268L732,289L725,320L719,331L694,356L685,368L669,380L671,366L686,335L688,314L684,307L681,307L673,314L653,343L655,324L662,301L669,290L690,272L709,264L725,262Z',
-            'M985,261L981,262L979,268L979,289L986,320L992,331L1017,356L1026,368L1042,380L1040,366L1025,335L1023,314L1027,307L1030,307L1038,314L1058,343L1056,324L1049,301L1042,290L1021,272L1002,264L986,262Z'
+            'M726,261L730,262L732,268L732,289L725,320L719,331L694,356L685,368L669,380L653,343L655,324L662,301L669,290L690,272L709,264L725,262Z',
+            'M985,261L981,262L979,268L979,289L986,320L992,331L1017,356L1026,368L1042,380L1058,343L1056,324L1049,301L1042,290L1021,272L1002,264L986,262Z'
         ],
         // Por detrás el antebrazo se ve entero, sin la línea que lo parte en
         // dos por delante. Recortado por arriba en y=371: la punta del tríceps

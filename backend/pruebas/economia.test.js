@@ -274,7 +274,7 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         });
     });
 
-    test('el plinko devuelve EXACTAMENTE el 85%, y el centro es lo que mas paga', () => {
+    test('el plinko devuelve EXACTAMENTE el 85%, y los bordes son lo que mas paga', () => {
         // La bola cae a un lado u otro en cada fila: la casilla k tiene
         // probabilidad C(filas, k) / 2^filas.
         const n = PLINKO_FILAS;
@@ -283,14 +283,18 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         const devuelve = PLINKO_MULTIPLICADORES.reduce((acc, m, k) => acc + (comb(n, k) / Math.pow(2, n)) * m, 0);
         assert.ok(Math.abs(devuelve - 0.85) < 0.01, `El plinko devuelve el ${(devuelve * 100).toFixed(1)}%, no el 85%`);
 
-        // Lo pedido: por los bordes se pierde, hacia el centro se gana.
+        // Como el plinko de verdad: hacia los bordes se paga mas, en el centro
+        // se pierde algo. Y que no sea un juego imposible: al menos un tercio
+        // de las bolas tiene que devolver la bola entera o mas.
         const centro = Math.floor(n / 2);
         for (let k = 1; k <= centro; k++) {
-            assert.ok(PLINKO_MULTIPLICADORES[k] >= PLINKO_MULTIPLICADORES[k - 1], `la casilla ${k} paga menos que la ${k - 1}`);
+            assert.ok(PLINKO_MULTIPLICADORES[k] <= PLINKO_MULTIPLICADORES[k - 1], `la casilla ${k} paga mas que la ${k - 1}`);
             assert.strictEqual(PLINKO_MULTIPLICADORES[k], PLINKO_MULTIPLICADORES[n - k], 'el triangulo es simetrico');
         }
-        assert.ok(PLINKO_MULTIPLICADORES[centro] > 1, 'en el centro se gana');
-        assert.ok(PLINKO_MULTIPLICADORES[0] < 1, 'en los bordes se pierde');
+        assert.ok(PLINKO_MULTIPLICADORES[centro] < 1, 'en el centro se pierde algo');
+        assert.ok(PLINKO_MULTIPLICADORES[0] >= 10, 'en las puntas hay premio gordo');
+        const recuperan = PLINKO_MULTIPLICADORES.reduce((acc, m, k) => acc + (m >= 1 ? comb(n, k) / Math.pow(2, n) : 0), 0);
+        assert.ok(recuperan >= 0.33, `solo el ${(recuperan * 100).toFixed(0)}% de las bolas devuelve algo: demasiado dificil`);
     });
 
     test('ruleta: a caballo y esquina solo entre numeros que se tocan en el tapete', () => {

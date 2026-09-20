@@ -3,7 +3,6 @@ import { Volume2, VolumeX, Info, X } from '../../iconos';
 import BackButton from '../../components/common/BackButton';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
-import SelectorApuesta from '../../components/games/SelectorApuesta';
 import { Ficha } from '../../components/games/Ficha';
 import { trayectoriaPlinko, clavo, casilla, FILAS, PASO, ALTO, ARRIBA } from '../../utils/fisicaPlinko';
 import { crearSintetizador, haySonidoJuegos, cambiarSonidoJuegos, melodias } from '../../utils/sintetizador';
@@ -32,13 +31,15 @@ const ANCHO = 340;
 const ALTURA = ARRIBA + FILAS * ALTO + 44;
 // Sin el servidor aun (la primera vez), para pintar el tablero. Se sustituye
 // por lo que mande el servidor en cuanto se tira.
-const MULTIPLICADORES_DE_PARTIDA = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.8, 0.7, 0.5, 0.4, 0.3, 0.2, 0.1];
+const MULTIPLICADORES_DE_PARTIDA = [20, 5, 2.2, 1.4, 1, 0.6, 0.5, 0.6, 1, 1.4, 2.2, 5, 20];
+const PRECIO_BOLA = 100;
 
 /** El color de una casilla segun lo que paga: rojo pierde, dorado gana. */
 const colorDeCasilla = (m) => {
-    if (m >= 1) return { fondo: '#c9a33f', tinta: '#1a1200' };
-    if (m >= 0.5) return { fondo: '#b45309', tinta: '#fff' };
-    if (m >= 0.3) return { fondo: '#9a3412', tinta: '#fff' };
+    if (m >= 10) return { fondo: '#facc15', tinta: '#1a1200' };
+    if (m >= 2) return { fondo: '#c9a33f', tinta: '#1a1200' };
+    if (m >= 1) return { fondo: '#b45309', tinta: '#fff' };
+    if (m >= 0.6) return { fondo: '#9a3412', tinta: '#fff' };
     return { fondo: '#7f1d1d', tinta: '#fecaca' };
 };
 
@@ -106,7 +107,7 @@ export default function Plinko() {
     const setIsUiHidden = useAuthStore(state => state.setIsUiHidden);
     useEffect(() => { setIsUiHidden(true); return () => setIsUiHidden(false); }, [setIsUiHidden]);
 
-    const [bet, setBet] = useState(100);
+    const bet = PRECIO_BOLA;
     const [bolas, setBolas] = useState(1);
     const [tirando, setTirando] = useState(false);
     const [multiplicadores, setMultiplicadores] = useState(MULTIPLICADORES_DE_PARTIDA);
@@ -142,7 +143,7 @@ export default function Plinko() {
         if (tirando || coste > fichas) return;
         setTirando(true); setErrorMsg(null); setResultado(null); setCaidas({});
         try {
-            const res = await api.post('/games/plinko', { bet, balls: bolas });
+            const res = await api.post('/games/plinko', { balls: bolas });
             const { bolas: resultados, total, apuesta, multiplicadores: mults, user: updatedUser } = res.data;
             if (mults) setMultiplicadores(mults);
 
@@ -286,11 +287,12 @@ export default function Plinko() {
 
                 {/* LOS CONTROLES */}
                 <div className="w-full bg-zinc-900 rounded-[2rem] border border-white/[0.07] p-4 shadow-2xl">
-                    <div className={tirando ? 'opacity-40 pointer-events-none' : ''}>
-                        <SelectorApuesta valor={bet} onChange={setBet} saldo={fichas} minimo={10} deshabilitado={tirando} etiqueta="Por bola" />
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.12em]">Cada bola</span>
+                        <span className="flex items-center gap-1.5 text-sm font-black text-white tabular-nums"><Ficha valor={PRECIO_BOLA} tamano={18} />{PRECIO_BOLA}</span>
                     </div>
 
-                    <div className="flex items-center justify-between mt-3 mb-3">
+                    <div className="flex items-center justify-between mb-3">
                         <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.12em]">Bolas</span>
                         <div className="flex items-center gap-1.5">
                             {OPCIONES_BOLAS.map(n => (
@@ -328,9 +330,9 @@ export default function Plinko() {
                         <button onClick={() => setShowInfo(false)} aria-label="Cerrar" className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X /></button>
                         <h3 className="text-xl font-black text-white text-center mb-4 uppercase not-italic">Cómo va</h3>
                         <p className="text-xs text-zinc-300 leading-relaxed">
-                            Cada bola cae por doce filas de clavos y rebota a un lado o a otro. Abajo, cada casilla multiplica lo que
-                            apostaste por esa bola: <span className="text-amber-400 font-bold">al centro x1,8</span>, y cuanto más al borde, menos.
-                            Eliges cuánto vale cada bola y cuántas tiras.
+                            Cada bola vale 100 fichas y cae por doce filas de clavos rebotando a un lado o a otro. Abajo, cada casilla
+                            multiplica las 100: <span className="text-amber-400 font-bold">en las puntas x20</span>, y cuanto más al centro, menos.
+                            Solo eliges cuántas tiras.
                         </p>
                         <div className="mt-4 grid grid-cols-7 gap-1">
                             {multiplicadores.slice(0, 7).map((m, k) => {

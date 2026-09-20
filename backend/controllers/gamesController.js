@@ -937,13 +937,19 @@ const playTower = asyncHandler(async (req, res) => {
  * de derechas.
  */
 const PLINKO_FILAS = 12;
-const PLINKO_MULTIPLICADORES = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.8, 0.7, 0.5, 0.4, 0.3, 0.2, 0.1];
+// ⚠️ Como el plinko de verdad: los BORDES pagan gordo y el centro poco. La
+// primera version lo tenia al reves (centro x1,8, bordes x0,1) y se sentia
+// imposible de ganar: solo el 23% de las bolas devolvia mas de lo apostado.
+// Con esta tabla el 39% devuelve la bola entera o mas, y hay x20 en las
+// puntas. El retorno total sigue clavado en el 85%.
+const PLINKO_MULTIPLICADORES = [20, 5, 2.2, 1.4, 1, 0.6, 0.5, 0.6, 1, 1.4, 2.2, 5, 20];
 const PLINKO_MAX_BOLAS = 10;
+// Cada bola vale lo mismo, siempre: sin selector de apuesta
+const PLINKO_PRECIO_BOLA = 100;
 
 const playPlinko = asyncHandler(async (req, res) => {
-    const { bet, balls } = req.body;
-    const apuesta = normalizarApuesta(bet);
-    if (apuesta === null) { res.status(400); throw new Error('Apuesta mínima 10 por bola'); }
+    const { balls } = req.body;
+    const apuesta = PLINKO_PRECIO_BOLA;
     const bolas = Number(balls);
     if (!Number.isInteger(bolas) || bolas < 1 || bolas > PLINKO_MAX_BOLAS) { res.status(400); throw new Error(`Entre 1 y ${PLINKO_MAX_BOLAS} bolas`); }
 
@@ -963,7 +969,7 @@ const playPlinko = asyncHandler(async (req, res) => {
 
 module.exports = {
     playDice, playScratch, playSlots, playRoulette, playFortuneWheel, getFortuneWheels, playBlackjack, playTower, playPlinko,
-    PLINKO_MULTIPLICADORES, PLINKO_FILAS, getCanonicalRouletteBet,
+    PLINKO_MULTIPLICADORES, PLINKO_FILAS, PLINKO_PRECIO_BOLA, getCanonicalRouletteBet,
     RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.

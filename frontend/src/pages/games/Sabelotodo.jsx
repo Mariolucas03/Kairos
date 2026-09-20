@@ -76,6 +76,22 @@ const Coronas = ({ coronas = [], tamano = 34 }) => (
     </div>
 );
 
+/** Los del equipo en fila: el del turno con aro, los que no han contestado, apagados. */
+const Equipo = ({ jugadores = [], pendientes = [], tamano = 34 }) => (
+    <div className="flex items-center">
+        {jugadores.map((j, i) => (
+            <div key={j._id || i} className="relative rounded-full" style={{ marginLeft: i === 0 ? 0 : -8, zIndex: j.esTurno ? 5 : 1, boxShadow: j.esTurno ? `0 0 0 2px #000, 0 0 0 4px ${ACENTO}` : '0 0 0 2px #000' }} title={j.nombre}>
+                <Avatar persona={j} tamano={tamano} />
+            </div>
+        ))}
+        {pendientes.map((j, i) => (
+            <div key={j._id || `p${i}`} className="relative rounded-full opacity-40" style={{ marginLeft: -8, boxShadow: '0 0 0 2px #000' }} title={j.nombre}>
+                <Avatar persona={j} tamano={tamano} />
+            </div>
+        ))}
+    </div>
+);
+
 const Vidas = ({ vidas, max = 3 }) => (
     <div className="flex items-center gap-1">
         {Array.from({ length: max }).map((_, i) => (
@@ -208,7 +224,7 @@ const Pregunta = ({ enCurso, onContestar, resultado, enviando }) => {
 };
 
 /** Una partida abierta. */
-const Partida = ({ id, onVolver, avisar }) => {
+const Partida = ({ id, onVolver, avisar, onInvitar }) => {
     const { data: partida, mutate } = useSWR(`/sabelotodo/${id}`, fetcher, {
         // Mientras le toca al otro se pregunta cada pocos segundos
         refreshInterval: (d) => (d && d.estado === 'activa' && !d.meToca) || d?.estado === 'invitacion' ? 6000 : 0
@@ -250,6 +266,13 @@ const Partida = ({ id, onVolver, avisar }) => {
         } finally { setCargando(false); }
     };
 
+    const empezar = async () => {
+        try {
+            const r = await api.post(`/sabelotodo/${id}/empezar`);
+            mutate(r.data, false); refrescarTodo();
+        } catch (e) { avisar(e.response?.data?.message || 'No se pudo empezar', 'error'); }
+    };
+
     const responder = async (respuesta) => {
         try {
             const r = await api.post(`/sabelotodo/${id}/responder`, { respuesta });
@@ -276,7 +299,7 @@ const Partida = ({ id, onVolver, avisar }) => {
         <div className="animate-in fade-in">
             {confirmarSalir && (
                 <ConfirmDialog
-                    message="¿Dejar la partida? Se termina para los dos y nadie cobra."
+                    message={p.estado === 'invitacion' ? (p.soyCreador ? '¿Cancelar la partida? Se avisa a nadie: simplemente no empieza.' : '¿Salirte del equipo antes de empezar?') : (p.jugadores.length > 2 ? '¿Dejar la partida? Los demás siguen sin ti y tú no cobras.' : '¿Dejar la partida? Se termina para los dos y nadie cobra.')}
                     confirmLabel="Dejarla"
                     onCancel={() => setConfirmarSalir(false)}
                     onConfirm={() => { setConfirmarSalir(false); abandonar(); }}
@@ -285,14 +308,9 @@ const Partida = ({ id, onVolver, avisar }) => {
 
             <div className="flex items-center gap-3 mb-4">
                 <button onClick={onVolver} aria-label="Volver" className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-2xl text-zinc-400 active:scale-95 shrink-0"><ChevronLeft size={18} /></button>
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <Avatar persona={p.yo} tamano={36} />
-                    <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest not-italic">y</span>
-                    <Avatar persona={otro} tamano={36} />
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-black text-white truncate not-italic">{otro?.nombre || 'Esperando…'}</p>
-                        <p className="text-[10px] text-zinc-500 font-bold not-italic">{p.coronas.length} de 6 coronas</p>
-                    </div>
+                <div className="flex-1 min-w-0">
+                    <Equipo jugadores={p.jugadores} pendientes={p.pendientes} />
+                    <p className="text-[10px] text-zinc-500 font-bold not-italic mt-1.5">{p.coronas.length} de 6 coronas · {p.jugadores.length + (p.pendientes?.length || 0)} en el equipo</p>
                 </div>
                 <Vidas vidas={p.vidas} max={p.vidasMax} />
             </div>
@@ -304,8 +322,8 @@ const Partida = ({ id, onVolver, avisar }) => {
             {/* ── LO QUE TOCA ─────────────────────────────────────────── */}
             {p.estado === 'invitacion' && p.soyInvitado && (
                 <div className="rounded-3xl border p-5 text-center" style={{ borderColor: ACENTO + '55', background: ACENTO + '14' }}>
-                    <p className="text-sm font-black text-white not-italic">{otro?.nombre || 'Alguien'} te invita a jugar en pareja</p>
-                    <p className="text-[11px] text-zinc-400 mt-1">Seis coronas, tres vidas, los dos juntos. Os turnáis.</p>
+                    <p className="text-sm font-black text-white not-italic">{p.jugadores[0]?.nombre || 'Alguien'} te invita a su equipo</p>
+                    <p className="text-[11px] text-zinc-400 mt-1">Seis coronas, tres vidas, todos juntos. Os turnáis.</p>
                     <div className="flex gap-2 mt-4">
                         <button onClick={() => responder('rechazar')} className="flex-1 h-12 rounded-2xl bg-zinc-900 border border-white/10 text-zinc-300 font-black text-[12px] uppercase tracking-widest">Paso</button>
                         <button onClick={() => responder('aceptar')} className="flex-1 h-12 rounded-2xl text-white font-black text-[12px] uppercase tracking-widest" style={{ background: ACENTO }}>Jugar</button>
@@ -314,11 +332,43 @@ const Partida = ({ id, onVolver, avisar }) => {
             )}
 
             {p.estado === 'invitacion' && !p.soyInvitado && (
-                <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-6 text-center">
-                    <Loader2 size={22} className="animate-spin mx-auto" style={{ color: ACENTO }} />
-                    <p className="text-sm font-black text-white mt-3 not-italic">Esperando a que acepte</p>
-                    <p className="text-[11px] text-zinc-500 mt-1">Le ha llegado un aviso. En cuanto entre, empezáis.</p>
-                    <button onClick={() => setConfirmarSalir(true)} className="mt-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">Cancelar la invitación</button>
+                <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-5">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.18em] mb-3 not-italic">El equipo</p>
+                    <div className="space-y-2">
+                        {p.jugadores.map(j => (
+                            <div key={j._id} className="flex items-center gap-3">
+                                <Avatar persona={j} tamano={32} />
+                                <span className="flex-1 text-[13px] font-black text-white truncate not-italic">{j.soyYo ? 'Tú' : j.nombre}</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-green-400 flex items-center gap-1"><Check size={11} /> Dentro</span>
+                            </div>
+                        ))}
+                        {p.pendientes.map(j => (
+                            <div key={j._id} className="flex items-center gap-3 opacity-70">
+                                <Avatar persona={j} tamano={32} />
+                                <span className="flex-1 text-[13px] font-bold text-zinc-300 truncate not-italic">{j.nombre}</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Sin contestar</span>
+                            </div>
+                        ))}
+                    </div>
+                    {p.soyCreador ? (
+                        <>
+                            <p className="text-[11px] text-zinc-500 mt-4 text-center">
+                                {p.jugadores.length < 2 ? 'En cuanto acepte alguien podréis empezar.' : 'Puedes empezar ya o esperar a los que faltan. Cuando conteste el último, arranca sola.'}
+                            </p>
+                            <div className="flex gap-2 mt-3">
+                                {p.puedeInvitar && (
+                                    <button onClick={() => onInvitar?.(p)} className="flex-1 h-12 rounded-2xl bg-zinc-900 border border-white/10 text-zinc-200 font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-1.5"><UserPlus size={14} /> Invitar</button>
+                                )}
+                                <button onClick={empezar} disabled={!p.puedeEmpezar} className="flex-1 h-12 rounded-2xl text-white font-black text-[11px] uppercase tracking-widest disabled:opacity-40" style={{ background: ACENTO }}>Empezar</button>
+                            </div>
+                            <button onClick={() => setConfirmarSalir(true)} className="mt-4 w-full text-[10px] font-black uppercase tracking-widest text-zinc-500">Cancelar la partida</button>
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-[11px] text-zinc-500 mt-4 text-center">Empieza cuando {p.jugadores[0]?.nombre} lo diga o cuando conteste el último.</p>
+                            <button onClick={() => setConfirmarSalir(true)} className="mt-3 w-full text-[10px] font-black uppercase tracking-widest text-zinc-500">Salirme</button>
+                        </>
+                    )}
                 </div>
             )}
 
@@ -339,7 +389,7 @@ const Partida = ({ id, onVolver, avisar }) => {
             )}
 
             {enJuego && !p.meToca && (
-                <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-6 text-center">
+                <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-6 text-center flex flex-col items-center">
                     <Avatar persona={otro} tamano={56} />
                     <p className="text-sm font-black text-white mt-3 not-italic">Le toca a {otro?.nombre}</p>
                     <p className="text-[11px] text-zinc-500 mt-1">
@@ -413,9 +463,9 @@ const FilaPartida = ({ p, onAbrir }) => {
     return (
         <button onClick={onAbrir} className="w-full text-left rounded-3xl border p-4 bg-[#0a0a0c] active:scale-[0.99] transition-transform" style={{ borderColor: pide ? color + '66' : 'rgba(255,255,255,0.07)' }}>
             <div className="flex items-center gap-3">
-                <Avatar persona={otro || { nombre: '?' }} tamano={42} />
+                <Equipo jugadores={p.jugadores || []} pendientes={p.pendientes || []} tamano={36} />
                 <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-black text-white truncate not-italic">{otro?.nombre || 'Sin compañero'}</p>
+                    <p className="text-[14px] font-black text-white truncate not-italic">{(p.jugadores || []).filter(j => !j.soyYo).concat(p.pendientes || []).map(j => j.nombre).join(', ') || 'Sin compañeros'}</p>
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] mt-0.5 not-italic" style={{ color }}>{estado}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -432,7 +482,9 @@ const FilaPartida = ({ p, onAbrir }) => {
 export default function Sabelotodo() {
     const [toast, setToast] = useState(null);
     const [abierta, setAbierta] = useState(null);
+    // `eligiendo`: false, 'nueva' (varios amigos) o la partida a la que se invita uno mas
     const [eligiendo, setEligiendo] = useState(false);
+    const [marcados, setMarcados] = useState([]);
     const [creando, setCreando] = useState(null);
 
     const { data: partidas, mutate } = useSWR('/sabelotodo', fetcher, { refreshInterval: 15000 });
@@ -445,20 +497,32 @@ export default function Sabelotodo() {
     const vivasCon = new Set();
     (partidas || []).forEach(p => {
         if (!['invitacion', 'activa'].includes(p.estado)) return;
-        if (p.companero?._id) vivasCon.add(p.companero._id);
+        (p.jugadores || []).forEach(j => { if (!j.soyYo) vivasCon.add(j._id); });
+        (p.pendientes || []).forEach(j => vivasCon.add(j._id));
     });
 
-    const crear = async (amigo) => {
-        if (creando) return;
-        setCreando(amigo._id);
+    const abrirSelector = (modo) => { setMarcados([]); setEligiendo(modo); };
+    const alternar = (id) => setMarcados(m => m.includes(id) ? m.filter(x => x !== id) : (m.length >= 3 ? m : [...m, id]));
+
+    const confirmar = async () => {
+        if (creando || marcados.length === 0) return;
+        setCreando(true);
         try {
-            const r = await api.post('/sabelotodo', { amigoId: amigo._id });
-            await mutate();
-            setEligiendo(false);
-            setAbierta(r.data._id);
-            avisar(`Invitación enviada a ${amigo.username}`);
+            if (eligiendo === 'nueva') {
+                const r = await api.post('/sabelotodo', { amigosIds: marcados });
+                await mutate();
+                setEligiendo(false);
+                setAbierta(r.data._id);
+                avisar(marcados.length === 1 ? 'Invitación enviada' : `${marcados.length} invitaciones enviadas`);
+            } else {
+                await api.post(`/sabelotodo/${eligiendo._id}/invitar`, { amigoId: marcados[0] });
+                mutarGlobal(`/sabelotodo/${eligiendo._id}`);
+                await mutate();
+                setEligiendo(false);
+                avisar('Invitación enviada');
+            }
         } catch (e) {
-            avisar(e.response?.data?.message || 'No se pudo crear la partida', 'error');
+            avisar(e.response?.data?.message || 'No se pudo invitar', 'error');
         } finally { setCreando(null); }
     };
 
@@ -478,7 +542,7 @@ export default function Sabelotodo() {
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {abierta ? (
-                <Partida id={abierta} onVolver={() => { setAbierta(null); mutate(); }} avisar={avisar} />
+                <Partida id={abierta} onVolver={() => { setAbierta(null); mutate(); }} avisar={avisar} onInvitar={(p) => abrirSelector(p)} />
             ) : (
                 <>
                     <div className="flex items-center gap-3 mb-5">
@@ -487,38 +551,45 @@ export default function Sabelotodo() {
                             <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] leading-none not-italic">En pareja</p>
                             <h1 className="mt-1.5 text-[24px] font-black text-white uppercase tracking-[-0.04em] leading-none not-italic">Sabelotodo</h1>
                         </div>
-                        <button onClick={() => setEligiendo(true)} className="h-11 px-4 rounded-2xl text-white font-black text-[11px] uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-transform not-italic" style={{ background: ACENTO }}>
+                        <button onClick={() => abrirSelector('nueva')} className="h-11 px-4 rounded-2xl text-white font-black text-[11px] uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-transform not-italic" style={{ background: ACENTO }}>
                             <Plus size={15} /> Nueva
                         </button>
                     </div>
 
                     <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-4 mb-5">
                         <p className="text-[12px] text-zinc-300 leading-snug">
-                            Tú y un amigo, <span className="text-white font-black">en el mismo bando</span>. Os turnáis: ruleta, pregunta, y si aciertas te quedas la corona. Fallar quita una vida al equipo. <span className="text-white font-black">Seis coronas</span> y ganáis los dos; <span className="text-white font-black">tres fallos</span> y perdéis los dos.
+                            De dos a cuatro, <span className="text-white font-black">en el mismo bando</span>. Os turnáis: ruleta, pregunta, y si aciertas te quedas la corona. Fallar quita una vida al equipo. <span className="text-white font-black">Seis coronas</span> y ganáis todos; <span className="text-white font-black">tres fallos</span> y perdéis todos.
                         </p>
                         <div className="mt-3"><Coronas coronas={CLAVES} tamano={26} /></div>
                     </div>
 
                     {eligiendo && (
                         <div className="fixed inset-0 z-[100] bg-black/90 flex items-end sm:items-center justify-center p-4" onClick={() => setEligiendo(false)}>
-                            <div className="w-full max-w-sm bg-[#0a0a0c] border border-white/10 rounded-3xl p-5 max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-between mb-3">
-                                    <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 not-italic"><UserPlus size={16} style={{ color: ACENTO }} /> ¿Con quién?</h2>
+                            <div className="w-full max-w-sm bg-[#0a0a0c] border border-white/10 rounded-3xl p-5 max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 not-italic"><UserPlus size={16} style={{ color: ACENTO }} /> {eligiendo === 'nueva' ? '¿Con quién?' : 'Uno más'}</h2>
                                     <button onClick={() => setEligiendo(false)} className="p-2 rounded-full bg-zinc-900 text-zinc-400"><X size={14} /></button>
                                 </div>
+                                <p className="text-[11px] text-zinc-500 mb-3">{eligiendo === 'nueva' ? 'Hasta tres amigos: seréis cuatro como mucho.' : 'Elige a quién sumar al equipo.'}</p>
                                 <div className="overflow-y-auto no-scrollbar space-y-2 flex-1">
-                                    {amigos.length === 0 && <p className="text-[11px] text-zinc-500 text-center py-6">Añade amigos en la pestaña IG para poder jugar en pareja.</p>}
+                                    {amigos.length === 0 && <p className="text-[11px] text-zinc-500 text-center py-6">Añade amigos en la pestaña IG para poder jugar en equipo.</p>}
                                     {amigos.map(a => {
                                         const ocupado = vivasCon.has(a._id);
+                                        const marcado = marcados.includes(a._id);
                                         return (
-                                            <button key={a._id} disabled={ocupado || !!creando} onClick={() => crear(a)} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/[0.07] bg-black disabled:opacity-40 active:scale-[0.99]">
+                                            <button key={a._id} disabled={ocupado || !!creando} onClick={() => eligiendo === 'nueva' ? alternar(a._id) : setMarcados([a._id])} className="w-full flex items-center gap-3 p-3 rounded-2xl border bg-black disabled:opacity-40 active:scale-[0.99] transition-colors" style={{ borderColor: marcado ? ACENTO : 'rgba(255,255,255,0.07)', background: marcado ? ACENTO + '14' : '#000' }}>
                                                 <Avatar persona={{ nombre: a.username, avatar: a.avatar, frame: a.frame }} tamano={36} />
                                                 <span className="flex-1 text-left text-[13px] font-black text-white truncate not-italic">{a.username}</span>
-                                                {ocupado ? <span className="text-[9px] font-black uppercase text-zinc-500">En partida</span> : creando === a._id ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} style={{ color: ACENTO }} />}
+                                                {ocupado
+                                                    ? <span className="text-[9px] font-black uppercase text-zinc-500">En partida</span>
+                                                    : <span className="w-6 h-6 rounded-full border flex items-center justify-center" style={{ borderColor: marcado ? ACENTO : 'rgba(255,255,255,0.15)', background: marcado ? ACENTO : 'transparent' }}>{marcado && <Check size={13} className="text-white" />}</span>}
                                             </button>
                                         );
                                     })}
                                 </div>
+                                <button onClick={confirmar} disabled={marcados.length === 0 || !!creando} className="mt-3 w-full h-12 rounded-2xl text-white font-black text-[12px] uppercase tracking-widest disabled:opacity-40 flex items-center justify-center gap-2" style={{ background: ACENTO }}>
+                                    {creando ? <Loader2 size={16} className="animate-spin" /> : <><Plus size={15} /> {eligiendo === 'nueva' ? (marcados.length <= 1 ? 'Invitar' : `Invitar a ${marcados.length}`) : 'Invitar'}</>}
+                                </button>
                             </div>
                         </div>
                     )}

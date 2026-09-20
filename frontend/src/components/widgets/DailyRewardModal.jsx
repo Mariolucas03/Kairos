@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Zap, Heart, Loader2, Package, Check, Flame } from '../../iconos';
 
@@ -32,13 +32,6 @@ const IconoPremio = ({ tipo, tamano = 22, color }) => {
 };
 
 export default function DailyRewardModal({ camino, premioRecogido, onClose, onClaim, claiming = false }) {
-    const hoyRef = useRef(null);
-
-    // El de hoy, al centro, nada mas abrir.
-    useEffect(() => {
-        hoyRef.current?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
-    }, [camino?.dia]);
-
     // El confeti solo al recoger, y la libreria se carga aqui: quien no abre
     // esta ventana no se la descarga.
     useEffect(() => {
@@ -61,11 +54,12 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
     const tramo = camino?.camino || [];
     const hoy = camino?.hoy;
 
-    const estadoDe = (d) => {
-        if (d < dia) return 'hecho';
-        if (d === dia) return cobradoHoy ? 'hecho-hoy' : 'hoy';
-        return 'futuro';
-    };
+    // Lo que se enseña: la racha visible, el color del premio de hoy, los
+    // siete dias a partir de hoy y el proximo hito con cofre.
+    const rachaVisible = cobradoHoy ? dia : Math.max(0, dia - 1);
+    const hoyColor = COLOR[hoy?.tipo] || ACENTO;
+    const proximos = tramo.filter(p => p.dia >= dia).slice(0, 7);
+    const proximoHito = tramo.find(p => p.dia > dia && p.hito) || null;
 
     return createPortal(
         <div
@@ -81,98 +75,86 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
                     <X size={18} />
                 </button>
 
-                {/* LA CABECERA: la racha, en grande */}
-                <div className="px-6 pt-6 pb-2 relative z-10">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] not-italic" style={{ color: ACENTO }}>Tu racha</p>
-                    <div className="flex items-end gap-3 mt-1">
-                        <div className="flex items-center gap-2">
-                            <Flame size={30} color={ACENTO} fill={ACENTO} />
-                            <span className="text-5xl font-black text-white tracking-[-0.05em] leading-none not-italic tabular-nums">{cobradoHoy ? dia : Math.max(0, dia - 1)}</span>
-                        </div>
-                        <span className="text-[12px] font-black text-zinc-500 uppercase tracking-wider pb-1 not-italic">
-                            {(cobradoHoy ? dia : dia - 1) === 1 ? 'día seguido' : 'días seguidos'}
-                        </span>
+                {/* ARRIBA: la racha, pequeña, y el cierre */}
+                <div className="px-5 pt-5 flex items-center gap-2 relative z-10">
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] not-italic" style={{ background: ACENTO + '1f', color: ACENTO }}>
+                        <Flame size={13} fill={ACENTO} /> {rachaVisible} {rachaVisible === 1 ? 'día' : 'días'} seguidos
+                    </span>
+                </div>
+
+                {/* EL PREMIO DE HOY, en el centro */}
+                <div className="px-5 pt-5 pb-4 flex flex-col items-center text-center relative z-10">
+                    <div
+                        className="w-24 h-24 rounded-full flex items-center justify-center border-2"
+                        style={{ background: (hoyColor) + '1a', borderColor: cobradoHoy ? ACENTO : hoyColor, boxShadow: cobradoHoy ? 'none' : `0 0 40px ${hoyColor}44` }}
+                    >
+                        {cobradoHoy || premioRecogido
+                            ? <Check size={44} color={ACENTO} strokeWidth={3} />
+                            : <IconoPremio tipo={hoy?.tipo} tamano={44} color={hoyColor} />}
                     </div>
-                    <p className="text-[12px] text-zinc-400 mt-2 font-medium">
-                        {cobradoHoy
-                            ? `Día ${dia} recogido. Mañana, el ${dia + 1}.`
-                            : dia === 1
-                                ? 'Hoy empieza el camino. Cada día que entres, un premio distinto.'
-                                : `Hoy es el día ${dia}. Si un día no entras, vuelves al 1.`}
+                    <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500 not-italic">Día {dia}</p>
+                    <p className="mt-1 text-[26px] font-black text-white leading-none not-italic">
+                        {premioRecogido ? premioRecogido.etiqueta : hoy?.etiqueta || '—'}
+                    </p>
+                    <p className="mt-2 text-[12px] text-zinc-400 font-medium max-w-[260px]">
+                        {premioRecogido
+                            ? (premioRecogido.tipo === 'cofre' ? 'Ya está en tu mochila, en la tienda. Ábrelo cuando quieras.' : 'Recogido. Mañana te espera el siguiente.')
+                            : cobradoHoy
+                                ? `Ya lo tienes. Mañana toca el día ${dia + 1}.`
+                                : dia === 1
+                                    ? 'Hoy empieza. Cada día que entres, un premio distinto; si fallas uno, vuelves al 1.'
+                                    : 'Si un día no entras, vuelves al 1.'}
                     </p>
                 </div>
 
-                {/* EL CAMINO */}
-                <div className="relative z-10 mt-3 overflow-x-auto no-scrollbar" style={{ scrollSnapType: 'x proximity' }}>
-                    <div className="flex items-center gap-0 px-6 py-5 min-w-max">
-                        {tramo.map((p, i) => {
-                            const estado = estadoDe(p.dia);
-                            const esHoy = estado === 'hoy' || estado === 'hecho-hoy';
-                            const hecho = estado === 'hecho' || estado === 'hecho-hoy';
+                {/* LA SEMANA QUE VIENE: siete casillas, la de hoy primero */}
+                <div className="px-5 pb-4 relative z-10">
+                    <div className="grid grid-cols-7 gap-1.5">
+                        {proximos.map(p => {
+                            const esHoy = p.dia === dia;
                             const color = COLOR[p.tipo] || ACENTO;
-                            // Cada dia es una FICHA: una tarjeta vertical con el
-                            // dia arriba, el premio en medio y lo que da abajo,
-                            // todo dentro. La de hoy, mas grande y encendida.
-                            const ancho = esHoy ? 78 : 64;
-                            const alto = esHoy ? 96 : 84;
-                            const bordeColor = hecho ? ACENTO : esHoy ? color : p.hito ? `${COLOR.cofre}88` : 'rgba(255,255,255,0.09)';
+                            const hecho = esHoy && cobradoHoy;
                             return (
-                                <div key={p.dia} className="flex items-center" ref={esHoy ? hoyRef : undefined} style={{ scrollSnapAlign: esHoy ? 'center' : 'none' }}>
+                                <div key={p.dia} className="flex flex-col items-center gap-1">
                                     <div
-                                        className={`relative rounded-2xl flex flex-col items-center justify-between py-2 px-1 transition-all ${esHoy && !cobradoHoy ? 'animate-pulse' : ''}`}
+                                        className="w-full aspect-square rounded-xl flex items-center justify-center border relative"
                                         style={{
-                                            width: ancho, height: alto,
-                                            background: hecho ? `${ACENTO}` : esHoy ? '#18181b' : '#0f0f12',
-                                            border: `${esHoy ? 2 : 1.5}px solid ${bordeColor}`,
-                                            boxShadow: esHoy ? `0 0 26px ${color}55` : hecho ? `0 0 12px ${ACENTO}44` : 'none',
-                                            opacity: estado === 'futuro' && !p.hito ? 0.6 : 1
+                                            background: hecho ? ACENTO : esHoy ? color + '26' : p.hito ? COLOR.cofre + '14' : '#0f0f12',
+                                            borderColor: esHoy ? (hecho ? ACENTO : color) : p.hito ? COLOR.cofre + '66' : 'rgba(255,255,255,0.08)'
                                         }}
                                     >
-                                        <span className={`text-[9px] font-black uppercase tracking-wider not-italic ${hecho ? 'text-black/70' : esHoy ? 'text-white' : 'text-zinc-500'}`}>
-                                            {esHoy ? 'Hoy' : `Día ${p.dia}`}
-                                        </span>
-                                        {hecho
-                                            ? <Check size={esHoy ? 30 : 24} color="#fff" strokeWidth={3} />
-                                            : <IconoPremio tipo={p.tipo} tamano={esHoy ? 28 : 22} color={color} />}
-                                        <span className={`text-[9px] font-black text-center leading-[1.1] not-italic line-clamp-2 w-full ${hecho ? 'text-black/80' : 'text-zinc-500'}`} style={{ color: !hecho && esHoy ? color : undefined }}>
-                                            {p.etiqueta}
-                                        </span>
-                                        {p.hito && !hecho && (
-                                            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black" style={{ background: COLOR.cofre }}>★</span>
-                                        )}
+                                        {hecho ? <Check size={16} color="#fff" strokeWidth={3} /> : <IconoPremio tipo={p.tipo} tamano={p.hito ? 20 : 17} color={color} />}
                                     </div>
-                                    {i < tramo.length - 1 && (
-                                        <div className="h-[3px] w-3 rounded-full" style={{ background: p.dia < dia || (p.dia === dia && cobradoHoy) ? ACENTO : 'rgba(255,255,255,0.08)' }} />
-                                    )}
+                                    <span className={`text-[9px] font-black tabular-nums not-italic ${esHoy ? 'text-white' : p.hito ? 'text-yellow-500' : 'text-zinc-500'}`}>{p.dia}</span>
                                 </div>
                             );
                         })}
                     </div>
+                    {proximoHito && (
+                        <p className="mt-2 text-center text-[10px] text-zinc-500 font-bold not-italic">
+                            Día {proximoHito.dia}: <span className="text-yellow-500">{proximoHito.etiqueta}</span>
+                        </p>
+                    )}
                 </div>
 
-                {/* LO DE HOY, Y EL BOTON */}
-                <div className="px-6 pb-6 pt-1 relative z-10">
+                {/* EL BOTON */}
+                <div className="px-5 pb-5 relative z-10">
                     {premioRecogido ? (
-                        <div className="rounded-2xl border px-4 py-3 text-center animate-in zoom-in-95" style={{ borderColor: `${COLOR[premioRecogido.tipo] || ACENTO}55`, background: `${COLOR[premioRecogido.tipo] || ACENTO}14` }}>
-                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400 not-italic">Recogido</p>
-                            <div className="flex items-center justify-center gap-2 mt-1">
-                                <IconoPremio tipo={premioRecogido.tipo} tamano={22} color={COLOR[premioRecogido.tipo] || ACENTO} />
-                                <span className="text-xl font-black text-white not-italic">{premioRecogido.etiqueta}</span>
-                            </div>
-                            {premioRecogido.tipo === 'cofre' && <p className="text-[10px] text-zinc-500 mt-1">Está en tu mochila, en la tienda. Ábrelo cuando quieras.</p>}
-                        </div>
+                        <button onClick={onClose} className="w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-sm bg-zinc-900 border border-white/[0.07] text-zinc-200 active:scale-95 transition-transform">
+                            Listo
+                        </button>
                     ) : hoy && !cobradoHoy ? (
                         <button
                             onClick={onClaim}
                             disabled={claiming}
-                            className="w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-sm text-black active:scale-95 transition-transform border-b-4 flex items-center justify-center gap-2 disabled:opacity-60"
-                            style={{ background: ACENTO, borderColor: '#9a3412' }}
+                            className="w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-sm text-black active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
+                            style={{ background: ACENTO }}
                         >
-                            {claiming ? <Loader2 className="animate-spin" size={18} /> : <>Recoger · {hoy.etiqueta}</>}
+                            {claiming ? <Loader2 className="animate-spin" size={18} /> : 'Recoger'}
                         </button>
                     ) : (
                         <button onClick={onClose} className="w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-sm bg-zinc-900 border border-white/[0.07] text-zinc-300 active:scale-95 transition-transform">
-                            Mañana, el día {dia + 1}
+                            Hasta mañana
                         </button>
                     )}
                 </div>
