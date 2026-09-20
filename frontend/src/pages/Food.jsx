@@ -281,7 +281,6 @@ export default function Food() {
             <div className="px-4">
                 <div className="relative bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-[18px] overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${acentoComida}, transparent)` }} />
-                    <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo opacity-[0.11] pointer-events-none" style={{ background: acentoComida }} />
 
                     <div className="relative z-10 flex items-center gap-[18px]">
 
@@ -359,7 +358,6 @@ export default function Food() {
                             {!vacia && (
                                 <>
                                     <div className="absolute top-0 left-0 w-full h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${tono}, transparent)` }} />
-                                    <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo opacity-[0.11] pointer-events-none" style={{ background: tono }} />
                                 </>
                             )}
 

@@ -17,7 +17,6 @@ export default function WidgetCard({
     onClick,
     className = '',
     padding = 'p-4',
-    glow = true,
     children
 }) {
     return (
@@ -36,13 +35,6 @@ export default function WidgetCard({
                 style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }}
             />
 
-            {/* Halo */}
-            {glow && (
-                <div
-                    className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
-                    style={{ background: accent, opacity: 0.11 }}
-                />
-            )}
 
             {(label || labelRight) && (
                 <div className="relative z-10 flex items-baseline justify-between gap-2">

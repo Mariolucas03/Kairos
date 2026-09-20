@@ -220,7 +220,6 @@ function MissionCard({ mission, onUpdateProgress, onRequestDelete, currentUserId
 
                 <div className="p-4 relative overflow-hidden h-full flex flex-col justify-between">
                     {/* Halo suave del color, muy tenue */}
-                    {!mission.completed && <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none opacity-[0.11]" style={{ backgroundColor: styles.accent }} />}
                     <div className="relative z-10">
                         {/* Título a todo el ancho. Antes tenía un `pr-20` para
                             dejar hueco a los chips que iban flotando encima; sin

@@ -221,7 +221,6 @@ export default function Shop() {
                 {activeTab === 'shop' && !selectedCategory && (
                     <div onClick={() => setShowExchange(true)} className="mb-5 relative overflow-hidden bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-5 flex items-center justify-between cursor-pointer active:scale-[0.985] transition-all">
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
-                        <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
                         <div className="flex items-center gap-4 relative z-10">
                             <div className="w-12 h-12 rounded-2xl bg-[#18181b] border border-white/[0.07] flex items-center justify-center" style={{ color: ACENTO_FICHAS }}>
                                 <ArrowRightLeft size={22} />
@@ -305,13 +304,6 @@ export default function Shop() {
                                                 style={{ background: `linear-gradient(90deg, ${rarity.accent}, transparent)` }}
                                             />
 
-                                            {/* Halo suave del mismo color, al 11% como el resto */}
-                                            {item.rarity && item.rarity !== 'comun' && (
-                                                <div
-                                                    className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
-                                                    style={{ background: rarity.accent, opacity: 0.11 }}
-                                                />
-                                            )}
 
                                             <div className="h-14 w-14 mb-2 flex items-center justify-center relative z-10">
                                                 {(item.icon?.startsWith('/') || item.icon?.startsWith('http')) ?
@@ -368,10 +360,6 @@ export default function Shop() {
                         <div
                             className="absolute inset-x-0 top-0 h-[2px] pointer-events-none"
                             style={{ background: `linear-gradient(90deg, ${rarezaSel.accent}, transparent)` }}
-                        />
-                        <div
-                            className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
-                            style={{ background: rarezaSel.accent, opacity: 0.11 }}
                         />
 
                         <button onClick={() => setSelectedItem(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-zinc-900 p-2 rounded-full transition-colors border border-zinc-800 z-20"><X size={20} /></button>
@@ -475,7 +463,6 @@ export default function Shop() {
                         {/* Acento y halo de la casa de cambio: morado, el color de
                             las fichas, que es lo que entregas aquí. */}
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />
-                        <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none" style={{ background: ACENTO_FICHAS, opacity: 0.11 }} />
 
                         <div className="flex justify-between items-center mb-7 relative z-10">
                             <h3 className="text-[20px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Casa de cambio</h3>

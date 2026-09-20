@@ -102,7 +102,6 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
 
             {/* Decoración Fondo */}
             <div className="absolute top-0 left-0 w-full h-[2px]" style={{ background: 'linear-gradient(90deg, #eab308, transparent)' }}></div>
-            <div className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none" style={{ background: '#eab308', opacity: 0.11 }}></div>
 
             {/* HEADER CON BOTÓN X DENTRO */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-20 shrink-0">

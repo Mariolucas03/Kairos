@@ -24,7 +24,6 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
 
     const headerCard = (
         <>
-            <div className="absolute top-0 right-0 p-12 opacity-5 bg-white halo w-60 h-60 -mr-10 -mt-10 pointer-events-none"></div>
             <div className="flex justify-between items-center mb-3 relative z-10">
                 <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-xl border border-white/10 ${config.color} bg-white/5`}><EventIcon size={24} /></div>

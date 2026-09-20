@@ -25,10 +25,6 @@ export default function RankUpModal({ subidas = [], monedas = 0, onClose }) {
                     className="absolute inset-x-0 top-0 h-[2px] pointer-events-none"
                     style={{ background: `linear-gradient(90deg, ${subidas[0].color}, transparent)` }}
                 />
-                <div
-                    className="absolute -right-12 -bottom-14 w-[170px] h-[170px] halo pointer-events-none"
-                    style={{ background: subidas[0].color, opacity: 0.11 }}
-                />
 
                 <button
                     onClick={onClose}

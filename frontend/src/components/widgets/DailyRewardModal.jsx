@@ -76,7 +76,6 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
 
             <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl shadow-2xl overflow-hidden animate-in zoom-in-95">
                 <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${ACENTO}, transparent)` }} />
-                <div className="absolute -right-10 -top-10 w-48 h-48 halo pointer-events-none" style={{ background: ACENTO, opacity: 0.12 }} />
 
                 <button onClick={onClose} aria-label="Cerrar" className="absolute top-4 right-4 z-20 bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white border border-white/[0.07]">
                     <X size={18} />

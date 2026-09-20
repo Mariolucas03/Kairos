@@ -157,7 +157,6 @@ export default function Profile() {
 
         return (
             <div className="bg-[#0a0a0c] border border-white/[0.07] p-5 rounded-3xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-12 opacity-5 bg-yellow-500 halo w-40 h-40 -mr-10 -mt-10 pointer-events-none"></div>
                 <div className="flex justify-between items-center mb-4 relative z-10">
                     <button onClick={() => setCalendarViewDate(new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1))} className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><ChevronLeft size={16} /></button>
                     <span className="text-white font-black uppercase tracking-wider text-sm">{monthNames[calendarViewDate.getMonth()]} {calendarViewDate.getFullYear()}</span>
