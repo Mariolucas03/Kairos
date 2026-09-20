@@ -32,16 +32,20 @@ body {
 
 /* --- ÁREAS SEGURAS (AJUSTE AGRESIVO MANUAL) --- */
 
-/* HEADER: Forzamos 50px. Esto baja el header para que NO toque la hora/batería. */
+/* HEADER. Antes eran 50px fijos "para no tocar la hora y la bateria": hacian
+   falta porque la barra de estado del iPhone se pintaba ENCIMA de la pagina
+   (status-bar-style translucida). Ahora la barra es opaca y va fuera de la
+   pagina, asi que env(safe-area-inset-top) es 0 y solo hace falta un poco
+   de aire. Si algun dia vuelve a haber solape, --sat lo trae. */
 .safe-top {
-    padding-top: max(50px, var(--sat)) !important;
+    padding-top: calc(var(--sat) + 10px) !important;
 }
 
 /* PÁGINAS SIN HEADER GLOBAL (ajustes, perfil propio y de otros):
    como no tienen la barra fija encima, su contenido empezaba pegado a la hora
    y la batería. Este padding las baja igual que baja el header. */
 .pt-safe-page {
-    padding-top: max(58px, calc(var(--sat) + 12px)) !important;
+    padding-top: calc(var(--sat) + 18px) !important;
 }
 
 /* FOOTER: Forzamos 15px (muy poco). Esto PEGA los iconos abajo, eliminando el hueco negro grande. */

@@ -12,7 +12,12 @@
     <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
 
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- ⚠️ "black", no "black-translucent". Con la translucida, la barra de
+         estado del iPhone se pinta ENCIMA del contenido, y desde iOS 26 (el
+         cristal liquido) lo hace con un desenfoque: la cabecera entera se
+         veia borrosa. Con "black" la barra es negra, opaca y va fuera de la
+         pagina: el contenido empieza debajo y no se toca. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Kairos">
     <meta name="theme-color" content="#000000" />
 </head>
