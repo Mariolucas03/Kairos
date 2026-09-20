@@ -99,11 +99,11 @@ export default function Header() {
                             )}
                         </div>
                         <MarcoPerfil marco={userFrame} tamano={68} desborde={10} className="sm:!w-[80px] sm:!h-[80px] sm:!-top-3 sm:!-left-3" />
-                        {userPet && <img src={userPet} className="absolute -bottom-1 -right-2 w-6 h-6 sm:w-7 sm:h-7 object-contain z-30 drop-shadow-md filter" />}
+                        {userPet && <img src={userPet} className="absolute -bottom-1 -right-2 w-6 h-6 sm:w-7 sm:h-7 object-contain z-30" />}
                     </Link>
 
                     <div className="flex flex-col justify-center w-full max-w-[140px] sm:max-w-[220px]">
-                        <span className="text-[9px] sm:text-[10px] text-gold-500/80 font-bold tracking-[0.16em] mb-0.5 truncate uppercase not-italic">
+                        <span className="text-[9px] sm:text-[10px] text-gold-500 font-bold tracking-[0.16em] mb-0.5 truncate uppercase not-italic">
                             {userTitle}
                         </span>
                         <div className="flex items-center gap-2 mb-1 overflow-hidden">
@@ -128,9 +128,7 @@ export default function Header() {
 
                 {/* 2. DERECHA: SALUD + ECONOMÍA */}
                 <div className="flex items-center gap-4 shrink-0">
-                    <div className="scale-90 sm:scale-100 origin-right">
-                        <HealthWidget user={user} setUser={setUser} />
-                    </div>
+                    <HealthWidget user={user} setUser={setUser} />
 
                     {/* Monedas y fichas: son CONTADORES, no botones.
                         - Ya no navegan (tocar tu saldo te metía de golpe en la
@@ -139,26 +137,18 @@ export default function Header() {
                           que con 790 monedas y 49.690 fichas las dos cajas medían
                           distinto y quedaban desalineadas una encima de otra. */}
                     <div className="flex flex-col gap-1.5 items-end">
-                        <div className="relative flex items-center bg-zinc-900/90 border border-gold-500/30 rounded-lg h-6 w-[78px] px-2 shadow-md overflow-hidden">
-                            <span className={`relative z-10 text-gold-400 font-black w-full text-right pr-5 ${getFontSize(coins)}`}>
+                        <div className="flex items-center gap-1 bg-zinc-900 border border-gold-500/30 rounded-lg h-6 w-[78px] pl-2 pr-1">
+                            <span className={`text-gold-400 font-black flex-1 text-right ${getFontSize(coins)}`}>
                                 {coins > 99999 ? (coins / 1000).toFixed(0) + 'k' : coins.toLocaleString()}
                             </span>
-                            <img
-                                src={ICON_COINS}
-                                alt="Monedas"
-                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain"
-                            />
+                            <img src={ICON_COINS} alt="Monedas" className="w-4 h-4 object-contain shrink-0" />
                         </div>
 
-                        <div className="relative flex items-center bg-zinc-900/90 border border-purple-500/30 rounded-lg h-6 w-[78px] px-2 shadow-md overflow-hidden">
-                            <span className={`relative z-10 text-purple-300 font-black w-full text-right pr-5 ${getFontSize(gameCoins)}`}>
+                        <div className="flex items-center gap-1 bg-zinc-900 border border-purple-500/30 rounded-lg h-6 w-[78px] pl-2 pr-1">
+                            <span className={`text-purple-300 font-black flex-1 text-right ${getFontSize(gameCoins)}`}>
                                 {gameCoins > 99999 ? (gameCoins / 1000).toFixed(0) + 'k' : gameCoins.toLocaleString()}
                             </span>
-                            <img
-                                src={ICON_CHIPS}
-                                alt="Fichas"
-                                className="absolute right-1 top-1/2 transform -translate-y-1/2 w-4 h-4 object-contain"
-                            />
+                            <img src={ICON_CHIPS} alt="Fichas" className="w-4 h-4 object-contain shrink-0" />
                         </div>
                     </div>
                 </div>

@@ -46,7 +46,7 @@ export default function MarcoPerfil({ marco, tamano = 52, desborde = 6, classNam
     };
 
     if (esImagen(marco)) {
-        return <img src={marco} alt="" style={comun} className={`drop-shadow-md ${className}`} />;
+        return <img src={marco} alt="" style={comun} className={className} />;
     }
 
     // Emoji: se pinta centrado y a un tamaño que rodea la cara sin taparla. El
@@ -55,7 +55,7 @@ export default function MarcoPerfil({ marco, tamano = 52, desborde = 6, classNam
     return (
         <span
             style={{ ...comun, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: tamano * 0.95, lineHeight: 1 }}
-            className={`drop-shadow-md select-none ${className}`}
+            className={`select-none ${className}`}
             aria-hidden="true"
         >
             {marco}

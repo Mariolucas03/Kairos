@@ -73,7 +73,7 @@ export default function HealthWidget({ user, setUser }) {
             {/* --- BOTÓN DE SALUD --- */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="relative w-16 h-16 flex items-center justify-center group active:scale-95 transition-transform z-10"
+                className="relative w-14 h-14 flex items-center justify-center group active:scale-95 transition-transform z-10"
             >
                 {/* 2. Anillo SVG */}
                 <svg viewBox="0 0 70 70" className="absolute inset-0 w-full h-full rotate-[-90deg]">
@@ -95,8 +95,7 @@ export default function HealthWidget({ user, setUser }) {
                 <div className="relative z-10 flex flex-col items-center justify-center pt-2">
                     <span
                         // AÑADIDO: translate-y-[2px] para bajar el número
-                        className={`text-lg font-black leading-none tracking-tighter transition-colors duration-300 translate-y-[5px] ${statusStyle.text}`}
-                        style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                        className={`text-base font-black leading-none tracking-tighter transition-colors duration-300 mt-[5px] ${statusStyle.text}`}
                     >
                         {hp}
                     </span>
@@ -105,7 +104,7 @@ export default function HealthWidget({ user, setUser }) {
                         src={ICON_HEART}
                         alt="HP"
                         // AÑADIDO: -translate-y-[2px] para subir el corazón
-                        className={`w-7 h-7 object-contain mt-0.5 -translate-y-[2px] ${isCritical ? 'opacity-100 brightness-125 animate-pulse' : 'opacity-90'}`}
+                        className={`w-6 h-6 object-contain -mt-[1px] ${isCritical ? 'animate-pulse' : ''}`}
                     />
                 </div>
             </button>
