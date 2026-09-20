@@ -40,6 +40,18 @@ export default function Social() {
     // viven en el usuario: son partidas.
     const { data: retosCartas, mutate: recargarRetos } = useSWR('/carta-alta/invitaciones', fetcher);
     const { data: mesasPoker, mutate: recargarPoker } = useSWR('/poker/invitaciones', fetcher);
+    const { data: retosSabelotodo, mutate: recargarSabelotodo } = useSWR('/sabelotodo/invitaciones', fetcher);
+
+    const handleRespondSabelotodo = async (partidaId, respuesta) => {
+        try {
+            await api.post(`/sabelotodo/${partidaId}/responder`, { respuesta });
+            recargarSabelotodo();
+            refreshBadge();
+            if (respuesta === 'aceptar') navigate('/games/sabelotodo');
+        } catch (e) {
+            console.error('No se pudo responder al Sabelotodo', e);
+        }
+    };
 
     const handleRespondPoker = async (mesaId, respuesta) => {
         try {
@@ -334,6 +346,8 @@ export default function Social() {
                     requests={requests}
                     missionInvites={missionInvites}
                     retosCartas={retosCartas || []}
+                    retosSabelotodo={retosSabelotodo || []}
+                    onRespondSabelotodo={handleRespondSabelotodo}
                     mesasPoker={mesasPoker || []}
                     onRespondPoker={handleRespondPoker}
                     onRespondReto={handleRespondReto}

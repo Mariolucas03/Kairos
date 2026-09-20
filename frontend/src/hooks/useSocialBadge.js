@@ -28,6 +28,7 @@ export default function useSocialBadge() {
         cartas: data?.cartas || 0,
         poker: data?.poker || 0,
         clan: data?.clan || 0,
+        sabelotodo: data?.sabelotodo || 0,
         refreshBadge: mutate
     };
 }

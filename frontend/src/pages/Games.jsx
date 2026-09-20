@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords, Club, Triangle } from '../iconos';
+import { CircleDollarSign, Ticket, Disc, Spade, Zap, Dices, Building2, Lock, ArrowRight, Swords, Club, Triangle, BrainCircuit } from '../iconos';
+import useSocialBadge from '../hooks/useSocialBadge';
 import api from '../services/api';
 import WidgetCard, { WidgetBar } from '../components/common/WidgetCard';
 import { useAuthStore } from '../store/useAuthStore';
@@ -28,6 +29,11 @@ const fetcher = (url) => api.get(url).then(res => res.data);
 const MESAS = [
     { id: 'poker', name: 'Póquer', desc: "Texas Hold'em con amigos", accent: '#2f8f5b', Icon: Club },
     { id: 'carta-alta', name: 'Carta Alta', desc: 'La más alta se lo lleva', accent: '#c9822b', Icon: Swords }
+];
+
+// En el mismo bando: no se le gana a nadie, se gana con alguien
+const EN_PAREJA = [
+    { id: 'sabelotodo', name: 'Sabelotodo', desc: 'Trivial en pareja: seis coronas', accent: '#a855f7', Icon: BrainCircuit }
 ];
 
 const MAQUINAS = [
@@ -64,8 +70,8 @@ const Bombillas = ({ cuantas = 22 }) => (
  * nombre es un letrero de neon (el texto con su halo); y el cristal, un brillo
  * diagonal fijo por encima.
  */
-const TarjetaJuego = ({ id, name, desc, accent, Icon, alta = false }) => (
-    <Link to={`/games/${id}`} className="block">
+const TarjetaJuego = ({ id, name, desc, accent, Icon, alta = false, aviso = 0, ancha = false }) => (
+    <Link to={`/games/${id}`} className={`block ${ancha ? 'col-span-2' : ''}`}>
         <div
             className={`relative overflow-hidden rounded-3xl border active:scale-[0.985] transition-transform ${alta ? 'h-[150px]' : 'h-[136px]'}`}
             style={{
@@ -79,6 +85,12 @@ const TarjetaJuego = ({ id, name, desc, accent, Icon, alta = false }) => (
             {/* El icono grande, como el simbolo pintado en la maquina */}
             <Icon size={alta ? 64 : 56} className="absolute -right-2 -bottom-2 opacity-[0.10]" style={{ color: accent }} />
 
+            {/* Algo pide tu atencion dentro: te toca, o te han invitado */}
+            {aviso > 0 && (
+                <span className="absolute top-3 right-3 z-20 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center border border-black">
+                    {aviso > 9 ? '9+' : aviso}
+                </span>
+            )}
             <div className="relative z-10 h-full p-4 flex flex-col justify-between">
                 <div className="w-10 h-10 rounded-xl bg-black/60 border flex items-center justify-center" style={{ borderColor: `${accent}55`, color: accent, boxShadow: `0 0 14px ${accent}55` }}>
                     <Icon size={20} />
@@ -98,7 +110,7 @@ const TarjetaJuego = ({ id, name, desc, accent, Icon, alta = false }) => (
     </Link>
 );
 
-const Grupo = ({ titulo, pie, juegos, alta }) => (
+const Grupo = ({ titulo, pie, juegos, alta, avisos = {}, ancha = false }) => (
     <section className="mb-7">
         <div className="mb-3 flex items-baseline gap-2">
             <h2 className="text-[11px] font-black text-yellow-500/90 uppercase tracking-[0.22em] not-italic">{titulo}</h2>
@@ -106,7 +118,7 @@ const Grupo = ({ titulo, pie, juegos, alta }) => (
         </div>
         <p className="text-[10px] text-zinc-600 -mt-2 mb-3 leading-tight">{pie}</p>
         <div className="grid grid-cols-2 gap-3">
-            {juegos.map(j => <TarjetaJuego key={j.id} {...j} alta={alta} />)}
+            {juegos.map(j => <TarjetaJuego key={j.id} {...j} alta={alta} aviso={avisos[j.id] || 0} ancha={ancha} />)}
         </div>
     </section>
 );
@@ -124,6 +136,7 @@ export default function Games() {
     // arcade estaba SIEMPRE desbloqueado (la pantalla de bloqueo era inalcanzable).
     // La fuente real del progreso diario es missionStats del log del día.
     const { data: daily } = useSWR('/daily', fetcher);
+    const { sabelotodo: avisosSabelotodo } = useSocialBadge();
 
     const completedMissions = daily?.missionStats?.completed || 0;
     const totalMissions = daily?.missionStats?.total || 0;
@@ -265,6 +278,14 @@ export default function Games() {
                 pie="Hay alguien al otro lado. Lo que pierdes, lo gana él."
                 juegos={MESAS}
                 alta
+            />
+
+            <Grupo
+                titulo="En pareja"
+                pie="Los dos en el mismo bando: o ganáis juntos o perdéis juntos."
+                juegos={EN_PAREJA}
+                avisos={{ sabelotodo: avisosSabelotodo }}
+                ancha
             />
 
             <Grupo

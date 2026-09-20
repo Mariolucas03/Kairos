@@ -136,6 +136,7 @@ app.use('/api/games', gamesRoutes);
 
 // Carta Alta: partidas entre dos amigos con una baraja espanola
 app.use('/api/carta-alta', require('./routes/cartaAlta'));
+app.use('/api/sabelotodo', require('./routes/sabelotodo'));
 
 // Poquer Texas Hold'em entre amigos
 app.use('/api/poker', require('./routes/poker'));

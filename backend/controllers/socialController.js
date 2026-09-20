@@ -1048,14 +1048,17 @@ const getBadge = async (req, res) => {
         // tambien aqui, o pasa lo mismo.
         const CartaAlta = require('../models/CartaAlta');
         const Poker = require('../models/Poker');
+        const { pendientesDe } = require('./sabelotodoController');
 
-        const [actividad, clan, usuario, cartas, poker] = await Promise.all([
+        const [actividad, clan, usuario, cartas, poker, sabelotodo] = await Promise.all([
             Notification.countDocuments({ user: req.user._id, read: false, type: { $ne: 'clan' } }),
             // Los avisos del clan encienden el punto rojo de "Clan", no el del buzon
             Notification.countDocuments({ user: req.user._id, read: false, type: 'clan' }),
             User.findById(req.user._id).select('friendRequests missionRequests challengeRequests').lean(),
             CartaAlta.countDocuments({ invitados: req.user._id, estado: 'sala' }),
-            Poker.countDocuments({ invitados: req.user._id, estado: 'sala' })
+            Poker.countDocuments({ invitados: req.user._id, estado: 'sala' }),
+            // Invitaciones al Sabelotodo y partidas en las que te toca
+            pendientesDe(req.user._id)
         ]);
 
         const solicitudes = (usuario?.friendRequests || []).length;
@@ -1070,7 +1073,8 @@ const getBadge = async (req, res) => {
             cartas,
             poker,
             clan,
-            total: actividad + solicitudes + misiones + retos + cartas + poker + clan
+            sabelotodo,
+            total: actividad + solicitudes + misiones + retos + cartas + poker + clan + sabelotodo
         });
     } catch (error) {
         console.error('Error en getBadge:', error);

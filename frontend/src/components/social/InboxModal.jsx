@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, Check, Heart, MessageCircle, Swords, Club, Shield } from '../../iconos';
+import { Bell, X, Check, Heart, MessageCircle, Swords, Club, Shield, BrainCircuit } from '../../iconos';
 
 // Tiempo relativo corto para la lista de avisos
 const hace = (fecha) => {
@@ -15,13 +15,15 @@ export default function InboxModal({
     requests = [],
     missionInvites = [],
     retosCartas = [],
+    retosSabelotodo = [],
     mesasPoker = [],
     notifications = [],
     onClose,
     onRespondFriend,
     onRespondMission,
     onRespondReto,
-    onRespondPoker
+    onRespondPoker,
+    onRespondSabelotodo
 }) {
     const navigate = useNavigate();
     return (
@@ -77,6 +79,30 @@ export default function InboxModal({
                                     <div className="flex gap-2 shrink-0">
                                         <button onClick={() => onRespondReto(r._id, 'rechazar')} className="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white"><X size={14} /></button>
                                         <button onClick={() => onRespondReto(r._id, 'aceptar')} className="p-2 text-black rounded-lg" style={{ background: '#c9822b' }}><Check size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* --- SABELOTODO: alguien quiere jugar en pareja --- */}
+                    {retosSabelotodo.length > 0 && (
+                        <div>
+                            <h3 className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#a855f7' }}>
+                                Sabelotodo en pareja
+                            </h3>
+                            {retosSabelotodo.map(r => (
+                                <div key={r._id} className="p-3 rounded-2xl border flex justify-between items-center mb-2" style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.3)' }}>
+                                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                                        <BrainCircuit size={16} style={{ color: '#a855f7' }} className="shrink-0" />
+                                        <div className="min-w-0">
+                                            <p className="text-white font-bold text-sm truncate">{r.de}</p>
+                                            <p className="text-[10px]" style={{ color: '#a855f7' }}>Te invita a jugar en pareja</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
+                                        <button onClick={() => onRespondSabelotodo?.(r._id, 'rechazar')} className="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white"><X size={14} /></button>
+                                        <button onClick={() => onRespondSabelotodo?.(r._id, 'aceptar')} className="p-2 text-white rounded-lg" style={{ background: '#a855f7' }}><Check size={14} /></button>
                                     </div>
                                 </div>
                             ))}

@@ -45,6 +45,7 @@ const BlackJack = lazy(() => import('./pages/games/BlackJack'));
 const Slots = lazy(() => import('./pages/games/Slots'));
 const TowerGame = lazy(() => import('./pages/games/TowerGame'));
 const CartaAlta = lazy(() => import('./pages/games/CartaAlta'));
+const Sabelotodo = lazy(() => import('./pages/games/Sabelotodo'));
 const Poker = lazy(() => import('./pages/games/Poker'));
 const Plinko = lazy(() => import('./pages/games/Plinko'));
 
@@ -189,6 +190,7 @@ function App() {
                             <Route path="/games/slots" element={<Slots />} />
                             <Route path="/games/tower" element={<TowerGame />} />
                             <Route path="/games/carta-alta" element={<CartaAlta />} />
+                            <Route path="/games/sabelotodo" element={<Sabelotodo />} />
                             <Route path="/games/poker" element={<Poker />} />
                             <Route path="/games/plinko" element={<Plinko />} />
                         </Route>
