@@ -39,7 +39,7 @@ export default function SleepWidget({ hours = 0, onUpdate }) {
 
             {isOpen && createPortal(
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={handleSave}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+                    <div className="absolute inset-0 bg-black/95" />
 
                     <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 left-0 w-full h-1" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
@@ -73,7 +73,7 @@ export default function SleepWidget({ hours = 0, onUpdate }) {
                                     onChange={(e) => setTempHours(Number(e.target.value))}
                                     className="w-full h-2 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-[#64748b]"
                                 />
-                                <div className="flex justify-between text-xs font-bold text-zinc-600 uppercase mt-3 px-1 not-italic">
+                                <div className="flex justify-between text-xs font-bold text-zinc-500 uppercase mt-3 px-1 not-italic">
                                     <span>0H</span><span>4H</span><span>8H</span><span>12H</span>
                                 </div>
                             </div>

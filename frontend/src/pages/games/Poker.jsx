@@ -254,10 +254,10 @@ export default function Poker() {
                     <div className="bg-[#0a0a0c] border rounded-3xl p-5 mb-6 space-y-4" style={{ borderColor: ACENTO + '55' }}>
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nueva mesa</p>
-                            <button onClick={() => setCreando(false)} className="text-zinc-600 hover:text-white"><X size={16} /></button>
+                            <button onClick={() => setCreando(false)} className="text-zinc-500 hover:text-white"><X size={16} /></button>
                         </div>
                         <div>
-                            <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Ciega grande</label>
+                            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Ciega grande</label>
                             <div className="flex gap-2 mt-2">
                                 {[10, 20, 50, 100].map(v => (
                                     <button
@@ -270,7 +270,7 @@ export default function Poker() {
                                     >{v}</button>
                                 ))}
                             </div>
-                            <p className="text-[10px] text-zinc-600 mt-2">
+                            <p className="text-[10px] text-zinc-500 mt-2">
                                 Hacen falta <strong className="text-zinc-400">{ciega * 10} fichas</strong> para sentarse. Ciega pequeña: {Math.floor(ciega / 2)}.
                             </p>
                         </div>
@@ -321,7 +321,7 @@ export default function Poker() {
                 )}
 
                 {mesas && mesas.length === 0 && !creando && (
-                    <p className="text-center text-zinc-600 text-sm py-10">Todavía no te has sentado a ninguna mesa.</p>
+                    <p className="text-center text-zinc-500 text-sm py-10">Todavía no te has sentado a ninguna mesa.</p>
                 )}
             </div>
         );
@@ -365,7 +365,7 @@ export default function Poker() {
                         confirmLabel: m.soyLider ? 'Cerrar' : 'Levantarme',
                         accion: () => levantarse(m._id)
                     })}
-                    className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-600 hover:text-red-400 active:scale-95 shrink-0"
+                    className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-red-400 active:scale-95 shrink-0"
                 >
                     <LogOut size={15} />
                 </button>
@@ -379,7 +379,7 @@ export default function Poker() {
             <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 mb-4">
                 <div className="flex items-baseline justify-between mb-3">
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">En la mesa</p>
-                    <span className="text-[10px] text-zinc-600 font-bold">
+                    <span className="text-[10px] text-zinc-500 font-bold">
                         {m.jugadores.filter(j => j.sentado).length}/{m.maxJugadores}
                         {m.invitadosPendientes > 0 && ` · ${m.invitadosPendientes} sin contestar`}
                     </span>
@@ -402,14 +402,14 @@ export default function Poker() {
                                     {j.nombre}
                                     {j.esLider && <Crown size={10} style={{ color: ACENTO }} />}
                                 </p>
-                                <p className="text-[10px] text-zinc-600 tabular-nums">{j.fichas} fichas</p>
+                                <p className="text-[10px] text-zinc-500 tabular-nums">{j.fichas} fichas</p>
                             </div>
 
                             {m.soyLider && !j.soyYo && (
                                 <button
                                     onClick={() => expulsar(j._id)}
                                     disabled={enVuelo}
-                                    className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-600 hover:text-red-400 active:scale-95 shrink-0"
+                                    className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-red-400 active:scale-95 shrink-0"
                                 ><UserMinus size={13} /></button>
                             )}
                         </div>
@@ -421,10 +421,10 @@ export default function Poker() {
                         {invitando ? (
                             <div className="mt-3 space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">A quién invitas</p>
-                                    <button onClick={() => setInvitando(false)} className="text-zinc-600 hover:text-white"><X size={14} /></button>
+                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">A quién invitas</p>
+                                    <button onClick={() => setInvitando(false)} className="text-zinc-500 hover:text-white"><X size={14} /></button>
                                 </div>
-                                {invitables.length === 0 && <p className="text-[11px] text-zinc-600">No te queda nadie a quien invitar.</p>}
+                                {invitables.length === 0 && <p className="text-[11px] text-zinc-500">No te queda nadie a quien invitar.</p>}
                                 {invitables.map(a => (
                                     <button
                                         key={a._id}
@@ -457,7 +457,7 @@ export default function Poker() {
                 )}
 
                 {!m.soyLider && (
-                    <p className="text-[11px] text-zinc-600 mt-3 text-center">Esperando a que el líder reparta.</p>
+                    <p className="text-[11px] text-zinc-500 mt-3 text-center">Esperando a que el líder reparta.</p>
                 )}
             </div>
             )}
@@ -515,7 +515,7 @@ export default function Poker() {
                                 ))}
                             </div>
 
-                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-[2px]">
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10">
                                 <Coins size={13} style={{ color: ACENTO }} />
                                 <span className="text-base font-black tabular-nums leading-none" style={{ color: ACENTO }}>{m.bote}</span>
                             </div>
@@ -720,7 +720,7 @@ export default function Poker() {
                                         >All-in</button>
                                     </div>
 
-                                    <p className="text-[10px] text-zinc-600 text-center mt-2">
+                                    <p className="text-[10px] text-zinc-500 text-center mt-2">
                                         Tienes {yo?.fichas} fichas · subida mínima {m.subidaMinima}
                                     </p>
                                 </>

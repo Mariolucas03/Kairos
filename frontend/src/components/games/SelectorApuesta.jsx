@@ -119,7 +119,7 @@ export default function SelectorApuesta({
         <div className={`w-full ${deshabilitado ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-baseline justify-between mb-2 px-1">
                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.12em] not-italic">{etiqueta}</span>
-                <span className="text-[10px] font-bold text-zinc-600 tabular-nums">
+                <span className="text-[10px] font-bold text-zinc-500 tabular-nums">
                     Tienes <span className="text-zinc-300">{saldo.toLocaleString('es-ES')}</span>
                 </span>
             </div>

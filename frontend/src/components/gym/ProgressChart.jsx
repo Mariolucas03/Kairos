@@ -8,7 +8,7 @@ export default function ProgressChart({ points = [], metric = 'bestWeight', colo
     if (points.length < 2) {
         return (
             <div className="h-40 flex items-center justify-center text-center px-6">
-                <p className="text-[11px] text-zinc-600 font-bold leading-tight">
+                <p className="text-[11px] text-zinc-500 font-bold leading-tight">
                     Necesitas al menos dos sesiones de este ejercicio para ver la evolución.
                 </p>
             </div>

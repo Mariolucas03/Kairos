@@ -314,7 +314,7 @@ export default function Home() {
                 monedas) sigue viviendo en Header.jsx / Layout.jsx, sin tocar. */}
             <div className="flex items-end justify-between gap-3 px-4 pt-[18px]">
                 <div className="min-w-0">
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">
+                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] leading-none not-italic">
                         {weekday}
                     </p>
                     <p className="mt-[9px] text-[19px] font-black text-white uppercase tracking-[-0.04em] leading-none not-italic">
@@ -394,7 +394,7 @@ export default function Home() {
 
             {showSettings && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowSettings(false)}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+                    <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
                     <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl shadow-2xl flex flex-col h-auto max-h-[70vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-zinc-700 to-transparent" />
                         <div className="flex justify-between items-center p-6 border-b border-white/[0.07] shrink-0 relative z-10">
@@ -434,8 +434,8 @@ export default function Home() {
                                 <div className="space-y-2">
                                     {Object.keys(DEFAULTS_CONFIG).map(key => (
                                         <div key={key} onClick={() => toggleWidget(key)} className={`p-3.5 rounded-2xl border flex justify-between items-center cursor-pointer transition-all active:scale-[0.98] ${visibleWidgets[key] ? 'bg-zinc-900 border-yellow-500/30' : 'bg-black border-white/[0.07] opacity-60'}`}>
-                                            <span className={`text-xs font-bold ${visibleWidgets[key] ? 'text-white' : 'text-zinc-600'}`}>{widgetNames[key] || key}</span>
-                                            {visibleWidgets[key] ? <ToggleRight className="text-yellow-500" size={22} /> : <ToggleLeft className="text-zinc-700" size={22} />}
+                                            <span className={`text-xs font-bold ${visibleWidgets[key] ? 'text-white' : 'text-zinc-500'}`}>{widgetNames[key] || key}</span>
+                                            {visibleWidgets[key] ? <ToggleRight className="text-yellow-500" size={22} /> : <ToggleLeft className="text-zinc-600" size={22} />}
                                         </div>
                                     ))}
                                 </div>

@@ -285,14 +285,14 @@ function ActiveWheel({ config, user, setUser, onBack, onSpinComplete }) {
                 <button
                     onClick={alternarSonido}
                     aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                    className={`w-14 h-[68px] rounded-2xl border border-zinc-800 bg-zinc-900 flex items-center justify-center active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                    className={`w-14 h-[68px] rounded-2xl border border-zinc-800 bg-zinc-900 flex items-center justify-center active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-500'}`}
                 >
                     {conSonido ? <Volume2 size={22} /> : <VolumeX size={22} />}
                 </button>
             </div>
 
             {winData && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-6 animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-6 animate-in zoom-in-95 duration-200">
                     <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-4xl p-8 text-center shadow-2xl">
                         <div className="mb-6 flex justify-center">
                             {winData.v > 0 ? (
@@ -364,7 +364,7 @@ export default function FortuneWheel() {
             ) : (
                 <div className="flex flex-col gap-3">
                     {!data && (
-                        <div className="flex justify-center py-16 text-zinc-600"><Loader2 size={22} className="animate-spin" /></div>
+                        <div className="flex justify-center py-16 text-zinc-500"><Loader2 size={22} className="animate-spin" /></div>
                     )}
                     {ruedas.map((rueda) => {
                         const Icono = ICONOS[rueda.id] || Star;
@@ -405,7 +405,7 @@ export default function FortuneWheel() {
                                 <div className="flex flex-col items-end shrink-0 pl-2">
                                     <span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Coste</span>
                                     <div className="bg-black px-3 py-1.5 rounded-lg border border-zinc-800 flex items-center gap-1.5">
-                                        <span className={`text-sm font-black ${bloqueada ? 'text-zinc-600' : 'text-white'}`}>{esGratis ? 'GRATIS' : rueda.coste}</span>
+                                        <span className={`text-sm font-black ${bloqueada ? 'text-zinc-500' : 'text-white'}`}>{esGratis ? 'GRATIS' : rueda.coste}</span>
                                         {!esGratis && <img src="/assets/icons/ficha.png" className="w-3.5 h-3.5" alt="F" />}
                                     </div>
                                 </div>

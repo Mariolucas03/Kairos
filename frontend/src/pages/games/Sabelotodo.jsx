@@ -81,7 +81,7 @@ const Vidas = ({ vidas, max = 3 }) => (
         {Array.from({ length: max }).map((_, i) => (
             i < vidas
                 ? <Heart key={i} size={16} className="text-red-500" />
-                : <HeartCrack key={i} size={16} className="text-zinc-700" />
+                : <HeartCrack key={i} size={16} className="text-zinc-600" />
         ))}
     </div>
 );
@@ -263,7 +263,7 @@ const Partida = ({ id, onVolver, avisar }) => {
         catch (e) { avisar(e.response?.data?.message || 'No se pudo salir', 'error'); }
     };
 
-    if (!partida) return <div className="py-20 text-center text-zinc-600 text-xs font-bold uppercase animate-pulse">Cargando la partida...</div>;
+    if (!partida) return <div className="py-20 text-center text-zinc-500 text-xs font-bold uppercase animate-pulse">Cargando la partida...</div>;
 
     const p = partida;
     const otro = p.companero;
@@ -380,7 +380,7 @@ const Partida = ({ id, onVolver, avisar }) => {
                                     <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: cat.color + '22', color: cat.color }}><cat.Icon size={13} /></span>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[11px] text-zinc-300 truncate">{h.texto}</p>
-                                        <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider">{h.fuiYo ? 'Tú' : h.nombre} · {h.acierto ? 'acertó' : `falló · era ${h.correcta}`}</p>
+                                        <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">{h.fuiYo ? 'Tú' : h.nombre} · {h.acierto ? 'acertó' : `falló · era ${h.correcta}`}</p>
                                     </div>
                                     {h.acierto ? <Check size={14} className="text-green-500 shrink-0" /> : <X size={14} className="text-red-500 shrink-0" />}
                                 </div>
@@ -391,7 +391,7 @@ const Partida = ({ id, onVolver, avisar }) => {
             )}
 
             {enJuego && (
-                <button onClick={() => setConfirmarSalir(true)} className="mt-6 w-full text-[10px] font-black uppercase tracking-widest text-zinc-600 flex items-center justify-center gap-1.5">
+                <button onClick={() => setConfirmarSalir(true)} className="mt-6 w-full text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center justify-center gap-1.5">
                     <LogOut size={12} /> Dejar la partida
                 </button>
             )}
@@ -484,7 +484,7 @@ export default function Sabelotodo() {
                     <div className="flex items-center gap-3 mb-5">
                         <BackButton to="/games" />
                         <div className="flex-1 min-w-0">
-                            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">En pareja</p>
+                            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] leading-none not-italic">En pareja</p>
                             <h1 className="mt-1.5 text-[24px] font-black text-white uppercase tracking-[-0.04em] leading-none not-italic">Sabelotodo</h1>
                         </div>
                         <button onClick={() => setEligiendo(true)} className="h-11 px-4 rounded-2xl text-white font-black text-[11px] uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-transform not-italic" style={{ background: ACENTO }}>
@@ -523,13 +523,13 @@ export default function Sabelotodo() {
                         </div>
                     )}
 
-                    {!partidas && <div className="py-16 text-center text-zinc-600 text-xs font-bold uppercase animate-pulse">Cargando partidas...</div>}
+                    {!partidas && <div className="py-16 text-center text-zinc-500 text-xs font-bold uppercase animate-pulse">Cargando partidas...</div>}
 
                     {partidas && vivas.length === 0 && (
                         <div className="rounded-3xl border border-dashed border-white/10 p-8 text-center">
-                            <Crown size={28} className="mx-auto text-zinc-700" />
+                            <Crown size={28} className="mx-auto text-zinc-600" />
                             <p className="mt-3 text-[12px] font-black text-zinc-400 uppercase tracking-widest not-italic">Ninguna partida en marcha</p>
-                            <p className="text-[11px] text-zinc-600 mt-1">Invita a un amigo y empezad una.</p>
+                            <p className="text-[11px] text-zinc-500 mt-1">Invita a un amigo y empezad una.</p>
                         </div>
                     )}
 

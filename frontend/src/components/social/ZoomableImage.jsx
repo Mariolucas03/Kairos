@@ -114,7 +114,7 @@ export default function ZoomableImage({ src, alt = '' }) {
             {conZoom && (
                 <button
                     onClick={() => { setEscala(1); setPos({ x: 0, y: 0 }); }}
-                    className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-full border border-white/20"
+                    className="absolute bottom-3 right-3 bg-black/90 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-full border border-white/20"
                 >
                     {escala.toFixed(1)}× · Restablecer
                 </button>

@@ -61,9 +61,9 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
     // abrir un panel vacío.
     if (!ficha && !cargando) {
         if (noEncontrado) return createPortal(
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-6" onClick={onClose}>
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-6" onClick={onClose}>
                 <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 text-center max-w-xs">
-                    <Dumbbell className="mx-auto text-zinc-700 mb-3" size={28} />
+                    <Dumbbell className="mx-auto text-zinc-600 mb-3" size={28} />
                     <p className="text-xs font-bold text-zinc-400 uppercase tracking-wide mb-4">
                         No hay demostración de "{exerciseName || exercise?.name}"
                     </p>
@@ -80,7 +80,7 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
     const hayGif = ficha?.gif && !gifRoto;
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/95 animate-in fade-in duration-150">
             <div className="bg-[#09090b] w-full sm:max-w-sm rounded-t-[32px] sm:rounded-4xl border border-zinc-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
 
                 <div className="flex justify-between items-start gap-3 p-5 pb-3 shrink-0">
@@ -90,7 +90,7 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
                         </h2>
                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mt-1">
                             {ficha?.muscle}
-                            {ficha?.equipment && <span className="text-zinc-700"> · {ficha.equipment}</span>}
+                            {ficha?.equipment && <span className="text-zinc-600"> · {ficha.equipment}</span>}
                         </p>
                     </div>
                     <button
@@ -158,7 +158,7 @@ export default function ExerciseSheet({ exercise, exerciseId, exerciseName, onCl
                     )}
 
                     {cargando && faltanPasos && (
-                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wide text-center">
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide text-center">
                             Cargando ejecución...
                         </p>
                     )}

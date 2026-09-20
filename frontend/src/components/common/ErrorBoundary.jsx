@@ -1,5 +1,6 @@
 import React from 'react';
 import { reportarFallo } from '../../utils/reportarFallo';
+import { AlertTriangle } from '../../iconos';
 
 /**
  * RED DE SEGURIDAD GLOBAL.
@@ -54,12 +55,12 @@ export default class ErrorBoundary extends React.Component {
 
         return (
             <div className="min-h-screen bg-black flex flex-col items-center justify-center px-8 text-center gap-4">
-                <span className="text-5xl">💥</span>
+                <AlertTriangle size={44} className="text-red-500" />
                 <h1 className="text-white font-black uppercase tracking-tighter text-xl">Algo se ha roto</h1>
                 <p className="text-xs text-zinc-500 leading-relaxed max-w-xs">
                     La pantalla anterior ha fallado. No has perdido nada: vuelve al inicio y sigue.
                 </p>
-                <p className="text-[10px] text-zinc-700 font-mono break-all max-w-xs">
+                <p className="text-[10px] text-zinc-600 font-mono break-all max-w-xs">
                     {String(this.state.error?.message || this.state.error)}
                 </p>
                 <button

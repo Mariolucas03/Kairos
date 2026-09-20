@@ -159,7 +159,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                     type="button"
                     onClick={quitar}
                     aria-label="Quitar la canción"
-                    className="w-9 h-9 shrink-0 rounded-xl text-zinc-600 hover:text-red-400 flex items-center justify-center active:scale-90 transition-transform"
+                    className="w-9 h-9 shrink-0 rounded-xl text-zinc-500 hover:text-red-400 flex items-center justify-center active:scale-90 transition-transform"
                 >
                     <X size={16} />
                 </button>
@@ -199,7 +199,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                         className="w-full accent-yellow-500"
                     />
 
-                    <p className="text-[9px] text-zinc-600 font-bold leading-snug mt-1">
+                    <p className="text-[9px] text-zinc-500 font-bold leading-snug mt-1">
                         Apple solo deja usar 30 segundos de cada canción. Dentro de
                         esos 30 eliges por dónde entra.
                     </p>
@@ -248,7 +248,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
             </div>
 
             {buscando && (
-                <p className="text-[10px] text-zinc-600 font-bold text-center py-4 uppercase tracking-widest animate-pulse">
+                <p className="text-[10px] text-zinc-500 font-bold text-center py-4 uppercase tracking-widest animate-pulse">
                     Buscando...
                 </p>
             )}
@@ -262,7 +262,7 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                     <p className="text-[11px] text-zinc-500 font-bold leading-snug">
                         Nada con ese nombre.
                     </p>
-                    <p className="text-[10px] text-zinc-600 font-bold leading-snug mt-1.5">
+                    <p className="text-[10px] text-zinc-500 font-bold leading-snug mt-1.5">
                         Prueba con el título solo, sin el artista. Y ten en cuenta
                         que no está todo el catálogo.
                     </p>
@@ -311,12 +311,12 @@ export default function BuscadorCancion({ cancion, onElegir }) {
                 Mónaco en la posición 27, porque iTunes ordena por lo popular que
                 es el artista. Buscar "monaco" a secas la saca la primera. */}
             {resultados.length > 0 && (
-                <p className="text-[10px] text-zinc-600 font-bold text-center pt-2 leading-snug">
+                <p className="text-[10px] text-zinc-500 font-bold text-center pt-2 leading-snug">
                     ¿No la ves? Busca solo el título, sin el artista.
                 </p>
             )}
 
-            <p className="text-[9px] text-zinc-600 font-bold text-center pt-2 leading-snug">
+            <p className="text-[9px] text-zinc-500 font-bold text-center pt-2 leading-snug">
                 Sonarán 30 segundos en tu publicación. Música de Apple Music.
             </p>
         </div>

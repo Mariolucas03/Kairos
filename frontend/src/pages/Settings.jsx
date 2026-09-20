@@ -148,7 +148,7 @@ export default function Settings() {
                         <p className="text-white font-black uppercase truncate">{user?.username}</p>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide">Ver mi perfil público</p>
                     </div>
-                    <ChevronRight size={18} className="text-zinc-600 shrink-0" />
+                    <ChevronRight size={18} className="text-zinc-500 shrink-0" />
                 </button>
 
                 {/* Descripción */}
@@ -162,9 +162,9 @@ export default function Settings() {
                         maxLength={BIO_MAX}
                         onChange={(e) => setBio(e.target.value)}
                         placeholder="Cuenta algo sobre ti, tus objetivos, tu deporte..."
-                        className="w-full bg-black border border-zinc-800 rounded-2xl p-3 text-white text-sm outline-none focus:border-yellow-500/50 transition-colors resize-none placeholder:text-zinc-700"
+                        className="w-full bg-black border border-zinc-800 rounded-2xl p-3 text-white text-sm outline-none focus:border-yellow-500/50 transition-colors resize-none placeholder:text-zinc-500"
                     />
-                    <p className={`text-[10px] font-bold text-right mt-1 ${bio.length >= BIO_MAX ? 'text-yellow-500' : 'text-zinc-600'}`}>
+                    <p className={`text-[10px] font-bold text-right mt-1 ${bio.length >= BIO_MAX ? 'text-yellow-500' : 'text-zinc-500'}`}>
                         {bio.length}/{BIO_MAX}
                     </p>
                 </div>
@@ -198,7 +198,7 @@ export default function Settings() {
                             <div className={`w-5 h-5 rounded-full bg-white transition-transform ${isPrivate ? 'translate-x-5' : 'translate-x-0'}`} />
                         </div>
                     </button>
-                    <p className="text-[10px] text-zinc-600 px-4 pb-3 leading-tight">
+                    <p className="text-[10px] text-zinc-500 px-4 pb-3 leading-tight">
                         Tu foto, nombre, descripción y contadores se ven siempre, tengas la cuenta como la tengas.
                     </p>
                 </div>
@@ -209,7 +209,7 @@ export default function Settings() {
                 <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1 ml-1">
                     2 · Qué enseñas de ti
                 </h2>
-                <p className="text-[10px] text-zinc-600 mb-3 ml-1 leading-tight">
+                <p className="text-[10px] text-zinc-500 mb-3 ml-1 leading-tight">
                     Puedes apagar una sección aunque tengas la cuenta pública. Tú siempre la ves.
                 </p>
                 <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl overflow-hidden divide-y divide-white/5">
@@ -221,7 +221,7 @@ export default function Settings() {
                                 onClick={() => setVisibility(v => ({ ...v, [key]: !visible }))}
                                 className="w-full p-4 flex items-center gap-4 active:bg-white/5 transition-colors"
                             >
-                                <div className={`p-2.5 rounded-xl border ${visible ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-500' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+                                <div className={`p-2.5 rounded-xl border ${visible ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-500' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
                                     <Icon size={18} />
                                 </div>
                                 <div className="flex-1 min-w-0 text-left">
@@ -296,7 +296,7 @@ export default function Settings() {
                             <p className="font-bold text-sm text-white">Panel de administración</p>
                             <p className="text-[10px] text-zinc-500 mt-0.5">Usuarios, avisos y moderación</p>
                         </div>
-                        <ChevronRight size={18} className="text-zinc-600" />
+                        <ChevronRight size={18} className="text-zinc-500" />
                     </button>
                 )}
                 <button
@@ -310,7 +310,7 @@ export default function Settings() {
                         <p className="font-bold text-sm text-white">Privacidad</p>
                         <p className="text-[10px] text-zinc-500 mt-0.5">Qué se guarda de ti y quién lo ve</p>
                     </div>
-                    <ChevronRight size={18} className="text-zinc-600" />
+                    <ChevronRight size={18} className="text-zinc-500" />
                 </button>
 
                 <button
@@ -325,7 +325,7 @@ export default function Settings() {
                         <p className="font-bold text-sm text-white">{descargando ? 'Preparando...' : 'Descargar mis datos'}</p>
                         <p className="text-[10px] text-zinc-500 mt-0.5">Todo lo que guarda la app, en un fichero</p>
                     </div>
-                    <ChevronRight size={18} className="text-zinc-600" />
+                    <ChevronRight size={18} className="text-zinc-500" />
                 </button>
 
                 </div>

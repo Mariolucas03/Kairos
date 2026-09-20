@@ -57,7 +57,7 @@ export default function FriendsPage() {
             {isLoading && !data ? (
                 <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando amigos...</div>
             ) : friends.length === 0 ? (
-                <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                <div className="text-center py-16 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Users className="mx-auto mb-3 opacity-50" size={32} />
                     <p className="text-xs mb-4">Aún no tienes aliados.</p>
                     <button onClick={() => navigate('/social')} className="bg-yellow-500 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-yellow-400 transition-colors">
@@ -66,7 +66,7 @@ export default function FriendsPage() {
                 </div>
             ) : (
                 <>
-                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-3 ml-2">
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-3 ml-2">
                         Desliza: ← eliminar · → retar a un duelo
                     </p>
                     {friends.map(friend => (

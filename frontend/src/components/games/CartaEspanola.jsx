@@ -99,7 +99,7 @@ export default function CartaEspanola({ carta, tamano = 'md', apagada = false, c
                 aria-label="Carta boca abajo"
             >
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-zinc-700 font-black" style={{ fontSize: medidas.simbolo * 0.55 }}>?</span>
+                    <span className="text-zinc-600 font-black" style={{ fontSize: medidas.simbolo * 0.55 }}>?</span>
                 </div>
             </div>
         );

@@ -203,7 +203,7 @@ export default function TowerGame() {
                 el lado que menos ocupaba. */}
             <div className="absolute top-12 left-4 right-4 flex items-center z-20">
                 <div className="flex-1 flex"><BackButton to="/games" /></div>
-                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-emerald-500/50 backdrop-blur-md shadow-2xl">
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-emerald-500/50 shadow-2xl">
                     <span className="text-emerald-400 font-black text-xl tabular-nums">{fichas.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="fichas" />
                 </div>
@@ -211,7 +211,7 @@ export default function TowerGame() {
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-500'}`}
                     >
                         {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
                     </button>
@@ -271,7 +271,7 @@ export default function TowerGame() {
 
                         return (
                             <div key={planta} ref={esActual ? filaActualRef : undefined} className={`flex items-center gap-2 transition-opacity ${esActual || superada || result ? 'opacity-100' : 'opacity-35'}`}>
-                                <span className={`w-12 shrink-0 text-right text-[10px] font-black tabular-nums ${esActual ? 'text-emerald-400' : 'text-zinc-600'}`}>
+                                <span className={`w-12 shrink-0 text-right text-[10px] font-black tabular-nums ${esActual ? 'text-emerald-400' : 'text-zinc-500'}`}>
                                     x{mult}
                                 </span>
                                 <div className={`flex-1 grid gap-1.5 ${losas === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
@@ -289,7 +289,7 @@ export default function TowerGame() {
 
                                         // Losas de piedra con su canto: la cara de arriba mas clara,
                                         // el borde de abajo mas oscuro. Es lo que las hace pisables.
-                                        let clase = 'text-zinc-700';
+                                        let clase = 'text-zinc-600';
                                         let estilo = { background: 'linear-gradient(180deg, #26262b 0%, #18181c 100%)', boxShadow: '0 4px 0 #0a0a0c, 0 5px 8px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.05)' };
                                         if (esTrampaRevelada) {
                                             clase = 'text-red-400';

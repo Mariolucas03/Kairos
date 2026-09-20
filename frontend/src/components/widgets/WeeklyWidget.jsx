@@ -50,7 +50,7 @@ export function WeeklyHistoryModal({ onClose }) {
 
     return createPortal(
         <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+            <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
 
             <div
                 className="bg-[#09090b] border border-white/10 w-[95%] max-w-4xl rounded-4xl p-6 shadow-2xl relative flex flex-col gap-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar z-10"
@@ -84,12 +84,12 @@ export function WeeklyHistoryModal({ onClose }) {
                     ))}
                 </div>
 
-                <div className="bg-zinc-900/30 rounded-4xl p-6 border border-white/[0.07] relative h-64 w-full flex items-center justify-center flex-col gap-4 text-zinc-600 shrink-0">
+                <div className="bg-zinc-900/30 rounded-4xl p-6 border border-white/[0.07] relative h-64 w-full flex items-center justify-center flex-col gap-4 text-zinc-500 shrink-0">
                     <BarChart3 size={64} className="opacity-20" />
                     <span className="uppercase font-black tracking-widest text-sm opacity-50 not-italic">
                         Gráfica de {selectedMuscle} - {selectedYear}
                     </span>
-                    <p className="text-xs text-zinc-700 font-bold not-italic">(Próximamente)</p>
+                    <p className="text-xs text-zinc-600 font-bold not-italic">(Próximamente)</p>
                 </div>
             </div>
         </div>,

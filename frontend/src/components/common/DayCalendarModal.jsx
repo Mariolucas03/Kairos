@@ -54,7 +54,7 @@ export default function DayCalendarModal({ selectedDate, onSelect, onClose, acce
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+            <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
 
             <div
                 className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden"
@@ -85,7 +85,7 @@ export default function DayCalendarModal({ selectedDate, onSelect, onClose, acce
 
                 <div className="grid grid-cols-7 gap-1 text-center relative z-10">
                     {WEEKDAYS.map((d) => (
-                        <span key={d} className="text-[10px] font-black text-zinc-600 uppercase">{d}</span>
+                        <span key={d} className="text-[10px] font-black text-zinc-500 uppercase">{d}</span>
                     ))}
                 </div>
                 <div className="grid grid-cols-7 gap-1 place-items-center relative z-10">{cells}</div>

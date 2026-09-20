@@ -207,7 +207,7 @@ export default function BlackJack() {
                 el lado que menos ocupaba. */}
             <div className="fixed top-12 left-4 right-4 flex items-center z-50">
                 <div className="flex-1 flex"><BackButton to="/games" /></div>
-                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-green-500/50 backdrop-blur-md shadow-2xl">
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-green-500/50 shadow-2xl">
                     <span className="text-green-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
@@ -215,7 +215,7 @@ export default function BlackJack() {
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-500'}`}
                     >
                         {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
                     </button>
@@ -259,7 +259,7 @@ export default function BlackJack() {
 
                     {/* DEALER */}
                     <div className="flex flex-col items-center relative z-10 pt-4">
-                        <div className="bg-black/60 px-4 py-1.5 rounded-full border border-white/10 mb-3 backdrop-blur-sm shadow-lg">
+                        <div className="bg-black/60 px-4 py-1.5 rounded-full border border-white/10 mb-3 shadow-lg">
                             <span className="text-[10px] font-black text-zinc-200 uppercase tracking-widest">
                                 Crupier: {gameState ? calculateScore(gameState.dHand) : '?'}
                             </span>
@@ -308,7 +308,7 @@ export default function BlackJack() {
                 </div>
 
                 {/* CONTROLES */}
-                <div className="w-full bg-zinc-900/90 backdrop-blur-md rounded-[2.5rem] border border-white/10 p-5 shadow-2xl flex flex-col gap-4">
+                <div className="w-full bg-zinc-900 rounded-[2.5rem] border border-white/10 p-5 shadow-2xl flex flex-col gap-4">
                     {gameState?.status === 'playing' ? (
                         <div className="grid grid-cols-2 gap-3">
                             <button onClick={() => handleAction('hit')} disabled={isProcessing} className="bg-green-600 hover:bg-green-500 text-white py-4 rounded-2xl font-black text-lg shadow-[0_4px_0_#14532d] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50">PEDIR</button>
@@ -334,7 +334,7 @@ export default function BlackJack() {
 
             {/* MODAL RESULTADO */}
             {resultModal && (
-                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
                     <div className={`w-full max-w-xs rounded-4xl p-8 text-center border-2 shadow-2xl relative ${resultModal.type === 'win' ? 'bg-green-900/40 border-green-500' : resultModal.type === 'lose' ? 'bg-red-900/40 border-red-500' : 'bg-zinc-900 border-zinc-500'}`}>
                         <div className="mb-6 flex justify-center">
                             <div className={`p-6 rounded-full border-4 shadow-xl ${resultModal.type === 'win' ? 'bg-green-500 border-green-300' : resultModal.type === 'lose' ? 'bg-red-500 border-red-300' : 'bg-zinc-600 border-zinc-400'}`}>

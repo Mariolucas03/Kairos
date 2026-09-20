@@ -88,10 +88,10 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLock
         <div className="relative w-full mb-3 select-none touch-pan-y overflow-hidden rounded-3xl">
             {/* Acciones que asoman al deslizar */}
             <div className="absolute inset-0 flex justify-between items-center px-6 bg-[#0a0a0c] border border-white/[0.07] rounded-3xl">
-                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-600' : 'text-blue-400'} font-black uppercase text-[10px] tracking-[0.1em] transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-blue-400'} font-black uppercase text-[10px] tracking-[0.1em] transition-opacity ${offsetX > 50 ? 'opacity-100' : 'opacity-30'}`}>
                     {isLocked ? <><Lock size={18} /> Bloqueado</> : <><Edit size={18} /> Editar</>}
                 </div>
-                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-600' : 'text-red-400'} font-black uppercase text-[10px] tracking-[0.1em] transition-opacity ${offsetX < -50 ? 'opacity-100' : 'opacity-30'}`}>
+                <div className={`flex items-center gap-2 ${isLocked ? 'text-zinc-500' : 'text-red-400'} font-black uppercase text-[10px] tracking-[0.1em] transition-opacity ${offsetX < -50 ? 'opacity-100' : 'opacity-30'}`}>
                     {isLocked ? <>Bloqueado <Lock size={18} /></> : <>Borrar <Trash2 size={18} /></>}
                 </div>
             </div>
@@ -242,8 +242,8 @@ export default function Gym() {
 
             {/* CABECERA DE PÁGINA */}
             <div className="pt-[18px]">
-                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">
-                    Supera tus límites
+                <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] leading-none not-italic">
+                    {routines.length === 0 ? 'Sin rutinas todavía' : routines.length === 1 ? '1 rutina' : `${routines.length} rutinas`}
                 </p>
                 <h1 className="mt-[9px] text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">
                     Zona de entreno
@@ -281,16 +281,16 @@ export default function Gym() {
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-zinc-300 not-italic">Mis rutinas</h3>
                         {routines.length > 0 && (
-                            <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic">Desliza para editar o borrar</span>
+                            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.08em] not-italic">Desliza para editar o borrar</span>
                         )}
                     </div>
 
                     <div className="pb-24">
                         {routines.length === 0 ? (
                             <div onClick={() => openCreateRoutine(null)} className="text-center py-14 border-2 border-dashed border-white/10 rounded-3xl cursor-pointer hover:border-yellow-500/30 transition-colors group">
-                                <Dumbbell className="mx-auto text-zinc-700 mb-3 group-hover:text-yellow-500 transition-colors" size={32} />
+                                <Dumbbell className="mx-auto text-zinc-600 mb-3 group-hover:text-yellow-500 transition-colors" size={32} />
                                 <p className="text-zinc-500 text-[11px] font-black uppercase tracking-[0.1em] not-italic">Todavía no tienes rutinas</p>
-                                <p className="text-zinc-600 text-[9px] font-black uppercase tracking-[0.08em] mt-2 not-italic">Toca aquí para crear la primera</p>
+                                <p className="text-zinc-500 text-[9px] font-black uppercase tracking-[0.08em] mt-2 not-italic">Toca aquí para crear la primera</p>
                             </div>
                         ) : (
                             routines.map((routine, index) => (

@@ -54,7 +54,7 @@ export default function ChestModal({ isOpen, onClose, reward }) {
             : reward?.tipo === 'xp' ? `+${reward.valor} XP` : `+${reward?.valor} fichas`;
 
     return (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-sm select-none animate-in fade-in">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 select-none animate-in fade-in">
             <style>{`
                 @keyframes cofreTiembla {
                     0%, 100% { transform: translate(0, 0) rotate(0deg); }

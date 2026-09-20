@@ -68,9 +68,9 @@ export default function Privacidad() {
             <Bloque titulo="Dónde está y quién lo procesa">
                 <p>La app se apoya en servicios de terceros para funcionar:</p>
                 <ul className="list-disc list-inside space-y-1 text-zinc-400">
-                    <li><strong className="text-zinc-200">MongoDB Atlas</strong> — guarda la base de datos.</li>
-                    <li><strong className="text-zinc-200">Render</strong> — ejecuta el servidor.</li>
-                    <li><strong className="text-zinc-200">Vercel</strong> — sirve la aplicación web.</li>
+                    <li><strong className="text-zinc-200">MongoDB Atlas</strong>: guarda la base de datos.</li>
+                    <li><strong className="text-zinc-200">Render</strong>: ejecuta el servidor.</li>
+                    <li><strong className="text-zinc-200">Vercel</strong>: sirve la aplicación web.</li>
                     <li><strong className="text-zinc-200">Google (Gemini)</strong> y <strong className="text-zinc-200">OpenRouter</strong> —
                     analizan lo que escribes o fotografías de tus comidas y generan rutinas.</li>
                 </ul>
@@ -111,7 +111,7 @@ export default function Privacidad() {
                 para que se borre algo, escribe a esa dirección.</p>
             </Bloque>
 
-            <p className="text-zinc-600 text-[11px] text-center mt-6 mb-2">
+            <p className="text-zinc-500 text-[11px] text-center mt-6 mb-2">
                 Última actualización: agosto de 2026
             </p>
         </div>

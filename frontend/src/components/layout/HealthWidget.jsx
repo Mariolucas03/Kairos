@@ -63,7 +63,7 @@ export default function HealthWidget({ user, setUser }) {
 
             {showTutorial && (
                 <div className="absolute top-14 right-[-20px] w-32 z-50 pointer-events-none animate-bounce">
-                    <div className="bg-red-900/90 text-[#E8DCC4] text-[9px] font-bold p-2 rounded-lg border border-red-500/30 text-center relative shadow-xl backdrop-blur-sm">
+                    <div className="bg-red-900/90 text-[#E8DCC4] text-[9px] font-bold p-2 rounded-lg border border-red-500/30 text-center relative shadow-xl">
                         <div className="absolute -top-1.5 right-1/2 translate-x-1/2 w-3 h-3 bg-red-900/90 rotate-45 border-t border-l border-red-500/30"></div>
                         <p>¡FIRMA TU PACTO!</p>
                     </div>

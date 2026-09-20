@@ -79,7 +79,7 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
 
             {isOpen && createPortal(
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+                    <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
 
                     <div
                         className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
@@ -159,9 +159,9 @@ export default function TrainingWidget({ workouts = [], weeklyVolume = 0, weekly
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-10 text-center relative z-10 flex-1">
-                                <Activity size={48} className="text-zinc-700 mb-4" />
+                                <Activity size={48} className="text-zinc-600 mb-4" />
                                 <p className="text-zinc-500 text-sm font-bold uppercase">No has entrenado hoy.</p>
-                                <p className="text-zinc-600 text-xs mt-1">¡Ve al gimnasio y registra tu sesión!</p>
+                                <p className="text-zinc-500 text-xs mt-1">¡Ve al gimnasio y registra tu sesión!</p>
                             </div>
                         )}
                     </div>

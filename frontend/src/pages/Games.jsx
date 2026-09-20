@@ -116,7 +116,7 @@ const Grupo = ({ titulo, pie, juegos, alta, avisos = {}, ancha = false }) => (
             <h2 className="text-[11px] font-black text-yellow-500/90 uppercase tracking-[0.22em] not-italic">{titulo}</h2>
             <span className="h-px flex-1 bg-gradient-to-r from-yellow-500/30 to-transparent" />
         </div>
-        <p className="text-[10px] text-zinc-600 -mt-2 mb-3 leading-tight">{pie}</p>
+        <p className="text-[10px] text-zinc-500 -mt-2 mb-3 leading-tight">{pie}</p>
         <div className="grid grid-cols-2 gap-3">
             {juegos.map(j => <TarjetaJuego key={j.id} {...j} alta={alta} aviso={avisos[j.id] || 0} ancha={ancha} />)}
         </div>
@@ -192,7 +192,7 @@ export default function Games() {
                                 <WidgetBar percent={percentage} accent={ACENTO_BLOQUEO} />
                                 <div className="absolute top-0 bottom-0 left-[75%] w-px bg-white/40" />
                             </div>
-                            <div className="flex justify-between mt-2 text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
+                            <div className="flex justify-between mt-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                                 <span>
                                     <span className="text-zinc-300">{percentage}%</span> · {completedMissions}/{totalMissions}
                                 </span>
@@ -241,11 +241,8 @@ export default function Games() {
             >
                 <Bombillas />
                 <div className="py-3 text-center">
-                    <p className="text-[9px] font-black text-yellow-500/70 uppercase tracking-[0.35em] leading-none not-italic">
-                        Bienvenido al
-                    </p>
                     <h1
-                        className="mt-2 text-[34px] font-black text-yellow-400 uppercase tracking-[-0.03em] leading-none not-italic"
+                        className="text-[34px] font-black text-yellow-400 uppercase tracking-[-0.03em] leading-none not-italic"
                         style={{ textShadow: '0 0 10px rgba(253,224,71,0.8), 0 0 30px rgba(234,179,8,0.5), 0 2px 0 #7a5a00' }}
                     >
                         Casino
@@ -260,7 +257,7 @@ export default function Games() {
             {/* LA CAJA: tus fichas, como en la ventanilla de un casino */}
             <div className="flex items-center justify-between rounded-2xl border border-white/[0.07] bg-[#0a0a0c] px-4 py-3 mb-6">
                 <div>
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none">En caja</p>
+                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] leading-none">En caja</p>
                     <p className="mt-1.5 text-[22px] font-black text-yellow-400 tabular-nums leading-none">
                         {fichas.toLocaleString('es-ES')}
                     </p>

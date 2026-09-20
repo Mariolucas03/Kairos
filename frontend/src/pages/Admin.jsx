@@ -70,14 +70,14 @@ const Titulo = ({ children }) => (
 
 const Dato = ({ etiqueta, valor, pie, color = 'text-white' }) => (
     <Tarjeta className="p-4">
-        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">{etiqueta}</p>
+        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{etiqueta}</p>
         <p className={`text-2xl font-black mt-1 ${color}`}>{valor}</p>
-        {pie && <p className="text-[9px] text-zinc-600 mt-0.5">{pie}</p>}
+        {pie && <p className="text-[9px] text-zinc-500 mt-0.5">{pie}</p>}
     </Tarjeta>
 );
 
 const Vacio = ({ children }) => (
-    <p className="text-zinc-600 text-sm text-center py-12">{children}</p>
+    <p className="text-zinc-500 text-sm text-center py-12">{children}</p>
 );
 
 // Campo numérico. El `min-w-0` NO sobra: dentro de un flex, los <input> traen un
@@ -85,7 +85,7 @@ const Vacio = ({ children }) => (
 // de la pantalla — que es lo que hacía que la app se pudiera arrastrar de lado.
 const Numero = ({ etiqueta, valor, onChange, placeholder }) => (
     <div className="flex-1 min-w-0">
-        {etiqueta && <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1.5">{etiqueta}</p>}
+        {etiqueta && <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1.5">{etiqueta}</p>}
         <input
             type="number"
             inputMode="numeric"
@@ -268,7 +268,7 @@ export default function Admin() {
             {/* La clave temporal se enseña aquí y en ningún sitio más */}
             {claveNueva && (
                 <div className="fixed inset-0 flex items-center justify-center p-6" style={{ zIndex: Z.confirm }}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setClaveNueva(null)} />
+                    <div className="absolute inset-0 bg-black/95" onClick={() => setClaveNueva(null)} />
                     <div className="relative z-10 w-full max-w-xs bg-[#0a0a0c] border border-yellow-500/40 rounded-3xl p-6 text-center">
                         <KeyRound size={32} className="text-yellow-500 mx-auto mb-3" />
                         <p className="text-white font-bold text-sm mb-1">Clave nueva de {claveNueva.usuario}</p>
@@ -299,11 +299,11 @@ export default function Admin() {
             {/* ─── FICHA DE USUARIO ─────────────────────────────────────── */}
             {ficha && (
                 <div className="fixed inset-0 flex items-end sm:items-center justify-center" style={{ zIndex: Z.modal }}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setFicha(null)} />
+                    <div className="absolute inset-0 bg-black/95" onClick={() => setFicha(null)} />
                     <div className="relative z-10 w-full max-w-md bg-[#09090b] border-t sm:border border-white/10 rounded-t-[32px] sm:rounded-4xl max-h-[88vh] overflow-y-auto custom-scrollbar">
 
                         {ficha.cargando || cargandoFicha ? (
-                            <div className="flex justify-center py-20 text-zinc-600"><Loader2 className="animate-spin" size={24} /></div>
+                            <div className="flex justify-center py-20 text-zinc-500"><Loader2 className="animate-spin" size={24} /></div>
                         ) : (
                             <div className="p-5 space-y-4">
                                 <div className="flex items-start gap-3">
@@ -314,7 +314,7 @@ export default function Admin() {
                                             {ficha.baneado && <span className="text-[9px] bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full font-black uppercase">baneado</span>}
                                         </h2>
                                         <p className="text-[10px] text-zinc-500 truncate mt-1">{ficha.email}</p>
-                                        <p className="text-[10px] text-zinc-600 mt-0.5">
+                                        <p className="text-[10px] text-zinc-500 mt-0.5">
                                             Alta {fechaCorta(ficha.alta)} · visto {cuandoFue(ficha.ultimoAcceso)} · {ficha.dispositivos} disp.
                                         </p>
                                     </div>
@@ -340,18 +340,18 @@ export default function Admin() {
                                         <div key={t} className="bg-black border border-white/[0.07] rounded-2xl p-2.5 text-center">
                                             <Icono size={13} className={`${c} mx-auto`} />
                                             <p className="text-sm font-black text-white mt-1 leading-none">{v}</p>
-                                            <p className="text-[9px] text-zinc-600 uppercase tracking-wide mt-1">{t}</p>
+                                            <p className="text-[9px] text-zinc-500 uppercase tracking-wide mt-1">{t}</p>
                                         </div>
                                     ))}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="bg-black border border-white/[0.07] rounded-2xl p-3">
-                                        <p className="text-[9px] text-zinc-600 uppercase tracking-widest">Monedas</p>
+                                        <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Monedas</p>
                                         <p className="text-lg font-black text-yellow-500">{ficha.stats.coins}</p>
                                     </div>
                                     <div className="bg-black border border-white/[0.07] rounded-2xl p-3">
-                                        <p className="text-[9px] text-zinc-600 uppercase tracking-widest">Fichas</p>
+                                        <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Fichas</p>
                                         <p className="text-lg font-black text-violet-400">{ficha.stats.gameCoins}</p>
                                     </div>
                                 </div>
@@ -382,7 +382,7 @@ export default function Admin() {
                                             {ficha.ultimosEntrenos.map(e => (
                                                 <div key={e._id} className="flex items-center justify-between gap-2">
                                                     <span className="text-xs text-zinc-300 truncate">{e.routineName || 'Entreno'}</span>
-                                                    <span className="text-[10px] text-zinc-600 shrink-0">
+                                                    <span className="text-[10px] text-zinc-500 shrink-0">
                                                         {e.date} · {Math.round((e.duration || 0) / 60)} min
                                                     </span>
                                                 </div>
@@ -395,7 +395,7 @@ export default function Admin() {
                                 <Tarjeta className="p-4 space-y-3">
                                     <div>
                                         <Titulo>Ajustar saldo</Titulo>
-                                        <p className="text-[10px] text-zinc-600 mt-1 leading-tight">
+                                        <p className="text-[10px] text-zinc-500 mt-1 leading-tight">
                                             Se SUMA a lo que ya tiene. En negativo, resta.
                                         </p>
                                     </div>
@@ -424,7 +424,7 @@ export default function Admin() {
                                 <Tarjeta className="p-4 space-y-3">
                                     <div>
                                         <Titulo>Ajustar estadísticas</Titulo>
-                                        <p className="text-[10px] text-zinc-600 mt-1 leading-tight">
+                                        <p className="text-[10px] text-zinc-500 mt-1 leading-tight">
                                             Aquí se FIJA el valor, no se suma. Deja en blanco lo que no quieras tocar.
                                         </p>
                                     </div>
@@ -516,9 +516,9 @@ export default function Admin() {
                                     {/* Por qué no hay un botón de "hacer admin": porque un endpoint
                                         que reparte permisos de administrador es justo el que no debe
                                         existir. Se da desde el servidor, a mano, y con eso basta. */}
-                                    <p className="text-[9px] text-zinc-700 leading-tight pt-1">
+                                    <p className="text-[9px] text-zinc-600 leading-tight pt-1">
                                         El rango de administrador no se da desde aquí a propósito: se pone
-                                        en el servidor con <span className="text-zinc-600">scripts/hacer-admin.js</span>.
+                                        en el servidor con <span className="text-zinc-500">scripts/hacer-admin.js</span>.
                                     </p>
                                 </Tarjeta>
                             </div>
@@ -545,7 +545,7 @@ export default function Admin() {
                             className={`min-w-0 flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl border text-[9px] font-black uppercase tracking-wider transition-colors ${
                                 pestana === key
                                     ? 'bg-[#0a0a0c] border-yellow-500/40 text-yellow-500'
-                                    : 'bg-[#0a0a0c] border-white/[0.07] text-zinc-600'
+                                    : 'bg-[#0a0a0c] border-white/[0.07] text-zinc-500'
                             }`}
                         >
                             <Icon size={15} />
@@ -555,7 +555,7 @@ export default function Admin() {
                 </div>
 
                 {cargando && (
-                    <div className="flex justify-center py-12 text-zinc-600">
+                    <div className="flex justify-center py-12 text-zinc-500">
                         <Loader2 className="animate-spin" size={24} />
                     </div>
                 )}
@@ -564,7 +564,7 @@ export default function Admin() {
                 {!cargando && pestana === 'usuarios' && (
                     <div className="space-y-2">
                         <div className="relative mb-3">
-                            <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
+                            <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
                             <input
                                 value={busqueda}
                                 onChange={e => setBusqueda(e.target.value)}
@@ -587,12 +587,12 @@ export default function Admin() {
                                         {u.isAdmin && <span className="text-[9px] bg-yellow-500/15 text-yellow-500 px-2 py-0.5 rounded-full font-black uppercase">admin</span>}
                                         {u.baneado && <span className="text-[9px] bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full font-black uppercase">baneado</span>}
                                     </p>
-                                    <p className="text-[10px] text-zinc-600 truncate mt-0.5">{u.email}</p>
-                                    <p className="text-[10px] text-zinc-600 mt-1">
+                                    <p className="text-[10px] text-zinc-500 truncate mt-0.5">{u.email}</p>
+                                    <p className="text-[10px] text-zinc-500 mt-1">
                                         Nivel {u.level} · {u.hp} HP · {u.coins} monedas · activo {cuandoFue(u.lastActive)}
                                     </p>
                                 </div>
-                                <ChevronRight size={16} className="text-zinc-700 shrink-0" />
+                                <ChevronRight size={16} className="text-zinc-600 shrink-0" />
                             </button>
                         ))}
                     </div>
@@ -610,7 +610,7 @@ export default function Admin() {
                                     key={t}
                                     onClick={() => setVerEntrenos(k)}
                                     className={`flex-1 min-w-0 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-wider transition-colors ${
-                                        verEntrenos === k ? 'bg-zinc-900 border-yellow-500/40 text-yellow-500' : 'bg-[#0a0a0c] border-white/[0.07] text-zinc-600'
+                                        verEntrenos === k ? 'bg-zinc-900 border-yellow-500/40 text-yellow-500' : 'bg-[#0a0a0c] border-white/[0.07] text-zinc-500'
                                     }`}
                                 >
                                     {t}{n !== undefined && n !== null ? ' (' + n + ')' : ''}
@@ -618,18 +618,18 @@ export default function Admin() {
                             ))}
                         </div>
 
-                        {verEntrenos && entrenos === null && <div className="flex justify-center py-10 text-zinc-600"><Loader2 className="animate-spin" size={20} /></div>}
+                        {verEntrenos && entrenos === null && <div className="flex justify-center py-10 text-zinc-500"><Loader2 className="animate-spin" size={20} /></div>}
                         {verEntrenos && entrenos?.length === 0 && <Vacio>Todavía no hay entrenos.</Vacio>}
 
                         {verEntrenos && entrenos?.map(e => (
                             <Tarjeta key={e._id} className="p-4 flex items-start gap-3">
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] text-zinc-600">
+                                    <p className="text-[10px] text-zinc-500">
                                         <span className="text-zinc-400 font-bold">{e.autor}</span> · {e.fecha} · {cuandoFue(e.cuando)}
                                     </p>
                                     <p className="text-white text-sm font-bold mt-0.5 truncate">{e.nombre}</p>
                                     {e.texto && <p className="text-zinc-400 text-xs mt-1 break-words">{e.texto}</p>}
-                                    <p className="text-[10px] text-zinc-600 mt-1 flex items-center gap-2 flex-wrap">
+                                    <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-2 flex-wrap">
                                         {Math.round(e.duracion / 60)} min · {e.calorias} kcal · {e.comentarios} coment.
                                         {e.tieneFoto && <span className="flex items-center gap-1 text-zinc-500"><Image size={10} /> foto</span>}
                                     </p>
@@ -650,13 +650,13 @@ export default function Admin() {
                             </Tarjeta>
                         ))}
 
-                        {!verEntrenos && comentarios === null && <div className="flex justify-center py-10 text-zinc-600"><Loader2 className="animate-spin" size={20} /></div>}
+                        {!verEntrenos && comentarios === null && <div className="flex justify-center py-10 text-zinc-500"><Loader2 className="animate-spin" size={20} /></div>}
                         {!verEntrenos && comentarios?.length === 0 && <Vacio>Todavía no hay comentarios.</Vacio>}
 
                         {!verEntrenos && comentarios?.map(c => (
                             <Tarjeta key={c.comentarioId} className="p-4 flex items-start gap-3">
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] text-zinc-600">
+                                    <p className="text-[10px] text-zinc-500">
                                         <span className="text-zinc-400 font-bold">{c.autor}</span> en "{c.nombreEntreno || 'entreno'}" · {cuandoFue(c.fecha)}
                                     </p>
                                     <p className="text-white text-sm mt-1 break-words">{c.texto}</p>
@@ -722,7 +722,7 @@ export default function Admin() {
                         {/* Vista previa: el nombre de la app lo pone el móvil encima,
                             así que repetirlo en el título sale duplicado. */}
                         <div className="bg-black border border-white/[0.07] rounded-2xl p-4">
-                            <p className="text-[9px] text-zinc-600 uppercase tracking-widest mb-2">Así se verá</p>
+                            <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-2">Así se verá</p>
                             <p className="text-[10px] text-zinc-500">Kairos</p>
                             <p className="text-white text-sm font-bold break-words">{titulo || 'Título'}</p>
                             <p className="text-zinc-400 text-xs break-words">{texto || 'Texto del aviso'}</p>
@@ -742,10 +742,10 @@ export default function Admin() {
                 {/* ─── FALLOS ───────────────────────────────────────────── */}
                 {!cargando && pestana === 'fallos' && (
                     fallos === null ? (
-                        <div className="flex justify-center py-12 text-zinc-600"><Loader2 className="animate-spin" size={24} /></div>
+                        <div className="flex justify-center py-12 text-zinc-500"><Loader2 className="animate-spin" size={24} /></div>
                     ) : (
                         <div className="space-y-2">
-                            <p className="text-[10px] text-zinc-600 leading-tight ml-1 mb-3">
+                            <p className="text-[10px] text-zinc-500 leading-tight ml-1 mb-3">
                                 Pantallas que se han roto en el móvil de alguien. Van agrupadas: el mismo
                                 fallo en la misma pantalla es una línea con su contador, aunque haya
                                 pasado cien veces. Se caducan solas al mes.
@@ -754,8 +754,8 @@ export default function Admin() {
                             {fallos.errores.length === 0 && (
                                 <div className="py-14 text-center">
                                     <Bug size={26} className="text-zinc-800 mx-auto mb-3" />
-                                    <p className="text-zinc-600 text-sm">No se ha roto nada.</p>
-                                    <p className="text-[10px] text-zinc-700 mt-1">Es la pantalla que quieres ver vacía.</p>
+                                    <p className="text-zinc-500 text-sm">No se ha roto nada.</p>
+                                    <p className="text-[10px] text-zinc-600 mt-1">Es la pantalla que quieres ver vacía.</p>
                                 </div>
                             )}
 
@@ -777,13 +777,13 @@ export default function Admin() {
                                                     </span>
                                                 )}
                                                 {f.ruta && (
-                                                    <span className="text-[9px] text-zinc-600 font-mono truncate">{f.ruta}</span>
+                                                    <span className="text-[9px] text-zinc-500 font-mono truncate">{f.ruta}</span>
                                                 )}
                                             </div>
 
                                             <p className="text-white text-sm font-bold mt-1.5 break-words">{f.mensaje}</p>
 
-                                            <p className="text-[10px] text-zinc-600 mt-1">
+                                            <p className="text-[10px] text-zinc-500 mt-1">
                                                 {/* A cuanta gente le pasa: a uno puede ser su movil; a los tres, es la app */}
                                                 {f.aQuien.length > 0 && <>A {f.aQuien.join(', ')} · </>}
                                                 última {cuandoFue(f.ultimaVez)}
@@ -809,14 +809,14 @@ export default function Admin() {
                                         <>
                                             <button
                                                 onClick={() => setFalloAbierto(falloAbierto === f._id ? null : f._id)}
-                                                className="mt-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-zinc-400 transition-colors"
+                                                className="mt-2 text-[9px] font-black text-zinc-500 uppercase tracking-widest hover:text-zinc-400 transition-colors"
                                             >
                                                 {falloAbierto === f._id ? 'Ocultar detalle' : 'Ver detalle'}
                                             </button>
                                             {falloAbierto === f._id && (
                                                 <div className="mt-2 bg-black border border-white/[0.07] rounded-xl p-3 overflow-x-auto">
                                                     <pre className="text-[9px] text-zinc-500 font-mono whitespace-pre-wrap break-words">{f.pila}</pre>
-                                                    <p className="text-[9px] text-zinc-700 mt-2 pt-2 border-t border-white/[0.07]">
+                                                    <p className="text-[9px] text-zinc-600 mt-2 pt-2 border-t border-white/[0.07]">
                                                         Primera vez: {cuando(f.primeraVez)}
                                                         {f.navegador && <><br />{f.navegador}</>}
                                                     </p>
@@ -833,7 +833,7 @@ export default function Admin() {
                 {/* ─── ECONOMÍA ─────────────────────────────────────────── */}
                 {!cargando && pestana === 'economia' && (
                     eco === null ? (
-                        <div className="flex justify-center py-12 text-zinc-600"><Loader2 className="animate-spin" size={24} /></div>
+                        <div className="flex justify-center py-12 text-zinc-500"><Loader2 className="animate-spin" size={24} /></div>
                     ) : (
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
@@ -844,7 +844,7 @@ export default function Admin() {
                             {/* Lo que devuelve cada juego */}
                             <Tarjeta className="p-5">
                                 <Titulo>Lo que devuelve cada juego</Titulo>
-                                <p className="text-[10px] text-zinc-600 mt-1 mb-3 leading-tight">
+                                <p className="text-[10px] text-zinc-500 mt-1 mb-3 leading-tight">
                                     Por encima de {eco.limites.techo}% el juego regala dinero. Por debajo de {eco.limites.suelo}% es
                                     tan duro que nadie vuelve. Se calcula ahora mismo desde las tablas que usa el juego.
                                 </p>
@@ -889,7 +889,7 @@ export default function Admin() {
                                 <div className="mt-3 space-y-1.5">
                                     {eco.ricos.map((u, i) => (
                                         <div key={u.username} className="flex items-center gap-3">
-                                            <span className="text-[10px] text-zinc-700 font-black w-4 shrink-0">{i + 1}</span>
+                                            <span className="text-[10px] text-zinc-600 font-black w-4 shrink-0">{i + 1}</span>
                                             <span className="text-xs text-zinc-300 font-bold flex-1 min-w-0 truncate">{u.username}</span>
                                             <span className="text-[10px] text-yellow-500 font-bold shrink-0">{u.coins.toLocaleString('es-ES')}</span>
                                             <span className="text-xs text-violet-400 font-black shrink-0 w-16 text-right">{u.gameCoins.toLocaleString('es-ES')}</span>
@@ -923,7 +923,7 @@ export default function Admin() {
                                             : 'ninguno hoy'}
                                     </p>
                                 </div>
-                                <ChevronRight size={16} className="text-zinc-600 shrink-0" />
+                                <ChevronRight size={16} className="text-zinc-500 shrink-0" />
                             </button>
                         )}
 
@@ -960,7 +960,7 @@ export default function Admin() {
                                                 style={{ width: Math.min(100, (estado.base.megasUsados / estado.base.topeMegas) * 100) + '%' }}
                                             />
                                         </div>
-                                        <p className="text-[9px] text-zinc-600 mt-1">
+                                        <p className="text-[9px] text-zinc-500 mt-1">
                                             {(estado.base.documentos || 0).toLocaleString('es-ES')} documentos en {estado.base.colecciones} colecciones
                                         </p>
                                     </div>
@@ -1005,7 +1005,7 @@ export default function Admin() {
                         {/* Lanzarlas a mano */}
                         <Tarjeta className="p-5 space-y-2">
                             <Titulo>Lanzar a mano</Titulo>
-                            <p className="text-[10px] text-zinc-600 mb-3 leading-tight">
+                            <p className="text-[10px] text-zinc-500 mb-3 leading-tight">
                                 Las tres se pueden repetir sin miedo: no castigan, ni pagan, ni avisan dos veces.
                             </p>
 
@@ -1032,10 +1032,10 @@ export default function Admin() {
                 {/* ─── REGISTRO ─────────────────────────────────────────── */}
                 {!cargando && pestana === 'registro' && (
                     registro === null ? (
-                        <div className="flex justify-center py-12 text-zinc-600"><Loader2 className="animate-spin" size={24} /></div>
+                        <div className="flex justify-center py-12 text-zinc-500"><Loader2 className="animate-spin" size={24} /></div>
                     ) : (
                         <div className="space-y-2">
-                            <p className="text-[10px] text-zinc-600 leading-tight ml-1 mb-3">
+                            <p className="text-[10px] text-zinc-500 leading-tight ml-1 mb-3">
                                 Todo lo que se hace desde este panel queda aquí. No se puede borrar desde la
                                 app a propósito: un registro que el propio administrador puede limpiar no es
                                 un registro. Se caduca solo al año.
@@ -1047,7 +1047,7 @@ export default function Admin() {
                                 <Tarjeta key={r._id} className="p-4">
                                     <div className="flex items-baseline justify-between gap-2">
                                         <span className="text-[10px] font-black text-yellow-500/80 uppercase tracking-wide truncate">{r.accion}</span>
-                                        <span className="text-[10px] text-zinc-600 shrink-0">{cuandoFue(r.cuando)}</span>
+                                        <span className="text-[10px] text-zinc-500 shrink-0">{cuandoFue(r.cuando)}</span>
                                     </div>
                                     <p className="text-sm text-white mt-1 break-words">
                                         <span className="font-bold">{r.quien}</span> {r.resumen}

@@ -58,7 +58,7 @@ export default function EstadisticasTab() {
                 <span className="text-xl font-black text-white tabular-nums leading-none not-italic">{valor}</span>
                 {unidad && <span className="text-[10px] font-black text-zinc-500">{unidad}</span>}
             </div>
-            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mt-1 not-italic">{etiqueta}</p>
+            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-1 not-italic">{etiqueta}</p>
         </div>
     );
 
@@ -108,7 +108,7 @@ export default function EstadisticasTab() {
                                 </div>
                                 <span className="text-[13px] font-black text-white tabular-nums shrink-0">
                                     {resumen.mejorSerie.peso}<span className="text-[9px] text-zinc-500">kg</span>
-                                    <span className="text-zinc-600 mx-0.5">x</span>{resumen.mejorSerie.reps}
+                                    <span className="text-zinc-500 mx-0.5">x</span>{resumen.mejorSerie.reps}
                                 </span>
                             </div>
                         )}
@@ -214,7 +214,7 @@ export default function EstadisticasTab() {
                                     );
                                 })}
                             </div>
-                            <div className="flex justify-between mt-1.5 text-[9px] font-bold text-zinc-600 not-italic">
+                            <div className="flex justify-between mt-1.5 text-[9px] font-bold text-zinc-500 not-italic">
                                 <span>hace {filas.length} semanas</span>
                                 <span className="text-yellow-500">esta semana</span>
                             </div>
@@ -249,10 +249,10 @@ export default function EstadisticasTab() {
                             const reciente = (Date.now() - new Date(m.fecha)) < 30 * 86400000;
                             return (
                                 <div key={m.ejercicio} className="flex items-center gap-3 px-2.5 py-2">
-                                    <span className={`w-5 shrink-0 text-center text-[11px] font-black tabular-nums not-italic ${i < 3 ? 'text-yellow-500' : 'text-zinc-600'}`}>{i + 1}</span>
+                                    <span className={`w-5 shrink-0 text-center text-[11px] font-black tabular-nums not-italic ${i < 3 ? 'text-yellow-500' : 'text-zinc-500'}`}>{i + 1}</span>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-[12px] font-black text-white uppercase tracking-tight truncate not-italic">{m.ejercicio}</p>
-                                        <p className="text-[9px] text-zinc-600 font-bold tabular-nums">
+                                        <p className="text-[9px] text-zinc-500 font-bold tabular-nums">
                                             {new Date(m.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })} · 1RM {m.rm1} kg
                                             {reciente && <span className="text-emerald-400"> · nueva</span>}
                                         </p>
@@ -284,17 +284,17 @@ export default function EstadisticasTab() {
                                     <p className="text-[12px] font-black text-white uppercase tracking-tight truncate not-italic">
                                         {e.nombre}
                                     </p>
-                                    <p className="text-[9px] text-zinc-600 font-bold tabular-nums">
+                                    <p className="text-[9px] text-zinc-500 font-bold tabular-nums">
                                         {e.rm1} kg estimados · mejor serie {e.peso} × {e.reps}
                                     </p>
                                 </div>
                                 <span className="shrink-0 text-[17px] font-black text-yellow-500 tabular-nums">
                                     {e.veces.toLocaleString('es-ES')}
-                                    <span className="text-[9px] text-zinc-600 ml-0.5">×</span>
+                                    <span className="text-[9px] text-zinc-500 ml-0.5">×</span>
                                 </span>
                             </div>
                         ))}
-                        <p className="text-[9px] text-zinc-600 font-bold px-2.5 pt-1.5 pb-1">
+                        <p className="text-[9px] text-zinc-500 font-bold px-2.5 pt-1.5 pb-1">
                             Con tu peso de {fuerza.pesoCorporal} kg. Si adelgazas, sube sin levantar más.
                         </p>
                     </div>
@@ -326,7 +326,7 @@ export default function EstadisticasTab() {
                                     <p className="text-[12px] font-black text-white uppercase tracking-tight truncate not-italic">
                                         {e.name}
                                     </p>
-                                    <p className="text-[9px] text-zinc-600 font-bold">
+                                    <p className="text-[9px] text-zinc-500 font-bold">
                                         {e.sessions} {e.sessions === 1 ? 'sesión' : 'sesiones'} antes de dejarlo
                                     </p>
                                 </div>
@@ -379,7 +379,7 @@ export default function EstadisticasTab() {
                         ))}
 
                         {reparto?.sinClasificar > 0 && (
-                            <p className="text-[9px] text-zinc-600 font-bold pt-1">
+                            <p className="text-[9px] text-zinc-500 font-bold pt-1">
                                 Sin clasificar: {reparto.sinClasificar.toLocaleString('es-ES')} kg de ejercicios
                                 que ya no están en el catálogo.
                             </p>
@@ -397,7 +397,7 @@ export default function EstadisticasTab() {
             {!entrenados || entrenados.length === 0 ? (
                 <div className="text-center py-10 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Dumbbell className="mx-auto text-zinc-800 mb-2" size={26} />
-                    <p className="text-[11px] text-zinc-600 font-bold">Entrena y aquí verás tu evolución.</p>
+                    <p className="text-[11px] text-zinc-500 font-bold">Entrena y aquí verás tu evolución.</p>
                 </div>
             ) : (
                 <div className="bg-zinc-950 border border-white/[0.07] rounded-3xl p-4">
@@ -416,11 +416,11 @@ export default function EstadisticasTab() {
                     </div>
 
                     {!ejercicio ? (
-                        <p className="text-center text-[11px] text-zinc-600 py-8 font-bold">
+                        <p className="text-center text-[11px] text-zinc-500 py-8 font-bold">
                             Elige un ejercicio para ver cómo has progresado.
                         </p>
                     ) : cargandoProgreso ? (
-                        <p className="text-center text-[11px] text-zinc-600 py-8 animate-pulse font-bold uppercase">Cargando...</p>
+                        <p className="text-center text-[11px] text-zinc-500 py-8 animate-pulse font-bold uppercase">Cargando...</p>
                     ) : (
                         <>
                             {progreso?.record && (
@@ -455,7 +455,7 @@ export default function EstadisticasTab() {
                             {/* Que es el 1RM, dicho una vez y en pequeño. Sin esto
                                 es una sigla mas en una fila de botones. */}
                             {metrica === 'rm1' && (
-                                <p className="text-[9px] text-zinc-600 font-bold mb-2 px-1 leading-snug">
+                                <p className="text-[9px] text-zinc-500 font-bold mb-2 px-1 leading-snug">
                                     Lo que moverías a una sola repetición, estimado.
                                     Sube cuando progresas de verdad, no solo cuando
                                     cambias repeticiones por peso.
@@ -471,7 +471,7 @@ export default function EstadisticasTab() {
                             />
 
                             {metrica === 'rm1' && puntosConRM.every(p => p.rm1 === null) && (
-                                <p className="text-[10px] text-zinc-600 font-bold text-center py-2">
+                                <p className="text-[10px] text-zinc-500 font-bold text-center py-2">
                                     Aquí no se puede estimar: es un ejercicio sin peso,
                                     o siempre lo haces a más de 12 repeticiones.
                                 </p>

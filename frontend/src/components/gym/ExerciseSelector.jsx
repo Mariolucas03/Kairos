@@ -266,12 +266,12 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                 {/* Sin esto la lista parece incompleta: por defecto sólo salen
                     los básicos, y no hay forma de adivinar que hay 1.200 más. */}
                 {modoBasicos && !loading && (
-                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide leading-tight">
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide leading-tight">
                         Básicos ({filtered.length}). Busca o elige un grupo para ver el catálogo completo.
                     </p>
                 )}
                 {!modoBasicos && !loading && filtered.length >= 300 && (
-                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide leading-tight">
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide leading-tight">
                         Primeros 300 resultados. Afina la búsqueda si no lo encuentras.
                     </p>
                 )}
@@ -283,14 +283,14 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                 más abajo y por esa franja se veían pasar las filas. El hueco lo
                 pone ahora la propia cabecera con su `pt-4`. */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-black px-4 pt-0 pb-24 space-y-2">
-                {loading ? <div className="text-center py-10 text-zinc-600 animate-pulse font-bold text-xs uppercase">Cargando...</div> :
+                {loading ? <div className="text-center py-10 text-zinc-500 animate-pulse font-bold text-xs uppercase">Cargando...</div> :
                     agrupados.map(([grupo, lista]) => (
                         <div key={grupo} className="mb-4">
                             {/* Cabecera del grupo muscular: se queda pegada
                                 mientras recorres sus ejercicios */}
                             <div className="flex items-center justify-between px-1 mb-2 sticky top-0 bg-black pt-4 pb-1.5 z-10">
                                 <h3 className="text-[10px] font-black text-yellow-500 uppercase tracking-widest">{grupo}</h3>
-                                <span className="text-[9px] font-bold text-zinc-600">{lista.length}</span>
+                                <span className="text-[9px] font-bold text-zinc-500">{lista.length}</span>
                             </div>
                             <div className="space-y-2">
                                 {lista.map(ex => {
@@ -308,7 +308,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                                 {/* Miniatura del ejercicio. `loading="lazy"` es lo que
                                                     evita que abrir un grupo dispare 200 descargas de
                                                     golpe: sólo baja lo que entra en pantalla. */}
-                                                <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-black transition-all overflow-hidden ${isSelected ? 'bg-yellow-500 text-black text-xl shadow-lg shadow-yellow-500/20' : ex.thumb ? 'bg-white' : 'bg-black text-zinc-600'}`}>
+                                                <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-black transition-all overflow-hidden ${isSelected ? 'bg-yellow-500 text-black text-xl shadow-lg shadow-yellow-500/20' : ex.thumb ? 'bg-white' : 'bg-black text-zinc-500'}`}>
                                                     {isSelected ? (selectionIndex + 1) : ex.thumb ? (
                                                         <img
                                                             src={ex.thumb}
@@ -325,7 +325,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                                     {/* El grupo y la familia ya los dicen las cabeceras:
                                                         aquí va el equipamiento concreto (Multipower,
                                                         Barra Z...) y los músculos secundarios. */}
-                                                    <p className="text-[10px] text-zinc-600 font-bold uppercase truncate">
+                                                    <p className="text-[10px] text-zinc-500 font-bold uppercase truncate">
                                                         {/* La MARCA manda cuando la hay: delante de la
                                                             maquina lo que reconoces es "Technogym", no
                                                             "Maquina". Solo la llevan las de gimnasio. */}
@@ -333,7 +333,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                                             ? <span className="text-yellow-600/90">{ex.marca}</span>
                                                             : (ex.equipment || ex.muscle)}
                                                         {secundarios.length > 0 && (
-                                                            <span className="text-zinc-700 normal-case"> · también {secundarios.join(', ')}</span>
+                                                            <span className="text-zinc-600 normal-case"> · también {secundarios.join(', ')}</span>
                                                         )}
                                                     </p>
                                                 </div>
@@ -365,7 +365,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                 {!loading && porEquipo.length === 0 && (
                     <div className="text-center py-12">
                         <Dumbbell className="mx-auto text-zinc-800 mb-3" size={32} />
-                        <p className="text-zinc-600 text-xs font-bold uppercase mb-4">
+                        <p className="text-zinc-500 text-xs font-bold uppercase mb-4">
                             {searchTerm ? `No hay ningún "${searchTerm}"` : 'No hay ejercicios en esta categoría'}
                         </p>
                         <button onClick={abrirCrear} className="bg-blue-600 text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-wide inline-flex items-center gap-2 active:scale-95 transition-transform">
@@ -398,7 +398,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                 onChange={(e) => { setNuevoNombre(e.target.value); setErrorCrear(''); }}
                                 placeholder="Ej: Press inclinado con mancuernas"
                                 autoFocus
-                                className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white font-bold outline-none focus:border-blue-500 transition-colors placeholder:text-zinc-700"
+                                className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white font-bold outline-none focus:border-blue-500 transition-colors placeholder:text-zinc-500"
                             />
                         </div>
 
@@ -430,7 +430,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">
                                     ¿Qué músculo en concreto?
                                 </label>
-                                <p className="text-[10px] text-zinc-600 mb-2 leading-tight">
+                                <p className="text-[10px] text-zinc-500 mb-2 leading-tight">
                                     Opcional, pero es lo que hace que suba de rango <span className="text-zinc-400">ese</span> músculo
                                     y se pinte solo su zona del cuerpo.
                                 </p>
@@ -464,7 +464,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                             </label>
                             {/* Aquí está la respuesta al "press militar es pecho y hombro":
                                 el principal se lleva todo el volumen y cada secundario un 40% */}
-                            <p className="text-[10px] text-zinc-600 mb-2 leading-tight">
+                            <p className="text-[10px] text-zinc-500 mb-2 leading-tight">
                                 Opcional. Los secundarios reciben el 40% de los kilos para sus rangos.
                                 Ej: el press militar es <span className="text-zinc-400">Hombro</span> y además trabaja pecho y tríceps.
                             </p>
@@ -494,7 +494,7 @@ export default function ExerciseSelector({ onSelect, onClose }) {
                         <button
                             onClick={handleCreateNew}
                             disabled={guardando || !nuevoNombre.trim()}
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-black rounded-2xl uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 border-b-4 border-blue-800 disabled:border-zinc-900"
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-black rounded-2xl uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 border-b-4 border-blue-800 disabled:border-zinc-900"
                         >
                             <Save size={18} /> {guardando ? 'Creando...' : 'Crear y añadir'}
                         </button>

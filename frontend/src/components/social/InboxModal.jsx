@@ -27,7 +27,7 @@ export default function InboxModal({
 }) {
     const navigate = useNavigate();
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-4xl p-6 shadow-2xl relative flex flex-col max-h-[70vh]">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-bold text-white flex items-center gap-2"><Bell className="text-yellow-500" /> Notificaciones</h2>
@@ -180,7 +180,7 @@ export default function InboxModal({
                                                 : n.type === 'clan'
                                                     ? <Shield size={14} className="text-purple-400" />
                                                     : <MessageCircle size={14} className="text-blue-400" />}
-                                        <span className="text-[9px] text-zinc-600 font-bold">{hace(n.createdAt)}</span>
+                                        <span className="text-[9px] text-zinc-500 font-bold">{hace(n.createdAt)}</span>
                                     </div>
                                 </button>
                             ))}
@@ -207,7 +207,7 @@ export default function InboxModal({
 
                     <div>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Solicitudes Amistad</h3>
-                        {requests.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Nada por aquí.</p>}
+                        {requests.length === 0 && <p className="text-[10px] text-zinc-500 not-italic">Nada por aquí.</p>}
                         {requests.map(req => (
                             <div key={req._id} className="bg-black p-3 rounded-2xl border border-zinc-800 flex justify-between items-center mb-2">
                                 <div className="flex items-center gap-2 min-w-0">

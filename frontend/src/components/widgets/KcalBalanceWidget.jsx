@@ -132,7 +132,7 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
 
             {isOpen && createPortal(
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+                    <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
 
                     <div
                         className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
@@ -270,7 +270,7 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                                             </div>
                                         </div>
 
-                                        <div className={`relative z-10 ${includeBMR ? 'text-zinc-900' : 'text-zinc-600'}`}>
+                                        <div className={`relative z-10 ${includeBMR ? 'text-zinc-900' : 'text-zinc-500'}`}>
                                             {includeBMR ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                                         </div>
                                     </div>
@@ -288,7 +288,7 @@ export default function KcalBalanceWidget({ intake = 0, burned = 0, weight: prop
                         </div>
 
                         <div className="text-center relative z-10 pt-2 opacity-50 shrink-0">
-                            <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-zinc-600 uppercase">
+                            <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-zinc-500 uppercase">
                                 <Scale size={12} /> Balance = Ingesta - {includeBMR ? '(Actividad + Basal)' : 'Actividad'}
                             </div>
                         </div>

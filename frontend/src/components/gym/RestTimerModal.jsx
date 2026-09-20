@@ -62,7 +62,7 @@ export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip,
     };
 
     return (
-        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 p-4 rounded-3xl shadow-2xl z-50 ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-32 left-4 right-4 bg-zinc-900 border border-zinc-700 p-4 rounded-3xl shadow-2xl z-50 ring-1 ring-white/10 animate-in slide-in-from-bottom-5">
             {/* QUÉ VIENE AHORA.
 
                 Esta pantalla se mira quince o veinte veces por sesión, y hasta
@@ -92,7 +92,7 @@ export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip,
                             ¿Cuántas más podías hacer?
                         </span>
                         {esfuerzo !== undefined && esfuerzo !== null && (
-                            <span className="text-[9px] font-bold text-zinc-600">
+                            <span className="text-[9px] font-bold text-zinc-500">
                                 {OPCIONES_RIR.find(o => o.valor === esfuerzo)?.ayuda}
                             </span>
                         )}

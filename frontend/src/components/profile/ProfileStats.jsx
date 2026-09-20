@@ -140,9 +140,9 @@ export default function ProfileStats({ mini = false, onClick, onCloseExternal })
             {/* GRÁFICA */}
             <div className="flex-1 w-full bg-zinc-900/30 rounded-4xl p-4 border border-white/[0.07] relative z-10">
                 {loading ? (
-                    <div className="h-full flex items-center justify-center text-zinc-600 animate-pulse font-bold text-xs uppercase"><Activity size={24} className="mr-2" /> Cargando datos...</div>
+                    <div className="h-full flex items-center justify-center text-zinc-500 animate-pulse font-bold text-xs uppercase"><Activity size={24} className="mr-2" /> Cargando datos...</div>
                 ) : chartData.length < 2 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-zinc-600 text-xs font-bold uppercase border-2 border-dashed border-zinc-800 rounded-2xl">
+                    <div className="h-full flex flex-col items-center justify-center text-zinc-500 text-xs font-bold uppercase border-2 border-dashed border-zinc-800 rounded-2xl">
                         <p>Faltan datos para la gráfica</p>
                     </div>
                 ) : (

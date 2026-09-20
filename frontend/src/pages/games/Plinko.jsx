@@ -228,7 +228,7 @@ export default function Plinko() {
         <div className="fixed inset-0 bg-black flex flex-col items-center pt-28 pb-4 overflow-y-auto overflow-x-hidden select-none font-sans">
             <div className="fixed top-12 left-4 right-4 flex items-center z-50">
                 <div className="flex-1 flex"><BackButton to="/games" /></div>
-                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-amber-500/50 backdrop-blur-md shadow-2xl">
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-amber-500/50 shadow-2xl">
                     <span className="text-amber-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
@@ -236,7 +236,7 @@ export default function Plinko() {
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-500'}`}
                     >
                         {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
                     </button>
@@ -285,7 +285,7 @@ export default function Plinko() {
                 )}
 
                 {/* LOS CONTROLES */}
-                <div className="w-full bg-zinc-900/80 backdrop-blur-md rounded-[2rem] border border-white/[0.07] p-4 shadow-2xl">
+                <div className="w-full bg-zinc-900 rounded-[2rem] border border-white/[0.07] p-4 shadow-2xl">
                     <div className={tirando ? 'opacity-40 pointer-events-none' : ''}>
                         <SelectorApuesta valor={bet} onChange={setBet} saldo={fichas} minimo={10} deshabilitado={tirando} etiqueta="Por bola" />
                     </div>
@@ -338,7 +338,7 @@ export default function Plinko() {
                                 return <div key={k} className="rounded-md py-1.5 text-center text-[10px] font-black" style={{ background: col.fondo, color: col.tinta }}>x{String(m).replace('.', ',')}</div>;
                             })}
                         </div>
-                        <p className="text-[10px] text-zinc-600 mt-2 text-center">…y simétrico hacia el otro lado.</p>
+                        <p className="text-[10px] text-zinc-500 mt-2 text-center">…y simétrico hacia el otro lado.</p>
                     </div>
                 </div>
             )}

@@ -248,7 +248,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                             placeholder="Ej: PECHO Y BICEPS"
                             value={routineName}
                             onChange={(e) => setRoutineName(e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-white font-black text-lg focus:border-yellow-500 outline-none transition-colors placeholder:text-zinc-700 uppercase"
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-white font-black text-lg focus:border-yellow-500 outline-none transition-colors placeholder:text-zinc-500 uppercase"
                         />
                     </div>
 
@@ -257,7 +257,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                         <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest">
                             ¿Qué días toca?
                         </label>
-                        <p className="text-[10px] text-zinc-600 mb-2 ml-1 leading-tight">
+                        <p className="text-[10px] text-zinc-500 mb-2 ml-1 leading-tight">
                             Opcional. Si marcas días, la rutina aparecerá destacada como
                             <span className="text-zinc-400"> lo que toca hoy</span> en la pantalla de Gym.
                         </p>
@@ -284,7 +284,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                         <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 mb-2 block tracking-widest flex items-center gap-1">
                             <Timer size={12} /> Descanso entre series (Seg)
                         </label>
-                        <p className="text-[10px] text-zinc-600 mb-2 ml-1 leading-tight">
+                        <p className="text-[10px] text-zinc-500 mb-2 ml-1 leading-tight">
                             Es el de toda la rutina. Cada ejercicio puede llevar el suyo propio
                             en su casilla <span className="text-zinc-400">SEG</span>; en blanco usa este.
                         </p>
@@ -348,7 +348,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                     <div className="space-y-2">
                         {addedExercises.length === 0 ? (
                             <div onClick={() => setShowExerciseSelector(true)} className="border-2 border-dashed border-zinc-800 rounded-2xl p-8 text-center cursor-pointer hover:bg-zinc-900/50 hover:border-yellow-500/30 transition-all group">
-                                <Plus className="mx-auto text-zinc-600 group-hover:text-yellow-500 mb-2" />
+                                <Plus className="mx-auto text-zinc-500 group-hover:text-yellow-500 mb-2" />
                                 <p className="text-zinc-500 text-xs font-bold uppercase">Toca para añadir ejercicios</p>
                             </div>
                         ) : (
@@ -434,7 +434,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                 placeholder={String(restTime)}
                                                 onChange={(e) => updateExerciseRest(idx, e.target.value)}
                                                 title="Descanso solo para este ejercicio. Vacío usa el general."
-                                                className="w-full bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-700"
+                                                className="w-full bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-500"
                                             />
                                         </div>
 
@@ -467,7 +467,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                 onChange={(e) => updateExerciseReps(idx, e.target.value)}
                                                 onBlur={() => cerrarReps(idx)}
                                                 title="Cuando aguantes el número de arriba en todas las series, la app te sube el peso. Vale 5, 3-5 o 10-12."
-                                                className="w-full bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-700"
+                                                className="w-full bg-transparent text-center text-white font-bold text-sm outline-none focus:text-yellow-500 p-0 placeholder:text-zinc-500"
                                             />
                                         </div>
                                   </div>
@@ -477,7 +477,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                     onClick={() => setAjustesAbiertos(ajustesAbiertos === idx ? null : idx)}
                                     className={`w-full mt-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors ${ajustesAbiertos === idx
                                         ? 'bg-zinc-800 border-zinc-700 text-white'
-                                        : 'bg-black border-zinc-800 text-zinc-600 hover:text-zinc-400'}`}
+                                        : 'bg-black border-zinc-800 text-zinc-500 hover:text-zinc-400'}`}
                                   >
                                     <SlidersHorizontal size={11} />
                                     {ajustesAbiertos === idx ? 'Cerrar ajustes' : 'Cómo se mide'}
@@ -485,7 +485,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
 
                                   {ajustesAbiertos === idx && (
                                     <div className="mt-3 animate-in fade-in duration-200">
-                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-2">Cómo se mide</p>
+                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Cómo se mide</p>
                                     <div className="flex flex-wrap items-center gap-1.5">
                                         {[
                                             { campo: 'esPorTiempo', icono: Clock, texto: 'Tiempo', ayuda: 'Se mide en segundos: plancha, isométricos, muerto colgado' },
@@ -498,7 +498,7 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                                 title={ayuda}
                                                 className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide border transition-colors ${ex[campo]
                                                     ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-500'
-                                                    : 'bg-black border-zinc-800 text-zinc-600'}`}
+                                                    : 'bg-black border-zinc-800 text-zinc-500'}`}
                                             >
                                                 <Icono size={10} /> {texto}
                                             </button>
@@ -509,14 +509,14 @@ export default function CreateRoutineModal({ onClose, onRoutineCreated, routineT
                                             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black border border-zinc-800"
                                             title="Misma letra en los ejercicios que hagas seguidos sin descanso"
                                         >
-                                            <Link2 size={10} className={ex.superserie ? 'text-yellow-500' : 'text-zinc-600'} />
+                                            <Link2 size={10} className={ex.superserie ? 'text-yellow-500' : 'text-zinc-500'} />
                                             <input
                                                 type="text"
                                                 maxLength={1}
                                                 value={ex.superserie || ''}
                                                 placeholder="—"
                                                 onChange={(e) => cambiarSuperserie(idx, e.target.value)}
-                                                className="w-4 bg-transparent text-center text-[10px] font-black uppercase text-yellow-500 outline-none placeholder:text-zinc-700"
+                                                className="w-4 bg-transparent text-center text-[10px] font-black uppercase text-yellow-500 outline-none placeholder:text-zinc-500"
                                             />
                                         </div>
                                     </div>

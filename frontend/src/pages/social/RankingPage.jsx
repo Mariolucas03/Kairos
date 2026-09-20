@@ -61,7 +61,7 @@ export default function RankingPage() {
                 <h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest">
                     {isMonthly ? 'Top XP del mes' : 'Top 10 Global'}
                 </h3>
-                <span className="text-[10px] text-zinc-600 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase bg-zinc-900 px-2 py-1 rounded">
                     {isMonthly ? 'Se reinicia cada mes' : 'Histórico'}
                 </span>
             </div>
@@ -69,7 +69,7 @@ export default function RankingPage() {
             {loading ? (
                 <div className="text-center py-20 text-zinc-500 animate-pulse uppercase text-xs font-bold">Cargando ranking...</div>
             ) : list.length === 0 ? (
-                <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                <div className="text-center py-16 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Trophy className="mx-auto mb-3 opacity-50" size={32} />
                     <p className="text-xs">
                         {isMonthly ? 'Todavía nadie ha ganado XP este mes. ¡Sé el primero!' : 'Sin datos de ranking.'}

@@ -52,7 +52,7 @@ export default function BodyTab() {
         });
 
     if (isLoading) {
-        return <div className="py-16 text-center text-zinc-600 text-xs font-bold uppercase animate-pulse">Calculando tus rangos...</div>;
+        return <div className="py-16 text-center text-zinc-500 text-xs font-bold uppercase animate-pulse">Calculando tus rangos...</div>;
     }
 
     // ⚠️ Si la peticion falla (el servidor gratuito despertando, o sin red), la
@@ -89,7 +89,7 @@ export default function BodyTab() {
                         <div className="mt-2 h-1.5 bg-black/60 rounded-full overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${general.progress || 0}%`, background: general.rankColor }} />
                         </div>
-                        <p className="text-[9px] text-zinc-600 font-bold mt-1 not-italic">{general.nextRankLabel ? `Media de tus grupos · faltan ${miles(general.pointsToNext)} kg para ${general.nextRankLabel}` : 'Escalón máximo'}</p>
+                        <p className="text-[9px] text-zinc-500 font-bold mt-1 not-italic">{general.nextRankLabel ? `Media de tus grupos · faltan ${miles(general.pointsToNext)} kg para ${general.nextRankLabel}` : 'Escalón máximo'}</p>
                     </div>
                 </div>
             )}
@@ -176,14 +176,14 @@ export default function BodyTab() {
                                                 </div>
                                                 <p className="text-[11px] font-black text-white leading-tight mt-1.5 line-clamp-2 not-italic">{e.nombre}</p>
                                                 <p className="text-[9px] text-zinc-400 font-bold mt-1 not-italic">{e.sesiones} {e.sesiones === 1 ? 'vez' : 'veces'} · {miles(e.volumen)} kg</p>
-                                                {e.mejorPeso > 0 && <p className="text-[9px] text-zinc-600 font-bold not-italic">mejor {e.mejorPeso} kg</p>}
+                                                {e.mejorPeso > 0 && <p className="text-[9px] text-zinc-500 font-bold not-italic">mejor {e.mejorPeso} kg</p>}
                                                 </div>
                                             </button>
                                         ))}
                                     </div>
                                 </>
                             ) : (
-                                <p className="text-[10px] text-zinc-600 font-bold mt-3 not-italic">Todavía ningún ejercicio ha trabajado este músculo.</p>
+                                <p className="text-[10px] text-zinc-500 font-bold mt-3 not-italic">Todavía ningún ejercicio ha trabajado este músculo.</p>
                             )}
 
                             {/* La grafica del ejercicio tocado, aqui mismo */}
@@ -207,7 +207,7 @@ export default function BodyTab() {
                     );
                 })()}
 
-                <p className="text-[9px] text-zinc-600 text-center mt-2">
+                <p className="text-[9px] text-zinc-500 text-center mt-2">
                     Toca un músculo para ver su detalle
                 </p>
             </div>
@@ -239,7 +239,7 @@ export default function BodyTab() {
                                     <div key={r.key} className="flex items-center gap-2 bg-black rounded-lg px-2 py-1.5 border border-white/[0.07]">
                                         <IconoRango rango={r.key} color={r.color} tamano={18} />
                                         <span className="text-[10px] font-black uppercase" style={{ color: r.color }}>{r.label}</span>
-                                        <span className="text-[9px] text-zinc-600 ml-auto font-bold">{miles(r.min)}</span>
+                                        <span className="text-[9px] text-zinc-500 ml-auto font-bold">{miles(r.min)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -268,7 +268,7 @@ export default function BodyTab() {
                                             {hijos.length > 0 && (
                                                 <ChevronDown
                                                     size={13}
-                                                    className={`text-zinc-600 shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}
+                                                    className={`text-zinc-500 shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`}
                                                 />
                                             )}
                                         </div>
@@ -286,7 +286,7 @@ export default function BodyTab() {
 
                                     <div className="flex items-center justify-between mt-1.5">
                                         <span className="text-[9px] font-bold text-zinc-500">{miles(info.volume)} kg movidos</span>
-                                        <span className="text-[9px] font-bold text-zinc-600">
+                                        <span className="text-[9px] font-bold text-zinc-500">
                                             {info.nextRankLabel
                                                 ? `Faltan ${miles(info.pointsToNext)} para ${info.nextRankLabel}`
                                                 : 'Rango máximo'}
@@ -314,7 +314,7 @@ export default function BodyTab() {
                                                             style={{ width: `${r.progress || 0}%`, backgroundColor: r.rankColor }}
                                                         />
                                                     </div>
-                                                    <span className="text-[9px] font-bold text-zinc-600 mt-0.5 block">{miles(r.volume)} kg</span>
+                                                    <span className="text-[9px] font-bold text-zinc-500 mt-0.5 block">{miles(r.volume)} kg</span>
                                                 </div>
                                             );
                                         })}

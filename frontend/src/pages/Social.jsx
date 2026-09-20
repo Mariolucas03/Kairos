@@ -228,7 +228,7 @@ export default function Social() {
                             value={searchText}
                             onChange={(e) => setSearchText(e.target.value)}
                             placeholder="Buscar jugadores..."
-                            className="w-full bg-zinc-950 border border-yellow-500/50 rounded-2xl py-3.5 pl-12 pr-12 text-white outline-none font-bold text-sm placeholder:text-zinc-600"
+                            className="w-full bg-zinc-950 border border-yellow-500/50 rounded-2xl py-3.5 pl-12 pr-12 text-white outline-none font-bold text-sm placeholder:text-zinc-500"
                         />
                         <button onClick={closeSearch} className="absolute right-3 top-1/2 -translate-y-1/2 bg-zinc-800 p-1.5 rounded-full text-zinc-400 hover:text-white">
                             {isSearching ? <Loader2 size={14} className="animate-spin text-yellow-500" /> : <X size={14} />}
@@ -263,7 +263,7 @@ export default function Social() {
                                         style={{ background: 'linear-gradient(90deg, #eab308, transparent)' }}
                                     />
                                     <Icon size={19} className={avisa ? 'text-yellow-500' : 'text-zinc-300 group-hover:text-white transition-colors'} />
-                                    <span className={`text-[9px] font-black uppercase tracking-[0.1em] not-italic ${avisa ? 'text-yellow-500/80' : 'text-zinc-600 group-hover:text-zinc-400 transition-colors'}`}>
+                                    <span className={`text-[9px] font-black uppercase tracking-[0.1em] not-italic ${avisa ? 'text-yellow-500/80' : 'text-zinc-500 group-hover:text-zinc-400 transition-colors'}`}>
                                         {label}
                                     </span>
                                     {avisa && (
@@ -283,7 +283,7 @@ export default function Social() {
                 <div className="space-y-2 mb-6 animate-in fade-in">
                     <h3 className="text-[10px] font-black text-yellow-500 uppercase ml-2 tracking-widest">Resultados</h3>
                     {searchResults.length === 0 && !isSearching && (
-                        <p className="text-center py-6 text-zinc-600 text-xs not-italic">Nadie con ese nombre.</p>
+                        <p className="text-center py-6 text-zinc-500 text-xs not-italic">Nadie con ese nombre.</p>
                     )}
                     {searchResults.map(u => (
                         <div key={u._id} className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl flex justify-between items-center">
@@ -317,7 +317,7 @@ export default function Social() {
                     </button>
                 </div>
             ) : friends.length === 0 ? (
-                <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                <div className="text-center py-16 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Users className="mx-auto mb-3 opacity-50" size={32} />
                     <p className="text-xs mb-4">Añade amigos para ver aquí sus entrenos.</p>
                     <button onClick={() => setSearchOpen(true)} className="bg-yellow-500 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-yellow-400 transition-colors inline-flex items-center gap-2">
@@ -325,7 +325,7 @@ export default function Social() {
                     </button>
                 </div>
             ) : feedItems.length === 0 ? (
-                <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                <div className="text-center py-16 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Dumbbell className="mx-auto mb-3 opacity-50" size={32} />
                     <p className="text-xs">Tus amigos aún no han publicado entrenos.</p>
                 </div>

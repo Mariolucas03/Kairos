@@ -26,7 +26,7 @@ export default function Toast({ message, type = 'success', onClose }) {
     return (
         // Fijo abajo y centrado. Va en la capa más alta para que nunca lo tape
         // un modal (antes usaba z-200, el mismo que los modales).
-        <div style={{ zIndex: Z.toast }} className="fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-3 rounded-2xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm bg-zinc-950/90 border-white/10">
+        <div style={{ zIndex: Z.toast }} className="fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 w-[90%] max-w-sm bg-zinc-950/90 border-white/10">
             <div className={`p-2 rounded-full ${styles} bg-opacity-20`}>
                 <Icon size={20} />
             </div>

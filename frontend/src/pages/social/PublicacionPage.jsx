@@ -62,7 +62,7 @@ export default function PublicacionPage() {
             </div>
 
             {cargando && (
-                <div className="flex items-center justify-center py-20 text-zinc-600">
+                <div className="flex items-center justify-center py-20 text-zinc-500">
                     <Loader2 size={22} className="animate-spin" />
                 </div>
             )}

@@ -89,7 +89,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
 
                         <div className="mt-3.5 flex flex-col gap-[9px]">
                             {loggedMeals.length === 0 ? (
-                                <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.1em] leading-relaxed not-italic">
+                                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.1em] leading-relaxed not-italic">
                                     SIN COMIDAS<br />REGISTRADAS HOY
                                 </span>
                             ) : (
@@ -118,7 +118,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
 
             {isOpen && createPortal(
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+                    <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
 
                     <div
                         className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
@@ -146,7 +146,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                             {loggedMeals.length === 0 && (
                                 <div className="py-8 text-center">
                                     <p className="text-zinc-500 text-sm font-bold uppercase">Nada registrado todavía</p>
-                                    <p className="text-zinc-600 text-xs mt-1">Añade alimentos y aparecerán aquí.</p>
+                                    <p className="text-zinc-500 text-xs mt-1">Añade alimentos y aparecerán aquí.</p>
                                 </div>
                             )}
                             {loggedMeals.map((meal) => {
@@ -165,7 +165,7 @@ export default function FoodWidget({ currentKcal = 0, limitKcal = 2100, meals = 
                                                 </span>
                                             </div>
                                             <span className="text-sm font-black text-zinc-300">
-                                                {f(Math.round(mealKcal))} <span className="text-[9px] text-zinc-600 font-bold uppercase">KCAL</span>
+                                                {f(Math.round(mealKcal))} <span className="text-[9px] text-zinc-500 font-bold uppercase">KCAL</span>
                                             </span>
                                         </div>
 

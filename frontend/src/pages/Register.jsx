@@ -90,7 +90,7 @@ export default function Register() {
             acento={ACENTO}
             icono={UserPlus}
             titulo="Crear cuenta"
-            subtitulo="Empieza a entrenar en Kairos"
+            subtitulo="Usuario, correo y contraseña. Un minuto."
             error={error}
             exito={exito}
             pie={

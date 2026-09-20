@@ -52,7 +52,7 @@ const Cifra = ({ icono: Icono, valor, etiqueta, color }) => (
     <div className="flex-1 min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-2xl py-2.5 text-center">
         <Icono size={12} className={`${color} mx-auto`} />
         <p className="text-base font-black text-white mt-1 leading-none truncate px-1">{valor}</p>
-        <p className="text-[9px] text-zinc-600 uppercase tracking-wide mt-1 truncate px-1">{etiqueta}</p>
+        <p className="text-[9px] text-zinc-500 uppercase tracking-wide mt-1 truncate px-1">{etiqueta}</p>
     </div>
 );
 
@@ -69,7 +69,7 @@ const Enlace = ({ icono: Icono, titulo, pie, onClick, className = '', tono = 'te
             <p className="font-bold text-sm text-white truncate">{titulo}</p>
             {pie && <p className="text-[10px] text-zinc-500 mt-0.5 truncate">{pie}</p>}
         </div>
-        <Flecha size={18} className="text-zinc-600 shrink-0" />
+        <Flecha size={18} className="text-zinc-500 shrink-0" />
     </button>
 );
 
@@ -144,10 +144,10 @@ export default function Profile() {
                         isToday
                             ? 'bg-yellow-500 text-black border border-yellow-400'
                             : isFuture
-                                ? 'text-zinc-700 cursor-not-allowed'
+                                ? 'text-zinc-600 cursor-not-allowed'
                                 : tuvoActividad
                                     ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/25 hover:bg-yellow-500/20'
-                                    : 'text-zinc-600 hover:bg-zinc-800 hover:text-white'
+                                    : 'text-zinc-500 hover:bg-zinc-800 hover:text-white'
                     }`}
                 >
                     {i}
@@ -162,9 +162,9 @@ export default function Profile() {
                     <span className="text-white font-black uppercase tracking-wider text-sm">{monthNames[calendarViewDate.getMonth()]} {calendarViewDate.getFullYear()}</span>
                     <button onClick={() => setCalendarViewDate(new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 1))} className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white border border-zinc-800"><ChevronRight size={16} /></button>
                 </div>
-                <div className="grid grid-cols-7 gap-1 text-center mb-2">{['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => <span key={d} className="text-[10px] font-bold text-zinc-600">{d}</span>)}</div>
+                <div className="grid grid-cols-7 gap-1 text-center mb-2">{['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => <span key={d} className="text-[10px] font-bold text-zinc-500">{d}</span>)}</div>
                 <div className="grid grid-cols-7 gap-1 place-items-center relative z-10">{days}</div>
-                <p className="mt-4 pt-4 border-t border-zinc-800 text-center text-[10px] text-zinc-600 relative z-10">
+                <p className="mt-4 pt-4 border-t border-zinc-800 text-center text-[10px] text-zinc-500 relative z-10">
                     En amarillo, los días que hiciste algo. Toca uno para verlo en Inicio.
                 </p>
             </div>
@@ -305,7 +305,7 @@ export default function Profile() {
             </Seccion>
 
             {openStrength && (
-                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+                <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in">
                     <div className="w-full max-w-2xl relative z-10">
                         <Suspense fallback={<CargandoGrafica alto={320} />}>
                             <ProfileStats onCloseExternal={() => setOpenStrength(false)} />

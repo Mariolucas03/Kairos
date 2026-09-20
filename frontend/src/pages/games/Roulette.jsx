@@ -334,7 +334,7 @@ export default function Roulette() {
                 el lado que menos ocupaba. */}
             <div className="absolute top-12 left-4 right-4 flex items-center z-20">
                 <div className="flex-1 flex"><BackButton to="/games" /></div>
-                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-yellow-500/50 backdrop-blur-md shadow-2xl transition-all duration-200">
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-yellow-500/50 shadow-2xl transition-all duration-200">
                     <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
@@ -345,7 +345,7 @@ export default function Roulette() {
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar la ruleta' : 'Activar el sonido de la ruleta'}
-                        className={`p-2 rounded-xl border active:scale-95 transition-transform ${conSonido ? 'bg-zinc-900/80 border-zinc-800 text-zinc-300' : 'bg-zinc-900/80 border-zinc-800 text-zinc-600'}`}
+                        className={`p-2 rounded-xl border active:scale-95 transition-transform ${conSonido ? 'bg-zinc-900/80 border-zinc-800 text-zinc-300' : 'bg-zinc-900/80 border-zinc-800 text-zinc-500'}`}
                     >
                         {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
                     </button>
@@ -420,7 +420,7 @@ export default function Roulette() {
                         girar, en letra pequeña. */}
                     <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.08em] not-italic">
                         <span className="text-zinc-500">Mesa <span className="text-yellow-500 tabular-nums text-xs">{currentBetTotal.toLocaleString('es-ES')}</span></span>
-                        <span className="text-zinc-700">·</span>
+                        <span className="text-zinc-600">·</span>
                         <span className="text-zinc-500">Quedan <span className="text-zinc-200 tabular-nums text-xs">{visualBalance.toLocaleString('es-ES')}</span></span>
                     </div>
 
@@ -440,7 +440,7 @@ export default function Roulette() {
                                 onChange={(e) => setTextoFicha(e.target.value.replace(/[^\d]/g, '').slice(0, 7))}
                                 onKeyDown={(e) => e.key === 'Enter' && confirmarFichaLibre()}
                                 placeholder="Cantidad"
-                                className="flex-1 min-w-0 bg-black border border-yellow-500/50 rounded-xl px-3 py-2 text-center text-lg font-black text-yellow-500 tabular-nums outline-none placeholder:text-zinc-700 placeholder:text-sm"
+                                className="flex-1 min-w-0 bg-black border border-yellow-500/50 rounded-xl px-3 py-2 text-center text-lg font-black text-yellow-500 tabular-nums outline-none placeholder:text-zinc-500 placeholder:text-sm"
                             />
                             <button onClick={confirmarFichaLibre} className="p-2 rounded-xl bg-yellow-500 text-black active:scale-90 transition-transform"><Check size={18} /></button>
                             <button onClick={() => setEditandoFicha(false)} className="p-2 rounded-xl bg-zinc-800 border border-zinc-600 text-zinc-400"><X size={18} /></button>
@@ -518,7 +518,7 @@ export default function Roulette() {
 
             {/* MODAL RESULTADO */}
             {resultModal && (
-                <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 animate-in zoom-in-95 duration-200">
                     <div className={`w-full max-w-xs rounded-4xl p-8 text-center border-2 shadow-2xl relative ${resultModal.won ? 'bg-green-900/40 border-green-500' : 'bg-red-900/40 border-red-500'}`}>
                         <div className="mb-4 flex justify-center">
                             <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl font-black text-white shadow-xl border-4 ${resultModal.color === 'red' ? 'bg-red-600 border-red-400' : resultModal.color === 'black' ? 'bg-black border-zinc-500' : 'bg-green-600 border-green-400'}`}>

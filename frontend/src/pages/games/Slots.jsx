@@ -50,7 +50,7 @@ const ICONS = {
     star: <Star size={32} className="text-purple-400" />,
     gem: <Gem size={32} className="text-cyan-400" />,
     crown: <Crown size={32} className="text-yellow-600" />,
-    skull: <Skull size={32} className="text-zinc-600" />,
+    skull: <Skull size={32} className="text-zinc-500" />,
     ghost: <Ghost size={32} className="text-zinc-500" />
 };
 
@@ -317,7 +317,7 @@ export default function Slots() {
                 el lado que menos ocupaba. */}
             <div className="fixed top-12 left-4 right-4 flex items-center z-50">
                 <div className="flex-1 flex"><BackButton to="/games" /></div>
-                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-purple-500/50 backdrop-blur-md shadow-2xl">
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-purple-500/50 shadow-2xl">
                     <span className="text-purple-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
@@ -325,7 +325,7 @@ export default function Slots() {
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-500'}`}
                     >
                         {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
                     </button>
@@ -402,7 +402,7 @@ export default function Slots() {
                 </div>
 
                 {/* CONTROLES */}
-                <div className="w-full bg-zinc-900/80 backdrop-blur-md rounded-3xl border border-white/10 p-5 flex flex-col gap-4 shadow-xl">
+                <div className="w-full bg-zinc-900 rounded-3xl border border-white/10 p-5 flex flex-col gap-4 shadow-xl">
                     <div className="bg-black/60 rounded-xl py-3 border border-white/[0.07] text-center h-12 flex items-center justify-center">
                         {result.won ? (
                             <span className="text-green-400 font-black text-xl animate-pulse">+{result.payout} FICHAS</span>
@@ -419,7 +419,7 @@ export default function Slots() {
                             disabled={isGameActive || (gameStarted && visualBalance < bet)}
                             className={`w-full h-14 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg active:scale-95 transition-all border-b-4 
                                 ${isGameActive
-                                    ? 'bg-zinc-800 border-zinc-900 text-zinc-600'
+                                    ? 'bg-zinc-800 border-zinc-900 text-zinc-500'
                                     : 'bg-fuchsia-600 border-fuchsia-800 text-white hover:brightness-110'
                                 }`}
                         >

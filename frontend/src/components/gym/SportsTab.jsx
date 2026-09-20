@@ -101,19 +101,19 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
 
             {/* BUSCADOR */}
             <div className="relative mb-4">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" size={16} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" size={16} />
                 <input
                     type="text"
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar deporte..."
-                    className="w-full min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-2xl py-3 pl-11 pr-4 text-white text-sm font-bold outline-none focus:border-lime-500/40 transition-colors placeholder:text-zinc-700"
+                    className="w-full min-w-0 bg-[#0a0a0c] border border-white/[0.07] rounded-2xl py-3 pl-11 pr-4 text-white text-sm font-bold outline-none focus:border-lime-500/40 transition-colors placeholder:text-zinc-500"
                 />
             </div>
 
             {/* REJILLA DE DEPORTES */}
             {!sports ? (
-                <div className="py-12 text-center text-zinc-600 text-xs font-bold uppercase animate-pulse">Cargando deportes...</div>
+                <div className="py-12 text-center text-zinc-500 text-xs font-bold uppercase animate-pulse">Cargando deportes...</div>
             ) : (
                 categorias.map(([grupo, items]) => items.length > 0 && (
                     <div key={grupo} className="mb-5">
@@ -147,7 +147,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
             )}
 
             {sports && lista.length === 0 && (
-                <p className="text-center py-8 text-zinc-600 text-xs font-bold">
+                <p className="text-center py-8 text-zinc-500 text-xs font-bold">
                     Nada con ese nombre. Usa <span className="text-zinc-400">Otro</span> para cualquier actividad.
                 </p>
             )}
@@ -160,7 +160,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                    parte de arriba. Centrado y con aire por los cuatro lados
                    cuadra en cualquier alto de pantalla. */
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[200] flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setElegido(null)} />
+                    <div className="absolute inset-0 bg-black/95" onClick={() => setElegido(null)} />
                     <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-lime-500/20 rounded-3xl p-5 shadow-2xl shadow-black/70 animate-in zoom-in-95 fade-in duration-200 max-h-[85vh] overflow-y-auto custom-scrollbar">
 
                         <div className="flex items-center justify-between mb-5">
@@ -182,7 +182,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                                     onChange={(e) => setNombreLibre(e.target.value)}
                                     placeholder="Ej: Escalada en rocódromo"
                                     autoFocus
-                                    className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white font-bold outline-none focus:border-lime-500 placeholder:text-zinc-700"
+                                    className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white font-bold outline-none focus:border-lime-500 placeholder:text-zinc-500"
                                 />
                             </div>
                         )}
@@ -190,12 +190,12 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                         <div className={`grid ${elegido.distance ? 'grid-cols-2' : 'grid-cols-1'} gap-3 mb-4`}>
                             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
                                 <label className="text-[10px] font-black text-zinc-500 uppercase mb-1 flex items-center gap-1"><Timer size={10} /> Minutos</label>
-                                <input type="number" inputMode="decimal" placeholder="0" value={minutos} onChange={(e) => setMinutos(e.target.value)} autoFocus={elegido.id !== 'otro'} className="w-full bg-transparent text-3xl font-black text-white outline-none p-0 placeholder:text-zinc-700" />
+                                <input type="number" inputMode="decimal" placeholder="0" value={minutos} onChange={(e) => setMinutos(e.target.value)} autoFocus={elegido.id !== 'otro'} className="w-full bg-transparent text-3xl font-black text-white outline-none p-0 placeholder:text-zinc-500" />
                             </div>
                             {elegido.distance && (
                                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
                                     <label className="text-[10px] font-black text-zinc-500 uppercase mb-1 flex items-center gap-1"><MapPin size={10} /> Km</label>
-                                    <input type="number" inputMode="decimal" placeholder="-" value={distancia} onChange={(e) => setDistancia(e.target.value)} className="w-full bg-transparent text-3xl font-black text-white outline-none p-0 placeholder:text-zinc-700" />
+                                    <input type="number" inputMode="decimal" placeholder="-" value={distancia} onChange={(e) => setDistancia(e.target.value)} className="w-full bg-transparent text-3xl font-black text-white outline-none p-0 placeholder:text-zinc-500" />
                                 </div>
                             )}
                         </div>
@@ -203,13 +203,13 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                         {/* Calorías del reloj: si las pones mandan ellas */}
                         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-4">
                             <label className="text-[10px] font-black text-zinc-500 uppercase mb-1 flex items-center gap-1">
-                                <Watch size={10} /> Calorías de tu reloj <span className="text-zinc-600 normal-case font-bold">(opcional)</span>
+                                <Watch size={10} /> Calorías de tu reloj <span className="text-zinc-500 normal-case font-bold">(opcional)</span>
                             </label>
                             <div className="flex items-center gap-2">
                                 <Flame size={20} className="text-orange-500 shrink-0" />
-                                <input type="number" inputMode="decimal" placeholder="Las calcula la app" value={kcal} onChange={(e) => setKcal(e.target.value)} className="w-full bg-transparent text-2xl font-black text-white outline-none p-0 placeholder:text-zinc-700 placeholder:text-sm placeholder:font-bold" />
+                                <input type="number" inputMode="decimal" placeholder="Las calcula la app" value={kcal} onChange={(e) => setKcal(e.target.value)} className="w-full bg-transparent text-2xl font-black text-white outline-none p-0 placeholder:text-zinc-500 placeholder:text-sm placeholder:font-bold" />
                             </div>
-                            <p className="text-[9px] text-zinc-600 mt-1.5 flex items-center gap-1">
+                            <p className="text-[9px] text-zinc-500 mt-1.5 flex items-center gap-1">
                                 <Sparkles size={9} /> Si lo dejas vacío las calcula la IA con tu peso y la intensidad.
                             </p>
                         </div>
@@ -228,7 +228,7 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
                         <button
                             onClick={guardar}
                             disabled={guardando}
-                            className="w-full py-4 bg-lime-500 hover:bg-lime-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black rounded-2xl uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 border-b-4 border-lime-700 disabled:border-zinc-900"
+                            className="w-full py-4 bg-lime-500 hover:bg-lime-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-black font-black rounded-2xl uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 border-b-4 border-lime-700 disabled:border-zinc-900"
                         >
                             {guardando ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                             {guardando ? 'Registrando...' : 'Registrar'}

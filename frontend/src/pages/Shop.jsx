@@ -198,7 +198,7 @@ export default function Shop() {
             <div className="flex justify-between items-end px-4 pt-6 pb-2 bg-black border-b border-zinc-900">
                 <div>
                     <h1 className="text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Mercado</h1>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Gasta tu fortuna</p>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">{(user?.coins || 0).toLocaleString('es-ES')} monedas · {currentFichas.toLocaleString('es-ES')} fichas</p>
                 </div>
             </div>
 
@@ -227,7 +227,7 @@ export default function Shop() {
                             </div>
                             <div>
                                 <h3 className="text-white font-black text-[15px] uppercase tracking-[0.02em] leading-none not-italic">Casa de cambio</h3>
-                                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide mt-1.5">100 fichas · 1 moneda</p>
+                                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide mt-1.5">100 fichas · 1 moneda</p>
                             </div>
                         </div>
                     </div>
@@ -239,7 +239,7 @@ export default function Shop() {
                         {CATEGORIES.map(cat => (
                             <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="aspect-[4/3] bg-[#0a0a0c] border border-white/[0.07] rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all active:scale-[0.985] cursor-pointer group relative overflow-hidden">
                                 <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_TIENDA}, transparent)` }} />
-                                <div className="text-zinc-600 group-hover:text-zinc-300 transition-colors relative z-10">{cat.icon}</div>
+                                <div className="text-zinc-500 group-hover:text-zinc-300 transition-colors relative z-10">{cat.icon}</div>
                                 <span className="font-black text-[10px] text-zinc-500 group-hover:text-white tracking-[0.16em] relative z-10 uppercase not-italic">{cat.label}</span>
                             </div>
                         ))}
@@ -354,7 +354,7 @@ export default function Shop() {
                 // borrón amarillo fijo, igual para un común que para un legendario.
                 const rarezaSel = RARITIES[selectedItem.rarity] || RARITIES.comun;
                 return (
-                <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
+                <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
                     <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-4xl p-8 relative flex flex-col items-center text-center shadow-2xl overflow-hidden">
                         {/* Acento de 2px + halo al 11%, como las tarjetas */}
                         <div
@@ -401,7 +401,7 @@ export default function Shop() {
                                             </div>
                                         ))}
                                     </div>
-                                    <p className="text-[9px] text-zinc-600 mt-2 px-1">Un objeto repetido se convierte en la mitad de su precio en fichas.</p>
+                                    <p className="text-[9px] text-zinc-500 mt-2 px-1">Un objeto repetido se convierte en la mitad de su precio en fichas.</p>
                                 </div>
                             );
                         })()}
@@ -431,7 +431,7 @@ export default function Shop() {
 
             {/* 2. Crear Premio */}
             {showCreator && (
-                <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
+                <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-6 animate-in fade-in h-screen w-screen">
                     <div className="w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-4xl p-6 relative shadow-2xl overflow-hidden">
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_TIENDA}, transparent)` }} />
                         <div className="flex justify-between items-center mb-6 relative z-10">
@@ -442,11 +442,11 @@ export default function Shop() {
                         <div className="space-y-4 relative z-10">
                             <div>
                                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 block mb-2 tracking-widest">Nombre</label>
-                                <input type="text" placeholder="Ej: 1h Videojuegos" autoFocus value={newReward.name} onChange={e => setNewReward({ ...newReward, name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-sm outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors placeholder:text-zinc-700" />
+                                <input type="text" placeholder="Ej: 1h Videojuegos" autoFocus value={newReward.name} onChange={e => setNewReward({ ...newReward, name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-sm outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors placeholder:text-zinc-500" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-1 block mb-2 tracking-widest">Precio</label>
-                                <input type="number" placeholder="Ej: 100" value={newReward.price} onChange={e => setNewReward({ ...newReward, price: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-sm outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors placeholder:text-zinc-700" />
+                                <input type="number" placeholder="Ej: 100" value={newReward.price} onChange={e => setNewReward({ ...newReward, price: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white font-bold text-sm outline-none focus:ring-0 focus:border-yellow-500/50 transition-colors placeholder:text-zinc-500" />
                             </div>
                             <button onClick={handleCreate} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl mt-4 transition-all active:scale-95 flex items-center justify-center gap-2 border-b-4 border-yellow-700 uppercase tracking-[0.12em] text-xs">
                                 <Save size={16} /> Crear premio
@@ -458,7 +458,7 @@ export default function Shop() {
 
             {/* 3. Modal Canje */}
             {showExchange && (
-                <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in h-screen w-screen">
+                <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 animate-in fade-in h-screen w-screen">
                     <div className="bg-[#09090b] w-full max-w-sm rounded-4xl border border-white/[0.07] p-6 shadow-2xl relative overflow-hidden">
                         {/* Acento y halo de la casa de cambio: morado, el color de
                             las fichas, que es lo que entregas aquí. */}
@@ -476,7 +476,7 @@ export default function Shop() {
                                     <img src="/assets/icons/ficha.png" className="w-6 h-6 object-contain mt-1" /> Fichas
                                 </span>
                             </div>
-                            <div className="text-zinc-600"><ArrowRightLeft size={20} /></div>
+                            <div className="text-zinc-500"><ArrowRightLeft size={20} /></div>
                             <div className="text-center flex flex-col items-center">
                                 <span className="block text-2xl font-black text-yellow-500 leading-none mb-2">{Math.floor(exchangeAmount / 100)}</span>
                                 <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest flex items-center gap-1">

@@ -48,14 +48,14 @@ export default function Footer() {
     const renderItem = (item) => (
         <NavLink key={item.name} to={item.path} className="group relative flex-1 flex justify-center">
             {({ isActive }) => (
-                <div className={`flex flex-col items-center justify-center gap-0.5 transition-all duration-300 ${isActive ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                <div className={`flex flex-col items-center justify-center gap-0.5 transition-all duration-300 ${isActive ? 'text-yellow-500' : 'text-zinc-500 hover:text-zinc-400'}`}>
                     <div className="relative">
                         <item.icon size={21} strokeWidth={isActive ? 2.5 : 2} />
                         {item.hasBadge && (
                             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0a0a0c] animate-pulse"></span>
                         )}
                     </div>
-                    <span className={`text-[9px] font-bold tracking-wide uppercase transition-colors ${isActive ? 'text-yellow-500' : 'text-zinc-600'}`}>
+                    <span className={`text-[9px] font-bold tracking-wide uppercase transition-colors ${isActive ? 'text-yellow-500' : 'text-zinc-500'}`}>
                         {item.name}
                     </span>
                 </div>

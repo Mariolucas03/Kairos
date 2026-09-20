@@ -186,7 +186,7 @@ export default function CancionDelPost({ cancion }) {
             >
                 {cancion.caratula
                     ? <img src={cancion.caratula} alt="" className="w-full h-full object-cover" />
-                    : <span className="w-full h-full bg-zinc-900 flex items-center justify-center"><Music size={13} className="text-zinc-600" /></span>}
+                    : <span className="w-full h-full bg-zinc-900 flex items-center justify-center"><Music size={13} className="text-zinc-500" /></span>}
                 <span className="absolute inset-0 bg-black/50 flex items-center justify-center text-white">
                     {conSonido ? <Volume2 size={13} /> : <VolumeX size={13} />}
                 </span>
@@ -195,13 +195,13 @@ export default function CancionDelPost({ cancion }) {
             <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-bold text-zinc-300 truncate leading-tight">
                     {cancion.titulo}
-                    <span className="text-zinc-600"> · {cancion.artista}</span>
+                    <span className="text-zinc-500"> · {cancion.artista}</span>
                 </p>
                 {/* Se dice UNA vez lo que hay que hacer. Sin esto, el altavoz
                     tachado sobre una carátula no se lee como "toca aquí para
                     oírla": se lee como un icono decorativo. */}
                 {!conSonido && (
-                    <p className="text-[9px] text-zinc-600 font-bold leading-tight">
+                    <p className="text-[9px] text-zinc-500 font-bold leading-tight">
                         Toca para escucharla
                     </p>
                 )}

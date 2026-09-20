@@ -18,7 +18,7 @@ export default function RankUpModal({ subidas = [], monedas = 0, onClose }) {
     return createPortal(
         <div
             style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }}
-            className="fixed left-0 right-0 z-[10000] flex items-center justify-center p-5 overflow-y-auto bg-black/95 backdrop-blur-md animate-in fade-in duration-200"
+            className="fixed left-0 right-0 z-[10000] flex items-center justify-center p-5 overflow-y-auto bg-black/95 animate-in fade-in duration-200"
         >
             <div className="relative w-full max-w-sm bg-[#09090b] border border-white/[0.07] rounded-4xl p-7 overflow-hidden animate-in zoom-in-95">
                 <div

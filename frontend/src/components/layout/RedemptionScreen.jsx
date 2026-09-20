@@ -53,7 +53,7 @@ export default function RedemptionScreen({ user, setUser }) {
                 <h1 className="text-5xl font-black text-white mb-2 tracking-tighter uppercase">Game Over</h1>
                 <p className="text-red-300 font-bold tracking-widest uppercase mb-8 text-sm">Tu salud ha llegado a cero</p>
 
-                <div className="bg-black/80 border-2 border-red-600/50 p-6 rounded-2xl mb-8 shadow-2xl backdrop-blur-sm">
+                <div className="bg-black/80 border-2 border-red-600/50 p-6 rounded-2xl mb-8 shadow-2xl">
                     <div className="flex items-center justify-center gap-2 text-red-500 mb-4">
                         <Lock size={20} />
                         <span className="font-bold text-xs uppercase">Misión de Desbloqueo</span>

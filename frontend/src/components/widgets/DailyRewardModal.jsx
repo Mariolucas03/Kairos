@@ -72,7 +72,7 @@ export default function DailyRewardModal({ camino, premioRecogido, onClose, onCl
             style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }}
             className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4"
         >
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={onClose} aria-hidden="true" />
+            <div className="absolute inset-0 bg-black/95" onClick={onClose} aria-hidden="true" />
 
             <div className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl shadow-2xl overflow-hidden animate-in zoom-in-95">
                 <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg, ${ACENTO}, transparent)` }} />

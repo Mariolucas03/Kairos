@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Share, X } from '../../iconos';
+import { Share, X, Download } from '../../iconos';
 
 export default function IosInstallPrompt() {
     const [showPrompt, setShowPrompt] = useState(false);
@@ -22,7 +22,7 @@ export default function IosInstallPrompt() {
     if (!showPrompt) return null;
 
     return (
-        <div className="fixed bottom-6 left-4 right-4 z-[100] bg-zinc-900/95 backdrop-blur-md border border-yellow-500/30 p-5 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-700">
+        <div className="fixed bottom-6 left-4 right-4 z-[100] bg-zinc-900 border border-yellow-500/30 p-5 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-700">
             <button
                 onClick={() => setShowPrompt(false)}
                 className="absolute top-2 right-2 text-zinc-500 hover:text-white bg-black/20 p-1 rounded-full"
@@ -32,7 +32,7 @@ export default function IosInstallPrompt() {
 
             <div className="flex gap-4">
                 <div className="bg-black w-12 h-12 rounded-xl flex items-center justify-center border border-zinc-800 shrink-0">
-                    <span className="text-2xl">🔥</span>
+                    <Download size={22} className="text-yellow-500" />
                 </div>
                 <div>
                     <h3 className="text-white font-bold text-sm uppercase tracking-wide">Instalar App</h3>

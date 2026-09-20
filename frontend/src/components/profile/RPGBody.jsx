@@ -75,7 +75,7 @@ export default function RPGBody({ mini = false, onClick }) {
     return (
         <div className="w-full h-full bg-gray-950 p-0 relative overflow-hidden flex flex-col items-center select-none">
 
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex bg-gray-900/90 backdrop-blur border border-gray-700 rounded-full p-1 shadow-xl">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex bg-gray-900 border border-gray-700 rounded-full p-1 shadow-xl">
                 <button onClick={() => setView('front')} className={`px-6 py-2 text-xs font-bold rounded-full transition-all ${view === 'front' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>FRONTAL</button>
                 <button onClick={() => setView('back')} className={`px-6 py-2 text-xs font-bold rounded-full transition-all ${view === 'back' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>TRASERA</button>
             </div>
@@ -131,7 +131,7 @@ export default function RPGBody({ mini = false, onClick }) {
                 </div>
             )}
 
-            <div className="absolute bottom-6 flex gap-4 bg-gray-900/90 backdrop-blur border border-gray-700 py-2 px-4 rounded-full shadow-2xl z-50">
+            <div className="absolute bottom-6 flex gap-4 bg-gray-900 border border-gray-700 py-2 px-4 rounded-full shadow-2xl z-50">
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-green-500"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Bien</span></div>
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-500"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Recup</span></div>
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500"></div><span className="text-[10px] md:text-xs font-bold text-gray-300 uppercase">Agujetas</span></div>

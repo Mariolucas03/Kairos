@@ -179,7 +179,7 @@ export default function CartaAlta() {
                         la siguiente se lo lleva todo.
                     </p>
                     <div className="flex items-center gap-1 mt-3 flex-wrap">
-                        <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mr-1">Manda</span>
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mr-1">Manda</span>
                         {[...ESCALERA].reverse().map((n, i) => (
                             <span key={n} className="text-[10px] font-black" style={{ color: i === 0 ? ACENTO : '#52525b' }}>
                                 {NOMBRES[n]}{i < ESCALERA.length - 1 && <span className="text-zinc-800 mx-0.5">›</span>}
@@ -200,7 +200,7 @@ export default function CartaAlta() {
                     <div className="bg-[#0a0a0c] border rounded-3xl p-5 mb-6 space-y-4" style={{ borderColor: ACENTO + '55' }}>
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nueva sala</p>
-                            <button onClick={() => setCreando(false)} className="text-zinc-600 hover:text-white"><X size={16} /></button>
+                            <button onClick={() => setCreando(false)} className="text-zinc-500 hover:text-white"><X size={16} /></button>
                         </div>
                         <SelectorApuesta
                             valor={apuesta}
@@ -246,7 +246,7 @@ export default function CartaAlta() {
                 )}
 
                 {salas && salas.length === 0 && !creando && (
-                    <p className="text-center text-zinc-600 text-sm py-10">
+                    <p className="text-center text-zinc-500 text-sm py-10">
                         Todavía no has jugado ninguna partida.
                     </p>
                 )}
@@ -297,7 +297,7 @@ export default function CartaAlta() {
                             confirmLabel: esSala && s.soyLider ? 'Cerrar' : 'Salir',
                             accion: () => salir(s._id)
                         })}
-                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-600 hover:text-red-400 active:scale-95 shrink-0"
+                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-red-400 active:scale-95 shrink-0"
                     >
                         <LogOut size={15} />
                     </button>
@@ -310,7 +310,7 @@ export default function CartaAlta() {
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
                         {esSala ? 'En la sala' : 'Jugadores'}
                     </p>
-                    <span className="text-[10px] text-zinc-600 font-bold">
+                    <span className="text-[10px] text-zinc-500 font-bold">
                         {s.jugadores.length}/{s.maxJugadores}
                         {s.invitadosPendientes > 0 && ` · ${s.invitadosPendientes} sin contestar`}
                     </span>
@@ -334,10 +334,10 @@ export default function CartaAlta() {
                                 <p className="text-sm font-bold text-white truncate flex items-center gap-1.5">
                                     {j.nombre}
                                     {j.esLider && <Crown size={11} style={{ color: ACENTO }} />}
-                                    {j.soyYo && <span className="text-[9px] text-zinc-600 font-black uppercase">tú</span>}
+                                    {j.soyYo && <span className="text-[9px] text-zinc-500 font-black uppercase">tú</span>}
                                 </p>
                                 {!esSala && (
-                                    <p className="text-[10px] text-zinc-600">
+                                    <p className="text-[10px] text-zinc-500">
                                         {j.haTirado ? 'ha levantado' : 'esperando'}
                                     </p>
                                 )}
@@ -354,7 +354,7 @@ export default function CartaAlta() {
                                     onClick={() => expulsar(j._id)}
                                     disabled={enVuelo}
                                     title={`Sacar a ${j.nombre}`}
-                                    className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-600 hover:text-red-400 active:scale-95 shrink-0"
+                                    className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-red-400 active:scale-95 shrink-0"
                                 >
                                     <UserMinus size={14} />
                                 </button>
@@ -368,11 +368,11 @@ export default function CartaAlta() {
                         {invitando ? (
                             <div className="mt-4 space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">A quién invitas</p>
-                                    <button onClick={() => setInvitando(false)} className="text-zinc-600 hover:text-white"><X size={14} /></button>
+                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">A quién invitas</p>
+                                    <button onClick={() => setInvitando(false)} className="text-zinc-500 hover:text-white"><X size={14} /></button>
                                 </div>
                                 {invitables.length === 0 && (
-                                    <p className="text-[11px] text-zinc-600">
+                                    <p className="text-[11px] text-zinc-500">
                                         No te queda nadie a quien invitar. Puedes empezar igual: jugarás contra la máquina.
                                     </p>
                                 )}
@@ -413,7 +413,7 @@ export default function CartaAlta() {
                 )}
 
                 {esSala && !s.soyLider && (
-                    <p className="text-[11px] text-zinc-600 mt-4 text-center">
+                    <p className="text-[11px] text-zinc-500 mt-4 text-center">
                         Esperando a que el líder empiece la partida.
                     </p>
                 )}
@@ -520,7 +520,7 @@ export default function CartaAlta() {
                             el precio viejo. */}
                         {!terminada && s.soyLider && !yaTire && s.bote === 0 && (
                             <div className="mt-5">
-                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-2 text-center">
+                                <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2 text-center">
                                     Lo que cuesta la mano
                                 </p>
                                 <div className="flex gap-2">
@@ -571,7 +571,7 @@ export default function CartaAlta() {
                             <div className="space-y-3">
                                 {s.historial.map(m => (
                                     <div key={m.numero} className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[10px] font-black text-zinc-700 w-5 shrink-0 tabular-nums">{m.numero}</span>
+                                        <span className="text-[10px] font-black text-zinc-600 w-5 shrink-0 tabular-nums">{m.numero}</span>
                                         {m.tiradas.map((t, i) => (
                                             <CartaEspanola key={i} carta={t.carta} tamano="sm" apagada={!m.empate && t.nombre !== m.ganador} />
                                         ))}
@@ -639,7 +639,7 @@ const FilaSala = ({ sala, onAbrir, apagada = false }) => {
 
 const Dato = ({ etiqueta, valor, color = '#fff' }) => (
     <div className="bg-[#0a0a0c] border border-white/[0.07] rounded-2xl p-3 text-center">
-        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">{etiqueta}</p>
+        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{etiqueta}</p>
         <p className="text-lg font-black mt-0.5 tabular-nums" style={{ color }}>{valor}</p>
     </div>
 );

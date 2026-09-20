@@ -107,14 +107,14 @@ const Marcador = ({ mio, suyo, unidad, rival }) => {
                     <p className={`text-[17px] font-black tabular-nums leading-none not-italic ${voyGanando ? 'text-yellow-500' : 'text-zinc-300'}`}>
                         {conUnidad(mio, unidad)}
                     </p>
-                    <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mt-1">Tú</p>
+                    <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mt-1">Tú</p>
                 </div>
-                <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest pb-3 shrink-0">vs</span>
+                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest pb-3 shrink-0">vs</span>
                 <div className="min-w-0 flex-1 text-right">
                     <p className={`text-[17px] font-black tabular-nums leading-none not-italic ${!voyGanando && !empate ? 'text-yellow-500' : 'text-zinc-300'}`}>
                         {conUnidad(suyo, unidad)}
                     </p>
-                    <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mt-1 truncate">
+                    <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mt-1 truncate">
                         {rival?.username}
                     </p>
                 </div>
@@ -300,7 +300,7 @@ export default function DuelosPage() {
             />
 
             {isLoading && (
-                <div className="flex justify-center py-16 text-zinc-600">
+                <div className="flex justify-center py-16 text-zinc-500">
                     <Loader2 size={22} className="animate-spin" />
                 </div>
             )}
@@ -345,7 +345,7 @@ export default function DuelosPage() {
                                             <X size={12} /> Paso
                                         </Boton>
                                     </div>
-                                    <p className="text-[9px] text-zinc-600 mt-2.5 text-center leading-snug">
+                                    <p className="text-[9px] text-zinc-500 mt-2.5 text-center leading-snug">
                                         Al aceptar se os cobra la apuesta a los dos y arrancan los {dias} días.
                                     </p>
                                 </Tarjeta>
@@ -409,7 +409,7 @@ export default function DuelosPage() {
                                             <p className="text-[12px] font-black text-zinc-300 uppercase truncate not-italic">
                                                 {d.opponent?.username}
                                             </p>
-                                            <p className="text-[10px] text-zinc-600">
+                                            <p className="text-[10px] text-zinc-500">
                                                 {d.betAmount} fichas · aún no ha contestado
                                             </p>
                                         </div>
@@ -429,7 +429,7 @@ export default function DuelosPage() {
                     )}
 
                     {terminados.length > 0 && (
-                        <Seccion titulo="Terminados" color="text-zinc-600">
+                        <Seccion titulo="Terminados" color="text-zinc-500">
                             {terminados.map(d => {
                                 const rival = elOtro(d, miId);
                                 const soyRetador = d.challenger?._id === miId;
@@ -443,17 +443,17 @@ export default function DuelosPage() {
                                         <div className="flex items-center gap-3">
                                             {empate
                                                 ? <Handshake size={16} className="text-zinc-500 shrink-0" />
-                                                : <Trophy size={16} className={gane ? 'text-yellow-500 shrink-0' : 'text-zinc-700 shrink-0'} />}
+                                                : <Trophy size={16} className={gane ? 'text-yellow-500 shrink-0' : 'text-zinc-600 shrink-0'} />}
                                             <div className="min-w-0 flex-1">
                                                 <p className={`text-[12px] font-black uppercase truncate not-italic ${gane ? 'text-yellow-500' : 'text-zinc-400'}`}>
                                                     {empate ? 'Empate' : gane ? 'Ganaste' : 'Perdiste'}
-                                                    <span className="text-zinc-600"> contra {rival?.username}</span>
+                                                    <span className="text-zinc-500"> contra {rival?.username}</span>
                                                 </p>
                                                 <p className="text-[10px] text-zinc-500 tabular-nums">
                                                     {conUnidad(mios, unidadDe(d.type))} contra {conUnidad(suyos, unidadDe(d.type))}
                                                 </p>
                                             </div>
-                                            <span className={`text-[12px] font-black tabular-nums shrink-0 ${gane ? 'text-yellow-500' : 'text-zinc-600'}`}>
+                                            <span className={`text-[12px] font-black tabular-nums shrink-0 ${gane ? 'text-yellow-500' : 'text-zinc-500'}`}>
                                                 {empate ? '±0' : gane ? `+${d.betAmount}` : `−${d.betAmount}`}
                                             </span>
                                         </div>
@@ -465,11 +465,11 @@ export default function DuelosPage() {
 
                     {duelos.length === 0 && (
                         <div className="text-center py-14 px-8 border-2 border-dashed border-zinc-900 rounded-3xl">
-                            <Swords className="mx-auto mb-3 text-zinc-700" size={30} />
+                            <Swords className="mx-auto mb-3 text-zinc-600" size={30} />
                             <p className="text-[12px] text-zinc-500 font-bold leading-snug">
                                 Aún no has retado a nadie.
                             </p>
-                            <p className="text-[10px] text-zinc-600 mt-1.5 leading-snug">
+                            <p className="text-[10px] text-zinc-500 mt-1.5 leading-snug">
                                 Gana quien más kilos mueva en {dias} días.
                             </p>
                         </div>
@@ -480,7 +480,7 @@ export default function DuelosPage() {
             {/* --- ELEGIR RIVAL Y APUESTA --- */}
             {creando && (
                 <div
-                    className="fixed inset-0 z-[8000] bg-black/90 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+                    className="fixed inset-0 z-[8000] bg-black/95 flex items-end sm:items-center justify-center p-4"
                     onClick={() => setCreando(false)}
                 >
                     <div
@@ -505,7 +505,7 @@ export default function DuelosPage() {
                             Es la decision que cambia el duelo entero: uno de kilos
                             y uno de misiones no se parecen en nada. La apuesta va
                             despues porque es el detalle. */}
-                        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-2">
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">
                             ¿A qué jugáis?
                         </p>
                         <div className="grid grid-cols-2 gap-1.5 mb-4">
@@ -523,7 +523,7 @@ export default function DuelosPage() {
                                         <span className={`block text-[11px] font-black uppercase tracking-tight not-italic ${elegido ? 'text-yellow-500' : 'text-zinc-300'}`}>
                                             {m.etiqueta}
                                         </span>
-                                        <span className="block text-[9px] text-zinc-600 leading-tight mt-0.5">
+                                        <span className="block text-[9px] text-zinc-500 leading-tight mt-0.5">
                                             {m.pista}
                                         </span>
                                     </button>
@@ -545,12 +545,12 @@ export default function DuelosPage() {
                             y se cobra cuando acepte.
                         </p>
 
-                        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-2">
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">
                             ¿Contra quién?
                         </p>
 
                         {amigos.length === 0 ? (
-                            <p className="text-[11px] text-zinc-600 py-6 text-center leading-snug">
+                            <p className="text-[11px] text-zinc-500 py-6 text-center leading-snug">
                                 Los duelos son entre amigos.<br />Añade a alguien primero.
                             </p>
                         ) : (
@@ -570,7 +570,7 @@ export default function DuelosPage() {
                                                 {a.username}
                                             </span>
                                             {yaTiene && (
-                                                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-wider shrink-0">
+                                                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-wider shrink-0">
                                                     ya tenéis uno
                                                 </span>
                                             )}

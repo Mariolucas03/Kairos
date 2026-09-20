@@ -261,7 +261,7 @@ export default function Food() {
             {/* CABECERA DE PÁGINA */}
             <div className="flex items-start justify-between gap-3 px-4 pt-[18px]">
                 <div className="min-w-0">
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] leading-none not-italic">
+                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] leading-none not-italic">
                         Objetivo {f(limitKcal)} kcal
                     </p>
                     <h1 className="mt-[9px] text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">
@@ -368,7 +368,7 @@ export default function Food() {
                                         {meal.name}
                                     </h3>
                                     {vacia ? (
-                                        <p className="mt-2 text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] leading-none not-italic">
+                                        <p className="mt-2 text-[9px] font-black text-zinc-500 uppercase tracking-[0.08em] leading-none not-italic">
                                             Sin alimentos{restanKcal > 0 && ` · Te quedan ${f(restanKcal)} kcal`}
                                         </p>
                                     ) : (
@@ -398,7 +398,7 @@ export default function Food() {
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[12px] font-bold text-zinc-200 truncate not-italic">{item.name}</p>
                                                 <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-1 text-[9px] font-black uppercase not-italic">
-                                                    <span className="text-zinc-600">x{item.quantity}</span>
+                                                    <span className="text-zinc-500">x{item.quantity}</span>
                                                     <span style={{ color: MACRO_COLORS.protein }}>P {f(item.protein)}</span>
                                                     <span style={{ color: MACRO_COLORS.carbs }}>C {f(item.carbs)}</span>
                                                     <span style={{ color: MACRO_COLORS.fat }}>G {f(item.fat)}</span>
@@ -411,7 +411,7 @@ export default function Food() {
                                                 <button
                                                     onClick={() => setConfirmDelete({ mealId: meal._id, foodItemId: item._id, name: item.name })}
                                                     aria-label={`Quitar ${item.name}`}
-                                                    className="p-2 text-zinc-600 hover:text-red-400 transition-colors"
+                                                    className="p-2 text-zinc-500 hover:text-red-400 transition-colors"
                                                 >
                                                     <Trash2 size={14} />
                                                 </button>
@@ -445,7 +445,7 @@ export default function Food() {
 
             {/* Modal Configuración (IA / Manual) */}
             {configModal.show && createPortal(
-                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+                <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-zinc-950 border border-zinc-800 rounded-4xl w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
 
@@ -473,7 +473,7 @@ export default function Food() {
 
                                         <div onClick={() => setIsAutoMacro(!isAutoMacro)} className="flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-zinc-800 mb-4 cursor-pointer">
                                             <span className="text-xs font-bold text-zinc-400 uppercase">Autocompletar Macros</span>
-                                            {isAutoMacro ? <ToggleRight className="text-green-500" size={24} /> : <ToggleLeft className="text-zinc-600" size={24} />}
+                                            {isAutoMacro ? <ToggleRight className="text-green-500" size={24} /> : <ToggleLeft className="text-zinc-500" size={24} />}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">

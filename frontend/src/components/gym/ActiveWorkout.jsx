@@ -833,7 +833,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                     <span className="text-[10px] font-black text-purple-400 uppercase tracking-[0.14em] not-italic">
                                         Superserie {letraDe(ex)}
                                     </span>
-                                    <span className="text-[10px] text-zinc-600 font-bold truncate">
+                                    <span className="text-[10px] text-zinc-500 font-bold truncate">
                                         · seguido con {nombres.join(' y ')}, sin descanso
                                     </span>
                                 </div>
@@ -911,7 +911,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                                     <Trophy size={12} className="text-yellow-600 shrink-0" />
                                                     <span className="text-[11px] font-black text-yellow-500 whitespace-nowrap tabular-nums">
                                                         {ex.pr.weight}<span className="text-[9px] text-zinc-500">kg</span>
-                                                        <span className="text-zinc-600 mx-0.5">×</span>{ex.pr.reps}
+                                                        <span className="text-zinc-500 mx-0.5">×</span>{ex.pr.reps}
                                                     </span>
                                                 </div>
                                             )}
@@ -991,7 +991,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                                     ("10 · 10 · 6") y habia que contar con el
                                                     dedo para saber cual era la tuya. */}
                                                 {antes && (
-                                                    <span className="text-[9px] font-bold text-zinc-600 tabular-nums leading-none mt-0.5 whitespace-nowrap">
+                                                    <span className="text-[9px] font-bold text-zinc-500 tabular-nums leading-none mt-0.5 whitespace-nowrap">
                                                         {antes}
                                                     </span>
                                                 )}
@@ -1067,7 +1067,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             {/* ALERTAS */}
             {showExitAlert && (
-                <div className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
+                <div className="fixed inset-0 z-[10000] bg-black/95 flex items-center justify-center p-6 animate-in fade-in">
                     <div className="bg-zinc-950 border border-red-900/50 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative text-center">
                         <div className="bg-red-500/10 p-4 rounded-full text-red-500 inline-block mb-4"><AlertTriangle size={32} /></div>
                         <h3 className="text-white font-black text-lg uppercase">¿Salir sin guardar?</h3>
@@ -1081,7 +1081,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             {/* --- RESUMEN DE FIN DE SESIÓN (estilo Symmetry) --- */}
             {showFinishAlert && (
-                <div className="fixed inset-0 z-[10000] bg-black/95 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto animate-in fade-in">
+                <div className="fixed inset-0 z-[10000] bg-black/95 flex items-start justify-center p-4 overflow-y-auto animate-in fade-in">
                     <div className="bg-zinc-950 border border-yellow-500/30 p-5 rounded-3xl w-full max-w-sm shadow-2xl my-6">
                         <div className="text-center mb-4">
                             <div className="bg-yellow-500/10 p-3 rounded-full text-yellow-500 inline-block mb-2"><Trophy size={28} /></div>
@@ -1126,14 +1126,14 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                 <div className="space-y-1.5">
                                     {resumen.objetivos.map(o => (
                                         <div key={o.name} className="flex items-center gap-2">
-                                            <span className={`shrink-0 w-4 h-4 rounded-lg flex items-center justify-center text-[9px] font-black ${o.cumplida ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-600'}`}>
+                                            <span className={`shrink-0 w-4 h-4 rounded-lg flex items-center justify-center text-[9px] font-black ${o.cumplida ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-500'}`}>
                                                 {o.cumplida ? '✓' : '·'}
                                             </span>
                                             <span className="text-[11px] font-bold text-white uppercase truncate flex-1 min-w-0">{o.name}</span>
                                             <span className={`text-[10px] font-black tabular-nums shrink-0 ${o.cumplida ? 'text-emerald-400' : 'text-zinc-500'}`}>
                                                 {o.hecho}
                                             </span>
-                                            <span className="text-[9px] text-zinc-600 tabular-nums shrink-0">de {o.pedido}</span>
+                                            <span className="text-[9px] text-zinc-500 tabular-nums shrink-0">de {o.pedido}</span>
                                         </div>
                                     ))}
                                 </div>

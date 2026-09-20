@@ -54,7 +54,7 @@ function BodyTab({ ranks, mujer = false }) {
             </div>
 
             {conActividad.length === 0 && (
-                <div className="text-center py-8 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl mb-4">
+                <div className="text-center py-8 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl mb-4">
                     <p className="text-xs">Todavía no hay entrenos registrados.</p>
                     <p className="text-[10px] mt-1">Los músculos suben de rango con los kilos acumulados.</p>
                 </div>
@@ -78,7 +78,7 @@ function BodyTab({ ranks, mujer = false }) {
                                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.points ? r.rankColor : '#3f3f46' }} />
                                         <span className="text-xs font-black text-white uppercase truncate">{grupo}</span>
                                         {hijos.length > 0 && (
-                                            <ChevronDown size={13} className={`text-zinc-600 shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`} />
+                                            <ChevronDown size={13} className={`text-zinc-500 shrink-0 transition-transform duration-200 ${abierto ? 'rotate-180' : ''}`} />
                                         )}
                                     </div>
                                     <span
@@ -97,10 +97,10 @@ function BodyTab({ ranks, mujer = false }) {
                                 </div>
 
                                 <div className="flex items-center justify-between mt-1.5">
-                                    <span className="text-[9px] text-zinc-600 font-bold">
+                                    <span className="text-[9px] text-zinc-500 font-bold">
                                         {r.volume >= 1000 ? `${Math.round(r.volume / 1000)}k` : r.volume} kg·rep · {r.weeks} {r.weeks === 1 ? 'semana' : 'semanas'}
                                     </span>
-                                    <span className="text-[9px] text-zinc-600 font-bold">
+                                    <span className="text-[9px] text-zinc-500 font-bold">
                                         {r.nextRankLabel ? `${r.progress}% → ${r.nextRankLabel}` : 'Máximo'}
                                     </span>
                                 </div>
@@ -161,7 +161,7 @@ function FoodDayCard({ item }) {
                 ].map(m => (
                     <div key={m.label} className="bg-black/50 rounded-xl py-2 text-center border border-white/[0.07]">
                         <div className={`text-sm font-black ${m.color}`}>{m.value}g</div>
-                        <div className="text-[9px] font-bold text-zinc-600 uppercase">{m.label}</div>
+                        <div className="text-[9px] font-bold text-zinc-500 uppercase">{m.label}</div>
                     </div>
                 ))}
             </div>
@@ -184,11 +184,11 @@ function MissionDayCard({ item }) {
             <div className="flex justify-between items-center mb-3">
                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{formatDate(item.date)}</span>
                 <span className="text-xs font-black text-green-400">
-                    {item.completed}<span className="text-zinc-600"> / {Math.max(item.total, item.completed)}</span>
+                    {item.completed}<span className="text-zinc-500"> / {Math.max(item.total, item.completed)}</span>
                 </span>
             </div>
             <div className="space-y-1.5">
-                {item.list.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Sin detalle guardado.</p>}
+                {item.list.length === 0 && <p className="text-[10px] text-zinc-500 not-italic">Sin detalle guardado.</p>}
                 {item.list.map((m, i) => (
                     <div key={i} className="flex items-center justify-between bg-black/50 rounded-xl px-3 py-2 border border-white/[0.07]">
                         <span className="text-[11px] font-bold text-zinc-300 truncate pr-2">{m.title}</span>
@@ -238,7 +238,7 @@ function CuadroComida({ item, onOpen }) {
             <Flame size={16} className="text-orange-500 mb-1" />
             <span className="text-xl font-black text-white leading-none">{(item.totalCalories || 0).toLocaleString('es-ES')}</span>
             <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">kcal</span>
-            <span className="absolute bottom-1.5 text-[9px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
+            <span className="absolute bottom-1.5 text-[9px] font-bold text-zinc-500 uppercase">{formatDate(item.date)}</span>
         </button>
     );
 }
@@ -249,13 +249,13 @@ function CuadroMisiones({ item, onOpen }) {
     return (
         <button onClick={onOpen} className="relative aspect-square bg-zinc-950 border border-white/[0.07] flex flex-col items-center justify-center active:opacity-70 transition-opacity px-2">
             <span className="text-xl font-black text-white leading-none">
-                {item.completed}<span className="text-zinc-600 text-sm">/{total}</span>
+                {item.completed}<span className="text-zinc-500 text-sm">/{total}</span>
             </span>
             <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-0.5">misiones</span>
             <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/[0.07] mt-2">
                 <div className="h-full bg-green-500 rounded-full" style={{ width: `${pct}%` }} />
             </div>
-            <span className="absolute bottom-1.5 text-[9px] font-bold text-zinc-600 uppercase">{formatDate(item.date)}</span>
+            <span className="absolute bottom-1.5 text-[9px] font-bold text-zinc-500 uppercase">{formatDate(item.date)}</span>
         </button>
     );
 }
@@ -268,7 +268,7 @@ function DetalleModal({ children, onClose }) {
     }, []);
 
     return (
-        <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex flex-col animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col animate-in fade-in duration-150">
             <div className="flex justify-end p-3 shrink-0 safe-top">
                 <button onClick={onClose} className="bg-zinc-900 border border-white/10 p-2.5 rounded-full text-zinc-300 active:scale-90 transition-transform">
                     <X size={20} />
@@ -335,7 +335,7 @@ export default function UserProfilePage() {
         return (
             <div className="min-h-screen bg-black safe-top px-4 pb-24">
                 <div className="mb-8"><BackButton /></div>
-                <div className="text-center py-20 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                <div className="text-center py-20 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Lock className="mx-auto mb-3 opacity-50" size={32} />
                     <p className="text-xs px-6">
                         {denied ? 'Solo puedes ver el perfil de tus amigos.' : 'No se pudo cargar este perfil.'}
@@ -451,7 +451,7 @@ export default function UserProfilePage() {
                 <div className="relative w-full h-2 bg-zinc-900 rounded-full border border-zinc-800 overflow-hidden mt-2">
                     <div className="h-full transition-all duration-500" style={{ width: `${xpPercent}%`, background: '#3b82f6' }} />
                 </div>
-                <p className="text-[9px] text-zinc-600 font-bold mt-1 text-right">{profile.currentXP || 0}/{profile.nextLevelXP || 100} XP</p>
+                <p className="text-[9px] text-zinc-500 font-bold mt-1 text-right">{profile.currentXP || 0}/{profile.nextLevelXP || 100} XP</p>
 
                 {/* --- ACCIÓN PRINCIPAL (como el botón Seguir/Editar de IG) --- */}
                 <div className="mt-4">
@@ -498,7 +498,7 @@ export default function UserProfilePage() {
                                 key={key}
                                 onClick={() => { if (canViewContent) { setTab(key); setDetalle(null); } }}
                                 disabled={!canViewContent}
-                                className={`flex-1 py-3.5 flex flex-col items-center gap-1 relative transition-colors ${!canViewContent ? 'text-zinc-800 cursor-default' : active ? 'text-yellow-500' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                className={`flex-1 py-3.5 flex flex-col items-center gap-1 relative transition-colors ${!canViewContent ? 'text-zinc-800 cursor-default' : active ? 'text-yellow-500' : 'text-zinc-500 hover:text-zinc-400'}`}
                             >
                                 <Icon size={20} strokeWidth={active ? 2.5 : 2} />
                                 <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
@@ -535,7 +535,7 @@ export default function UserProfilePage() {
             ) : tab === 'body' ? (
                 <BodyTab ranks={itemsData?.ranks} mujer={profile.gender === 'female'} />
             ) : items.length === 0 ? (
-                <div className="text-center py-16 text-zinc-600 border-2 border-dashed border-zinc-900 rounded-3xl">
+                <div className="text-center py-16 text-zinc-500 border-2 border-dashed border-zinc-900 rounded-3xl">
                     {tab === 'workouts' && <><Dumbbell className="mx-auto mb-3 opacity-50" size={32} /><p className="text-xs">Sin entrenos publicados.</p></>}
                     {tab === 'food' && <><Utensils className="mx-auto mb-3 opacity-50" size={32} /><p className="text-xs">Sin comidas registradas.</p></>}
                     {tab === 'missions' && <><ScrollText className="mx-auto mb-3 opacity-50" size={32} /><p className="text-xs">Sin misiones completadas.</p></>}

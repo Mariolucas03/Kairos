@@ -100,7 +100,7 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
     const Tendencia = ({ cambio, etiqueta }) => (
         <div className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
             <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.14em] not-italic">{etiqueta}</p>
-            <p className={`mt-1 text-lg font-black tabular-nums not-italic flex items-center gap-1 ${cambio === null ? 'text-zinc-600' : cambio < 0 ? 'text-emerald-400' : cambio > 0 ? 'text-rose-400' : 'text-zinc-300'}`}>
+            <p className={`mt-1 text-lg font-black tabular-nums not-italic flex items-center gap-1 ${cambio === null ? 'text-zinc-500' : cambio < 0 ? 'text-emerald-400' : cambio > 0 ? 'text-rose-400' : 'text-zinc-300'}`}>
                 {cambio === null ? '—' : <>{cambio < 0 ? <TrendingDown size={15} /> : cambio > 0 ? <TrendingUp size={15} /> : null}{conSigno(cambio)} kg</>}
             </p>
         </div>
@@ -125,7 +125,7 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
                     <div className="mt-2 h-9 -mx-1">
                         {ultimos.length >= 2
                             ? <Linea puntos={ultimos} accent={accent} alto={36} id="peso-mini" />
-                            : <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.08em] not-italic pt-3">{actual ? 'Pésate otro día y verás la línea' : 'Toca para apuntar tu peso'}</p>}
+                            : <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.08em] not-italic pt-3">{actual ? 'Pésate otro día y verás la línea' : 'Toca para apuntar tu peso'}</p>}
                     </div>
                     <div className="mt-1 text-[9px] font-black uppercase tracking-[0.08em] not-italic"
                         style={{ color: cambioSemana === null ? '#71717a' : cambioSemana < 0 ? '#4ade80' : cambioSemana > 0 ? '#f87171' : '#a1a1aa' }}>
@@ -136,7 +136,7 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
 
             {isOpen && createPortal(
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+                    <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
 
                     <div
                         className="bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl relative flex flex-col gap-4 animate-in zoom-in-95 duration-200 overflow-hidden z-10"
@@ -165,7 +165,7 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
                                     onFocus={(e) => e.target.select()}
                                     placeholder={actual ? fmt(actual) : '70,0'}
                                     aria-label="Peso en kilos"
-                                    className="w-full bg-transparent text-center text-[44px] leading-none font-black text-white outline-none tabular-nums not-italic placeholder:text-zinc-700"
+                                    className="w-full bg-transparent text-center text-[44px] leading-none font-black text-white outline-none tabular-nums not-italic placeholder:text-zinc-500"
                                 />
                                 <span className="absolute right-1 bottom-1 text-[11px] font-black not-italic" style={{ color: accent }}>KG</span>
                             </div>
@@ -182,7 +182,7 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
                             <div className="flex items-baseline justify-between mb-2">
                                 <p className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.14em] not-italic">Últimas pesadas</p>
                                 {serie.length >= 2 && (
-                                    <p className="text-[9px] font-bold text-zinc-600 not-italic tabular-nums">
+                                    <p className="text-[9px] font-bold text-zinc-500 not-italic tabular-nums">
                                         {fmt(Math.min(...ultimos.map(p => p.weight)))} – {fmt(Math.max(...ultimos.map(p => p.weight)))} kg
                                     </p>
                                 )}
@@ -190,10 +190,10 @@ export default function WeightWidget({ initialWeight = 0, history = [], onUpdate
                             <div className="h-24">
                                 {ultimos.length >= 2
                                     ? <Linea puntos={ultimos} accent={accent} alto={96} conPuntos id="peso-grande" />
-                                    : <p className="text-[11px] text-zinc-600 font-bold text-center pt-9">Con dos pesadas ya hay línea.</p>}
+                                    : <p className="text-[11px] text-zinc-500 font-bold text-center pt-9">Con dos pesadas ya hay línea.</p>}
                             </div>
                             {ultimos.length >= 2 && (
-                                <div className="flex justify-between mt-1 text-[9px] font-bold text-zinc-600 not-italic">
+                                <div className="flex justify-between mt-1 text-[9px] font-bold text-zinc-500 not-italic">
                                     <span>{new Date(ultimos[0].date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
                                     <span>{new Date(ultimos[ultimos.length - 1].date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
                                 </div>

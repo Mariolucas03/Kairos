@@ -49,7 +49,7 @@ module.exports = {
                 }
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
+                sans: ['Barlow', 'system-ui', 'sans-serif'],
             },
 
             /**

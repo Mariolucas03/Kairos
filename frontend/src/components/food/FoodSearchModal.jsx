@@ -403,7 +403,7 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
                                 <input ref={searchInputRef} type="text" placeholder="Buscar en mis alimentos..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white pl-11 pr-4 py-4 rounded-2xl outline-none focus:border-zinc-600 transition-all font-bold text-sm placeholder-zinc-600" />
                                 {query && (
-                                    <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white p-1">
+                                    <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white p-1">
                                         <X size={16} />
                                     </button>
                                 )}
@@ -420,25 +420,25 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
 
                         {/* Carpetas: una sola fila, empezando por la de esta comida */}
                         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 items-center">
-                            <Filter size={14} className="text-zinc-600 shrink-0" />
+                            <Filter size={14} className="text-zinc-500 shrink-0" />
                             <button onClick={() => setFilterFolder('Todos')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === 'Todos' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>Todos</button>
                             {FOLDERS.map(f => {
                                 const cuantos = results.filter(item => item.folder === f).length;
                                 return (
                                     <button key={f} onClick={() => setFilterFolder(f)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border transition-all whitespace-nowrap ${filterFolder === f ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black text-zinc-500 border-zinc-800'}`}>
-                                        {f}{cuantos > 0 && <span className={filterFolder === f ? 'text-black/60' : 'text-zinc-700'}> {cuantos}</span>}
+                                        {f}{cuantos > 0 && <span className={filterFolder === f ? 'text-black/60' : 'text-zinc-600'}> {cuantos}</span>}
                                     </button>
                                 );
                             })}
                         </div>
 
                         <div className="space-y-2">
-                            {loading ? <div className="text-center py-10 text-zinc-600 font-bold uppercase text-xs animate-pulse">Cargando...</div> :
+                            {loading ? <div className="text-center py-10 text-zinc-500 font-bold uppercase text-xs animate-pulse">Cargando...</div> :
                                 processedResults.length > 0 ? processedResults.map((item, idx) => (
                                     <SwipeableFoodItem key={item._id || idx} item={item} onAdd={handleAddFood} onDelete={handleDeleteSavedFood} />
                                 )) : (
                                     <div className="text-center py-12 px-6 border-2 border-dashed border-zinc-900 rounded-3xl">
-                                        <p className="text-zinc-600 font-bold uppercase text-xs">
+                                        <p className="text-zinc-500 font-bold uppercase text-xs">
                                             {query ? 'Nada encontrado' : filterFolder !== 'Todos' ? `Sin alimentos en ${filterFolder}` : 'Todavía no tienes alimentos guardados'}
                                         </p>
                                         <button onClick={() => setMode('manual')} className="mt-4 bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2 active:scale-95 transition-transform">
@@ -489,7 +489,7 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
                             {!aiImagePreview ? (
                                 <button onClick={() => fileInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-zinc-800 rounded-3xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 hover:bg-zinc-900 transition-all group"><div className="bg-zinc-900 p-3 rounded-2xl group-hover:bg-black transition-colors"><Camera className="text-zinc-500 group-hover:text-blue-400" size={24} /></div><span className="text-xs font-bold text-zinc-500 uppercase tracking-wide group-hover:text-zinc-300">Tomar Foto (Requerido)</span></button>
                             ) : (
-                                <div className="relative rounded-3xl overflow-hidden border border-zinc-800 group"><img src={aiImagePreview} alt="Preview" className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4"><div className="flex justify-between items-center w-full"><span className="text-xs font-bold text-white flex items-center gap-2"><ImageIcon size={14} /> Imagen seleccionada</span><button onClick={clearImage} className="bg-red-500/20 text-red-400 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all backdrop-blur-md border border-red-500/30"><Trash2 size={18} /></button></div></div></div>
+                                <div className="relative rounded-3xl overflow-hidden border border-zinc-800 group"><img src={aiImagePreview} alt="Preview" className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4"><div className="flex justify-between items-center w-full"><span className="text-xs font-bold text-white flex items-center gap-2"><ImageIcon size={14} /> Imagen seleccionada</span><button onClick={clearImage} className="bg-red-500/20 text-red-400 p-2 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-500/30"><Trash2 size={18} /></button></div></div></div>
                             )}
                         </div>
                         <div className="pt-2">
@@ -547,7 +547,7 @@ export default function FoodSearchModal({ mealId, mealName, onClose, onFoodAdded
                         <div className="bg-zinc-900/30 p-4 rounded-3xl border border-zinc-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Raciones</p>
-                                <p className="text-[10px] text-zinc-600 font-bold mt-1 truncate">
+                                <p className="text-[10px] text-zinc-500 font-bold mt-1 truncate">
                                     Total: {porRaciones(manualForm.calories || 0)} kcal
                                 </p>
                             </div>

@@ -207,7 +207,7 @@ export default function ClansPage() {
                                     {RANK_CONFIG[myRank].label}
                                 </span>
                                 {myClan.minLevel > 1 && (
-                                    <span className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-600 not-italic">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500 not-italic">
                                         Nivel {myClan.minLevel}+
                                     </span>
                                 )}
@@ -237,7 +237,7 @@ export default function ClansPage() {
                                 <div className="flex items-center justify-center gap-1.5">
                                     <Users size={14} className="text-zinc-300 shrink-0" />
                                     <span className="text-[18px] font-black text-white leading-none tracking-[-0.04em] not-italic">
-                                        {myClan.members.length}<span className="text-zinc-600">/10</span>
+                                        {myClan.members.length}<span className="text-zinc-500">/10</span>
                                     </span>
                                 </div>
                                 <span className="block mt-1.5 text-[9px] font-black text-zinc-500 uppercase tracking-[0.16em] not-italic">Miembros</span>
@@ -264,7 +264,7 @@ export default function ClansPage() {
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-xs font-bold text-zinc-500 uppercase">Miembros</h3>
-                            <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Por aporte semanal</span>
+                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Por aporte semanal</span>
                         </div>
                         <div className="space-y-0 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
                             {(() => {
@@ -294,7 +294,7 @@ export default function ClansPage() {
                             })()}
                         </div>
                         {isLeader && (
-                            <p className="text-[9px] text-zinc-600 mt-3 text-center uppercase tracking-wide">
+                            <p className="text-[9px] text-zinc-500 mt-3 text-center uppercase tracking-wide">
                                 Como líder puedes cambiar rangos y expulsar miembros
                             </p>
                         )}
@@ -334,12 +334,12 @@ export default function ClansPage() {
                                 placeholder="Buscar alianza..."
                                 value={clanSearchText}
                                 onChange={(e) => setClanSearchText(e.target.value)}
-                                className="w-full bg-zinc-950 border border-zinc-800 rounded-3xl p-4 pl-12 text-white focus:border-yellow-500/50 outline-none transition-all placeholder:text-zinc-700 font-bold text-sm"
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-3xl p-4 pl-12 text-white focus:border-yellow-500/50 outline-none transition-all placeholder:text-zinc-500 font-bold text-sm"
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <div className="text-[10px] font-black text-zinc-600 uppercase ml-2 mb-1">
+                            <div className="text-[10px] font-black text-zinc-500 uppercase ml-2 mb-1">
                                 {clanSearchText ? 'Resultados' : 'Destacados'}
                             </div>
 
@@ -349,18 +349,18 @@ export default function ClansPage() {
                                         <div className="text-xl filter drop-shadow-md w-8 text-center shrink-0">{clan.icon}</div>
                                         <div className="min-w-0">
                                             <h3 className="text-zinc-300 font-bold text-xs uppercase truncate">{clan.name}</h3>
-                                            <span className="text-[9px] text-zinc-600">{clan.memberCount} Miembros</span>
+                                            <span className="text-[9px] text-zinc-500">{clan.memberCount} Miembros</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 pr-2 shrink-0">
                                         <span className="text-[10px] font-black text-purple-500/70">{clan.totalPower}</span>
-                                        <Eye size={14} className="text-zinc-700" />
+                                        <Eye size={14} className="text-zinc-600" />
                                     </div>
                                 </div>
                             ))}
 
                             {filteredClans.length === 0 && (
-                                <div className="text-center py-4 text-zinc-700 text-[10px] not-italic">No se encontraron clanes.</div>
+                                <div className="text-center py-4 text-zinc-600 text-[10px] not-italic">No se encontraron clanes.</div>
                             )}
                         </div>
                     </div>
@@ -370,7 +370,7 @@ export default function ClansPage() {
             {/* MODAL CREAR / EDITAR CLAN */}
             {(showCreateClan || showEditClan) && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => { setShowCreateClan(false); setShowEditClan(false); }} />
+                    <div className="absolute inset-0 bg-black/95" onClick={() => { setShowCreateClan(false); setShowEditClan(false); }} />
                     <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-4xl overflow-hidden flex flex-col max-h-[90vh] shadow-2xl relative z-10 animate-in zoom-in-95">
                         <div className="p-5 border-b border-white/10 flex justify-between items-center bg-zinc-950">
                             <h3 className="text-xl font-black text-white flex items-center gap-2 uppercase not-italic">
@@ -397,7 +397,7 @@ export default function ClansPage() {
                             <div>
                                 <label className="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Nivel Mínimo</label>
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-zinc-950 border border-zinc-800 p-3 rounded-xl"><Lock size={20} className="text-zinc-600" /></div>
+                                    <div className="bg-zinc-950 border border-zinc-800 p-3 rounded-xl"><Lock size={20} className="text-zinc-500" /></div>
                                     <input type="number" min="1" max="100" className="flex-1 bg-black border border-zinc-800 rounded-xl p-3 text-white font-bold focus:border-yellow-500 outline-none transition-colors text-center" value={newClanData.minLevel} onChange={e => setNewClanData({ ...newClanData, minLevel: parseInt(e.target.value) || 1 })} />
                                 </div>
                             </div>
@@ -418,7 +418,7 @@ export default function ClansPage() {
                                         placeholder="🛡️"
                                     />
                                 </div>
-                                <p className="text-[9px] text-zinc-600 text-center mt-2">Usa el teclado de emojis de tu móvil</p>
+                                <p className="text-[9px] text-zinc-500 text-center mt-2">Usa el teclado de emojis de tu móvil</p>
                             </div>
                         </div>
                         <div className="p-5 bg-zinc-950 border-t border-white/10">

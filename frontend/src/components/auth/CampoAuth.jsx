@@ -53,7 +53,7 @@ export function CampoAuth({
                     maxLength={maxLength}
                     autoComplete={autoComplete}
                     required
-                    className={`w-full bg-[#0f0f11] border rounded-xl py-[13px] pl-12 text-white font-semibold text-sm outline-none transition-colors placeholder:text-zinc-600 ${esClave ? 'pr-12' : 'pr-4'}`}
+                    className={`w-full bg-[#0f0f11] border rounded-xl py-[13px] pl-12 text-white font-semibold text-sm outline-none transition-colors placeholder:text-zinc-500 ${esClave ? 'pr-12' : 'pr-4'}`}
                     style={{ borderColor: enfocado ? acento : 'rgba(255,255,255,0.1)' }}
                 />
 

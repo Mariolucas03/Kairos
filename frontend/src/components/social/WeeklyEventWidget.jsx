@@ -53,7 +53,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
 
     const modalContent = (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => setIsOpen(false)} />
+            <div className="absolute inset-0 bg-black/95" onClick={() => setIsOpen(false)} />
             <div className="bg-zinc-950 w-full max-w-lg h-[80vh] rounded-4xl border border-white/10 shadow-2xl flex flex-col relative overflow-hidden animate-in zoom-in-95 z-10">
                 <div className="bg-zinc-950 p-5 border-b border-white/10 relative shrink-0 z-30">
                     <button onClick={() => setIsOpen(false)} className="absolute top-4 right-4 bg-zinc-900 p-2 rounded-full text-zinc-400 hover:text-white"><X size={20} /></button>
@@ -75,7 +75,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-black relative pb-20">
                     <div className="space-y-2">
                         {sortedMembers.map((member, index) => {
-                            const rankColor = index === 0 ? 'text-yellow-400' : index === 1 ? 'text-zinc-300' : index === 2 ? 'text-orange-400' : 'text-zinc-600';
+                            const rankColor = index === 0 ? 'text-yellow-400' : index === 1 ? 'text-zinc-300' : index === 2 ? 'text-orange-400' : 'text-zinc-500';
                             return (
                                 <div key={member._id || index} className={cardBaseStyle}>
                                     <div className={`absolute left-3 top-1/2 -translate-y-1/2 font-black text-lg opacity-30 ${rankColor}`}>#{index + 1}</div>
@@ -127,7 +127,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                                 return (
                                     <div key={m.tier} className={`p-4 rounded-2xl border flex items-center justify-between ${isReached ? 'bg-yellow-900/10 border-yellow-500/30' : 'bg-black border-zinc-800 opacity-50'}`}>
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isReached ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-600'}`}>
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isReached ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>
                                                 {isClaimed ? <Check size={24} /> : isReached ? <Gift size={24} /> : <Lock size={20} />}
                                             </div>
                                             <div>
@@ -145,7 +145,7 @@ export default function WeeklyEventWidget({ clan, onClaim, isPreview = false }) 
                                             ? <span className="text-xs text-green-500 font-bold uppercase">Reclamado</span>
                                             : isReached
                                                 ? <button onClick={() => onClaim(m.tier)} className="bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold text-xs active:scale-95 transition-transform">RECLAMAR</button>
-                                                : <span className="text-[10px] text-zinc-600 font-bold uppercase">Bloqueado</span>
+                                                : <span className="text-[10px] text-zinc-500 font-bold uppercase">Bloqueado</span>
                                         }
                                     </div>
                                 );

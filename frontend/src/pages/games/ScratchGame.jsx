@@ -236,7 +236,7 @@ export default function ScratchGame() {
                 el lado que menos ocupaba. */}
             <div className="fixed top-12 left-4 right-4 flex items-center z-50">
                 <div className="flex-1 flex"><BackButton to="/games" /></div>
-                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-yellow-500/50 backdrop-blur-md shadow-2xl">
+                <div className="flex items-center gap-2 bg-black/80 px-5 py-2 rounded-full border border-yellow-500/50 shadow-2xl">
                     <span className="text-yellow-400 font-black text-xl tabular-nums">{visualBalance.toLocaleString()}</span>
                     <img src="/assets/icons/ficha.png" className="w-6 h-6" alt="f" />
                 </div>
@@ -244,7 +244,7 @@ export default function ScratchGame() {
                     <button
                         onClick={alternarSonido}
                         aria-label={conSonido ? 'Silenciar' : 'Activar el sonido'}
-                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-600'}`}
+                        className={`p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 active:scale-95 transition-transform ${conSonido ? 'text-zinc-300' : 'text-zinc-500'}`}
                     >
                         {conSonido ? <Volume2 size={20} /> : <VolumeX size={20} />}
                     </button>
@@ -395,7 +395,7 @@ export default function ScratchGame() {
 
             {/* MODAL INFO */}
             {showInfo && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 animate-in fade-in">
                     <div className="bg-zinc-900 border border-white/10 rounded-[2rem] p-6 w-full max-w-xs relative shadow-2xl">
                         <button onClick={() => setShowInfo(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={24} /></button>
                         <div className="text-center mb-6">
@@ -414,7 +414,7 @@ export default function ScratchGame() {
                             ))}
                         </div>
                         <div className="text-center">
-                            <p className="text-[10px] text-zinc-600 uppercase font-bold">Calaveras y cacas no tienen premio.</p>
+                            <p className="text-[10px] text-zinc-500 uppercase font-bold">Calaveras y cacas no tienen premio.</p>
                         </div>
                     </div>
                 </div>

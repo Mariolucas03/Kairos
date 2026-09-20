@@ -37,7 +37,7 @@ export default function RankingItem({ player, index, isMe, isViewable, onViewPro
             >
                 <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">{rankIcon}</div>
                 <div className="relative flex-shrink-0">
-                    <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
+                    <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-500 border border-white/10 overflow-hidden">
                         {player.avatar ? <img src={player.avatar} className="w-full h-full object-cover" alt="avatar" /> : player.username?.charAt(0)}
                     </div>
                     <MarcoPerfil marco={player.frame} tamano={60} />
@@ -55,7 +55,7 @@ export default function RankingItem({ player, index, isMe, isViewable, onViewPro
                 <div className={`px-2 py-0.5 rounded-lg border text-[10px] font-black uppercase tracking-wide mb-1 ${levelClass}`}>
                     LVL {player.level || 1}
                 </div>
-                <span className="text-[9px] text-zinc-600 font-mono tracking-tight">
+                <span className="text-[9px] text-zinc-500 font-mono tracking-tight">
                     {(player.xp || player.currentXP || 0).toLocaleString()} {metricLabel}
                 </span>
             </div>

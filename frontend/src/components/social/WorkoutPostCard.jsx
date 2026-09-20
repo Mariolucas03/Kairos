@@ -305,7 +305,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
             {/* CABECERA */}
             <div className="flex items-center gap-3 px-4 py-3">
                 <button onClick={openProfile} disabled={!linkProfile} className="relative flex-shrink-0 active:scale-95 transition-transform disabled:cursor-default">
-                    <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
+                    <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-xs font-black text-zinc-500 border border-white/10 overflow-hidden">
                         {author.avatar ? <img src={author.avatar} className="w-full h-full object-cover" alt="av" /> : author.username?.charAt(0)}
                     </div>
                     <MarcoPerfil marco={author.frame} tamano={52} />
@@ -324,7 +324,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                 {soyElAutor && (
                     <button
                         onClick={() => setConfirmarBorrado(true)}
-                        className="p-2 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-600 hover:text-red-400 active:scale-95 transition-all"
+                        className="p-2 rounded-xl bg-zinc-900 border border-white/[0.07] text-zinc-500 hover:text-red-400 active:scale-95 transition-all"
                         title="Borrar publicación"
                     >
                         <Trash2 size={15} />
@@ -460,7 +460,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                                                 {ex.top && Number(ex.top.weight) > 0 && (
                                                                     <span className="text-[11px] font-black text-white tabular-nums shrink-0">
                                                                         {ex.top.weight}<span className="text-zinc-500 text-[9px]">kg</span>
-                                                                        <span className="text-zinc-600 mx-0.5">×</span>{ex.top.reps}
+                                                                        <span className="text-zinc-500 mx-0.5">×</span>{ex.top.reps}
                                                                     </span>
                                                                 )}
                                                                 <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden min-w-0">
@@ -517,7 +517,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
 
                     {/* Puntitos de posición */}
                     {slides.length > 1 && (
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/60 px-2 py-1 rounded-full backdrop-blur-sm pointer-events-none">
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/60 px-2 py-1 rounded-full pointer-events-none">
                             {slides.map((_, i) => (
                                 <span key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === slideIndex ? 'bg-white w-3' : 'bg-white/40'}`} />
                             ))}
@@ -584,7 +584,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
             {/* COMENTARIOS (DESPLEGABLE) */}
             {showComments && (
                 <div className="px-4 pt-3 space-y-3 animate-in slide-in-from-top-2 fade-in duration-200">
-                    {comments.length === 0 && <p className="text-[10px] text-zinc-600 not-italic">Sé el primero en comentar.</p>}
+                    {comments.length === 0 && <p className="text-[10px] text-zinc-500 not-italic">Sé el primero en comentar.</p>}
                     {comments.map((c, i) => (
                         <div key={c._id || i} className="flex items-start gap-2">
                             {/* El avatar con SU marco, como en todas partes */}
@@ -609,9 +609,9 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                 aria-label={c.likedByMe ? 'Quitar me gusta' : 'Me gusta'}
                                 className="shrink-0 flex flex-col items-center gap-0.5 pt-1.5 w-6 active:scale-90 transition-transform"
                             >
-                                <Heart size={13} className={c.likedByMe ? 'text-red-500 fill-red-500' : 'text-zinc-600'} />
+                                <Heart size={13} className={c.likedByMe ? 'text-red-500 fill-red-500' : 'text-zinc-500'} />
                                 {c.likesCount > 0 && (
-                                    <span className={`text-[9px] font-black leading-none not-italic ${c.likedByMe ? 'text-red-500' : 'text-zinc-600'}`}>
+                                    <span className={`text-[9px] font-black leading-none not-italic ${c.likedByMe ? 'text-red-500' : 'text-zinc-500'}`}>
                                         {c.likesCount}
                                     </span>
                                 )}
@@ -621,7 +621,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                                 <button
                                     onClick={() => borrarComentario(c)}
                                     disabled={borrandoComentario === c._id}
-                                    className="shrink-0 p-1.5 text-zinc-700 hover:text-red-400 active:scale-90 transition-all disabled:opacity-40"
+                                    className="shrink-0 p-1.5 text-zinc-600 hover:text-red-400 active:scale-90 transition-all disabled:opacity-40"
                                     title="Borrar comentario"
                                 >
                                     {borrandoComentario === c._id
@@ -659,7 +659,7 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
                             onKeyDown={(e) => e.key === 'Enter' && sugerencias.length === 0 && handleAddComment()}
                             placeholder="Escribe un comentario... @ para mencionar"
                             maxLength={300}
-                            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2 text-xs text-white outline-none focus:border-blue-500/50 placeholder:text-zinc-600"
+                            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2 text-xs text-white outline-none focus:border-blue-500/50 placeholder:text-zinc-500"
                         />
                         <button onClick={handleAddComment} disabled={posting || !commentText.trim()} className="bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed p-2.5 rounded-full text-white active:scale-90 transition-transform">
                             {posting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}

@@ -42,7 +42,7 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
                 className={`${cardBaseStyle} h-full`}>
                 <div onClick={() => onViewProfile?.(friend._id)} className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer active:opacity-70 transition-opacity">
                     <div className="relative flex-shrink-0">
-                        <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-600 border border-white/10 overflow-hidden">
+                        <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-xs font-black text-zinc-500 border border-white/10 overflow-hidden">
                             {friend.avatar ? <img src={friend.avatar} className="w-full h-full object-cover" alt="av" /> : friend.username.charAt(0)}
                         </div>
                         <MarcoPerfil marco={friend.frame} tamano={60} />
@@ -58,7 +58,7 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${levelClass}`}>
                                 LVL {friend.level}
                             </span>
-                            <span className={`text-[9px] font-black uppercase tracking-wider ${friend.online ? 'text-green-500' : 'text-zinc-600'}`}>
+                            <span className={`text-[9px] font-black uppercase tracking-wider ${friend.online ? 'text-green-500' : 'text-zinc-500'}`}>
                                 {friend.online ? 'ONLINE' : 'OFFLINE'}
                             </span>
                         </div>
@@ -71,7 +71,7 @@ export default function FriendCard({ friend, onRemoveRequest, onChallengeOrView,
                     <div className="flex items-center gap-1.5">
                         <Heart size={14} style={{ color: tonoVida }} fill="currentColor" />
                         <span className="text-xs font-black tracking-wider" style={{ color: tonoVida }}>
-                            {hp}<span className="text-zinc-600">/{maxHp}</span>
+                            {hp}<span className="text-zinc-500">/{maxHp}</span>
                         </span>
                     </div>
                     <div className="w-16 h-1.5 bg-black rounded-full overflow-hidden border border-white/10">

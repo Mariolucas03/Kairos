@@ -174,7 +174,7 @@ export default function MapaActividad({ semanas = 26 }) {
         <div className="flex gap-2">
             <div className="flex flex-col gap-[3px] pt-[1px] shrink-0" style={{ width: lado }}>
                 {DIAS_SEMANA.map((d, i) => (
-                    <span key={i} className="text-[9px] text-zinc-700 font-bold" style={{ height: lado, lineHeight: lado + 'px' }}>{d}</span>
+                    <span key={i} className="text-[9px] text-zinc-600 font-bold" style={{ height: lado, lineHeight: lado + 'px' }}>{d}</span>
                 ))}
             </div>
             <div ref={ref} className="flex-1 overflow-x-auto no-scrollbar">
@@ -218,7 +218,7 @@ export default function MapaActividad({ semanas = 26 }) {
                             colores y ya. Nadie puede adivinar que un dia se
                             enciende por entrenar, comer o cumplir misiones, ni que
                             el periodo son seis meses. Decirlo cuesta una frase. */}
-                        <p className="text-[9px] text-zinc-600 font-bold mt-0.5 leading-tight">
+                        <p className="text-[9px] text-zinc-500 font-bold mt-0.5 leading-tight">
                             Un cuadro por día. Se enciende si entrenas, comes o cumples misiones.
                         </p>
                     </div>
@@ -239,7 +239,7 @@ export default function MapaActividad({ semanas = 26 }) {
                         <div className="relative z-10">
                             <div className="grid grid-cols-7 gap-1 mb-1">
                                 {DIAS_SEMANA.map((d, i) => (
-                                    <span key={i} className="text-[9px] text-zinc-600 font-black text-center not-italic">{d}</span>
+                                    <span key={i} className="text-[9px] text-zinc-500 font-black text-center not-italic">{d}</span>
                                 ))}
                             </div>
                             <div className="grid grid-cols-7 gap-1">
@@ -278,13 +278,13 @@ export default function MapaActividad({ semanas = 26 }) {
 
                 <div className="relative z-10 flex items-center justify-between mt-3">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-zinc-600 font-bold uppercase mr-0.5">Nada</span>
+                        <span className="text-[9px] text-zinc-500 font-bold uppercase mr-0.5">Nada</span>
                         {COLORES.map((c, i) => (
                             <div key={i} className="w-[10px] h-[10px] rounded-[2px] shrink-0" style={{ backgroundColor: c }} />
                         ))}
-                        <span className="text-[9px] text-zinc-600 font-bold uppercase ml-0.5">Todo</span>
+                        <span className="text-[9px] text-zinc-500 font-bold uppercase ml-0.5">Todo</span>
                     </div>
-                    <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-wide">Aquí, 6 meses</span>
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wide">Aquí, 6 meses</span>
                 </div>
             </WidgetCard>
 
@@ -298,7 +298,7 @@ export default function MapaActividad({ semanas = 26 }) {
                     className="fixed left-0 right-0 flex items-center justify-center p-4 animate-in fade-in"
                     style={{ zIndex: Z.modal, top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }}
                 >
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setAbierto(false)} />
+                    <div className="absolute inset-0 bg-black/95" onClick={() => setAbierto(false)} />
 
                     <div className="relative z-10 w-full max-w-sm bg-[#0a0a0c] border border-white/10 rounded-3xl p-5 shadow-2xl shadow-black/70 max-h-[88%] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200">
 
@@ -331,7 +331,7 @@ export default function MapaActividad({ semanas = 26 }) {
                                 </span>
                             </div>
                             {rejilla(carrilDetalle, 14)}
-                            <p className="text-[9px] text-zinc-600 mt-3">
+                            <p className="text-[9px] text-zinc-500 mt-3">
                                 Se puede arrastrar hacia atrás. Cada cuadrado es un día; el último es hoy.
                             </p>
                         </div>
@@ -369,7 +369,7 @@ export default function MapaActividad({ semanas = 26 }) {
                                 {COLORES.map((c, i) => (
                                     <div key={i} className="flex items-center gap-3">
                                         <div className="w-[14px] h-[14px] rounded-[3px] shrink-0" style={{ backgroundColor: c }} />
-                                        <span className="text-[9px] font-black text-zinc-600 tabular-nums w-8 shrink-0">
+                                        <span className="text-[9px] font-black text-zinc-500 tabular-nums w-8 shrink-0">
                                             {i === 0 ? '0' : i === 4 ? '7+' : `${i * 2 - 1}-${i * 2}`}
                                         </span>
                                         <span className="text-[11px] text-zinc-400 leading-tight">{QUE_ES_CADA_COLOR[i]}</span>
@@ -389,6 +389,6 @@ const Cifra = ({ icono: Icono, color, valor, etiqueta, pie }) => (
         <Icono size={13} style={{ color }} />
         <p className="text-xl font-black text-white mt-1 leading-none tabular-nums">{valor}</p>
         <p className="text-[9px] font-black text-zinc-400 uppercase tracking-wide mt-1.5">{etiqueta}</p>
-        <p className="text-[9px] text-zinc-600 mt-0.5 leading-tight">{pie}</p>
+        <p className="text-[9px] text-zinc-500 mt-0.5 leading-tight">{pie}</p>
     </div>
 );

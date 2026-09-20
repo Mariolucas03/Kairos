@@ -64,7 +64,7 @@ export default function MissionsWidget({
 
             {isOpen && createPortal(
                 <div style={{ top: 'var(--vv-top, 0px)', height: 'var(--vv-alto, 100dvh)' }} className="fixed left-0 right-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
-                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" aria-hidden="true" />
+                    <div className="absolute inset-0 bg-black/95" aria-hidden="true" />
 
                     <div
                         className="relative bg-[#09090b] border border-white/10 w-full max-w-sm rounded-4xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 overflow-hidden max-h-[85vh]"
@@ -103,7 +103,7 @@ export default function MissionsWidget({
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className="text-[13px] font-bold text-white leading-tight line-clamp-1 not-italic">{m.title}</span>
                                                     <span className="text-[11px] font-black shrink-0 not-italic" style={{ color: tono }}>
-                                                        {m.progress || 0}<span className="text-zinc-600">/{objetivo}</span>
+                                                        {m.progress || 0}<span className="text-zinc-500">/{objetivo}</span>
                                                     </span>
                                                 </div>
                                                 <div className="mt-2 h-1 w-full bg-[#18181b] rounded-full overflow-hidden">
@@ -170,7 +170,7 @@ export default function MissionsWidget({
                                 pendientes.length === 0 && (
                                     <div className="flex flex-col items-center justify-center py-10 text-center relative z-10 flex-1">
                                         <Target size={48} className="text-zinc-800 mb-4" />
-                                        <p className="text-zinc-600 text-sm font-bold uppercase not-italic">
+                                        <p className="text-zinc-500 text-sm font-bold uppercase not-italic">
                                             {todas ? 'Nada pendiente hoy.' : 'Cargando...'}
                                         </p>
                                     </div>
