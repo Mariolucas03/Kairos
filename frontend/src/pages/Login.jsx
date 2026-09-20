@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Lock, User, Swords } from 'lucide-react';
+import { Lock, User, Swords } from '../iconos';
 import api from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
 import PantallaAuth from '../components/auth/PantallaAuth';
