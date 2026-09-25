@@ -137,6 +137,34 @@ export const asegurarPush = async () => {
     }
 };
 
+/**
+ * Como esta esto AHORA: el permiso del navegador, si el aparato tiene
+ * suscripcion viva y cuantos hay guardados en tu cuenta.
+ */
+export const estadoPush = async () => {
+    const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const instalada = window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+    const soporta = 'serviceWorker' in navigator && 'PushManager' in window;
+    const permiso = typeof Notification !== 'undefined' ? Notification.permission : 'sin-soporte';
+
+    let suscrito = false;
+    try {
+        if (soporta) {
+            const registro = await navigator.serviceWorker.ready;
+            suscrito = !!(await registro.pushManager.getSubscription());
+        }
+    } catch { /* da igual: se enseña como no suscrito */ }
+
+    let servidor = null; let dispositivos = null;
+    try {
+        const r = await api.get('/push/estado');
+        servidor = r.data?.servidor ?? null;
+        dispositivos = r.data?.dispositivos ?? null;
+    } catch { /* sin conexion: se enseña lo que sepamos del movil */ }
+
+    return { esIOS, instalada, soporta, permiso, suscrito, servidor, dispositivos };
+};
+
 /** Manda una notificacion de prueba a tus propios dispositivos. */
 export const probarPush = async () => {
     try {

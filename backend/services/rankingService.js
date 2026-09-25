@@ -37,7 +37,8 @@ const getMonthlyRanking = async (period = getMadridMonthString(), limit = 50) =>
 
     if (rows.length === 0) return [];
 
-    const users = await User.find({ _id: { $in: rows.map(r => r._id) } })
+    // Las cuentas ocultas no compiten: se caen aqui y los puestos se renumeran
+    const users = await User.find({ _id: { $in: rows.map(r => r._id) }, oculto: { $ne: true } })
         .select('username avatar frame level title clanRank')
         .lean();
 

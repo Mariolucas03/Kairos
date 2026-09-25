@@ -87,6 +87,30 @@ const sendPushToUser = async (user, payload) => {
 };
 
 /**
+ * EN QUE ESTADO ESTAN TUS NOTIFICACIONES.
+ *
+ * Las suscripciones se guardan POR CUENTA y por aparato. Al reinstalar la app
+ * en la pantalla de inicio del iPhone, iOS tira la suscripcion y el permiso:
+ * el movil sigue "permitido" a ojos del usuario pero el servidor ya no tiene
+ * a donde mandar nada, y no llega ningun aviso sin que nadie se entere.
+ *
+ * Esto lo dice en una linea: si el servidor tiene claves y cuantos aparatos
+ * hay registrados en la cuenta con la que has entrado.
+ *
+ * @route GET /api/push/estado
+ */
+const estadoPush = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user._id).select('pushSubscriptions').lean();
+    const subs = user?.pushSubscriptions || [];
+    res.json({
+        servidor: PUSH_CONFIGURADO,
+        dispositivos: subs.length,
+        // Los ultimos caracteres bastan para distinguir un aparato de otro
+        endpoints: subs.map(s => (s.endpoint || '').slice(-10))
+    });
+});
+
+/**
  * Envio de PRUEBA al propio usuario, con diagnostico.
  *
  * Sin esto la unica forma de saber si las notificaciones funcionan era esperar
@@ -267,4 +291,4 @@ const notificarA = async (userId, payload) => {
     }
 };
 
-module.exports = { subscribeToPush, sendPushToUser, notificarA, testPush, adminSendPush, enviarNotificacionManual };
+module.exports = { subscribeToPush, sendPushToUser, notificarA, testPush, estadoPush, adminSendPush, enviarNotificacionManual };

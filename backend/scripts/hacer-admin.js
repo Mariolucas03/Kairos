@@ -6,8 +6,14 @@
  * que esté, es el único fallo que convierte a cualquiera en dueño de la app.
  * Se hace desde aquí, con acceso al .env, que ya implica tener las llaves.
  *
+ * Tambien esconde la cuenta: una cuenta oculta no sale al buscar gente, ni en
+ * el ranking global, ni en el mensual, ni cuenta para el percentil del cuerpo.
+ * Juega, entrena y tiene amigos igual; simplemente no esta "en la liga".
+ *
  * Uso:
  *     node backend/scripts/hacer-admin.js --usuario Mario_27
+ *     node backend/scripts/hacer-admin.js --usuario Mario_27 --ocultar
+ *     node backend/scripts/hacer-admin.js --usuario Mario_27 --mostrar
  *     node backend/scripts/hacer-admin.js --usuario Mario_27 --quitar
  *     node backend/scripts/hacer-admin.js --listar
  */
@@ -25,32 +31,45 @@ const arg = (n) => {
     await mongoose.connect(process.env.MONGO_URI);
 
     if (process.argv.includes('--listar')) {
-        const admins = await User.find({ isAdmin: true }).select('username email').lean();
+        const admins = await User.find({ isAdmin: true }).select('username email oculto').lean();
         console.log(admins.length ? 'Administradores:' : 'No hay ningún administrador todavía.');
-        admins.forEach(a => console.log('   ' + a.username + '  <' + a.email + '>'));
+        admins.forEach(a => console.log('   ' + a.username + '  <' + a.email + '>' + (a.oculto ? '  (oculto)' : '')));
+        const ocultos = await User.find({ oculto: true, isAdmin: { $ne: true } }).select('username').lean();
+        if (ocultos.length) console.log('Ocultos sin ser admin: ' + ocultos.map(o => o.username).join(', '));
         return await mongoose.disconnect();
     }
 
     const nombre = arg('--usuario');
     if (!nombre) {
-        console.log('Uso: node backend/scripts/hacer-admin.js --usuario <nombre> [--quitar]');
+        console.log('Uso: node backend/scripts/hacer-admin.js --usuario <nombre> [--quitar] [--ocultar|--mostrar]');
         console.log('     node backend/scripts/hacer-admin.js --listar');
         return await mongoose.disconnect();
     }
 
     const quitar = process.argv.includes('--quitar');
+    // Esconder o volver a enseñar, sin tocar el resto
+    const cambios = {};
+    if (process.argv.includes('--ocultar')) cambios.oculto = true;
+    if (process.argv.includes('--mostrar')) cambios.oculto = false;
+    // Sin --quitar ni --mostrar explicitos, nombrar admin no cambia la visibilidad
+    if (!process.argv.includes('--solo-visibilidad')) cambios.isAdmin = !quitar;
 
     // Búsqueda exacta sin distinguir mayúsculas, escapando la entrada: un nombre
     // con puntos o paréntesis alteraría el patrón y podría tocar a otro usuario.
     const limpio = nombre.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const user = await User.findOneAndUpdate(
         { username: new RegExp('^' + limpio + '$', 'i') },
-        { $set: { isAdmin: !quitar } },
+        { $set: cambios },
         { new: true }
-    ).select('username isAdmin');
+    ).select('username isAdmin oculto');
 
     if (!user) console.log('❌ No existe ningún usuario llamado "' + nombre + '"');
-    else console.log((user.isAdmin ? '✅ ' : '🚫 ') + user.username + (user.isAdmin ? ' ya es administrador' : ' ya no es administrador'));
+    else {
+        console.log((user.isAdmin ? '✅ ' : '🚫 ') + user.username + (user.isAdmin ? ' ya es administrador' : ' ya no es administrador'));
+        console.log(user.oculto
+            ? '   🙈 Oculta: no sale al buscar, ni en los rankings, ni cuenta para el percentil.'
+            : '   👀 Visible para todo el mundo.');
+    }
 
     await mongoose.disconnect();
 })().catch(e => { console.error('❌ Error:', e.message); process.exit(1); });

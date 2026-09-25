@@ -575,7 +575,12 @@ const totalesDeTodos = async () => {
     const lista = await WorkoutLog.aggregate([
         { $match: { type: 'gym' } },
         { $unwind: '$exercises' }, { $unwind: '$exercises.sets' },
-        { $group: { _id: '$user', volumen: { $sum: { $multiply: [{ $ifNull: ['$exercises.sets.weight', 0] }, { $ifNull: ['$exercises.sets.reps', 0] }] } } } }
+        { $group: { _id: '$user', volumen: { $sum: { $multiply: [{ $ifNull: ['$exercises.sets.weight', 0] }, { $ifNull: ['$exercises.sets.reps', 0] }] } } } },
+        // Las cuentas ocultas no cuentan para el percentil: una cuenta de
+        // pruebas con datos inventados moveria la escala de todos los demas.
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'u', pipeline: [{ $project: { oculto: 1 } }] } },
+        { $match: { 'u.0.oculto': { $ne: true } } },
+        { $project: { volumen: 1 } }
     ]);
     cacheTotales = { en: Date.now(), lista };
     return lista;

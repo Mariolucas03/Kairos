@@ -63,6 +63,12 @@ const userSchema = new mongoose.Schema({
     // debe existir.
     isAdmin: { type: Boolean, default: false },
 
+    // CUENTA OCULTA. No aparece al buscar gente, ni en el ranking global, ni
+    // en el mensual, ni cuenta para el percentil del cuerpo. Para cuentas de
+    // administracion y pruebas: juegan igual, pero no estan "en la liga".
+    // Se pone desde scripts/hacer-admin.js --ocultar; no hay ruta para esto.
+    oculto: { type: Boolean, default: false },
+
     // Cuenta suspendida. `activo` en false (y no borrar el objeto) para que
     // quede el registro de por que se suspendio y cuando.
     baneado: {

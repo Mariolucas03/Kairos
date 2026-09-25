@@ -677,7 +677,9 @@ const searchUsers = async (req, res) => {
                 { username: { $regex: safeQuery, $options: 'i' } },
                 { email: { $regex: safeQuery, $options: 'i' } }
             ],
-            _id: { $ne: req.user._id }
+            _id: { $ne: req.user._id },
+            // Las cuentas ocultas (administracion, pruebas) no se buscan
+            oculto: { $ne: true }
         })
             .select('username avatar level title frame')
             .limit(20); // 🔥 Límite crítico para no tumbar la BBDD si hay miles de usuarios
@@ -900,7 +902,7 @@ const getRequests = async (req, res) => {
 // @desc    Ranking Global
 const getLeaderboard = async (req, res) => {
     try {
-        const topUsers = await User.find({})
+        const topUsers = await User.find({ oculto: { $ne: true } })
             .sort({ level: -1, currentXP: -1 })
             .limit(50)
             .select('username level currentXP title avatar frame clanRank');

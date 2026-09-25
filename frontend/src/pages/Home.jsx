@@ -7,7 +7,7 @@ import { getMadridDateString } from '../utils/dateHelpers';
 import DayCalendarModal from '../components/common/DayCalendarModal';
 import { useDailyLog } from '../hooks/useDailyLog';
 import { useDailyRewards } from '../hooks/useDailyRewards';
-import { registerPush, asegurarPush } from '../utils/pushNotifications';
+import { registerPush, asegurarPush, estadoPush, probarPush } from '../utils/pushNotifications';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import SortableWidget from '../components/common/SortableWidget';
@@ -83,6 +83,63 @@ const WIDGET_LAYOUT = {
     mood: 'col-span-4',
     constancia: 'col-span-4'
 };
+
+/** El estado de las notificaciones, con activar y probar. */
+function PanelAvisos({ onMensaje }) {
+    const [estado, setEstado] = useState(null);
+    const [ocupado, setOcupado] = useState(null);
+    const mirar = () => estadoPush().then(setEstado).catch(() => setEstado(null));
+    useEffect(() => { mirar(); }, []);
+
+    const activo = estado && estado.permiso === 'granted' && estado.suscrito && estado.dispositivos > 0 && estado.servidor !== false;
+    const motivo = !estado ? 'Comprobando…'
+        : !estado.soporta ? (estado.esIOS && !estado.instalada ? 'En iPhone hay que abrirla desde el icono de la pantalla de inicio.' : 'Este navegador no las soporta.')
+            : estado.permiso === 'denied' ? 'Bloqueadas en los ajustes del móvil para esta app.'
+                : estado.permiso !== 'granted' ? 'Falta darles permiso: pulsa Activar.'
+                    : estado.servidor === false ? 'El servidor no tiene claves configuradas.'
+                        : !estado.suscrito || !estado.dispositivos ? 'Este aparato no está registrado: pulsa Activar.'
+                            : `Activadas · ${estado.dispositivos} ${estado.dispositivos === 1 ? 'aparato' : 'aparatos'}`;
+
+    return (
+        <div className="p-4 border rounded-3xl bg-zinc-900/50" style={{ borderColor: activo ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.07)' }}>
+            <div className="flex justify-between items-start gap-3">
+                <div className="flex flex-col min-w-0">
+                    <span className="text-white text-sm font-bold">Avisos</span>
+                    <span className={`text-[10px] mt-0.5 ${activo ? 'text-green-400' : 'text-zinc-400'}`}>{motivo}</span>
+                </div>
+                <span className="shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg" style={{ background: activo ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', color: activo ? '#22c55e' : '#a1a1aa' }}>
+                    {activo ? 'ON' : 'OFF'}
+                </span>
+            </div>
+            <div className="flex gap-2 mt-3">
+                <button
+                    onClick={async () => {
+                        setOcupado('activar');
+                        const r = await registerPush();
+                        onMensaje({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
+                        await mirar(); setOcupado(null);
+                    }}
+                    disabled={!!ocupado}
+                    className="flex-1 text-[10px] bg-yellow-500 text-black px-4 py-2.5 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform disabled:opacity-50"
+                >
+                    {ocupado === 'activar' ? 'Activando…' : activo ? 'Reactivar' : 'Activar'}
+                </button>
+                <button
+                    onClick={async () => {
+                        setOcupado('probar');
+                        const r = await probarPush();
+                        onMensaje({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
+                        await mirar(); setOcupado(null);
+                    }}
+                    disabled={!!ocupado}
+                    className="flex-1 text-[10px] bg-zinc-800 border border-white/10 text-zinc-200 px-4 py-2.5 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform disabled:opacity-50"
+                >
+                    {ocupado === 'probar' ? 'Enviando…' : 'Probar'}
+                </button>
+            </div>
+        </div>
+    );
+}
 
 export default function Home() {
     const user = useAuthStore(state => state.user);
@@ -411,24 +468,12 @@ export default function Home() {
                                     {isDragEnabled ? <Unlock size={18} /> : <Lock size={18} />}
                                 </button>
                             </div>
-                            <div className="p-4 border border-white/[0.07] rounded-3xl bg-zinc-900/50 flex justify-between items-center">
-                                <div className="flex flex-col"><span className="text-white text-sm font-bold flex items-center gap-2">Alertas</span><span className="text-[10px] text-zinc-500 mt-0.5">Aviso castigo (20:00)</span></div>
-                                <div className="flex gap-2 shrink-0">
-                                    {/* ⚠️ registerPush ya no devuelve true/false sino el MOTIVO:
-                                        antes, cuando no iba, el aviso decia siempre "revisa los
-                                        permisos" aunque el problema fuera otro (iPhone sin
-                                        instalar, servidor sin claves...). */}
-                                    <button
-                                        onClick={async () => {
-                                            const r = await registerPush();
-                                            setPushMsg({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
-                                        }}
-                                        className="text-[10px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-xl font-black uppercase tracking-wider active:scale-95 transition-transform"
-                                    >
-                                        ACTIVAR
-                                    </button>
-                                </div>
-                            </div>
+            {/* ⚠️ LAS NOTIFICACIONES SE APAGAN SOLAS Y NADIE SE ENTERA.
+                                Se guardan por CUENTA y por aparato: al reinstalar la app en el
+                                iPhone, o al entrar con otra cuenta, el servidor se queda sin
+                                sitio a donde mandar. Antes aqui solo habia un boton ACTIVAR y
+                                ninguna forma de ver si estaba puesto ni de probarlo. */}
+                            <PanelAvisos onMensaje={setPushMsg} />
                             <div>
                                 <h3 className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-3 pl-1">Visibilidad</h3>
                                 <div className="space-y-2">
