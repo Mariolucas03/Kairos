@@ -111,8 +111,18 @@ const cambiarClave = async (nombre) => {
 
 const borrar = async (nombre) => {
     const limpio = nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const user = await User.findOne({ username: new RegExp('^' + limpio + '$', 'i') }).select('username level coins gameCoins');
+    const user = await User.findOne({ username: new RegExp('^' + limpio + '$', 'i') }).select('username level coins gameCoins isAdmin');
     if (!user) return console.log('❌ No existe ningún usuario llamado "' + nombre + '"');
+
+    // ⚠️ QUEDARSE SIN ADMINISTRADOR NO SE ARREGLA DESDE LA APP: no hay ninguna
+    // ruta que reparta permisos, a propósito. Si esta es la última cuenta de
+    // administración, primero se crea la nueva y se comprueba que entra.
+    if (user.isAdmin && (await User.countDocuments({ isAdmin: true, _id: { $ne: user._id } })) === 0) {
+        console.log('🚫 ' + user.username + ' es el ÚNICO administrador que hay.');
+        console.log('   Crea antes la cuenta nueva:  node backend/scripts/cuenta-admin.js --crear');
+        console.log('   Entra con ella en la app, y luego vuelve a borrar esta.');
+        return;
+    }
 
     console.log('\n⚠️  VAS A BORRAR ' + user.username + ' (nivel ' + user.level + ', ' + user.coins + ' monedas, ' + user.gameCoins + ' fichas).');
     console.log('   Se borran TODOS sus entrenos, comidas, rutinas, misiones y publicaciones.');
