@@ -2,7 +2,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
 const {
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, FORTUNE_PRIZES, normalizarApuesta, APUESTA_MAXIMA, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
     PLINKO_MULTIPLICADORES, PLINKO_FILAS
 } = require('../controllers/gamesController');
 
@@ -226,6 +226,21 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         assert.strictEqual(lineaPremiada([s('cherry'), s('clover'), s('cherry'), s('clover')]), null);
     });
 
+    test('las apuestas son fichas ENTERAS y tienen tope', () => {
+        // Media ficha no existe: con decimales el saldo se quedaba con comas
+        // (10,7 apostado, 21,4 pagado) y ya no habia forma de cuadrarlo.
+        assert.strictEqual(normalizarApuesta(10.7), 10);
+        assert.strictEqual(normalizarApuesta(10.999), 10);
+        assert.strictEqual(normalizarApuesta('25'), 25);
+        // Debajo del minimo y por encima del tope, fuera
+        assert.strictEqual(normalizarApuesta(9), null);
+        assert.strictEqual(normalizarApuesta(APUESTA_MAXIMA + 1), null);
+        assert.strictEqual(normalizarApuesta(1e9), null);
+        assert.strictEqual(normalizarApuesta('hola'), null);
+        assert.strictEqual(normalizarApuesta(null), null);
+        assert.strictEqual(normalizarApuesta(Infinity), null);
+    });
+
     test('los slots devuelven entre el 70% y el 100%', () => {
         // Se simula porque el pago depende de que salgan lineas de 3 o 4 iguales
         // en una cuadricula, y eso no tiene formula corta.
@@ -339,14 +354,18 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         assert.ok(18 * 2 / 37 < 1 && 9 * 4 / 37 < 1);
     });
 
-    test('la pista de la torre no es un regalo: cuesta mas de lo que vale', () => {
-        // Pasar de 1/2 a 2/3 de acertar vale (2/3 - 1/2) = 1/6 del premio final.
-        // Si se cobrara menos, comprar la pista seria ganar dinero a la casa.
-        const sinPista = (TOWER_ULTIMA.tiles - TOWER_ULTIMA.traps) / TOWER_ULTIMA.tiles;
-        const conPista = (TOWER_ULTIMA.tiles - TOWER_ULTIMA.traps) / (TOWER_ULTIMA.tiles - 1);
-        const valeDeVerdad = conPista - sinPista;
-        assert.ok(TOWER_PISTA > valeDeVerdad, `La pista cuesta el ${(TOWER_PISTA * 100).toFixed(0)}% del premio y vale el ${(valeDeVerdad * 100).toFixed(1)}%: REGALA dinero`);
-        assert.ok(TOWER_PISTA < valeDeVerdad * 1.5, 'La pista es tan cara que nadie la compraria');
+    test('la pista de la torre: mejor que seguir a ciegas, peor que retirarse', () => {
+        // Las tres opciones en la ultima planta, en veces la apuesta. Si la
+        // pista es muy cara nadie debe comprarla nunca (era el caso: costaba
+        // el 18% y dejaba seguir-con-pista por debajo de las otras dos). Si
+        // es muy barata, seguir pasa a valer mas que retirarse y la torre
+        // empieza a regalar dinero.
+        const tope = TOWER_MULTIPLIERS[TOWER_MULTIPLIERS.length - 1];
+        const retirarse = TOWER_MULTIPLIERS[TOWER_MULTIPLIERS.length - 2];
+        const sinPista = ((TOWER_ULTIMA.tiles - TOWER_ULTIMA.traps) / TOWER_ULTIMA.tiles) * tope;
+        const conPista = ((TOWER_ULTIMA.tiles - TOWER_ULTIMA.traps) / (TOWER_ULTIMA.tiles - 1)) * tope - tope * TOWER_PISTA;
+        assert.ok(conPista > sinPista, `con pista salen ${conPista.toFixed(1)} y a ciegas ${sinPista.toFixed(1)}: comprarla no sirve de nada`);
+        assert.ok(conPista < retirarse, `con pista salen ${conPista.toFixed(1)} y retirarse paga ${retirarse}: la torre REGALA dinero`);
     });
 });
 

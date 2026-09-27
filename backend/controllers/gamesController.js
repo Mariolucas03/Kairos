@@ -18,9 +18,21 @@ const { getMadridDateString } = require('../utils/dateHelpers');
  * Lo que se colaba acababa en `$inc: { gameCoins: NaN }`. Eso no da error:
  * deja el saldo del usuario en NaN y a partir de ahí ninguna partida cuadra.
  */
+/**
+ * La apuesta que entra por el movil, en fichas enteras y dentro de un tope.
+ *
+ * ⚠️ ANTES ADMITIA DECIMALES. `Number.isFinite(10.7)` es cierto, asi que una
+ * apuesta de 10,7 pasaba: se cobraba 10,7 y el premio salia 21,4. El saldo se
+ * quedaba con comas para siempre —las fichas son unidades, no kilos— y en la
+ * cabecera aparecian numeros como 1.240,5.
+ *
+ * Y no habia TOPE: la apuesta podia ser el saldo entero. Un cero de mas al
+ * escribir y se juega todo de una vez sin querer.
+ */
+const APUESTA_MAXIMA = 100000;
 const normalizarApuesta = (valor, minimo = 10) => {
-    const n = Number(valor);
-    if (!Number.isFinite(n) || n < minimo) return null;
+    const n = Math.floor(Number(valor));
+    if (!Number.isFinite(n) || n < minimo || n > APUESTA_MAXIMA) return null;
     return n;
 };
 
@@ -516,14 +528,16 @@ const playRoulette = asyncHandler(async (req, res) => {
 
     const canonicalBets = [];
     for (const b of bets) {
-        const amount = Number(b?.amount);
-        if (!Number.isFinite(amount) || amount <= 0) { res.status(400); throw new Error('Apuesta inválida'); }
+        // Enteras, como en el resto de juegos: aqui se colaban decimales
+        const amount = Math.floor(Number(b?.amount));
+        if (!Number.isFinite(amount) || amount <= 0 || amount > APUESTA_MAXIMA) { res.status(400); throw new Error('Apuesta inválida'); }
         const canonical = getCanonicalRouletteBet(b?.type, b?.value);
         if (!canonical) { res.status(400); throw new Error('Apuesta inválida'); }
         canonicalBets.push({ amount, ...canonical });
     }
 
     const totalBet = canonicalBets.reduce((a, b) => a + b.amount, 0);
+    if (totalBet > APUESTA_MAXIMA) { res.status(400); throw new Error(`Como mucho ${APUESTA_MAXIMA} fichas en la mesa`); }
     await chargeAndValidate(req.user._id, totalBet);
 
     const WHEEL_NUMBERS = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -801,7 +815,26 @@ const TOWER_FLOORS = 12;
 const TOWER_TILES = 3;
 const TOWER_ULTIMA = { tiles: 4, traps: 2 };
 const TOWER_MULTIPLIERS = [1.4, 2.0, 2.8, 3.9, 5.5, 7.7, 10.8, 15.0, 21, 29, 40, 70];
-const TOWER_PISTA = 0.18;   // parte del premio final que cuesta la pista
+/**
+ * Lo que cuesta la pista, en partes del premio final.
+ *
+ * ⚠️ ESTABA EN 0,18 Y NO SERVIA PARA NADA. En la ultima planta hay 4 losas y
+ * 2 trampas. Las tres opciones, en veces la apuesta:
+ *
+ *     retirarse           40,0
+ *     seguir a ciegas     35,0   (1/2 x 70)
+ *     seguir con pista    46,7 - lo que cueste la pista
+ *
+ * A 0,18 la pista costaba 12,6 y dejaba "seguir con pista" en 34: peor que
+ * las otras dos. Nadie debia comprarla nunca, y quien lo hacia perdia.
+ *
+ * La ventana buena es estrecha: por debajo de 0,095 la pista haria que
+ * seguir valiera MAS que retirarse (la torre pasaria a regalar dinero); por
+ * encima de 0,167 vuelve a no compensar ni frente a seguir a ciegas. 0,12
+ * deja seguir-con-pista en 38,3: mejor que a ciegas, peor que retirarse.
+ * O sea, una decision de verdad para quien va a por el x70.
+ */
+const TOWER_PISTA = 0.12;
 
 const losasDe = (floor) => (floor === TOWER_FLOORS - 1 ? TOWER_ULTIMA.tiles : TOWER_TILES);
 const costeDePista = (bet) => Math.ceil(bet * TOWER_MULTIPLIERS[TOWER_FLOORS - 1] * TOWER_PISTA);
@@ -994,6 +1027,7 @@ const playPlinko = asyncHandler(async (req, res) => {
 module.exports = {
     playDice, playScratch, playSlots, playRoulette, playFortuneWheel, getFortuneWheels, playBlackjack, playTower, playPlinko,
     PLINKO_MULTIPLICADORES, PLINKO_FILAS, PLINKO_PRECIO_BOLA, getCanonicalRouletteBet,
+    normalizarApuesta, APUESTA_MAXIMA,
     RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.
