@@ -340,16 +340,44 @@ const RUEDAS = [
 const FORTUNE_COSTS = Object.fromEntries(RUEDAS.map(r => [r.id, r.coste]));
 const FORTUNE_PRIZES = Object.fromEntries(RUEDAS.map(r => [r.id, r.premios]));
 
+// `val` es lo que paga UNA linea de tres iguales, en veces la apuesta; cuatro
+// iguales pagan PAGO_CUATRO veces eso.
+//
+// ⚠️ Estos numeros estaban calculados para CUATRO lineas y el juego mira DIEZ
+// (4 filas, 4 columnas y 2 diagonales): devolvia el 209% de lo apostado, o
+// sea que regalaba el doble de lo que se jugaba. Con esta tabla vuelve al
+// 86%, y la prueba de economia ya simula las diez lineas de verdad.
 const SLOT_SYMBOLS = [
-    { id: 'cherry', icon: '🍒', val: 4, weight: 25 },
-    { id: 'clover', icon: '🍀', val: 9, weight: 15 },
-    { id: 'zap', icon: '⚡', val: 15, weight: 10 },
-    { id: 'star', icon: '⭐', val: 30, weight: 8 },
-    { id: 'gem', icon: '💎', val: 60, weight: 4 },
-    { id: 'crown', icon: '👑', val: 150, weight: 1 },
+    { id: 'cherry', icon: '🍒', val: 1, weight: 25 },
+    { id: 'clover', icon: '🍀', val: 2, weight: 15 },
+    { id: 'zap', icon: '⚡', val: 4, weight: 10 },
+    { id: 'star', icon: '⭐', val: 8, weight: 8 },
+    { id: 'gem', icon: '💎', val: 20, weight: 4 },
+    { id: 'crown', icon: '👑', val: 70, weight: 1 },
     { id: 'skull', icon: '💀', val: 0, weight: 20 },
     { id: 'ghost', icon: '👻', val: 0, weight: 17 },
 ];
+const PAGO_CUATRO = 6;
+
+/**
+ * Que casillas de una linea de cuatro forman premio, o null.
+ *
+ * ⚠️ ANTES: `if (s[0].val === 0) return;` — si en la PRIMERA casilla habia
+ * una calavera, la linea entera se descartaba sin mirarla. Tres coronas
+ * seguidas en las tres ultimas casillas se veian en pantalla y no pagaban
+ * nada. Pasaba en el 5,2% de las tiradas: era el "a veces no da la
+ * recompensa".
+ *
+ * Lo que decide es el simbolo que se repite, no el que esta el primero.
+ */
+const PATRONES = [[0, 1, 2, 3], [0, 1, 2], [1, 2, 3]];
+const lineaPremiada = (s) => {
+    for (const patron of PATRONES) {
+        const simbolo = s[patron[0]];
+        if (simbolo.val > 0 && patron.every(i => s[i].id === simbolo.id)) return patron;
+    }
+    return null;
+};
 
 const getSlotSymbol = () => {
     const totalW = SLOT_SYMBOLS.reduce((a, s) => a + s.weight, 0);
@@ -384,18 +412,11 @@ const playSlots = asyncHandler(async (req, res) => {
     ];
 
     checkLines.forEach(line => {
-        const s = line.syms;
-        if (s[0].val === 0) return;
-        let matchIds = [];
-        if (s[0].id === s[1].id && s[1].id === s[2].id && s[2].id === s[3].id) matchIds = [0, 1, 2, 3];
-        else if (s[0].id === s[1].id && s[1].id === s[2].id) matchIds = [0, 1, 2];
-        else if (s[1].id === s[2].id && s[2].id === s[3].id && s[1].val > 0) matchIds = [1, 2, 3];
-
-        if (matchIds.length >= 3) {
-            const multi = matchIds.length === 4 ? 2 : 1;
-            totalPayout += apuesta * s[matchIds[0]].val * multi;
-            matchIds.forEach(i => winningCells.push(`${line.coords[i][0]}-${line.coords[i][1]}`));
-        }
+        const matchIds = lineaPremiada(line.syms);
+        if (!matchIds) return;
+        const multi = matchIds.length === 4 ? PAGO_CUATRO : 1;
+        totalPayout += apuesta * line.syms[matchIds[0]].val * multi;
+        matchIds.forEach(i => winningCells.push(`${line.coords[i][0]}-${line.coords[i][1]}`));
     });
 
     const finalUser = await payPrize(req.user._id, totalPayout);
@@ -976,6 +997,6 @@ module.exports = {
     RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
     premioDelRasca
 };

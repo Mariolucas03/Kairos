@@ -2,7 +2,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
 const {
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
     PLINKO_MULTIPLICADORES, PLINKO_FILAS
 } = require('../controllers/gamesController');
 
@@ -211,9 +211,29 @@ describe('Casino: ningun juego puede regalar dinero', () => {
             `La tirada gratis da ${media} fichas de media: demasiado para ser gratis`);
     });
 
+    test('en los slots, TRES iguales seguidos pagan aunque delante haya una calavera', () => {
+        // El fallo que se sufria: la linea se descartaba si la PRIMERA casilla
+        // era un simbolo sin valor, asi que tres coronas seguidas en las tres
+        // ultimas casillas salian en pantalla y no pagaban nada.
+        const s = (id) => SLOT_SYMBOLS.find(x => x.id === id);
+        assert.deepStrictEqual(lineaPremiada([s('skull'), s('crown'), s('crown'), s('crown')]), [1, 2, 3]);
+        assert.deepStrictEqual(lineaPremiada([s('cherry'), s('gem'), s('gem'), s('gem')]), [1, 2, 3]);
+        assert.deepStrictEqual(lineaPremiada([s('zap'), s('zap'), s('zap'), s('ghost')]), [0, 1, 2]);
+        assert.deepStrictEqual(lineaPremiada([s('star'), s('star'), s('star'), s('star')]), [0, 1, 2, 3]);
+        // Y lo que no es premio, no lo es: los simbolos muertos no pagan
+        assert.strictEqual(lineaPremiada([s('skull'), s('skull'), s('skull'), s('skull')]), null);
+        assert.strictEqual(lineaPremiada([s('ghost'), s('ghost'), s('ghost'), s('crown')]), null);
+        assert.strictEqual(lineaPremiada([s('cherry'), s('clover'), s('cherry'), s('clover')]), null);
+    });
+
     test('los slots devuelven entre el 70% y el 100%', () => {
         // Se simula porque el pago depende de que salgan lineas de 3 o 4 iguales
         // en una cuadricula, y eso no tiene formula corta.
+        //
+        // ⚠️ SE SIMULAN LAS DIEZ LINEAS QUE MIRA EL JUEGO: 4 filas, 4 columnas
+        // y 2 diagonales. Antes esto solo recorria las 4 filas y decia que
+        // devolvia el 85%, cuando de verdad devolvia el 209%: el doble de lo
+        // que se apostaba, regalado, durante meses.
         const TIRADAS = 200000;
         const APUESTA = 10;
         const pesoTotal = SLOT_SYMBOLS.reduce((a, s) => a + s.weight, 0);
@@ -230,20 +250,25 @@ describe('Casino: ningun juego puede regalar dinero', () => {
         let apostado = 0;
         let pagado = 0;
 
+        // Las mismas diez lineas que arma el controlador (grid[columna][fila])
+        const lineasDe = (g) => {
+            const filas = [0, 1, 2, 3].map(f => [g[0][f], g[1][f], g[2][f], g[3][f]]);
+            return [
+                ...filas,
+                [filas[0][0], filas[1][1], filas[2][2], filas[3][3]],
+                [filas[0][3], filas[1][2], filas[2][1], filas[3][0]],
+                ...g
+            ];
+        };
+
         for (let i = 0; i < TIRADAS; i++) {
             apostado += APUESTA;
             const cuadricula = Array.from({ length: 4 }, () => Array.from({ length: 4 }, sacarSimbolo));
 
-            for (const fila of cuadricula) {
-                if (fila[0].val === 0) continue;
-                let iguales = [];
-                if (fila[0].id === fila[1].id && fila[1].id === fila[2].id && fila[2].id === fila[3].id) iguales = [0, 1, 2, 3];
-                else if (fila[0].id === fila[1].id && fila[1].id === fila[2].id) iguales = [0, 1, 2];
-                else if (fila[1].id === fila[2].id && fila[2].id === fila[3].id && fila[1].val > 0) iguales = [1, 2, 3];
-
-                if (iguales.length >= 3) {
-                    pagado += APUESTA * fila[iguales[0]].val * (iguales.length === 4 ? 2 : 1);
-                }
+            for (const linea of lineasDe(cuadricula)) {
+                const iguales = lineaPremiada(linea);
+                if (!iguales) continue;
+                pagado += APUESTA * linea[iguales[0]].val * (iguales.length === 4 ? PAGO_CUATRO : 1);
             }
         }
 

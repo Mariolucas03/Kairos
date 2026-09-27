@@ -54,14 +54,17 @@ const ICONS = {
     ghost: <Ghost size={32} className="text-zinc-500" />
 };
 
-// --- VISUALES DE PAGO (Solo para Info Modal) ---
+// --- LO QUE PAGA CADA SIMBOLO ---
+// ⚠️ Tiene que cuadrar con SLOT_SYMBOLS del servidor: esta lista decia x50 por
+// la corona cuando el servidor pagaba x150, asi que la ayuda mentia.
+const PAGO_CUATRO = 6;
 const PAYTABLE = [
-    { id: 'crown', icon: <Crown size={24} className="text-yellow-600" />, val: 50 },
+    { id: 'crown', icon: <Crown size={24} className="text-yellow-600" />, val: 70 },
     { id: 'gem', icon: <Gem size={24} className="text-cyan-400" />, val: 20 },
-    { id: 'star', icon: <Star size={24} className="text-purple-400" />, val: 10 },
-    { id: 'zap', icon: <Zap size={24} className="text-yellow-400" />, val: 5 },
-    { id: 'clover', icon: <Clover size={24} className="text-green-500" />, val: 3 },
-    { id: 'cherry', icon: <Cherry size={24} className="text-red-500" />, val: 1.5 },
+    { id: 'star', icon: <Star size={24} className="text-purple-400" />, val: 8 },
+    { id: 'zap', icon: <Zap size={24} className="text-yellow-400" />, val: 4 },
+    { id: 'clover', icon: <Clover size={24} className="text-green-500" />, val: 2 },
+    { id: 'cherry', icon: <Cherry size={24} className="text-red-500" />, val: 1 },
 ];
 
 export default function Slots() {
@@ -444,8 +447,9 @@ export default function Slots() {
                             ))}
                         </div>
                         <div className="text-center text-[10px] text-zinc-400 mt-4 bg-purple-900/20 p-2 rounded-lg border border-purple-500/20">
-                            Calaveras y Fantasmas no dan premio.<br />
-                            ¡Consigue <strong>3 o 4 iguales</strong> en línea!
+                            Calaveras y fantasmas no dan premio.<br />
+                            Tres iguales en línea pagan lo de arriba; <strong>cuatro pagan x{PAGO_CUATRO}</strong> de eso.<br />
+                            Cuentan filas, columnas y las dos diagonales.
                         </div>
                     </div>
                 </div>
