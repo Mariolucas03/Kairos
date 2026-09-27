@@ -15,6 +15,7 @@
  *
  * Uso:
  *     node backend/scripts/cuenta-admin.js --crear
+ *     node backend/scripts/cuenta-admin.js --crear --usuario Kairos --correo tu@correo.com
  *     node backend/scripts/cuenta-admin.js --clave <usuario>     (cambiarla)
  *     node backend/scripts/cuenta-admin.js --borrar <usuario>
  */
@@ -64,13 +65,15 @@ const pedirClave = async () => {
 };
 
 const crear = async () => {
-    const nombre = await preguntar('Nombre de usuario (máx. 8): ');
+    // El nombre y el correo pueden venir por argumento (no son secretos); la
+    // contraseña NUNCA, que los argumentos quedan en el historial del terminal.
+    const nombre = arg('--usuario') || await preguntar('Nombre de usuario (máx. 8): ');
     if (!nombre || nombre.length > 8) return console.log('❌ El nombre tiene que tener entre 1 y 8 caracteres.');
     if (await User.findOne({ username: new RegExp('^' + nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') })) {
         return console.log('❌ Ya existe un usuario con ese nombre.');
     }
 
-    const email = await preguntar('Correo: ');
+    const email = arg('--correo') || await preguntar('Correo: ');
     if (!email.includes('@')) return console.log('❌ Ese correo no vale.');
     if (await User.findOne({ email: email.toLowerCase() })) return console.log('❌ Ya hay una cuenta con ese correo.');
 
@@ -92,7 +95,15 @@ const crear = async () => {
         streak: { current: 0, lastLogDate: new Date(0) }
     });
 
-    console.log('\n✅ Cuenta creada: ' + nombre);
+    // Se comprueba aquí mismo que con esa contraseña se entra: si algo fallara
+    // al cifrarla, mejor saberlo ahora y no al quedarse fuera de la app.
+    const recien = await User.findOne({ username: nombre }).select('+password');
+    if (!(await recien.comparePassword(clave))) {
+        console.log('❌ Algo ha ido mal: la contraseña guardada no coincide. NO borres la cuenta vieja.');
+        return;
+    }
+
+    console.log('\n✅ Cuenta creada y comprobada: ' + nombre);
     console.log('   👑 Administrador');
     console.log('   🙈 Oculta: no sale al buscar, ni en los rankings, ni cuenta para el percentil.');
     console.log('   🔒 La contraseña solo la sabes tú: en la base de datos está cifrada.');
@@ -142,7 +153,7 @@ const borrar = async (nombre) => {
     else if (arg('--borrar')) await borrar(arg('--borrar'));
     else {
         console.log('Uso:');
-        console.log('  node backend/scripts/cuenta-admin.js --crear');
+        console.log('  node backend/scripts/cuenta-admin.js --crear [--usuario <nombre>] [--correo <correo>]');
         console.log('  node backend/scripts/cuenta-admin.js --clave <usuario>');
         console.log('  node backend/scripts/cuenta-admin.js --borrar <usuario>');
     }
