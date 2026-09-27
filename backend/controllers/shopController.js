@@ -6,48 +6,45 @@ const { COFRES, cofrePorId, catalogoDeCofres, abrirCofre } = require('../service
 /**
  * CATÁLOGO DE LA TIENDA
  *
- * ⚠️ Los iconos son EMOJI, no rutas de imagen. El catálogo antiguo apuntaba a
- * '/avatars/zeus.png', '/chests/gold_chest.png', etc., pero esas carpetas no
- * existen en `frontend/public/`: todos esos items se veían rotos. El frontend
- * ya distingue emoji de ruta (Shop.jsx), así que con emoji se ve todo bien.
- * Si algún día añades los PNG reales, basta con cambiar el campo `icon`.
+ * ⚠️ AQUÍ SOLO SE VENDE LO QUE TIENE DIBUJO.
+ *
+ * Durante mucho tiempo la mitad del catálogo eran emoji haciéndose pasar por
+ * objetos: ocho marcos de los que solo dos tenían imagen, avatares que eran
+ * un 🥊, mascotas que eran un 🐱. Y como el avatar y la mascota se pintan con
+ * <img src>, comprar uno de esos dejaba un icono de imagen rota en la
+ * cabecera: el producto empeoraba el perfil.
+ *
+ * Regla: si no hay un PNG en frontend/public, no se vende. Los títulos son la
+ * excepción evidente —un título es texto, no un dibujo— y los cofres llevan
+ * icono propio porque son una mecánica, no un cosmético.
  */
 const SEED_ITEMS = [
     // ================= AVATARES =================
-    { name: 'Novato', price: 0, category: 'avatar', icon: '🙂', rarity: 'comun', description: 'Todo el mundo empieza por aquí.' },
-    { name: 'Boxeador', price: 150, category: 'avatar', icon: '🥊', rarity: 'comun', description: 'Puños de acero.' },
-    { name: 'Corredor', price: 150, category: 'avatar', icon: '🏃', rarity: 'comun', description: 'Kilómetros en las piernas.' },
-    { name: 'Halterófilo', price: 250, category: 'avatar', icon: '🏋️', rarity: 'raro', description: 'La barra es tu religión.' },
-    { name: 'Ninja', price: 400, category: 'avatar', icon: '🥷', rarity: 'raro', description: 'Entrena de madrugada.' },
-    { name: 'Vikingo', price: 600, category: 'avatar', icon: '🪓', rarity: 'raro', description: 'Fuerza bruta del norte.' },
-    { name: 'Zeus', price: 900, category: 'avatar', icon: '⚡', rarity: 'epico', description: 'El dios del rayo.' },
-    { name: 'Caballero Dorado', price: 1200, category: 'avatar', icon: '🛡️', rarity: 'epico', description: 'Armadura legendaria.' },
-    { name: 'Samurái', price: 1400, category: 'avatar', icon: '⚔️', rarity: 'epico', description: 'Disciplina absoluta.' },
-    { name: 'Diosa', price: 2100, category: 'avatar', icon: '👑', rarity: 'legendario', description: 'La diosa de la sabiduría.' },
-    { name: 'Titán', price: 3000, category: 'avatar', icon: '🗿', rarity: 'legendario', description: 'Inamovible.' },
-    { name: 'Fénix', price: 4000, category: 'avatar', icon: '🔥', rarity: 'legendario', description: 'Renace de sus cenizas.' },
+    // Los dibujos están en frontend/public/avatars. El nombre del fichero es
+    // el que es (con sus erratas): se respeta tal cual o la imagen no carga.
+    { name: 'Cazador', price: 150, category: 'avatar', icon: '/avatars/cazador.png', rarity: 'comun', description: 'Paciencia y puntería.' },
+    { name: 'Caníbal', price: 150, category: 'avatar', icon: '/avatars/canival.png', rarity: 'comun', description: 'Hambre de kilos.' },
+    { name: 'Mago', price: 250, category: 'avatar', icon: '/avatars/mago.png', rarity: 'comun', description: 'La técnica también es magia.' },
+    { name: 'Vikingo', price: 400, category: 'avatar', icon: '/avatars/vikingo.png', rarity: 'raro', description: 'Fuerza bruta del norte.' },
+    { name: 'Espartano', price: 450, category: 'avatar', icon: '/avatars/sparrta.png', rarity: 'raro', description: 'Esto es Esparta.' },
+    { name: 'Cazador Indio', price: 500, category: 'avatar', icon: '/avatars/cazdro_indio.png', rarity: 'raro', description: 'Rastrea sin descanso.' },
+    { name: 'Caballero', price: 600, category: 'avatar', icon: '/avatars/caballero_medival.png', rarity: 'raro', description: 'Acero y disciplina.' },
+    { name: 'Faraón', price: 900, category: 'avatar', icon: '/avatars/faraon.png', rarity: 'epico', description: 'Construye monumentos.' },
+    { name: 'Oni', price: 1000, category: 'avatar', icon: '/avatars/oni.png', rarity: 'epico', description: 'Demonio japonés.' },
+    { name: 'Medusa', price: 1100, category: 'avatar', icon: '/avatars/medusa.png', rarity: 'epico', description: 'Te deja de piedra.' },
+    { name: 'Hombre León', price: 1300, category: 'avatar', icon: '/avatars/HOMBRELEON.png', rarity: 'epico', description: 'Melena y rugido.' },
+    { name: 'Caballero Dorado', price: 1800, category: 'avatar', icon: '/avatars/CABALLEROAVNAZDO.png', rarity: 'legendario', description: 'Armadura legendaria.' },
+    { name: 'Hydra', price: 2400, category: 'avatar', icon: '/avatars/hydra.png', rarity: 'legendario', description: 'Cortas una cabeza y salen dos.' },
+    { name: 'Zeus', price: 3200, category: 'avatar', icon: '/avatars/ZEUS.png', rarity: 'legendario', description: 'El dios del rayo.' },
 
     // ================= MARCOS =================
-    { name: 'Marco de Hierro', price: 80, category: 'frame', icon: '⬛', rarity: 'comun', description: 'Sencillo y sólido.' },
-    { name: 'Marco de Bronce', price: 150, category: 'frame', icon: '🟫', rarity: 'comun', description: 'El primer escalón.' },
-    { name: 'Marco de Plata', price: 350, category: 'frame', icon: '⬜', rarity: 'raro', description: 'Brillo discreto.' },
-    { name: 'Marco de Rayos', price: 500, category: 'frame', icon: '🌩️', sprite: '/frames/rayos.png', rarity: 'raro', description: 'Energía pura.' },
-    { name: 'Marco de Oro', price: 800, category: 'frame', icon: '🟨', sprite: '/frames/marco_oro.png', rarity: 'epico', description: 'Brillante.' },
-    { name: 'Marco de Hielo', price: 900, category: 'frame', icon: '🧊', rarity: 'epico', description: 'Sangre fría.' },
-    { name: 'Marco Infernal', price: 1600, category: 'frame', icon: '😈', rarity: 'legendario', description: 'Forjado en llamas.' },
-    { name: 'Marco Cósmico', price: 2500, category: 'frame', icon: '🌌', rarity: 'legendario', description: 'Más allá del gimnasio.' },
-
-    // ================= MASCOTAS =================
-    { name: 'Gatito Gym', price: 120, category: 'pet', icon: '🐱', rarity: 'comun', description: 'Te mira mientras entrenas.' },
-    { name: 'Perro Fiel', price: 120, category: 'pet', icon: '🐶', rarity: 'comun', description: 'Nunca falta a una sesión.' },
-    { name: 'Búho Nocturno', price: 300, category: 'pet', icon: '🦉', rarity: 'raro', description: 'Para los turnos de noche.' },
-    { name: 'Lobo', price: 450, category: 'pet', icon: '🐺', rarity: 'raro', description: 'Instinto de manada.' },
-    { name: 'Serpiente', price: 500, category: 'pet', icon: '🐍', rarity: 'raro', description: 'Sigilosa y letal.' },
-    { name: 'Tigre', price: 850, category: 'pet', icon: '🐯', rarity: 'epico', description: 'Explosividad pura.' },
-    { name: 'Águila', price: 1000, category: 'pet', icon: '🦅', rarity: 'epico', description: 'Visión de campeón.' },
-    { name: 'Dragón Infernal', price: 2200, category: 'pet', icon: '🐉', rarity: 'legendario', description: 'Bestia legendaria.' },
+    // Solo los dos que tienen dibujo. Los otros seis eran un emoji metido en
+    // un <img>: se veían como una imagen rota alrededor de la cara.
+    { name: 'Marco de Rayos', price: 500, category: 'frame', icon: '/frames/rayos.png', sprite: '/frames/rayos.png', rarity: 'raro', description: 'Energía pura.' },
+    { name: 'Marco de Oro', price: 900, category: 'frame', icon: '/frames/marco_oro.png', sprite: '/frames/marco_oro.png', rarity: 'epico', description: 'Brillante.' },
 
     // ================= TÍTULOS =================
+    // Un título es texto: no necesita dibujo, se lee debajo de tu nombre.
     { name: 'Principiante', price: 0, category: 'title', icon: '🌱', rarity: 'comun', description: 'El principio de todo.' },
     { name: 'Constante', price: 200, category: 'title', icon: '📆', rarity: 'comun', description: 'No fallas ni un día.' },
     { name: 'Sin Excusas', price: 350, category: 'title', icon: '🚫', rarity: 'raro', description: 'Ni lluvia ni pereza.' },
@@ -58,12 +55,14 @@ const SEED_ITEMS = [
     { name: 'Inmortal', price: 3500, category: 'title', icon: '♾️', rarity: 'legendario', description: 'Ya no eres humano.' },
 
     // ================= POCIONES =================
-    { name: 'Chispa de XP', price: 25, category: 'consumable', icon: '✨', rarity: 'comun', effectType: 'xp', effectValue: 50, description: '+50 XP al instante.' },
-    { name: 'Frasco de Sabiduría', price: 40, category: 'consumable', icon: '🧪', rarity: 'comun', effectType: 'xp', effectValue: 100, description: '+100 XP al instante.' },
-    { name: 'Elixir de Maestría', price: 150, category: 'consumable', icon: '⚗️', rarity: 'raro', effectType: 'xp', effectValue: 500, description: '+500 XP al instante.' },
-    { name: 'Vendaje', price: 60, category: 'consumable', icon: '🩹', rarity: 'comun', effectType: 'heal', effectValue: 10, description: 'Recupera 10 de vida.' },
-    { name: 'Poción Vital', price: 100, category: 'consumable', icon: '❤️', rarity: 'raro', effectType: 'heal', effectValue: 25, description: 'Recupera 25 de vida.' },
-    { name: 'Néctar de los Dioses', price: 400, category: 'consumable', icon: '🏺', rarity: 'epico', effectType: 'heal', effectValue: 100, description: 'Restaura toda tu vida.' },
+    // Con los dos frascos que hay dibujados: el azul para la XP y el rojo
+    // para la vida.
+    { name: 'Chispa de XP', price: 25, category: 'consumable', icon: '/consumables/xp_potion.png', rarity: 'comun', effectType: 'xp', effectValue: 50, description: '+50 XP al instante.' },
+    { name: 'Frasco de Sabiduría', price: 40, category: 'consumable', icon: '/consumables/xp_potion.png', rarity: 'comun', effectType: 'xp', effectValue: 100, description: '+100 XP al instante.' },
+    { name: 'Elixir de Maestría', price: 150, category: 'consumable', icon: '/consumables/xp_potion.png', rarity: 'raro', effectType: 'xp', effectValue: 500, description: '+500 XP al instante.' },
+    { name: 'Vendaje', price: 60, category: 'consumable', icon: '/consumables/life_potion.png', rarity: 'comun', effectType: 'heal', effectValue: 10, description: 'Recupera 10 de vida.' },
+    { name: 'Poción Vital', price: 100, category: 'consumable', icon: '/consumables/life_potion.png', rarity: 'raro', effectType: 'heal', effectValue: 25, description: 'Recupera 25 de vida.' },
+    { name: 'Néctar de los Dioses', price: 400, category: 'consumable', icon: '/consumables/life_potion.png', rarity: 'epico', effectType: 'heal', effectValue: 100, description: 'Restaura toda tu vida.' },
 
     // ================= COFRES =================
     // Los diez cofres salen de cofresService: ahi esta cada tabla de premios y
@@ -74,14 +73,12 @@ const SEED_ITEMS = [
         name: c.nombre, price: c.precio, category: 'chest', icon: c.icono, rarity: c.rareza,
         description: c.descripcion, effectType: c.id
     })),
-
-    // ================= TEMAS =================
-    { name: 'Modo Oscuro', price: 0, category: 'theme', icon: '🌙', rarity: 'comun', description: 'El clásico de Kairos.', effectType: 'dark' },
-    { name: 'Modo Claro', price: 100, category: 'theme', icon: '☀️', rarity: 'comun', description: 'Para los valientes.', effectType: 'light' },
-    { name: 'Neón', price: 600, category: 'theme', icon: '🟪', rarity: 'raro', description: 'Estética arcade.', effectType: 'neon' },
-    { name: 'Sangre', price: 900, category: 'theme', icon: '🟥', rarity: 'epico', description: 'Rojo intenso.', effectType: 'blood' },
-    { name: 'Oro Puro', price: 1800, category: 'theme', icon: '🟡', rarity: 'legendario', description: 'Lujo absoluto.', effectType: 'gold' },
 ];
+
+// Categorias que ya NO se venden. Lo que la gente tuviera equipado de ellas se
+// quita al arrancar: una mascota o un avatar que era un emoji se pintaba con
+// <img src="🐱"> y salia el icono de imagen rota en la cabecera.
+const CATEGORIAS_RETIRADAS = ['pet', 'theme'];
 
 /**
  * Sincroniza el catálogo del sistema con SEED_ITEMS.
@@ -121,6 +118,27 @@ const syncSystemCatalog = async () => {
         await User.updateMany({}, { $pull: { inventory: { item: { $in: ids } } } });
         console.log(`🧹 ${ids.length} items retirados del catálogo y de los inventarios.`);
     }
+
+    // Categorías retiradas enteras (mascotas, temas): fuera de la tienda y de
+    // los inventarios.
+    const deCategoriasMuertas = await ShopItem.find({ category: { $in: CATEGORIAS_RETIRADAS } }).select('_id').lean();
+    if (deCategoriasMuertas.length > 0) {
+        const ids = deCategoriasMuertas.map(i => i._id);
+        await ShopItem.deleteMany({ _id: { $in: ids } });
+        await User.updateMany({}, { $pull: { inventory: { item: { $in: ids } } } });
+    }
+
+    // ⚠️ Y LO QUE LA GENTE LLEVA PUESTO.
+    //
+    // El avatar y la mascota se pintan con <img src={...}>. Mientras el
+    // catálogo vendió emoji, ahí dentro quedó guardado un 🥊 o un 🐱, que no
+    // es ninguna URL: el navegador busca un fichero con ese nombre, no existe,
+    // y en la cabecera sale el icono de imagen rota. Se limpia lo que no sea
+    // una ruta de verdad; el perfil vuelve a la inicial del nombre.
+    const noEsRuta = { $not: /^(\/|https?:)/ };
+    await User.updateMany({ avatar: { $nin: [null, ''], ...noEsRuta } }, { $set: { avatar: null } });
+    await User.updateMany({ pet: { $nin: [null, ''] } }, { $set: { pet: null } });
+    await User.updateMany({ theme: { $nin: [null, 'dark'] } }, { $set: { theme: 'dark' } });
 };
 
 // Devuelve el usuario sin entradas de inventario rotas (item borrado → null).

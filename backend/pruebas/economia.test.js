@@ -381,10 +381,21 @@ describe('Cofres: diez tablas, y ninguna regala ni estafa', () => {
         }, 0);
     };
 
-    test('hay diez cofres, con id, precio y tabla', () => {
-        assert.strictEqual(COFRES.length, 10);
+    test('los cofres tienen id, precio y tabla, y ninguno reparte cosas que ya no existen', () => {
+        assert.ok(COFRES.length >= 8, 'se han quedado muy pocos cofres');
         const ids = new Set(COFRES.map(c => c.id));
-        assert.strictEqual(ids.size, 10, 'dos cofres con el mismo id');
+        assert.strictEqual(ids.size, COFRES.length, 'dos cofres con el mismo id');
+        // El Cofre de la Bestia daba mascotas: al retirarlas se quedo dando
+        // nada. Una categoria sin objetos en el catalogo no puede estar en
+        // ninguna tabla.
+        const categoriasVivas = new Set(SEED_ITEMS.map(i => i.category));
+        for (const c of COFRES) {
+            for (const e of c.tabla) {
+                if (e.t !== 'objeto') continue;
+                assert.ok(e.categorias.some(cat => categoriasVivas.has(cat)),
+                    `${c.nombre} reparte ${e.categorias.join('/')}, que ya no se vende`);
+            }
+        }
         for (const c of COFRES) {
             assert.ok(c.precio > 0 && c.nombre && c.icono && c.descripcion, `cofre incompleto: ${c.id}`);
             assert.ok(c.tabla.length >= 2, `${c.id}: una tabla de un solo premio no es un cofre`);

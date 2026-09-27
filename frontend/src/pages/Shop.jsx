@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { useAuthStore } from '../store/useAuthStore';
 import {
     Plus, X, ArrowRightLeft,
-    Ticket, Heart, User, ScanFace, Palette, Package, PawPrint, Crown,
+    Ticket, Heart, User, ScanFace, Package, Crown,
     ShoppingBag, Backpack, Save, Loader2
 } from '../iconos';
 import api from '../services/api';
@@ -45,9 +45,7 @@ const CATEGORIES = [
     { id: 'consumable', label: 'POCIONES', icon: <Heart size={24} /> },
     { id: 'avatar', label: 'AVATAR', icon: <User size={24} /> },
     { id: 'frame', label: 'MARCOS', icon: <ScanFace size={24} /> },
-    { id: 'theme', label: 'TEMAS', icon: <Palette size={24} /> },
     { id: 'chest', label: 'COFRES', icon: <Package size={24} /> },
-    { id: 'pet', label: 'MASCOTAS', icon: <PawPrint size={24} /> },
     { id: 'title', label: 'TÍTULOS', icon: <Crown size={24} /> },
 ];
 
@@ -148,12 +146,22 @@ export default function Shop() {
                 localStorage.setItem('user', JSON.stringify(res.data.user));
             }
 
+            // ⚠️ NO se cierra la ficha: lo raro era comprar un cofre y que la
+            // ventana se cerrara sin poder abrirlo, obligando a buscarlo en la
+            // mochila. Con el objeto ya comprado, el boton pasa a ser "Abrir"
+            // o "Usar" (lo decide `tengoEste`, que mira el inventario nuevo).
             showToast("¡Comprado!", "success");
-            setSelectedItem(null);
+            if (!['chest', 'consumable'].includes(selectedItem.category)) setSelectedItem(null);
         } catch (error) {
             showToast(error.response?.data?.message || "Error en la compra", "error");
         } finally { setIsProcessing(false); }
     };
+
+    /** ¿Tengo este objeto en la mochila ahora mismo? */
+    const tengoEste = (item) => !!item && (user?.inventory || []).some(slot => {
+        const id = slot?.item?._id || slot?.item;
+        return id && id.toString() === item._id && (slot.quantity ?? 1) > 0;
+    });
 
     const handleUse = async () => {
         if (!selectedItem || isProcessing) return;
@@ -202,8 +210,9 @@ export default function Shop() {
                 </div>
             </div>
 
-            {/* TABS FLOTANTES (STICKY) */}
-            <div className="bg-black pt-4 pb-4 px-4 border-b border-zinc-900/50">
+            {/* TIENDA / MOCHILA: se quedan a la vista al bajar, justo debajo
+                de la cabecera de la app (que es fija y mide --alto-cabecera). */}
+            <div className="sticky z-30 bg-black pt-4 pb-4 px-4 border-b border-zinc-900/50" style={{ top: 'var(--alto-cabecera, 116px)' }}>
                 <div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-zinc-800">
                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'inventory' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`} />
                     <button onClick={() => setActiveTab('shop')} className={`flex-1 z-10 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'shop' ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}>
@@ -406,24 +415,46 @@ export default function Shop() {
                             );
                         })()}
 
-                        <button
-                            onClick={activeTab === 'shop' ? handleBuy : handleUse}
-                            disabled={isProcessing}
-                            className={`relative z-10 w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-xs transition-all active:scale-95 border-b-4 flex items-center justify-center gap-2
-                                ${activeTab === 'shop'
-                                    ? (selectedItem.category === 'reward' ? 'bg-yellow-500 text-black hover:bg-yellow-400 border-yellow-700' : 'bg-purple-600 text-white hover:bg-purple-500 border-purple-800')
-                                    : 'bg-green-600 text-white hover:bg-green-500 border-green-800'
-                                }`}
-                        >
-                            {isProcessing ? <Loader2 className="animate-spin" /> : (
-                                activeTab === 'shop' ? (
-                                    <>
-                                        Comprar · {selectedItem.price}
-                                        <img src={selectedItem.category === 'reward' ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png"} className="w-5 h-5 object-contain" />
-                                    </>
-                                ) : (selectedItem.category === 'chest' ? 'Abrir cofre' : 'Usar objeto')
-                            )}
-                        </button>
+                        {/* Si ya lo tienes, el boton es de USAR aunque estes en
+                            la tienda: comprar un cofre y no poder abrirlo sin
+                            buscarlo en la mochila no tenia ningun sentido. */}
+                        {(() => {
+                            const loTengo = tengoEste(selectedItem);
+                            const usable = ['chest', 'consumable'].includes(selectedItem.category);
+                            const usar = activeTab === 'inventory' || (loTengo && usable);
+                            return (
+                                <button
+                                    onClick={usar ? handleUse : handleBuy}
+                                    disabled={isProcessing}
+                                    className={`relative z-10 w-full py-4 rounded-2xl font-black uppercase tracking-[0.12em] text-xs transition-all active:scale-95 border-b-4 flex items-center justify-center gap-2
+                                        ${usar
+                                            ? 'bg-green-600 text-white hover:bg-green-500 border-green-800'
+                                            : (selectedItem.category === 'reward' ? 'bg-yellow-500 text-black hover:bg-yellow-400 border-yellow-700' : 'bg-purple-600 text-white hover:bg-purple-500 border-purple-800')
+                                        }`}
+                                >
+                                    {isProcessing ? <Loader2 className="animate-spin" /> : usar
+                                        ? (selectedItem.category === 'chest' ? 'Abrir cofre' : selectedItem.category === 'consumable' ? 'Usar ahora' : 'Equipar')
+                                        : (
+                                            <>
+                                                Comprar · {selectedItem.price}
+                                                <img src={selectedItem.category === 'reward' ? "/assets/icons/moneda.png" : "/assets/icons/ficha.png"} className="w-5 h-5 object-contain" />
+                                            </>
+                                        )}
+                                </button>
+                            );
+                        })()}
+
+                        {/* Y si lo acabas de comprar, seguir comprando otro */}
+                        {activeTab === 'shop' && tengoEste(selectedItem) && ['chest', 'consumable'].includes(selectedItem.category) && (
+                            <button
+                                onClick={handleBuy}
+                                disabled={isProcessing}
+                                className="relative z-10 w-full mt-2 py-3 rounded-2xl font-black uppercase tracking-[0.12em] text-[11px] bg-zinc-900 border border-white/10 text-zinc-300 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                            >
+                                Comprar otro · {selectedItem.price}
+                                <img src="/assets/icons/ficha.png" className="w-4 h-4 object-contain" />
+                            </button>
+                        )}
                     </div>
                 </div>
                 );

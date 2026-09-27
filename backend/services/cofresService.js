@@ -7,7 +7,7 @@ const { addRewards } = require('./levelService');
  * LOS COFRES DE LA TIENDA.
  *
  * Se compran con fichas y dentro puede haber de todo MENOS monedas de oro:
- * fichas, experiencia u objetos del catalogo (avatares, marcos, mascotas,
+ * fichas, experiencia u objetos del catalogo (avatares, marcos, titulos,
  * titulos, temas, pociones). Diez cofres, cada uno con su tabla de premios.
  *
  * ⚠️ LA TABLA ES LA VERDAD, Y SE ENSEÑA. `resumenDe(cofre)` calcula los
@@ -30,7 +30,7 @@ const { addRewards } = require('./levelService');
  *     { t: 'objeto', rareza, categorias, peso }   // uno al azar del catalogo
  */
 
-const COSMETICOS = ['avatar', 'frame', 'pet', 'title', 'theme'];
+const COSMETICOS = ['avatar', 'frame', 'title'];
 const UNICOS = new Set(COSMETICOS);
 
 const COFRES = [
@@ -44,7 +44,7 @@ const COFRES = [
         ]
     },
     {
-        id: 'madera', nombre: 'Cofre de Madera', precio: 100, icono: '🪵', rareza: 'comun',
+        id: 'madera', nombre: 'Cofre de Madera', precio: 120, icono: '🪵', rareza: 'comun',
         descripcion: 'Fichas, algo de XP, y un objeto común de vez en cuando.',
         tabla: [
             { t: 'fichas', min: 50, max: 160, peso: 60 },
@@ -53,7 +53,7 @@ const COFRES = [
         ]
     },
     {
-        id: 'hierro', nombre: 'Cofre de Hierro', precio: 180, icono: '⚙️', rareza: 'comun',
+        id: 'hierro', nombre: 'Cofre de Hierro', precio: 220, icono: '⚙️', rareza: 'comun',
         descripcion: 'Uno de cada cuatro trae un objeto.',
         tabla: [
             { t: 'fichas', min: 100, max: 300, peso: 50 },
@@ -63,7 +63,7 @@ const COFRES = [
         ]
     },
     {
-        id: 'bronce', nombre: 'Cofre de Bronce', precio: 300, icono: '🥉', rareza: 'raro',
+        id: 'bronce', nombre: 'Cofre de Bronce', precio: 350, icono: '🥉', rareza: 'raro',
         descripcion: 'Empiezan a salir objetos raros.',
         tabla: [
             { t: 'fichas', min: 180, max: 520, peso: 45 },
@@ -73,7 +73,7 @@ const COFRES = [
         ]
     },
     {
-        id: 'plata', nombre: 'Cofre de Plata', precio: 500, icono: '🥈', rareza: 'raro',
+        id: 'plata', nombre: 'Cofre de Plata', precio: 580, icono: '🥈', rareza: 'raro',
         descripcion: 'Casi la mitad de las veces, un objeto. Uno de cada diez, épico.',
         tabla: [
             { t: 'fichas', min: 200, max: 750, peso: 40 },
@@ -110,16 +110,6 @@ const COFRES = [
             { t: 'objeto', rareza: 'raro', categorias: COSMETICOS, peso: 40 },
             { t: 'objeto', rareza: 'epico', categorias: COSMETICOS, peso: 30 },
             { t: 'objeto', rareza: 'legendario', categorias: COSMETICOS, peso: 10 }
-        ]
-    },
-    {
-        id: 'bestia', nombre: 'Cofre de la Bestia', precio: 900, icono: '🐾', rareza: 'epico',
-        descripcion: 'Siempre una mascota.',
-        tabla: [
-            { t: 'objeto', rareza: 'comun', categorias: ['pet'], peso: 15 },
-            { t: 'objeto', rareza: 'raro', categorias: ['pet'], peso: 45 },
-            { t: 'objeto', rareza: 'epico', categorias: ['pet'], peso: 30 },
-            { t: 'objeto', rareza: 'legendario', categorias: ['pet'], peso: 10 }
         ]
     },
     {
