@@ -19,6 +19,10 @@ const { sendPushToUser } = require('./pushController');
  * ninguno hubiera escrito y el saldo acabaria en negativo. Con la condicion
  * dentro del filtro, Mongo solo deja pasar a uno.
  */
+// El mismo tope que en el casino: un cero de mas al escribir no puede
+// convertirse en un duelo por el saldo entero.
+const APUESTA_MAXIMA_DUELO = 100000;
+
 const cobrarFichas = async (userId, fichas) => {
     const r = await User.updateOne(
         { _id: userId, gameCoins: { $gte: fichas } },
@@ -166,10 +170,14 @@ const createChallenge = asyncHandler(async (req, res) => {
 
     // La apuesta llega del cliente: sin esto entraban textos, negativos e
     // Infinity, que quedaban guardados esperando a que algún día se pagaran.
-    const apuesta = Number(betAmount);
-    if (!Number.isFinite(apuesta) || apuesta <= 0) {
+    //
+    // ⚠️ Y ENTERA. `Number('10.7')` pasaba el filtro, y un duelo de 10,7
+    // fichas deja los dos saldos con comas para siempre: media ficha no
+    // existe en ningun sitio de la app. El tope es el mismo que en el casino.
+    const apuesta = Math.floor(Number(betAmount));
+    if (!Number.isFinite(apuesta) || apuesta <= 0 || apuesta > APUESTA_MAXIMA_DUELO) {
         res.status(400);
-        throw new Error('Apuesta inválida');
+        throw new Error(`La apuesta va de 1 a ${APUESTA_MAXIMA_DUELO} fichas`);
     }
 
     // Verificar saldo del retador

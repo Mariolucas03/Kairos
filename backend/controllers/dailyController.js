@@ -12,6 +12,29 @@ const { getMadridDateString } = require('../utils/dateHelpers');
 // documentos distintos y los totales nunca se sincronizaban.
 const getServerDateString = () => getMadridDateString();
 
+/**
+ * La fecha que manda el movil, comprobada.
+ *
+ * ⚠️ NO SE MIRABA NINGUNA. `PUT /daily` acepta una fecha para poder corregir
+ * un dia pasado desde el calendario del inicio, pero entraba cualquier cosa:
+ * "9999-12-31" creaba un registro en el año 9999, y una fecha futura deja un
+ * dia "activo" que todavia no ha pasado, lo que infla el mapa de constancia y
+ * los dias activos del perfil. Se acepta el formato exacto, que sea una fecha
+ * de verdad, que no sea futura y que no tenga mas de un año.
+ */
+const DIAS_ATRAS_EDITABLES = 366;
+const fechaValida = (texto) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(texto || '')) return null;
+    const d = new Date(`${texto}T12:00:00`);
+    if (Number.isNaN(d.getTime()) || getMadridDateString(d) !== texto) return null;
+    const hoy = getServerDateString();
+    if (texto > hoy) return null;
+    const limite = new Date();
+    limite.setDate(limite.getDate() - DIAS_ATRAS_EDITABLES);
+    if (texto < getMadridDateString(limite)) return null;
+    return texto;
+};
+
 const ensureDailyLog = async (userId, dateString, userStreak) => {
     // ⚠️ new Date('2026-08-03') se interpreta como medianoche UTC, y getDay()
     // devuelve el día en la zona del servidor: con cualquier desfase negativo
@@ -121,8 +144,8 @@ const getDailyLog = asyncHandler(async (req, res) => {
 });
 
 const getDailyLogByDate = asyncHandler(async (req, res) => {
-    const { date } = req.query;
-    if (!date) { res.status(400); throw new Error('Falta fecha'); }
+    const date = fechaValida(req.query?.date);
+    if (!date) { res.status(400); throw new Error('Falta la fecha o no es un día válido'); }
     const log = await DailyLog.findOne({ user: req.user._id, date: date }).lean();
     if (log) {
         const nutritionLog = await NutritionLog.findOne({ user: req.user._id, date: date }).lean();
@@ -134,7 +157,9 @@ const getDailyLogByDate = asyncHandler(async (req, res) => {
 const updateDailyLog = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const { type, value, date } = req.body;
-    const targetDate = date || req.query.date || getServerDateString();
+    const pedida = date || req.query.date;
+    const targetDate = pedida ? fechaValida(pedida) : getServerDateString();
+    if (!targetDate) { res.status(400); throw new Error('Esa fecha no vale: tiene que ser un día real del último año, y no puede ser futura'); }
     let { log } = await ensureDailyLog(userId, targetDate, req.user.streak.current);
 
     // ⚠️ Los CAMPOS ya estaban filtrados, pero no los VALORES.
