@@ -83,7 +83,7 @@ const COFRES = [
         ]
     },
     {
-        id: 'dorado', nombre: 'Cofre Dorado', precio: 800, icono: '🥇', rareza: 'epico',
+        id: 'dorado', nombre: 'Cofre Dorado', precio: 880, icono: '🥇', rareza: 'epico',
         descripcion: 'La mitad son objetos, y uno de cada cuatro es épico.',
         tabla: [
             { t: 'fichas', min: 450, max: 1300, peso: 35 },
@@ -103,7 +103,7 @@ const COFRES = [
         ]
     },
     {
-        id: 'coleccionista', nombre: 'Cofre del Coleccionista', precio: 900, icono: '🗝️', rareza: 'epico',
+        id: 'coleccionista', nombre: 'Cofre del Coleccionista', precio: 1050, icono: '🗝️', rareza: 'epico',
         descripcion: 'Siempre un objeto. Nunca fichas.',
         tabla: [
             { t: 'objeto', rareza: 'comun', categorias: COSMETICOS, peso: 20 },

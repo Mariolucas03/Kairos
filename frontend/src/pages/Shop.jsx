@@ -34,11 +34,29 @@ const ACENTO_TIENDA = '#eab308';
 const ACENTO_FICHAS = '#a855f7';
 
 const RARITIES = {
-    comun: { label: 'Común', accent: '#71717a', text: 'text-zinc-500' },
-    raro: { label: 'Raro', accent: '#3b82f6', text: 'text-blue-400' },
-    epico: { label: 'Épico', accent: '#a855f7', text: 'text-purple-400' },
-    legendario: { label: 'Legendario', accent: '#eab308', text: 'text-yellow-400' }
+    // `borde` es cuanto se ve el color en el contorno y `halo` el brillo que
+    // deja por dentro: el comun casi nada, el legendario se ve desde lejos.
+    comun: { label: 'Común', accent: '#71717a', text: 'text-zinc-500', borde: 0.45, halo: 0 },
+    raro: { label: 'Raro', accent: '#3b82f6', text: 'text-blue-400', borde: 0.85, halo: 0.16 },
+    epico: { label: 'Épico', accent: '#a855f7', text: 'text-purple-400', borde: 1, halo: 0.26 },
+    legendario: { label: 'Legendario', accent: '#eab308', text: 'text-yellow-400', borde: 1, halo: 0.4 }
 };
+
+const hex2 = (n) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+
+/**
+ * El contorno de una tarjeta segun su rareza.
+ *
+ * El color recorre TODO el borde, no solo una linea de 2px arriba: asi se ve
+ * de un vistazo que es comun y que es legendario sin leer la etiqueta. El
+ * fondo sigue siendo el mismo negro que el resto de la app.
+ */
+const marcoDeRareza = (rarity) => ({
+    borderColor: rarity.accent + (rarity.borde >= 1 ? '' : hex2(rarity.borde * 255)),
+    boxShadow: rarity.halo > 0
+        ? `inset 0 0 20px ${rarity.accent}${hex2(rarity.halo * 90)}, 0 0 16px ${rarity.accent}${hex2(rarity.halo * 70)}`
+        : 'none'
+});
 
 const CATEGORIES = [
     { id: 'reward', label: 'PREMIOS', icon: <Ticket size={24} /> },
@@ -188,12 +206,19 @@ export default function Shop() {
         } finally { setIsProcessing(false); }
     };
 
+    // Siempre de lo mas barato a lo mas caro: es el orden en el que se mira
+    // una tienda, y deja arriba lo que si te puedes permitir.
+    const porPrecio = (a, b) => ((a?.price ?? 0) - (b?.price ?? 0)) || String(a?.name).localeCompare(String(b?.name));
+
     const getFilteredItems = () => {
         if (!selectedCategory) return [];
-        if (activeTab === 'shop') return shopItems.filter(item => item && item.category === selectedCategory);
+        if (activeTab === 'shop') {
+            return shopItems.filter(item => item && item.category === selectedCategory).sort(porPrecio);
+        }
         // Filtramos el inventario para mostrar items reales
         return (user?.inventory || [])
-            .filter(slot => slot?.item && slot.item.category === selectedCategory);
+            .filter(slot => slot?.item && slot.item.category === selectedCategory)
+            .sort((x, y) => porPrecio(x.item, y.item));
     };
 
     const itemsToShow = getFilteredItems();
@@ -202,17 +227,17 @@ export default function Shop() {
         <div className="animate-in fade-in pb-24 relative min-h-screen select-none">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER PRO (SIN BOTÓN RESET) */}
-            <div className="flex justify-between items-end px-4 pt-6 pb-2 bg-black border-b border-zinc-900">
-                <div>
-                    <h1 className="text-[26px] font-black text-white uppercase tracking-[-0.045em] leading-none not-italic">Mercado</h1>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">{(user?.coins || 0).toLocaleString('es-ES')} monedas · {currentFichas.toLocaleString('es-ES')} fichas</p>
-                </div>
-            </div>
-
-            {/* TIENDA / MOCHILA: se quedan a la vista al bajar, justo debajo
-                de la cabecera de la app (que es fija y mide --alto-cabecera). */}
-            <div className="sticky z-30 bg-black pt-4 pb-4 px-4 border-b border-zinc-900/50" style={{ top: 'var(--alto-cabecera, 116px)' }}>
+            {/* TIENDA / MOCHILA, SIEMPRE A LA VISTA.
+                ⚠️ `fixed` y no `sticky`: en iPhone un sticky dentro del
+                contenedor que hace el scroll (nuestro <main>) da tirones y se
+                queda a medio camino mientras el dedo arrastra. Fijo no se
+                mueve nunca. Va justo debajo de la cabecera de la app
+                (--alto-cabecera), con el ancho del contenido, y el hueco que
+                deja de ocupar se reserva abajo. */}
+            <div className="fixed left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-black pt-4 pb-4 px-4 border-b border-zinc-900/50" style={{ top: 'var(--alto-cabecera, 116px)' }}>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-2 px-1">
+                    {(user?.coins || 0).toLocaleString('es-ES')} monedas · {currentFichas.toLocaleString('es-ES')} fichas
+                </p>
                 <div className="flex bg-zinc-900 p-1 rounded-2xl relative border border-zinc-800">
                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-yellow-500 rounded-xl transition-all duration-300 ease-out shadow-lg ${activeTab === 'inventory' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'}`} />
                     <button onClick={() => setActiveTab('shop')} className={`flex-1 z-10 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${activeTab === 'shop' ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'}`}>
@@ -224,7 +249,10 @@ export default function Shop() {
                 </div>
             </div>
 
-            <div className="px-4 pt-6">
+            {/* El hueco que dejan las pestañas fijas */}
+            <div aria-hidden="true" style={{ height: 104 }} />
+
+            <div className="px-4 pt-2">
 
                 {/* WIDGET CASA DE CAMBIO (Solo en tienda principal) */}
                 {activeTab === 'shop' && !selectedCategory && (
@@ -302,17 +330,12 @@ export default function Shop() {
                                         <div
                                             key={item._id}
                                             onClick={() => { if (!purchased) setSelectedItem(item); }}
+                                            style={marcoDeRareza(rarity)}
                                             className={`
-                                                relative bg-[#0a0a0c] border border-white/[0.07] rounded-3xl p-4 flex flex-col items-center justify-between transition-all min-h-[160px] overflow-hidden
+                                                relative bg-[#0a0a0c] border-2 rounded-3xl p-4 flex flex-col items-center justify-between transition-all min-h-[160px] overflow-hidden
                                                 ${purchased ? 'opacity-40 grayscale cursor-default' : 'cursor-pointer active:scale-[0.985]'}
                                             `}
                                         >
-                                            {/* Línea de acento de 2px con el color de la rareza */}
-                                            <div
-                                                className="absolute inset-x-0 top-0 h-[2px] z-20 pointer-events-none"
-                                                style={{ background: `linear-gradient(90deg, ${rarity.accent}, transparent)` }}
-                                            />
-
 
                                             <div className="h-14 w-14 mb-2 flex items-center justify-center relative z-10">
                                                 {(item.icon?.startsWith('/') || item.icon?.startsWith('http')) ?
@@ -490,7 +513,7 @@ export default function Shop() {
             {/* 3. Modal Canje */}
             {showExchange && (
                 <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 animate-in fade-in h-screen w-screen">
-                    <div className="bg-[#09090b] w-full max-w-sm rounded-4xl border border-white/[0.07] p-6 shadow-2xl relative overflow-hidden">
+                    <div className="bg-[#09090b] w-full max-w-sm rounded-4xl border-2 p-6 shadow-2xl relative overflow-hidden" style={marcoDeRareza(RARITIES[selectedItem.rarity] || RARITIES.comun)}>
                         {/* Acento y halo de la casa de cambio: morado, el color de
                             las fichas, que es lo que entregas aquí. */}
                         <div className="absolute inset-x-0 top-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, ${ACENTO_FICHAS}, transparent)` }} />

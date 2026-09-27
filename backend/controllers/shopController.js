@@ -38,21 +38,47 @@ const SEED_ITEMS = [
     { name: 'Zeus', price: 3200, category: 'avatar', icon: '/avatars/ZEUS.png', rarity: 'legendario', description: 'El dios del rayo.' },
 
     // ================= MARCOS =================
-    // Solo los dos que tienen dibujo. Los otros seis eran un emoji metido en
-    // un <img>: se veían como una imagen rota alrededor de la cara.
+    // Todos con su dibujo en public/frames. `sprite` es lo que se equipa y
+    // `icon` lo que se ve en el escaparate: aquí son la misma imagen.
+    { name: 'Marco de Engranajes', price: 250, category: 'frame', icon: '/frames/marco_engranajes.png', sprite: '/frames/marco_engranajes.png', rarity: 'comun', description: 'Cobre y maquinaria.' },
+    { name: 'Marco de Runas', price: 300, category: 'frame', icon: '/frames/marco_runas.png', sprite: '/frames/marco_runas.png', rarity: 'comun', description: 'Piedra vieja y símbolos.' },
+    { name: 'Marco del Bosque', price: 450, category: 'frame', icon: '/frames/marco_bosque.png', sprite: '/frames/marco_bosque.png', rarity: 'raro', description: 'Madera, hiedra y amatistas.' },
     { name: 'Marco de Rayos', price: 500, category: 'frame', icon: '/frames/rayos.png', sprite: '/frames/rayos.png', rarity: 'raro', description: 'Energía pura.' },
+    { name: 'Marco de Hielo', price: 600, category: 'frame', icon: '/frames/marco_hielo.png', sprite: '/frames/marco_hielo.png', rarity: 'raro', description: 'Cristales y sangre fría.' },
+    { name: 'Marco Esmeralda', price: 750, category: 'frame', icon: '/frames/marco_esmeralda.png', sprite: '/frames/marco_esmeralda.png', rarity: 'epico', description: 'Rojo y verde, sin término medio.' },
     { name: 'Marco de Oro', price: 900, category: 'frame', icon: '/frames/marco_oro.png', sprite: '/frames/marco_oro.png', rarity: 'epico', description: 'Brillante.' },
+    { name: 'Marco Neón', price: 1100, category: 'frame', icon: '/frames/marco_neon.png', sprite: '/frames/marco_neon.png', rarity: 'epico', description: 'Del casino a tu cara.' },
+    { name: 'Marco Solar', price: 1600, category: 'frame', icon: '/frames/marco_solar.png', sprite: '/frames/marco_solar.png', rarity: 'legendario', description: 'Ocho soles dando vueltas.' },
+    { name: 'Marco del Vacío', price: 2200, category: 'frame', icon: '/frames/marco_vacio.png', sprite: '/frames/marco_vacio.png', rarity: 'legendario', description: 'Ocho portales a ninguna parte.' },
 
     // ================= TÍTULOS =================
-    // Un título es texto: no necesita dibujo, se lee debajo de tu nombre.
+    // Un título es texto: no necesita dibujo, se lee debajo de tu nombre. Por
+    // eso son los más baratos de ampliar y los que más variedad admiten.
     { name: 'Principiante', price: 0, category: 'title', icon: '🌱', rarity: 'comun', description: 'El principio de todo.' },
+    { name: 'Novato', price: 60, category: 'title', icon: '🐣', rarity: 'comun', description: 'Todavía preguntando dónde va cada disco.' },
+    { name: 'Madrugador', price: 120, category: 'title', icon: '🌅', rarity: 'comun', description: 'Entrenas antes de que salga el sol.' },
+    { name: 'Nocturno', price: 120, category: 'title', icon: '🌙', rarity: 'comun', description: 'El gimnasio vacío es tuyo.' },
     { name: 'Constante', price: 200, category: 'title', icon: '📆', rarity: 'comun', description: 'No fallas ni un día.' },
+    { name: 'Cardio Odiado', price: 220, category: 'title', icon: '🏃', rarity: 'comun', description: 'Lo haces, pero protestando.' },
     { name: 'Sin Excusas', price: 350, category: 'title', icon: '🚫', rarity: 'raro', description: 'Ni lluvia ni pereza.' },
+    { name: 'Día de Pierna', price: 380, category: 'title', icon: '🦵', rarity: 'raro', description: 'El día que nadie quiere.' },
+    { name: 'Rata de Gimnasio', price: 420, category: 'title', icon: '🐀', rarity: 'raro', description: 'Vives ahí dentro.' },
     { name: 'Máquina', price: 500, category: 'title', icon: '🤖', rarity: 'raro', description: 'Funcionas sin descanso.' },
+    { name: 'Cabeza de Hierro', price: 550, category: 'title', icon: '🧠', rarity: 'raro', description: 'La disciplina antes que las ganas.' },
+    { name: 'Come Kilos', price: 600, category: 'title', icon: '🍽️', rarity: 'raro', description: 'Lo que cae, cuenta.' },
+    { name: 'Sargento', price: 650, category: 'title', icon: '🎖️', rarity: 'raro', description: 'Te mandas a ti mismo.' },
     { name: 'El Veterano', price: 800, category: 'title', icon: '📜', rarity: 'epico', description: 'Para quienes han visto mucho.' },
+    { name: 'Rompehierros', price: 900, category: 'title', icon: '🔨', rarity: 'epico', description: 'Las barras te tienen miedo.' },
+    { name: 'Espalda de Acero', price: 1000, category: 'title', icon: '🛡️', rarity: 'epico', description: 'Dominadas sin contar.' },
     { name: 'Bestia Parda', price: 1200, category: 'title', icon: '🐻', rarity: 'epico', description: 'Respeto en la sala.' },
+    { name: 'Tritón', price: 1300, category: 'title', icon: '🔱', rarity: 'epico', description: 'Ni el cansancio te hunde.' },
+    { name: 'Cazador de Récords', price: 1500, category: 'title', icon: '🎯', rarity: 'epico', description: 'Tu marca dura una semana.' },
+    { name: 'Titán', price: 1700, category: 'title', icon: '🗿', rarity: 'epico', description: 'Inamovible.' },
     { name: 'La Leyenda', price: 2000, category: 'title', icon: '👾', rarity: 'legendario', description: 'Legendario.' },
+    { name: 'Hijo del Trueno', price: 2400, category: 'title', icon: '🌩️', rarity: 'legendario', description: 'Se oye cuando sueltas la barra.' },
+    { name: 'Dios del Gimnasio', price: 2800, category: 'title', icon: '🏛️', rarity: 'legendario', description: 'Bajaste del Olimpo a entrenar.' },
     { name: 'Inmortal', price: 3500, category: 'title', icon: '♾️', rarity: 'legendario', description: 'Ya no eres humano.' },
+    { name: 'Kairos', price: 5000, category: 'title', icon: '⏳', rarity: 'legendario', description: 'El momento exacto. El título de la casa.' },
 
     // ================= POCIONES =================
     // Con los dos frascos que hay dibujados: el azul para la XP y el rojo
