@@ -6,7 +6,7 @@ const { arrancar, parar, limpiar, fingirPeticion } = require('./ayuda/baseDeDato
 const User = require('../models/User');
 const ShopItem = require('../models/ShopItem');
 const { claimDailyReward, getCaminoRacha } = require('../controllers/userController');
-const { recompensaDelDia, tramoDelCamino } = require('../utils/caminoRacha');
+const { recompensaDelDia, tramoDelCamino, HITOS } = require('../utils/caminoRacha');
 const { getMadridDateString } = require('../utils/dateHelpers');
 
 /**
@@ -151,6 +151,24 @@ describe('El camino de la racha: premios distintos y crecientes', () => {
             const r = recompensaDelDia(d);
             if (r.tipo === 'hp') assert.ok(r.valor <= 50, `el dia ${d} cura ${r.valor}`);
             if (r.tipo === 'xp') assert.ok(r.valor <= 200, `el dia ${d} da ${r.valor} XP: abrir la app no puede pagar como entrenar`);
+        }
+    });
+
+    test('todos los cofres que reparte la racha existen de verdad', () => {
+        // ⚠️ El premio de un hito se busca por su id en la tienda: si se
+        // retira un cofre del catalogo (paso con el de la Bestia, que solo
+        // daba mascotas), el dia 7, 14 o 30 no dan NADA y nadie se entera:
+        // el usuario ve "Cofre de Madera" en el camino y no le llega.
+        const { COFRES } = require('../services/cofresService');
+        const vivos = new Set(COFRES.map(c => c.id));
+        for (const [dia, hito] of Object.entries(HITOS)) {
+            assert.ok(vivos.has(hito.cofre), `el dia ${dia} regala el cofre "${hito.cofre}", que ya no existe`);
+        }
+        // Y cada hito tiene que llevar nombre para poder pintarlo
+        for (const dia of Object.keys(HITOS)) {
+            const r = recompensaDelDia(Number(dia));
+            assert.strictEqual(r.tipo, 'cofre');
+            assert.ok(r.etiqueta && r.etiqueta !== 'Cofre', `el dia ${dia} no tiene nombre de cofre`);
         }
     });
 
