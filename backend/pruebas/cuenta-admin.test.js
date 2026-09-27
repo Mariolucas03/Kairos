@@ -6,6 +6,8 @@ const User = require('../models/User');
 const WorkoutLog = require('../models/WorkoutLog');
 const { borrarUsuarioYSusDatos } = require('../services/borradoService');
 const { getLeaderboard, searchUsers } = require('../controllers/socialController');
+const Sabelotodo = require('../models/Sabelotodo');
+const Notification = require('../models/Notification');
 
 /**
  * LA CUENTA DE ADMINISTRACION OCULTA.
@@ -65,10 +67,22 @@ describe('Cuenta de administracion oculta', () => {
         assert.ok(nombres.includes('pepe'));
     });
 
-    test('al borrar una cuenta se va tambien lo suyo', async () => {
+    test('al borrar una cuenta se va tambien lo suyo, y su rastro en lo de los demas', async () => {
         const uno = await User.create({ username: 'viejo', email: 'viejo@k.test', password: 'x' });
         const amigo = await User.create({ username: 'amiga', email: 'amiga@k.test', password: 'x', friends: [uno._id] });
         await WorkoutLog.create({ user: uno._id, type: 'gym', routineName: 'Pecho', duration: 45, date: new Date(), exercises: [] });
+
+        // Su me gusta y su comentario en el entreno de OTRA persona
+        const ajeno = await WorkoutLog.create({
+            user: amigo._id, type: 'gym', routineName: 'Pierna', duration: 60, date: new Date(), exercises: [],
+            likes: [uno._id], comments: [{ user: uno._id, text: 'crack' }]
+        });
+        // Un aviso que le dio a la otra, y una partida a medias
+        await Notification.create({ user: amigo._id, actor: uno._id, type: 'like' });
+        await Sabelotodo.create({
+            creador: uno._id, estado: 'activa',
+            jugadores: [{ user: uno._id, nombre: 'viejo' }, { user: amigo._id, nombre: 'amiga' }]
+        });
 
         const resumen = await borrarUsuarioYSusDatos(uno._id);
         assert.strictEqual(resumen.usuario, 'viejo');
@@ -77,6 +91,12 @@ describe('Cuenta de administracion oculta', () => {
 
         const quedaEnAmigos = await User.findById(amigo._id).select('friends').lean();
         assert.strictEqual(quedaEnAmigos.friends.length, 0, 'no puede quedar en la lista de amigos de nadie');
+
+        const entrenoAjeno = await WorkoutLog.findById(ajeno._id).lean();
+        assert.strictEqual(entrenoAjeno.likes.length, 0, 'sus me gusta se van');
+        assert.strictEqual(entrenoAjeno.comments.length, 0, 'sus comentarios tambien');
+        assert.strictEqual(await Notification.countDocuments({ actor: uno._id }), 0, 'y los avisos que provoco');
+        assert.strictEqual(await Sabelotodo.countDocuments({}), 0, 'una partida en marcha no puede seguir sin el');
     });
 
     test('la cuenta nueva sigue siendo admin despues de borrar la vieja', async () => {

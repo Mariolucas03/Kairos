@@ -8,6 +8,11 @@ const Food = require('../models/Food');
 const Notification = require('../models/Notification');
 const Challenge = require('../models/Challenge');
 const Clan = require('../models/Clan');
+const Exercise = require('../models/Exercise');
+const Sabelotodo = require('../models/Sabelotodo');
+const CartaAlta = require('../models/CartaAlta');
+const Poker = require('../models/Poker');
+const UserEventProgress = require('../models/UserEventProgress');
 
 /**
  * BORRAR UNA CUENTA Y TODO SU RASTRO.
@@ -37,6 +42,9 @@ const borrarUsuarioYSusDatos = async (userId) => {
     resumen.nutricion = (await NutritionLog.deleteMany({ user: userId })).deletedCount;
     resumen.rutinas = (await Routine.deleteMany({ user: userId })).deletedCount;
     resumen.alimentos = (await Food.deleteMany({ user: userId })).deletedCount;
+    // Los ejercicios que se invento el, no el catalogo comun
+    resumen.ejerciciosPropios = (await Exercise.deleteMany({ user: userId, isCustom: true })).deletedCount;
+    resumen.eventos = (await UserEventProgress.deleteMany({ userId })).deletedCount;
 
     // --- 2. Misiones: las suyas, y salir de las cooperativas de otros ---
     resumen.misiones = (await Mission.deleteMany({ user: userId })).deletedCount;
@@ -55,6 +63,30 @@ const borrarUsuarioYSusDatos = async (userId) => {
         $or: [{ challenger: userId }, { opponent: userId }]
     })).deletedCount;
 
+    // --- 4.b Partidas: las suyas se borran; las de otros se quedan sin el ---
+    //
+    // ⚠️ Esto no estaba: el servicio es de antes del Sabelotodo, Carta Alta y
+    // el poquer. Una partida con un jugador que ya no existe se queda sin
+    // poder terminar, y en la lista del otro sale un hueco sin nombre.
+    resumen.partidas = 0;
+    for (const [Modelo, campos] of [
+        [Sabelotodo, ['jugadores.user', 'invitados.user']],
+        [CartaAlta, ['jugadores.user', 'invitados']],
+        [Poker, ['jugadores.user', 'invitados']]
+    ]) {
+        const suyas = { $or: campos.map(c => ({ [c]: userId })) };
+        // Las que estan en marcha no pueden seguir sin el: se borran enteras
+        resumen.partidas += (await Modelo.deleteMany({ ...suyas, estado: { $in: ['invitacion', 'sala', 'activa'] } })).deletedCount;
+        // De las terminadas solo se le quita a el, que el historial del otro
+        // sigue siendo suyo
+        await Modelo.updateMany(suyas, {
+            $pull: {
+                jugadores: { user: userId },
+                invitados: campos.includes('invitados') ? userId : { user: userId }
+            }
+        }).catch(() => { });
+    }
+
     // --- 5. Su rastro en el contenido de OTROS ---
     // Los "me gusta" y comentarios que dejó en entrenos ajenos: si se quedan,
     // el feed intenta pintar el nombre de alguien que ya no existe.
@@ -67,6 +99,7 @@ const borrarUsuarioYSusDatos = async (userId) => {
     // --- 6. Su id dentro de los demás usuarios ---
     // Amigos, solicitudes recibidas e invitaciones. Sin esto, la lista de amigos
     // de otra persona se queda con un hueco imposible de quitar desde la app.
+    // Y los premios de clan que reclamo, que apuntan a su id.
     const enOtrosUsuarios = await User.updateMany(
         {
             $or: [
@@ -77,6 +110,11 @@ const borrarUsuarioYSusDatos = async (userId) => {
         { $pull: { friends: userId, friendRequests: userId } }
     );
     resumen.enListasDeOtros = enOtrosUsuarios.modifiedCount;
+
+    await Clan.updateMany(
+        { 'weeklyEvent.claims.user': userId },
+        { $pull: { 'weeklyEvent.claims': { user: userId } } }
+    );
 
     // --- 7. Clan ---
     if (usuario.clan) {
