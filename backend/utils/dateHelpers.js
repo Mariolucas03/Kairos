@@ -35,7 +35,22 @@ const getMadridHour = (dateObj = new Date()) => {
     return Number.isFinite(h) ? h % 24 : new Date(dateObj).getHours();
 };
 
+/**
+ * ¿Estas dos fechas caen el MISMO dia de calendario en Madrid?
+ *
+ * ⚠️ NO vale `a.toDateString() === b.toDateString()`.
+ *
+ * Eso compara el dia del SERVIDOR, que en Render es UTC. Madrid va por
+ * delante: de 00:00 a 02:00 alli todavia es el dia de ayer. Asi que un habito
+ * marcado a las 21:00 y una visita a las 00:30 "caian el mismo dia" para el
+ * servidor, aunque en Madrid ya fuera manana.
+ */
+const esMismoDiaEnMadrid = (a, b = new Date()) => {
+    if (!a || !b) return false;
+    return getMadridDateString(a) === getMadridDateString(b);
+};
+
 // Alias histórico usado por foodController / gymController
 const getTodayDateString = () => getMadridDateString();
 
-module.exports = { getTodayDateString, getMadridDateString, getMadridMonthString, getMadridHour, APP_TIMEZONE };
+module.exports = { getTodayDateString, getMadridDateString, getMadridMonthString, getMadridHour, esMismoDiaEnMadrid, APP_TIMEZONE };

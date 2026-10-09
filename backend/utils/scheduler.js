@@ -167,7 +167,8 @@ const runEveningReminder = async ({ forzar = false } = {}) => {
         pushSubscriptions: { $exists: true, $not: { $size: 0 } }
     }).select('username pushSubscriptions streak dailyRewards.lastClaimDay lastActive');
 
-    const diaSemana = new Date().getDay();
+    // En hora de Madrid, como el resto (ver diaDeLaSemanaEnMadrid).
+    const diaSemana = diaDeLaSemanaEnMadrid();
     const ahora = Date.now();
     const informe = { vuelve: 0, duelos: 0, misiones: 0, diaria: 0 };
 

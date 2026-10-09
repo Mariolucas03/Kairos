@@ -3,7 +3,7 @@ const Mission = require('../models/Mission');
 const DailyLog = require('../models/DailyLog');
 const User = require('../models/User');
 const levelService = require('../services/levelService');
-const { getMadridDateString } = require('../utils/dateHelpers');
+const { getMadridDateString, esMismoDiaEnMadrid } = require('../utils/dateHelpers');
 const { notificarA } = require('./pushController');
 const mongoose = require('mongoose');
 
@@ -77,16 +77,19 @@ const getMissions = asyncHandler(async (req, res) => {
 
     const missions = await Mission.find(query).populate('participants', 'username avatar').sort({ completed: 1, createdAt: -1 });
 
-    const today = new Date().toDateString();
     let updated = false;
 
     for (let mission of missions) {
         try {
             if (mission.type === 'habit' && mission.completed) {
                 if (!mission.lastUpdated) mission.lastUpdated = new Date();
-                const lastUpdate = new Date(mission.lastUpdated).toDateString();
 
-                if (lastUpdate !== today && mission.frequency === 'daily') {
+                // ⚠️ EN HORA DE MADRID, no la del servidor (ver
+                // `esMismoDiaEnMadrid`). Con `toDateString()` un habito marcado
+                // por la noche seguia contando como "de hoy" hasta las 02:00:
+                // quien abriera la app a las 00:30 se encontraba los habitos de
+                // AYER todavia tachados y no podia hacer los de hoy.
+                if (!esMismoDiaEnMadrid(mission.lastUpdated) && mission.frequency === 'daily') {
                     mission.progress = 0;
                     mission.completed = false;
                     if (!mission.contributions) mission.contributions = new Map();
@@ -256,8 +259,10 @@ const updateProgress = asyncHandler(async (req, res) => {
             return res.status(200).json({ message: 'Ya completada en este ciclo', alreadyCompleted: true });
         }
 
-        const last = new Date(mission.lastUpdated);
-        if (last.toDateString() === today.toDateString()) {
+        // Mismo motivo que en getMissions: el dia es el de Madrid. Si no, de
+        // 00:00 a 02:00 esto contestaba "ya completada hoy" por una marcada
+        // ANOCHE, y el habito diario no se podia volver a hacer.
+        if (esMismoDiaEnMadrid(mission.lastUpdated, today)) {
             return res.status(200).json({ message: 'Ya completada hoy', alreadyCompleted: true });
         }
 
@@ -272,7 +277,9 @@ const updateProgress = asyncHandler(async (req, res) => {
     // 🔥 Clamp: nunca confiar en un incremento arbitrario del cliente. Como mucho,
     // lo que falte para completar la misión (evita completar de un tirón misiones coop grandes).
     const remaining = Math.max(mission.target - mission.progress, 1);
-    const requestedAmount = Number(amount) || 1;
+    // Entero: un avance de 2,7 dejaba el progreso en decimales y la mision en
+    // "4,5 de 5" para siempre en la pantalla.
+    const requestedAmount = Math.floor(Number(amount)) || 1;
     const addAmount = Math.min(Math.max(requestedAmount, 1), remaining);
     let rewards = null, leveledUp = false, userResult = null;
     let topeAlcanzado = false;
