@@ -5,7 +5,7 @@ const DailyLog = require('../models/DailyLog');
 const { sendPushToUser } = require('../controllers/pushController');
 const { addRewards } = require('../services/levelService');
 const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
-const { getMadridDateString, getMadridMonthString } = require('./dateHelpers');
+const { getMadridDateString, getMadridMonthString, getMadridHour } = require('./dateHelpers');
 const SystemState = require('../models/SystemState');
 const Notification = require('../models/Notification');
 const Routine = require('../models/Routine');
@@ -851,6 +851,79 @@ const ponerseAlDia = () => {
     return puestaAlDiaEnCurso;
 };
 
+/**
+ * LOS AVISOS QUE SE QUEDARON SIN MANDAR.
+ *
+ * ⚠️ POR QUE EXISTE ESTO.
+ *
+ * El aviso de las 20:00 tenia dos disparadores y los DOS dependen de que el
+ * servidor este vivo y en pie a esa hora exacta:
+ *
+ *   1. El cron interno (node-cron). Si Render tiene la instancia dormida —el
+ *      plan gratuito la duerme a los 15 minutos sin visitas— el proceso ni
+ *      siquiera existe: no hay nadie a quien se le dispare nada.
+ *   2. El cron externo de cron-job.org. Ese despierta la instancia, pero si
+ *      pilla a Render arrancando en frio, reiniciando o desplegando una
+ *      version nueva, el que contesta es Render con un 503 y la peticion no
+ *      llega nunca al codigo. Y el plan gratuito NO tiene despliegues sin
+ *      corte: cada vez que se sube algo hay unos minutos de 503.
+ *
+ * Fallaba cualquiera de las dos cosas y el aviso de ese dia se perdia para
+ * siempre. Nadie lo reintentaba.
+ *
+ * Esto le da la vuelta: en vez de depender de que alguien acierte el minuto,
+ * CADA VEZ que el servidor esta vivo se pregunta "¿el aviso de hoy ha salido
+ * ya?". Lo hace el ping de keep-alive (cada pocos minutos) y tambien el
+ * arranque. Asi, en cuanto la instancia vuelve en si dentro de la ventana, el
+ * aviso sale.
+ *
+ * LA VENTANA es lo importante. Un aviso de "te faltan misiones" a las tres de
+ * la madrugada no vale nada y despierta a la gente, asi que cada aviso solo se
+ * recupera dentro de unas horas razonables. Si el servidor estuvo caido toda
+ * la ventana, ese dia no se manda: es mejor que mandarlo a deshora.
+ *
+ * No hace falta protegerlo de envios dobles aqui: las dos tareas RESERVAN el
+ * dia en la base de datos antes de mandar nada (ver `runEveningReminder`), asi
+ * que llamarlas de mas no manda nada de mas.
+ */
+const VENTANAS_DE_AVISO = [
+    { nombre: 'el aviso de las 20:00', clave: CLAVE_RECORDATORIO, desde: 20, hasta: 23, ejecutar: () => runEveningReminder() },
+    { nombre: 'el aviso de entreno', clave: CLAVE_AVISO_ENTRENO, desde: 9, hasta: 13, ejecutar: () => runMorningReminder() },
+];
+
+// El ping entra cada pocos minutos y es publico: el repaso no puede ser una
+// consulta a la base de datos por cada visita.
+const ESPERA_ENTRE_REPASOS = 60 * 1000;
+let ultimoRepaso = 0;
+
+const repasarAvisosPendientes = async ({ forzar = false, ahora = new Date() } = {}) => {
+    // Se apunta ANTES de empezar: si llegan tres pings a la vez, solo el
+    // primero hace el trabajo.
+    if (!forzar && Date.now() - ultimoRepaso < ESPERA_ENTRE_REPASOS) return { saltado: true };
+    ultimoRepaso = Date.now();
+
+    const hoy = getMadridDateString(ahora);
+    const hora = getMadridHour(ahora);
+    const recuperados = [];
+
+    for (const aviso of VENTANAS_DE_AVISO) {
+        if (hora < aviso.desde || hora > aviso.hasta) continue;
+
+        const marca = await SystemState.findOne({ key: aviso.clave }).lean();
+        if (marca && marca.value === hoy) continue;
+
+        console.log(`⏰ ${aviso.nombre} de hoy no habia salido todavia. Mandandolo ahora.`);
+        try {
+            await aviso.ejecutar();
+            recuperados.push(aviso.clave);
+        } catch (e) {
+            console.error(`No se pudo recuperar ${aviso.nombre}:`, e.message);
+        }
+    }
+
+    return { dia: hoy, hora, recuperados };
+};
+
 // Función auxiliar para resetear misiones
 async function processCycle(frequency) {
     const yesterdayDate = new Date();
@@ -909,7 +982,7 @@ const initScheduledJobs = () => {
 
 module.exports = {
     initScheduledJobs, runNightlyMaintenance, runMonthlyRankingRewards, runEveningReminder,
-    runMorningReminder, ponerseAlDia, esperarPuestaAlDia,
+    runMorningReminder, ponerseAlDia, esperarPuestaAlDia, repasarAvisosPendientes,
     // Para las pruebas
     mensajeDeEntreno, mensajeDeDuelo, diaDeLaSemanaEnMadrid
 };

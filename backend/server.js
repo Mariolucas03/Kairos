@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
-const { initScheduledJobs, ponerseAlDia, esperarPuestaAlDia } = require('./utils/scheduler');
+const { initScheduledJobs, ponerseAlDia, esperarPuestaAlDia, repasarAvisosPendientes } = require('./utils/scheduler');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
@@ -154,6 +154,11 @@ initScheduledJobs();
 // comprueba si el castigo de ayer quedo pendiente y, si es asi, se ejecuta.
 // Es idempotente: lleva su propia marca en base de datos.
 ponerseAlDia();
+
+// Si la instancia estaba dormida o desplegando justo a la hora del aviso, el
+// aviso de hoy no ha salido. Al volver en si se comprueba y, si todavia esta
+// a tiempo, se manda. Ver `repasarAvisosPendientes`.
+repasarAvisosPendientes().catch(err => console.error('Repaso de avisos al arrancar:', err.message));
 
 app.get('/', (req, res) => res.send('API NoteGymk funcionando 🚀'));
 
