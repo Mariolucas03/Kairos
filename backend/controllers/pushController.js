@@ -99,6 +99,32 @@ const sendPushToUser = async (user, payload) => {
  *
  * @route GET /api/push/estado
  */
+/**
+ * LA CLAVE PUBLICA DEL SERVIDOR, PARA QUE EL MOVIL USE ESA Y NO OTRA.
+ *
+ * ⚠️ ESTA ES LA AVERIA SILENCIOSA DEL PUSH.
+ *
+ * El navegador se suscribe con una clave publica y el servidor firma el envio
+ * con la privada. Si no son pareja, la suscripcion se crea igual, se guarda
+ * igual, el boton dice "activadas"... y NO LLEGA NADA, nunca, sin un solo
+ * error visible: el fallo ocurre en el servicio de Apple o Google, no aqui.
+ *
+ * Y era facil que no cuadraran: el movil usaba una clave metida en el codigo
+ * del frontend (o en VITE_VAPID_PUBLIC_KEY, de Vercel) y el servidor otra
+ * distinta (VAPID_PUBLIC_KEY, de Render). Dos sitios que se cambian por
+ * separado y nadie vuelve a mirar.
+ *
+ * Ahora solo manda una: la del servidor. El movil la pide antes de
+ * suscribirse. No hace falta protegerla, es PUBLICA por definicion: va dentro
+ * de cada peticion de suscripcion que hace el navegador.
+ */
+const claveVapid = (req, res) => {
+    res.json({
+        configurado: PUSH_CONFIGURADO,
+        clave: process.env.VAPID_PUBLIC_KEY || ''
+    });
+};
+
 const estadoPush = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id).select('pushSubscriptions').lean();
     const subs = user?.pushSubscriptions || [];
@@ -291,4 +317,4 @@ const notificarA = async (userId, payload) => {
     }
 };
 
-module.exports = { subscribeToPush, sendPushToUser, notificarA, testPush, estadoPush, adminSendPush, enviarNotificacionManual };
+module.exports = { subscribeToPush, sendPushToUser, notificarA, testPush, estadoPush, claveVapid, adminSendPush, enviarNotificacionManual };

@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { subscribeToPush, testPush, estadoPush, adminSendPush } = require('../controllers/pushController');
+const { subscribeToPush, testPush, estadoPush, claveVapid, adminSendPush } = require('../controllers/pushController');
 const { protectCron } = require('../middleware/cronMiddleware');
 const protect = require('../middleware/authMiddleware');
+
+// La clave publica con la que hay que suscribirse. SIN sesion: el movil la
+// necesita antes de nada, y es publica por definicion (ver el controlador).
+router.get('/clave', claveVapid);
 
 router.post('/subscribe', protect, subscribeToPush);
 // En que estado estan: claves del servidor y aparatos registrados en TU cuenta

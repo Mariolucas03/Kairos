@@ -1,14 +1,50 @@
 import api from '../services/api';
 
-// Clave publica VAPID. TIENE que ser la pareja de la VAPID_PRIVATE_KEY del
-// servidor: si no coinciden, el navegador se suscribe pero el envio falla.
+// Clave publica VAPID de respaldo. TIENE que ser la pareja de la
+// VAPID_PRIVATE_KEY del servidor: si no coinciden, el navegador se suscribe,
+// el boton dice "activadas" y NO LLEGA NADA, sin un solo error visible.
 //
-// Se lee de VITE_VAPID_PUBLIC_KEY para poder rotar las claves sin tocar codigo.
-// El valor de abajo es el que habia fijo, y queda como respaldo para no romper
-// los despliegues que aun no definan la variable.
-const VAPID_PUBLIC_KEY =
+// ⚠️ YA NO ES LA FUENTE DE LA VERDAD. La clave buena se pide al servidor
+// (`/push/clave`), que es el unico que sabe con cual va a firmar. Esto queda
+// solo por si esa peticion falla (sin cobertura al abrir la app).
+const VAPID_DE_RESPALDO =
     import.meta.env.VITE_VAPID_PUBLIC_KEY ||
     "BHuNNV8fKxiIeIuObGJTavYPhf1G1Kpj4LN1TTCnaowLlmEJH6edktAmF0CcU5sZhpQZ5JxqzIK0qQ5sVSwmCuQ";
+
+/** La clave con la que hay que suscribirse: la del servidor. */
+const pedirClave = async () => {
+    try {
+        const r = await api.get('/push/clave');
+        if (r.data?.clave) return { clave: r.data.clave, configurado: r.data.configurado !== false };
+        if (r.data?.configurado === false) return { clave: '', configurado: false };
+    } catch { /* sin conexion: tiramos con la de respaldo */ }
+    return { clave: VAPID_DE_RESPALDO, configurado: null };
+};
+
+/**
+ * ¿La suscripcion que ya hay se hizo con ESTA clave?
+ *
+ * Si el servidor cambio de claves, la suscripcion vieja sigue pareciendo
+ * perfectamente valida desde el movil y se reenvia tal cual en cada arranque,
+ * pero ningun envio volvera a llegar. Hay que tirarla y rehacerla.
+ *
+ * Ante la duda, `true`: si el navegador no deja leer con que clave se hizo
+ * (`options` no existe en los mas viejos), mejor no tocar una suscripcion que
+ * a lo mejor funciona.
+ */
+export const mismaClave = (sub, clave) => {
+    try {
+        const actual = sub?.options?.applicationServerKey;
+        if (!actual || !clave) return true;
+        const a = new Uint8Array(actual);
+        const b = urlBase64ToUint8Array(clave);
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+        return true;
+    } catch {
+        return true;
+    }
+};
 
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -68,14 +104,24 @@ export const registerPush = async () => {
         const register = await navigator.serviceWorker.register('/service-worker.js');
         await navigator.serviceWorker.ready;
 
-        // 3. Reaprovechar la suscripcion si ya existe; si la clave del servidor
-        //    ha cambiado hay que tirar la vieja o el envio fallara para siempre.
+        // 3. La clave, siempre la que diga el servidor.
+        const { clave, configurado } = await pedirClave();
+        if (configurado === false) {
+            return {
+                ok: false,
+                motivo: 'sin-claves',
+                mensaje: 'El servidor no tiene claves VAPID configuradas. Hasta que las tenga no puede salir ninguna notificacion.'
+            };
+        }
+
+        // 4. Tirar la suscripcion vieja: si se hizo con otra clave, seguiria
+        //    pareciendo valida y no llegaria nada nunca.
         const existente = await register.pushManager.getSubscription();
         if (existente) await existente.unsubscribe();
 
         const subscription = await register.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            applicationServerKey: urlBase64ToUint8Array(clave)
         });
 
         // 4. Guardarla en el servidor
@@ -122,11 +168,26 @@ export const asegurarPush = async () => {
         if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
         const registro = await navigator.serviceWorker.ready;
-        const sub = await registro.pushManager.getSubscription()
-            || await registro.pushManager.subscribe({
+        const { clave, configurado } = await pedirClave();
+        if (configurado === false || !clave) return;
+
+        let sub = await registro.pushManager.getSubscription();
+
+        // ⚠️ Si se hizo con OTRA clave, no vale: se rehace. Sin esto, un
+        // cambio de claves en el servidor deja el movil mudo para siempre, y
+        // desde fuera todo se ve bien (hay permiso, hay suscripcion, el
+        // servidor la tiene guardada).
+        if (sub && !mismaClave(sub, clave)) {
+            await sub.unsubscribe().catch(() => {});
+            sub = null;
+        }
+
+        if (!sub) {
+            sub = await registro.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                applicationServerKey: urlBase64ToUint8Array(clave)
             });
+        }
 
         // El servidor deduplica por endpoint, asi que repetirlo no crea copias.
         await api.post('/push/subscribe', sub);
