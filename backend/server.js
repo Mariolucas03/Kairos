@@ -216,7 +216,14 @@ app.listen(PORT, '0.0.0.0', () => {
         .catch(err => console.error('⚠️ No se pudo sincronizar el catálogo al arrancar:', err.message));
 });
 
-// Endpoint de salud (Health Check)
+// Endpoint de salud (Health Check).
+//
+// Dice tambien QUE version esta viva. En el plan gratuito un despliegue tarda
+// unos minutos y no es sin corte: desde fuera no habia manera de saber si lo
+// que esta corriendo es lo ultimo que se subio o lo de antes, asi que un
+// arreglo recien subido y un 503 de Render se parecian demasiado. Render pone
+// el commit en RENDER_GIT_COMMIT; en local no existe y no se escribe nada.
 app.get('/ping', (req, res) => {
-    res.send('pong 🏓');
+    const version = (process.env.RENDER_GIT_COMMIT || '').slice(0, 7);
+    res.send('pong 🏓' + (version ? ' ' + version : ''));
 });
