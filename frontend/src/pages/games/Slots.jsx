@@ -57,14 +57,14 @@ const ICONS = {
 // --- LO QUE PAGA CADA SIMBOLO ---
 // ⚠️ Tiene que cuadrar con SLOT_SYMBOLS del servidor: esta lista decia x50 por
 // la corona cuando el servidor pagaba x150, asi que la ayuda mentia.
-const PAGO_CUATRO = 6;
+const PAGO_CUATRO = 8;
 const PAYTABLE = [
-    { id: 'crown', icon: <Crown size={24} className="text-yellow-600" />, val: 70 },
-    { id: 'gem', icon: <Gem size={24} className="text-cyan-400" />, val: 20 },
-    { id: 'star', icon: <Star size={24} className="text-purple-400" />, val: 8 },
-    { id: 'zap', icon: <Zap size={24} className="text-yellow-400" />, val: 4 },
-    { id: 'clover', icon: <Clover size={24} className="text-green-500" />, val: 2 },
-    { id: 'cherry', icon: <Cherry size={24} className="text-red-500" />, val: 1 },
+    { id: 'crown', icon: <Crown size={24} className="text-yellow-600" />, val: 180 },
+    { id: 'gem', icon: <Gem size={24} className="text-cyan-400" />, val: 54 },
+    { id: 'star', icon: <Star size={24} className="text-purple-400" />, val: 20 },
+    { id: 'zap', icon: <Zap size={24} className="text-yellow-400" />, val: 9 },
+    { id: 'clover', icon: <Clover size={24} className="text-green-500" />, val: 4.5 },
+    { id: 'cherry', icon: <Cherry size={24} className="text-red-500" />, val: 2.2 },
 ];
 
 export default function Slots() {
@@ -347,7 +347,7 @@ export default function Slots() {
                 <h1 className="text-4xl font-black text-fuchsia-400 tracking-[-0.045em] leading-none pb-1 not-italic text-center">
                     NEON SLOTS
                 </h1>
-                <div className="w-full aspect-[4/3.5] bg-zinc-900 rounded-[2rem] border-[6px] border-zinc-800 shadow-2xl relative overflow-hidden ring-4 ring-purple-900/20">
+                <div className={`w-full aspect-[4/3.5] bg-zinc-900 rounded-[2rem] border-[6px] shadow-2xl relative overflow-hidden ring-4 transition-colors ${result.cementerio ? 'border-purple-500 ring-purple-500/40' : 'border-zinc-800 ring-purple-900/20'}`}>
 
                     {/* PORTADA LIMPIA */}
                     <div className={`absolute inset-0 z-50 bg-black flex flex-col items-center justify-center transition-transform duration-500 ${gameStarted ? '-translate-y-full' : 'translate-y-0'}`}>

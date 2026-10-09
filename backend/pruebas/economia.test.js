@@ -2,7 +2,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert');
 
 const {
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, FORTUNE_PRIZES, normalizarApuesta, APUESTA_MAXIMA, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, CEMENTERIO_PAGO, esCementerio, FORTUNE_PRIZES, normalizarApuesta, APUESTA_MAXIMA, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
     PLINKO_MULTIPLICADORES, PLINKO_FILAS
 } = require('../controllers/gamesController');
 
@@ -211,6 +211,16 @@ describe('Casino: ningun juego puede regalar dinero', () => {
             `La tirada gratis da ${media} fichas de media: demasiado para ser gratis`);
     });
 
+    test('el cementerio: las dieciseis muertas pagan, y nada parecido cuela', () => {
+        const s = (id) => SLOT_SYMBOLS.find(x => x.id === id);
+        const lleno = (ids) => [0, 1, 2, 3].map(c => [0, 1, 2, 3].map(f => s(ids[(c * 4 + f) % ids.length])));
+        assert.strictEqual(esCementerio(lleno(['skull'])), true, 'dieciseis calaveras');
+        assert.strictEqual(esCementerio(lleno(['skull', 'ghost'])), true, 'calaveras y fantasmas valen igual');
+        const casi = lleno(['skull']); casi[2][3] = s('cherry');
+        assert.strictEqual(esCementerio(casi), false, 'con una sola viva no hay cementerio');
+        assert.ok(CEMENTERIO_PAGO >= 50, 'si no paga fuerte no es un huevo de pascua, es un consuelo');
+    });
+
     test('en los slots, TRES iguales seguidos pagan aunque delante haya una calavera', () => {
         // El fallo que se sufria: la linea se descartaba si la PRIMERA casilla
         // era un simbolo sin valor, asi que tres coronas seguidas en las tres
@@ -285,6 +295,8 @@ describe('Casino: ningun juego puede regalar dinero', () => {
                 if (!iguales) continue;
                 pagado += APUESTA * linea[iguales[0]].val * (iguales.length === 4 ? PAGO_CUATRO : 1);
             }
+            // El huevo de pascua tambien cuenta para lo que devuelve el juego
+            if (esCementerio(cuadricula)) pagado += APUESTA * CEMENTERIO_PAGO;
         }
 
         const devuelve = (pagado / apostado) * 100;

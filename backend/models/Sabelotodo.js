@@ -5,9 +5,10 @@ const mongoose = require('mongoose');
  *
  * Como el Preguntados, pero COOPERATIVO: de dos a cuatro personas, un solo
  * equipo. Se turnan; en cada turno se gira la ruleta, sale una categoria y
- * una pregunta. Acertar da la corona de esa categoria; fallar quita una vida
- * AL EQUIPO. Con las seis coronas ganan todos; con las tres vidas perdidas,
- * pierden todos. No hay nada que ganarle a nadie: o salis juntos o no salis.
+ * una pregunta. Acertar da la corona de esa categoria; fallar solo pasa el
+ * turno. La partida NO se pierde: dura hasta que esten las seis coronas, y
+ * entonces ganan todos. No hay nada que ganarle a nadie: o salis juntos o no
+ * salis.
  *
  * Como los duelos, se pueden tener varias a la vez.
  *
@@ -25,8 +26,9 @@ const jugadorSchema = new mongoose.Schema({
     avatar: { type: String, default: '' },
     // Solo en el modo duelo: cada uno lleva lo suyo
     coronas: { type: [String], default: [] },
-    vidas: { type: Number, default: 3 },
-    eliminado: { type: Boolean, default: false },
+    // Los fallos se cuentan pero no matan: aqui no se pierde (ver el
+    // controlador). Son para picarse al terminar.
+    fallos: { type: Number, default: 0 },
     // Si ya ha puesto su apuesta en el bote (para devolverla si no se juega)
     pagado: { type: Boolean, default: false }
 }, { _id: false });
@@ -57,7 +59,7 @@ const jugadaSchema = new mongoose.Schema({
 const sabelotodoSchema = new mongoose.Schema({
     creador: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
-    // 'equipo': todos contra las preguntas, coronas y vidas compartidas.
+    // 'equipo': todos contra las preguntas, con las coronas compartidas.
     // 'duelo': cada uno lo suyo, con apuesta; el ganador se lleva el bote.
     modo: { type: String, enum: ['equipo', 'duelo'], default: 'equipo' },
     apuesta: { type: Number, default: 0 },
@@ -72,12 +74,15 @@ const sabelotodoSchema = new mongoose.Schema({
     estado: {
         type: String,
         // 'terminada' es el final de un duelo (hay ganador); 'ganada'/'perdida' son del equipo
+        // 'terminada' es el final de un duelo (hay ganador); 'ganada' el del
+        // equipo. 'perdida' se queda para las partidas viejas, de cuando
+        // habia vidas: ya no se pone nunca.
         enum: ['invitacion', 'activa', 'ganada', 'perdida', 'terminada', 'rechazada', 'abandonada'],
         default: 'invitacion'
     },
 
     coronas: { type: [String], default: [] },
-    vidas: { type: Number, default: 3 },
+    fallos: { type: Number, default: 0 },
 
     // A quien le toca (indice en `jugadores`) y cuantas lleva seguidas en
     // este turno: a las tres, pasa el turno aunque acierte.

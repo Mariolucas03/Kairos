@@ -8,12 +8,22 @@ const { notificarA } = require('./pushController');
 /**
  * SABELOTODO: el trivial cooperativo, de dos a cuatro. Las reglas viven aqui.
  */
-const VIDAS = 3;
+/**
+ * ⚠️ AQUI NO SE PIERDE.
+ *
+ * Habia tres vidas y al tercer fallo se acababa la partida. Con preguntas de
+ * cultura general y cuatro personas turnandose, eso significaba que una
+ * partida se moria en diez minutos por tres despistes y habia que volver a
+ * montarla. Ahora fallar solo pasa el turno: la partida sigue viva hasta que
+ * esten las seis coronas, que es lo unico que la termina.
+ *
+ * El marcador pasa a ser los FALLOS, que se cuentan pero no matan: sirven
+ * para picarse ("la hemos sacado con dos fallos") sin cortar la partida.
+ */
 const SEGUIDAS_MAX = 3;          // aciertos seguidos antes de pasar el turno
 const TIEMPO_MS = 30000;         // el movil enseña 20 s; el servidor da margen de red
 const MAX_JUGADORES = 4;
 const PREMIO_GANAR = { xp: 250, fichas: 300 };   // para CADA uno
-const PREMIO_PERDER = { xp: 40, fichas: 0 };
 const APUESTA_MIN = 10;
 const APUESTA_MAX = 5000;
 const CLAVES = Object.keys(CATEGORIAS);
@@ -52,10 +62,10 @@ const siguientePregunta = (partida, coronas = partida.coronas) => {
 const mismo = (a, b) => a && b && a.toString() === b.toString();
 const puestoDe = (partida, userId) => partida.jugadores.findIndex(j => mismo(j.user, userId));
 const estaInvitado = (partida, userId) => partida.invitados.some(j => mismo(j.user, userId));
-const persona = (j) => ({ _id: j.user, nombre: j.nombre, avatar: j.avatar, coronas: j.coronas || [], vidas: j.vidas, eliminado: !!j.eliminado });
+const persona = (j) => ({ _id: j.user, nombre: j.nombre, avatar: j.avatar, coronas: j.coronas || [], fallos: j.fallos || 0 });
 const esDuelo = (p) => p.modo === 'duelo';
-/** En duelo, las coronas y vidas que se enseñan son las de quien mira */
-const loMio = (partida, yo) => esDuelo(partida) && yo ? { coronas: yo.coronas || [], vidas: yo.vidas } : { coronas: partida.coronas, vidas: partida.vidas };
+/** En duelo, las coronas y los fallos que se enseñan son los de quien mira */
+const loMio = (partida, yo) => esDuelo(partida) && yo ? { coronas: yo.coronas || [], fallos: yo.fallos || 0 } : { coronas: partida.coronas, fallos: partida.fallos || 0 };
 
 // El bote: cobrar y devolver
 const cobrar = async (userId, fichas) => {
@@ -103,8 +113,7 @@ const vista = (partida, yoId) => {
         puedeEmpezar: soyCreador && partida.estado === 'invitacion' && partida.jugadores.length >= 2,
         puedeInvitar: soyCreador && partida.estado === 'invitacion' && partida.jugadores.length + partida.invitados.length < MAX_JUGADORES,
         coronas: mio.coronas,
-        vidas: mio.vidas,
-        vidasMax: VIDAS,
+        fallos: mio.fallos,
         racha: partida.racha,
         seguidasMax: SEGUIDAS_MAX,
         // La pregunta solo la ve quien tiene que contestarla; el resto solo
@@ -155,7 +164,7 @@ const avisarInvitados = (partida, gente) => {
     const quien = partida.jugadores[0]?.nombre || 'Alguien';
     const texto = esDuelo(partida)
         ? `${quien} te reta a un Sabelotodo por ${partida.apuesta} fichas. El que llegue a seis coronas se lleva el bote.`
-        : `${quien} te invita a un Sabelotodo en equipo. Seis coronas, tres vidas, todos juntos.`;
+        : `${quien} te invita a un Sabelotodo en equipo. Seis coronas, sin prisa y sin perder.`;
     for (const g of gente) notificarA(g._id, PUSH(texto));
 };
 
@@ -181,10 +190,9 @@ const crear = asyncHandler(async (req, res) => {
         modo,
         apuesta,
         bote: apuesta,
-        jugadores: [{ user: yo._id, nombre: yo.username, avatar: yo.avatar || '', vidas: VIDAS, pagado: modo === 'duelo' }],
-        invitados: gente.map(g => ({ user: g._id, nombre: g.username, avatar: g.avatar || '', vidas: VIDAS })),
-        estado: 'invitacion',
-        vidas: VIDAS
+        jugadores: [{ user: yo._id, nombre: yo.username, avatar: yo.avatar || '', pagado: modo === 'duelo' }],
+        invitados: gente.map(g => ({ user: g._id, nombre: g.username, avatar: g.avatar || '' })),
+        estado: 'invitacion'
     });
 
     avisarInvitados(partida, gente);
@@ -237,7 +245,6 @@ const responderInvitacion = asyncHandler(async (req, res) => {
             yo.pagado = true;
             partida.bote = (partida.bote || 0) + partida.apuesta;
         }
-        yo.vidas = VIDAS;
         partida.jugadores.push(yo);
         if (partida.invitados.length === 0) {
             // Ya ha contestado todo el mundo: se empieza sin esperar a nadie
@@ -299,7 +306,7 @@ const terminar = async (partida, estado) => {
     partida.estado = estado;
     partida.terminadaEn = new Date();
     partida.enCurso = null;
-    const premio = estado === 'ganada' ? PREMIO_GANAR : PREMIO_PERDER;
+    const premio = PREMIO_GANAR;
     partida.premio = premio;
     await partida.save();
     // Todos cobran lo mismo: es un equipo
@@ -343,15 +350,8 @@ const contestar = asyncHandler(async (req, res) => {
         correcta: e.opciones[e.correcta]
     });
 
-    // El siguiente que siga en pie (en equipo, nadie queda eliminado)
-    const siguienteVivo = (desde) => {
-        for (let k = 1; k <= partida.jugadores.length; k++) {
-            const idx = (desde + k) % partida.jugadores.length;
-            if (!partida.jugadores[idx].eliminado) return idx;
-        }
-        return desde;
-    };
-    const siguiente = siguienteVivo(mi);
+    // Al siguiente de la mesa: aqui ya no se elimina a nadie
+    const siguiente = (mi + 1) % partida.jugadores.length;
     // A quien avisar y con que: al siguiente cuando cambia el turno; a todos
     // cuando se acaba.
     let aviso = null;
@@ -383,16 +383,13 @@ const contestar = asyncHandler(async (req, res) => {
             await partida.save();
         }
     } else {
-        partida.vidas = Math.max(0, partida.vidas - 1);
+        // Fallar no mata la partida: solo pasa el turno. Se apunta en el
+        // marcador de fallos del equipo, que es orgullo, no vida.
+        partida.fallos = (partida.fallos || 0) + 1;
         partida.racha = 0;
-        if (partida.vidas <= 0) {
-            await terminar(partida, 'perdida');
-            aviso = { todos: true, texto: `Se acabaron las vidas en ${nombreCategoria(e.categoria)}. ${partida.coronas.length} coronas de ${CLAVES.length}. Otra vez será.` };
-        } else {
-            partida.turno = siguiente;
-            await partida.save();
-            aviso = { todos: false, texto: `${quien.nombre} ha fallado en ${nombreCategoria(e.categoria)}. Te toca, y quedan ${partida.vidas} ${partida.vidas === 1 ? 'vida' : 'vidas'}.` };
-        }
+        partida.turno = siguiente;
+        await partida.save();
+        aviso = { todos: false, texto: `${quien.nombre} ha fallado en ${nombreCategoria(e.categoria)}. Te toca: ${partida.coronas.length} de ${CLAVES.length} coronas.` };
     }
 
     if (aviso) {
@@ -419,8 +416,9 @@ const coronarGanador = async (partida, idx) => {
 };
 
 /**
- * Una respuesta en modo duelo: coronas y vidas del que contesta. Gana quien
- * llega a seis coronas, o el ultimo que queda con vidas.
+ * Una respuesta en modo duelo: las coronas son de cada uno y gana quien
+ * llegue a seis. Aqui tampoco se elimina a nadie por fallar: mientras la
+ * partida siga, cualquiera puede remontar.
  */
 const contestarEnDuelo = async (partida, mi, e, acierto, siguiente) => {
     const yo = partida.jugadores[mi];
@@ -439,17 +437,11 @@ const contestarEnDuelo = async (partida, mi, e, acierto, siguiente) => {
         await partida.save();
         return {};
     }
-    yo.vidas = Math.max(0, (yo.vidas ?? VIDAS) - 1);
+    yo.fallos = (yo.fallos || 0) + 1;
     partida.racha = 0;
-    if (yo.vidas <= 0) yo.eliminado = true;
-    const vivos = partida.jugadores.map((j, i) => (!j.eliminado ? i : -1)).filter(i => i >= 0);
-    if (vivos.length === 1) {
-        await coronarGanador(partida, vivos[0]);
-        return { aviso: { todos: true, texto: `${partida.jugadores[vivos[0]].nombre} es el último en pie y se lleva ${partida.bote} fichas.` } };
-    }
     partida.turno = siguiente;
     await partida.save();
-    return { aviso: { a: siguiente, texto: yo.eliminado ? `${yo.nombre} se ha quedado sin vidas. Te toca.` : `${yo.nombre} ha fallado. Te toca.` } };
+    return { aviso: { a: siguiente, texto: `${yo.nombre} ha fallado. Te toca.` } };
 };
 
 /**
@@ -486,16 +478,19 @@ const abandonar = asyncHandler(async (req, res) => {
     }
 
     if (esDuelo(partida)) {
-        // Irse de un duelo es rendirse: la apuesta se queda en el bote
-        yo.eliminado = true;
-        const vivos = partida.jugadores.map((j, i) => (!j.eliminado ? i : -1)).filter(i => i >= 0);
-        if (vivos.length === 1) {
-            await coronarGanador(partida, vivos[0]);
-            for (const o of otros) notificarA(o.user, PUSH(`${yo.nombre} se ha rendido. ${partida.jugadores[vivos[0]].nombre} se lleva ${partida.bote} fichas.`));
+        // Irse de un duelo es rendirse: la apuesta se queda en el bote y se
+        // sale de la mesa. Si solo queda uno, se lo lleva.
+        const eraSuTurno = mi === partida.turno;
+        partida.jugadores.splice(mi, 1);
+        if (partida.jugadores.length === 1) {
+            await coronarGanador(partida, 0);
+            for (const o of otros) notificarA(o.user, PUSH(`${yo.nombre} se ha rendido. ${partida.jugadores[0].nombre} se lleva ${partida.bote} fichas.`));
         } else {
-            if (mi === partida.turno) { partida.enCurso = null; partida.racha = 0; partida.turno = vivos.find(i => i > mi) ?? vivos[0]; }
+            if (mi < partida.turno) partida.turno -= 1;
+            if (partida.turno >= partida.jugadores.length) partida.turno = 0;
+            if (eraSuTurno) { partida.enCurso = null; partida.racha = 0; }
             await partida.save();
-            for (const o of otros) notificarA(o.user, PUSH(`${yo.nombre} se ha rendido. Seguís ${vivos.length}.`));
+            for (const o of otros) notificarA(o.user, PUSH(`${yo.nombre} se ha rendido. Seguís ${partida.jugadores.length}.`));
         }
         return res.json(vista(partida, req.user._id));
     }
@@ -565,5 +560,5 @@ const pendientesDe = async (userId) => {
 module.exports = {
     crear, invitar, empezar, responderInvitacion, girar, contestar, abandonar, misPartidas, verPartida, misInvitaciones, pendientesDe,
     // Para las pruebas
-    VIDAS, SEGUIDAS_MAX, MAX_JUGADORES, PREMIO_GANAR, PREMIO_PERDER, TIEMPO_MS, APUESTA_MIN, APUESTA_MAX, siguientePregunta, vista
+    SEGUIDAS_MAX, MAX_JUGADORES, PREMIO_GANAR, TIEMPO_MS, APUESTA_MIN, APUESTA_MAX, siguientePregunta, vista
 };

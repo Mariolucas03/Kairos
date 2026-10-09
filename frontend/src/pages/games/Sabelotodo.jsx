@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import useSWR, { mutate as mutarGlobal } from 'swr';
 import {
-    Globe, ScrollText, Lightbulb, Trophy, Palette, Gamepad2, Crown, Heart, HeartCrack, Check, X, Plus,
+    Globe, ScrollText, Lightbulb, Trophy, Palette, Gamepad2, Crown, Check, X, Plus,
     Loader2, UserPlus, ChevronLeft, LogOut, Clock
 } from '../../iconos';
 import api from '../../services/api';
@@ -95,14 +95,17 @@ const Equipo = ({ jugadores = [], pendientes = [], tamano = 34 }) => (
     </div>
 );
 
-const Vidas = ({ vidas, max = 3 }) => (
-    <div className="flex items-center gap-1">
-        {Array.from({ length: max }).map((_, i) => (
-            i < vidas
-                ? <Heart key={i} size={16} className="text-red-500" />
-                : <HeartCrack key={i} size={16} className="text-zinc-600" />
-        ))}
-    </div>
+/**
+ * Los fallos del equipo (o los tuyos, en duelo).
+ *
+ * ⚠️ ANTES ERAN VIDAS Y MATABAN. Tres fallos y la partida se acababa, asi que
+ * con cuatro personas turnandose duraba diez minutos y habia que montarla otra
+ * vez. Ahora solo se cuentan: la partida vive hasta las seis coronas.
+ */
+const Fallos = ({ fallos = 0 }) => (
+    <span className="flex items-center gap-1 text-[11px] font-black tabular-nums not-italic" style={{ color: fallos > 0 ? '#ef4444' : '#52525b' }}>
+        <X size={13} /> {fallos}
+    </span>
 );
 
 /** La ruleta: seis gajos, y gira hasta caer en la categoria que diga el servidor. */
@@ -305,7 +308,7 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
                     message={p.estado === 'invitacion'
                         ? (p.soyCreador ? '¿Cancelar la partida? No empieza y cada uno recupera lo suyo.' : '¿Salirte antes de empezar? Recuperas tu apuesta si la había.')
                         : p.modo === 'duelo'
-                            ? `¿Rendirte? Tu apuesta se queda en el bote${p.jugadores.filter(j => !j.eliminado).length <= 2 ? ' y el otro se lo lleva' : ''}.`
+                            ? `¿Rendirte? Tu apuesta se queda en el bote${p.jugadores.length <= 2 ? ' y el otro se lo lleva' : ''}.`
                             : (p.jugadores.length > 2 ? '¿Dejar la partida? Los demás siguen sin ti y tú no cobras.' : '¿Dejar la partida? Se termina para los dos y nadie cobra.')}
                     confirmLabel="Dejarla"
                     onCancel={() => setConfirmarSalir(false)}
@@ -323,19 +326,19 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
                             : <>{p.coronas.length} de 6 coronas · {p.jugadores.length + (p.pendientes?.length || 0)} en el equipo</>}
                     </p>
                 </div>
-                <Vidas vidas={p.vidas} max={p.vidasMax} />
+                <Fallos fallos={p.fallos} />
             </div>
 
             {p.modo === 'duelo' ? (
                 <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-3 mb-4 space-y-2">
                     {p.jugadores.map(j => (
-                        <div key={j._id} className={`flex items-center gap-3 rounded-2xl px-2 py-1.5 ${j.esTurno ? 'bg-white/[0.04]' : ''} ${j.eliminado ? 'opacity-40' : ''}`}>
+                        <div key={j._id} className={`flex items-center gap-3 rounded-2xl px-2 py-1.5 ${j.esTurno ? 'bg-white/[0.04]' : ''}`}>
                             <Avatar persona={j} tamano={30} />
                             <div className="flex-1 min-w-0">
-                                <p className="text-[11px] font-black text-white truncate not-italic">{j.soyYo ? 'Tú' : j.nombre}{j.eliminado ? ' · fuera' : ''}</p>
+                                <p className="text-[11px] font-black text-white truncate not-italic">{j.soyYo ? 'Tú' : j.nombre}</p>
                                 <div className="mt-1 w-[150px]"><Coronas coronas={j.coronas || []} tamano={18} /></div>
                             </div>
-                            <Vidas vidas={j.vidas ?? 3} max={p.vidasMax} />
+                            <Fallos fallos={j.fallos} />
                         </div>
                     ))}
                 </div>
@@ -352,7 +355,7 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
                         {p.modo === 'duelo' ? `${p.jugadores[0]?.nombre || 'Alguien'} te reta por ${p.apuesta} fichas` : `${p.jugadores[0]?.nombre || 'Alguien'} te invita a su equipo`}
                     </p>
                     <p className="text-[11px] text-zinc-400 mt-1">
-                        {p.modo === 'duelo' ? 'Cada uno pone lo mismo. El primero en llegar a seis coronas, o el último con vidas, se lleva el bote entero.' : 'Seis coronas, tres vidas, todos juntos. Os turnáis.'}
+                        {p.modo === 'duelo' ? 'Cada uno pone lo mismo. El primero en llegar a seis coronas se lleva el bote entero. Fallar no elimina: solo pasa el turno.' : 'Seis coronas entre todos. Fallar no quita vidas: la partida dura hasta que estén las seis.'}
                     </p>
                     <div className="flex gap-2 mt-4">
                         <button onClick={() => responder('rechazar')} className="flex-1 h-12 rounded-2xl bg-zinc-900 border border-white/10 text-zinc-300 font-black text-[12px] uppercase tracking-widest">Paso</button>
@@ -429,15 +432,13 @@ const Partida = ({ id, onVolver, avisar, onInvitar }) => {
             )}
 
             {(p.estado === 'ganada' || p.estado === 'perdida') && (
-                <div className="rounded-3xl border p-6 text-center" style={{ borderColor: (p.estado === 'ganada' ? '#22c55e' : '#ef4444') + '55', background: (p.estado === 'ganada' ? '#22c55e' : '#ef4444') + '14' }}>
-                    <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center" style={{ background: p.estado === 'ganada' ? '#22c55e' : '#ef4444' }}>
-                        {p.estado === 'ganada' ? <Crown size={26} className="text-black" /> : <HeartCrack size={26} className="text-white" />}
+                <div className="rounded-3xl border p-6 text-center" style={{ borderColor: '#22c55e55', background: '#22c55e14' }}>
+                    <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center bg-green-500">
+                        <Crown size={26} className="text-black" />
                     </div>
-                    <p className="text-lg font-black text-white mt-3 uppercase not-italic">{p.estado === 'ganada' ? '¡Seis coronas!' : 'Sin vidas'}</p>
+                    <p className="text-lg font-black text-white mt-3 uppercase not-italic">¡Seis coronas!</p>
                     <p className="text-[12px] text-zinc-400 mt-1">
-                        {p.estado === 'ganada'
-                            ? `Los dos os lleváis ${p.premio?.fichas || 0} fichas y ${p.premio?.xp || 0} XP.`
-                            : `Os quedasteis en ${p.coronas.length} coronas. ${p.premio?.xp || 0} XP de consuelo para cada uno.`}
+                        {p.premio?.fichas || 0} fichas y {p.premio?.xp || 0} XP para cada uno{p.fallos > 0 ? `, con ${p.fallos} ${p.fallos === 1 ? 'fallo' : 'fallos'} por el camino` : ', y sin fallar ni una'}.
                     </p>
                 </div>
             )}
@@ -499,7 +500,7 @@ const FilaPartida = ({ p, onAbrir }) => {
     else if (p.estado === 'activa') { estado = p.meToca ? 'Te toca' : `Le toca a ${otro?.nombre || '…'}`; color = p.meToca ? '#22c55e' : '#71717a'; }
     else if (p.estado === 'ganada') { estado = 'Ganada'; color = '#22c55e'; }
     else if (p.estado === 'terminada') { estado = p.ganeYo ? `Ganaste ${p.bote} fichas` : `Ganó ${p.ganador?.nombre || 'otro'}`; color = p.ganeYo ? '#22c55e' : '#ef4444'; }
-    else if (p.estado === 'perdida') { estado = 'Perdida'; color = '#ef4444'; }
+    else if (p.estado === 'perdida') { estado = 'Terminada'; color = '#71717a'; }
     else estado = p.estado === 'rechazada' ? 'Rechazada' : 'Abandonada';
     const pide = (p.estado === 'activa' && p.meToca) || (p.estado === 'invitacion' && p.soyInvitado);
 
@@ -513,7 +514,7 @@ const FilaPartida = ({ p, onAbrir }) => {
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                     {p.modo === 'duelo' && <span className="flex items-center gap-1 text-[10px] font-black text-white tabular-nums"><Ficha valor={p.bote} tamano={12} />{p.bote}</span>}
-                    <Vidas vidas={p.vidas} max={p.vidasMax} />
+                    <Fallos fallos={p.fallos} />
                 </div>
             </div>
             <div className="mt-3">
@@ -606,7 +607,7 @@ export default function Sabelotodo() {
 
                     <div className="rounded-3xl border border-white/[0.07] bg-[#0a0a0c] p-4 mb-5">
                         <p className="text-[12px] text-zinc-300 leading-snug">
-                            De dos a cuatro. <span className="text-white font-black">En equipo</span>: coronas y vidas compartidas, o ganáis todos o perdéis todos. <span className="text-white font-black">A fichas</span>: cada uno pone lo mismo y el primero en seis coronas (o el último con vidas) se lleva el bote entero.
+                            De dos a cuatro. <span className="text-white font-black">En equipo</span>: las seis coronas se juntan entre todos y ganáis todos. <span className="text-white font-black">A fichas</span>: cada uno pone lo mismo y el primero en llegar a seis se lleva el bote. <span className="text-white font-black">Aquí no se pierde</span>: fallar solo pasa el turno.
                         </p>
                         <div className="mt-3"><Coronas coronas={CLAVES} tamano={26} /></div>
                     </div>
@@ -627,7 +628,7 @@ export default function Sabelotodo() {
                                             ))}
                                         </div>
                                         <p className="text-[10px] text-zinc-500 mt-2">
-                                            {modo === 'duelo' ? 'Cada uno pone la apuesta. Coronas y vidas propias: el primero en seis, o el último en pie, se lleva el bote.' : 'Coronas y vidas compartidas: o ganáis todos o perdéis todos.'}
+                                            {modo === 'duelo' ? 'Cada uno pone la apuesta y va a por sus propias coronas: el primero en seis se lleva el bote.' : 'Las coronas se juntan entre todos y la partida dura hasta tenerlas las seis.'}
                                         </p>
                                         {modo === 'duelo' && (
                                             <div className="mt-2">

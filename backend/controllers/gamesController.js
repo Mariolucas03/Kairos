@@ -355,21 +355,44 @@ const FORTUNE_PRIZES = Object.fromEntries(RUEDAS.map(r => [r.id, r.premios]));
 // `val` es lo que paga UNA linea de tres iguales, en veces la apuesta; cuatro
 // iguales pagan PAGO_CUATRO veces eso.
 //
-// ⚠️ Estos numeros estaban calculados para CUATRO lineas y el juego mira DIEZ
-// (4 filas, 4 columnas y 2 diagonales): devolvia el 209% de lo apostado, o
-// sea que regalaba el doble de lo que se jugaba. Con esta tabla vuelve al
-// 86%, y la prueba de economia ya simula las diez lineas de verdad.
+// ⚠️ DOS AJUSTES, Y EL SEGUNDO ES DE SENSACION.
+//
+// 1. Los numeros originales estaban calculados para CUATRO lineas y el juego
+//    mira DIEZ (4 filas, 4 columnas y 2 diagonales): devolvia el 209% de lo
+//    apostado, o sea que regalaba el doble de lo que se jugaba.
+// 2. Al corregirlo quedo un juego que pagaba a cada rato... migajas: premio
+//    en el 29% de las tiradas y 3 veces la apuesta de media, casi siempre la
+//    apuesta de vuelta. Una tragaperras que te devuelve lo puesto no se
+//    siente como ganar.
+//
+// Ahora: premio en el 14% de las tiradas, pero de 6 veces la apuesta de
+// media (el doble que antes) y con el cuadruple de corona pagando x1.440.
+// El retorno total sigue clavado en el 85%: lo que cambia es el reparto, no
+// lo que paga la casa.
 const SLOT_SYMBOLS = [
-    { id: 'cherry', icon: '🍒', val: 1, weight: 25 },
-    { id: 'clover', icon: '🍀', val: 2, weight: 15 },
-    { id: 'zap', icon: '⚡', val: 4, weight: 10 },
-    { id: 'star', icon: '⭐', val: 8, weight: 8 },
-    { id: 'gem', icon: '💎', val: 20, weight: 4 },
-    { id: 'crown', icon: '👑', val: 70, weight: 1 },
-    { id: 'skull', icon: '💀', val: 0, weight: 20 },
-    { id: 'ghost', icon: '👻', val: 0, weight: 17 },
+    { id: 'cherry', icon: '🍒', val: 2.2, weight: 18 },
+    { id: 'clover', icon: '🍀', val: 4.5, weight: 12 },
+    { id: 'zap', icon: '⚡', val: 9, weight: 8 },
+    { id: 'star', icon: '⭐', val: 20, weight: 6 },
+    { id: 'gem', icon: '💎', val: 54, weight: 3 },
+    { id: 'crown', icon: '👑', val: 180, weight: 1 },
+    { id: 'skull', icon: '💀', val: 0, weight: 26 },
+    { id: 'ghost', icon: '👻', val: 0, weight: 26 },
 ];
-const PAGO_CUATRO = 6;
+const PAGO_CUATRO = 8;
+
+/**
+ * EL CEMENTERIO: el huevo de pascua.
+ *
+ * Las dieciseis casillas en calaveras y fantasmas. Es la peor tirada posible
+ * —ni una linea, nada— y pasa una vez cada 43.000 tiradas, asi que quien la
+ * vea probablemente no la vea dos veces. Paga x100.
+ *
+ * Cuesta 0,2 puntos de retorno, que es nada, y convierte la tirada mas
+ * desgraciada del juego en la mejor.
+ */
+const CEMENTERIO_PAGO = 100;
+const esCementerio = (grid) => grid.flat().every(s => s.val === 0);
 
 /**
  * Que casillas de una linea de cuatro forman premio, o null.
@@ -431,8 +454,15 @@ const playSlots = asyncHandler(async (req, res) => {
         matchIds.forEach(i => winningCells.push(`${line.coords[i][0]}-${line.coords[i][1]}`));
     });
 
+    // El cementerio paga aparte: no es una linea, es la cuadricula entera
+    const cementerio = esCementerio(grid);
+    if (cementerio) {
+        totalPayout += apuesta * CEMENTERIO_PAGO;
+        winningCells = grid.flatMap((_, c) => [0, 1, 2, 3].map(f => `${c}-${f}`));
+    }
+
     const finalUser = await payPrize(req.user._id, totalPayout);
-    res.json({ grid, won: totalPayout > 0, payout: totalPayout, winningCells, user: finalUser });
+    res.json({ grid, won: totalPayout > 0, payout: totalPayout, winningCells, cementerio, user: finalUser });
 });
 
 // ==========================================
@@ -1031,6 +1061,6 @@ module.exports = {
     RUEDAS,
     // Se exportan SOLO para las pruebas: son las tablas que deciden cuanto
     // devuelve cada juego, y ya regalaron dinero una vez.
-    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
+    SCRATCH_SYMBOLS, SLOT_SYMBOLS, PAGO_CUATRO, lineaPremiada, CEMENTERIO_PAGO, esCementerio, FORTUNE_PRIZES, FORTUNE_COSTS, TOWER_MULTIPLIERS, TOWER_ULTIMA, TOWER_PISTA,
     premioDelRasca
 };

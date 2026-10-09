@@ -3,7 +3,7 @@ import usePantallaEncendida from '../../hooks/usePantallaEncendida';
 import { createPortal } from 'react-dom';
 import {
     Check, Loader2, X, Trophy, AlertTriangle, Plus,
-    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell
+    SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell, Trash2
 } from '../../iconos';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -326,7 +326,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
     useEffect(() => {
         // En lugar de guardar de inmediato, programamos el guardado para dentro de 1 segundo
         const timeoutId = setTimeout(() => {
-            const state = { startTime, clienteId, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
+            const state = { startTime, clienteId, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest, moldeable: !!routine.moldeable };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         }, 1000);
 
@@ -373,14 +373,46 @@ export default function ActiveWorkout({ routine, onFinish }) {
         setRestTargetTime(targetTime);
     };
 
-    // --- LOGICA DE SERIES Y SWAP ---
+    // --- LOGICA DE SERIES, CAMBIO, ALTA Y BAJA ---
+    //
+    // ⚠️ Antes solo se podia CAMBIAR un ejercicio por otro. Si en el gimnasio
+    // estaba ocupada la maquina y hacias otra cosa de mas, o te saltabas un
+    // ejercicio, la rutina no se enteraba: tenias que acordarte de entrar al
+    // editor despues, y nadie lo hace. Con `swapIndex = null` el selector
+    // AÑADE en vez de sustituir.
     const handleOpenSwap = (index) => { setSwapIndex(index); setShowSelector(true); };
+    const handleOpenAdd = () => { setSwapIndex(null); setShowSelector(true); };
+
+    const handleDeleteExercise = (index) => {
+        setExercises(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
+    };
 
     const handleSwapComplete = async (selectedList) => {
         if (!selectedList || selectedList.length === 0) { setShowSelector(false); return; }
 
-        const newExData = selectedList[0];
         const currentIndex = swapIndex;
+
+        // Sin ejercicio señalado, lo que se pidio fue AÑADIR: entran todos los
+        // elegidos al final, con tres series vacias como una rutina nueva.
+        if (currentIndex === null || currentIndex === undefined) {
+            setExercises(prev => [
+                ...prev,
+                ...selectedList.map(nuevo => ({
+                    name: nuevo.name,
+                    muscle: nuevo.muscle,
+                    esPorTiempo: !!nuevo.esPorTiempo,
+                    esPesoCorporal: !!nuevo.esPesoCorporal,
+                    porLado: !!nuevo.porLado,
+                    superserie: '',
+                    setsData: Array.from({ length: 3 }, () => ({ kg: '', reps: '', completed: false, type: 'N' })),
+                    pr: null
+                }))
+            ]);
+            setShowSelector(false);
+            return;
+        }
+
+        const newExData = selectedList[0];
 
         setExercises(prev => prev.map((ex, i) => {
             if (i !== currentIndex) return ex;
@@ -658,6 +690,31 @@ export default function ActiveWorkout({ routine, onFinish }) {
             };
 
             const res = await api.post('/gym/log', logData);
+
+            // ⚠️ LA RUTINA SE QUEDA COMO LA HAS DEJADO.
+            //
+            // Solo si se empezo con el boton de moldear. Lo que se guarda es
+            // la lista de ejercicios y cuantas series tiene cada uno, no los
+            // kilos: esos son de hoy. Va DESPUES de guardar el entreno y con
+            // su propio catch, porque el entreno ya esta a salvo y que falle
+            // esto no puede convertirse en un error que te haga repetirlo.
+            if (routine.moldeable && routine._id) {
+                const comoQuedo = exercises.map(ex => ({
+                    name: ex.name,
+                    muscle: ex.muscle || 'Otros',
+                    muscleDetail: ex.muscleDetail || '',
+                    secondary: ex.secondary || [],
+                    sets: ex.setsData.length,
+                    reps: ex.reps || '10-12',
+                    rest: ex.rest || 0,
+                    esPorTiempo: !!ex.esPorTiempo,
+                    esPesoCorporal: !!ex.esPesoCorporal,
+                    porLado: !!ex.porLado,
+                    superserie: ex.superserie || ''
+                }));
+                api.put(`/gym/routines/${routine._id}`, { exercises: comoQuedo })
+                    .catch(e => console.error('No se pudo guardar la rutina cambiada:', e.message));
+            }
             invalidarDiario();
 
             // ⚠️ Esto REESCRIBIA la rutina con solo cuatro campos, asi que cada
@@ -929,6 +986,17 @@ export default function ActiveWorkout({ routine, onFinish }) {
                                             >
                                                 <RefreshCw size={15} />
                                             </button>
+                                            {/* Quitarlo de la sesion. Con uno solo no se puede:
+                                                un entreno sin ejercicios no es un entreno. */}
+                                            {exercises.length > 1 && (
+                                                <button
+                                                    onClick={() => handleDeleteExercise(exIdx)}
+                                                    aria-label={`Quitar ${ex.name} de la sesión`}
+                                                    className="w-9 h-9 bg-black/40 rounded-xl text-zinc-500 border border-white/[0.07] flex items-center justify-center active:scale-90 active:text-red-400 transition-all"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1029,6 +1097,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
                         </div>
                     </div>
                 ))}
+
+                {/* AÑADIR UNO MAS, aqui y ahora. En modo moldeable ademas se
+                    queda guardado en la rutina al terminar. */}
+                <button
+                    onClick={handleOpenAdd}
+                    className="w-full mt-3 py-4 rounded-2xl border border-dashed border-zinc-700 text-zinc-400 font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
+                >
+                    <Plus size={16} /> Añadir ejercicio
+                </button>
 
                 <div className="pt-4 pb-2">
                     <h3 className="text-[10px] font-black text-zinc-500 uppercase ml-2 mb-3 tracking-widest">Intensidad</h3>

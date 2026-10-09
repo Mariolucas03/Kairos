@@ -132,23 +132,35 @@ describe('La partida en pareja', () => {
         assert.strictEqual(p.coronas.length, 3);
         assert.strictEqual(p.turno, 1, 'tras tres seguidas le toca a la otra');
         assert.strictEqual(p.racha, 0);
-        assert.strictEqual(p.vidas, 3);
     });
 
-    test('fallar quita una vida al equipo y pasa el turno; a la tercera se pierde y hay consuelo', async () => {
+    test('AQUI NO SE PIERDE: fallar solo pasa el turno, por muchas veces que sea', async () => {
         const id = await empezar();
-        const turnos = [a, b, a];
-        for (let i = 0; i < 3; i++) {
-            await llamar(ctrl.girar, { user: turnos[i], params: { id } });
-            const r = await contestar(id, turnos[i], false);
+        // Seis fallos seguidos, turnandose: con las vidas de antes la partida
+        // se habria muerto al tercero.
+        const turnos = [a, b, a, b, a, b];
+        for (const quien of turnos) {
+            await llamar(ctrl.girar, { user: quien, params: { id } });
+            const r = await contestar(id, quien, false);
+            assert.strictEqual(r.estado, 200, r.error);
             assert.strictEqual(r.dato.resultado.acierto, false);
-            assert.ok(r.dato.resultado.correcta);
+            assert.ok(r.dato.resultado.correcta, 'se dice cual era la buena');
+            assert.strictEqual(r.dato.estado, 'activa', 'la partida sigue viva');
         }
         const p = await Sabelotodo.findById(id).lean();
-        assert.strictEqual(p.vidas, 0);
-        assert.strictEqual(p.estado, 'perdida');
-        const ana = await User.findById(a._id).lean();
-        assert.strictEqual(ana.currentXP, ctrl.PREMIO_PERDER.xp);
+        assert.strictEqual(p.estado, 'activa');
+        assert.strictEqual(p.fallos, 6, 'los fallos se cuentan, pero no matan');
+        assert.strictEqual(p.turno, 0, 'y el turno sigue rotando');
+
+        // Y despues de todo eso se puede ganar igual
+        for (let k = 0; k < 6; k++) {
+            const quien = k < 3 ? a : b;
+            await llamar(ctrl.girar, { user: quien, params: { id } });
+            await contestar(id, quien, true);
+        }
+        const fin = await Sabelotodo.findById(id).lean();
+        assert.strictEqual(fin.estado, 'ganada');
+        assert.strictEqual(fin.coronas.length, 6);
     });
 
     test('con las seis coronas ganan los dos y cobran los dos lo mismo', async () => {
@@ -187,7 +199,8 @@ describe('La partida en pareja', () => {
         const tarde = await contestar(id, a, true);
         assert.strictEqual(tarde.dato.resultado.acierto, false);
         assert.strictEqual(tarde.dato.resultado.aTiempo, false);
-        assert.strictEqual(tarde.dato.vidas, 2);
+        assert.strictEqual(tarde.dato.fallos, 1, 'cuenta como fallo, pero la partida sigue');
+        assert.strictEqual(tarde.dato.estado, 'activa');
     });
 
     test('en equipo de tres: se empieza cuando todos han contestado y el turno va rotando', async () => {
@@ -235,7 +248,7 @@ describe('La partida en pareja', () => {
         assert.strictEqual(p.jugadores.length, 2);
         assert.strictEqual(p.jugadores[p.turno].nombre, 'bea', 'el turno pasa al siguiente');
         assert.strictEqual(p.enCurso, null, 'la pregunta en el aire se descarta');
-        assert.strictEqual(p.vidas, 3, 'sin castigo');
+        assert.strictEqual(p.fallos, 0, 'sin castigo');
         const fuera2 = await llamar(ctrl.abandonar, { user: b, params: { id } });
         assert.strictEqual(fuera2.dato.estado, 'abandonada');
     });
@@ -253,7 +266,7 @@ describe('La partida en pareja', () => {
         assert.strictEqual(await ctrl.pendientesDe(c._id), 0, 'a cai ya no le cuenta la invitacion');
     });
 
-    test('duelo a fichas: cada uno pone la apuesta, el que se queda sin vidas cae y el ultimo se lleva el bote', async () => {
+    test('duelo a fichas: cada uno pone la apuesta y el que llega a seis coronas se lleva el bote', async () => {
         await User.updateMany({ _id: { $in: [a._id, b._id] } }, { $set: { gameCoins: 500 } });
         const pobre = await llamar(ctrl.crear, { user: a, body: { amigosIds: [b._id.toString()], modo: 'duelo', apuesta: 9000 } });
         assert.strictEqual(pobre.estado, 400, 'sin fichas no hay duelo');
@@ -269,20 +282,20 @@ describe('La partida en pareja', () => {
         assert.strictEqual(ok.dato.bote, 200);
         assert.strictEqual((await User.findById(b._id).lean()).gameCoins, 400);
 
-        // ana falla tres veces seguidas (una por turno): se queda sin vidas y bea gana
-        for (let i = 0; i < 3; i++) {
-            await llamar(ctrl.girar, { user: a, params: { id } });
-            const r = await contestar(id, a, false);
-            assert.strictEqual(r.estado, 200, r.error);
-            if (i < 2) {
-                // le toca a bea: dos aciertos y un fallo, para devolver el turno sin llegar a seis
-                for (let k = 0; k < 3; k++) { await llamar(ctrl.girar, { user: b, params: { id } }); await contestar(id, b, k < 2); }
-            }
-        }
+        // ana falla y falla: no se la elimina, solo pasa el turno. bea va
+        // sumando coronas de tres en tres hasta las seis.
+        await llamar(ctrl.girar, { user: a, params: { id } });
+        await contestar(id, a, false);
+        for (let k = 0; k < 3; k++) { await llamar(ctrl.girar, { user: b, params: { id } }); await contestar(id, b, true); }
+        await llamar(ctrl.girar, { user: a, params: { id } });
+        await contestar(id, a, false);
+        let ultima;
+        for (let k = 0; k < 3; k++) { await llamar(ctrl.girar, { user: b, params: { id } }); ultima = await contestar(id, b, true); }
+
+        assert.strictEqual(ultima.dato.estado, 'terminada');
         const p = await Sabelotodo.findById(id).lean();
-        assert.strictEqual(p.estado, 'terminada');
         assert.strictEqual(p.ganador.toString(), b._id.toString());
-        assert.strictEqual(p.jugadores[0].eliminado, true);
+        assert.strictEqual(p.jugadores[0].fallos, 2, 'los fallos de ana se cuentan, no la eliminan');
         assert.strictEqual((await User.findById(b._id).lean()).gameCoins, 600, 'bea se lleva el bote entero');
         assert.strictEqual((await User.findById(a._id).lean()).gameCoins, 400, 'ana pierde su apuesta y nada mas');
     });
