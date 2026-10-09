@@ -88,17 +88,24 @@ const WIDGET_LAYOUT = {
 function PanelAvisos({ onMensaje }) {
     const [estado, setEstado] = useState(null);
     const [ocupado, setOcupado] = useState(null);
+    // Lo que contesto Apple/Google en el ultimo envio de prueba, aparato por
+    // aparato. Ver mas abajo por que se enseña.
+    const [detalle, setDetalle] = useState(null);
     const mirar = () => estadoPush().then(setEstado).catch(() => setEstado(null));
     useEffect(() => { mirar(); }, []);
 
-    const activo = estado && estado.permiso === 'granted' && estado.suscrito && estado.dispositivos > 0 && estado.servidor !== false;
+    const activo = estado && estado.permiso === 'granted' && estado.suscrito && estado.dispositivos > 0 && estado.servidor !== false && estado.claveOk !== false;
     const motivo = !estado ? 'Comprobando…'
         : !estado.soporta ? (estado.esIOS && !estado.instalada ? 'En iPhone hay que abrirla desde el icono de la pantalla de inicio.' : 'Este navegador no las soporta.')
             : estado.permiso === 'denied' ? 'Bloqueadas en los ajustes del móvil para esta app.'
                 : estado.permiso !== 'granted' ? 'Falta darles permiso: pulsa Activar.'
                     : estado.servidor === false ? 'El servidor no tiene claves configuradas.'
                         : !estado.suscrito || !estado.dispositivos ? 'Este aparato no está registrado: pulsa Activar.'
-                            : `Activadas · ${estado.dispositivos} ${estado.dispositivos === 1 ? 'aparato' : 'aparatos'}`;
+                            // Las claves cruzadas son el unico fallo que no se
+                            // nota: todo lo demas esta bien y aun asi no llega
+                            // nada. Se dice con todas las letras.
+                            : estado.claveOk === false ? 'Registrado con una clave vieja: pulsa Reactivar.'
+                                : `Activadas · ${estado.dispositivos} ${estado.dispositivos === 1 ? 'aparato' : 'aparatos'}`;
 
     return (
         <div className="p-4 border rounded-3xl bg-zinc-900/50" style={{ borderColor: activo ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.07)' }}>
@@ -117,6 +124,7 @@ function PanelAvisos({ onMensaje }) {
                         setOcupado('activar');
                         const r = await registerPush();
                         onMensaje({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
+                        setDetalle(null);
                         await mirar(); setOcupado(null);
                     }}
                     disabled={!!ocupado}
@@ -129,6 +137,7 @@ function PanelAvisos({ onMensaje }) {
                         setOcupado('probar');
                         const r = await probarPush();
                         onMensaje({ message: r.mensaje, type: r.ok ? 'success' : 'error' });
+                        setDetalle(r.detalle || null);
                         await mirar(); setOcupado(null);
                     }}
                     disabled={!!ocupado}
@@ -137,6 +146,33 @@ function PanelAvisos({ onMensaje }) {
                     {ocupado === 'probar' ? 'Enviando…' : 'Probar'}
                 </button>
             </div>
+
+            {/* ⚠️ QUE CONTESTO APPLE, APARATO POR APARATO.
+                El servidor ya devolvia esto y se tiraba a la basura: solo se
+                enseñaba "no se pudo entregar", que no sirve para nada. El
+                codigo es LO UNICO que distingue los tres fallos posibles, y
+                cada uno se arregla de una forma distinta:
+                  403 → las claves no son pareja (pulsar Reactivar)
+                  410/404 → el movil tiro la suscripcion (pulsar Activar)
+                  201 y aun asi no se ve → el aviso llego y lo escondio iOS */}
+            {detalle?.resultados?.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-white/[0.07] flex flex-col gap-1">
+                    {detalle.resultados.map((r, i) => (
+                        <div key={i} className="flex items-start gap-2 text-[10px] leading-snug">
+                            <span className={`font-black shrink-0 ${r.ok ? 'text-green-400' : 'text-red-400'}`}>
+                                {r.ok ? 'OK' : (r.codigo || 'ERR')}
+                            </span>
+                            <span className="text-zinc-500 font-mono shrink-0">…{r.endpoint}</span>
+                            {!r.ok && r.error && <span className="text-zinc-500 truncate">{r.error}</span>}
+                        </div>
+                    ))}
+                    {detalle.resultados.some(r => r.codigo === 403) && (
+                        <p className="text-[10px] text-amber-400/90 mt-1">
+                            403 = la clave con la que se registró este aparato no es la del servidor. Pulsa Reactivar.
+                        </p>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

@@ -209,10 +209,23 @@ export const estadoPush = async () => {
     const permiso = typeof Notification !== 'undefined' ? Notification.permission : 'sin-soporte';
 
     let suscrito = false;
+    // ⚠️ ¿ESTE APARATO SE REGISTRO CON LA CLAVE QUE USA EL SERVIDOR?
+    //
+    // Es la averia que no se ve: con las claves cruzadas hay permiso, hay
+    // suscripcion, el servidor la tiene guardada y el panel dice "Activadas",
+    // pero Apple rechaza cada envio y no llega nada NUNCA. Sin esta linea no
+    // habia forma de distinguirlo de "el aviso no se mando".
+    // null = no se ha podido comprobar (sin conexion, navegador antiguo).
+    let claveOk = null;
     try {
         if (soporta) {
             const registro = await navigator.serviceWorker.ready;
-            suscrito = !!(await registro.pushManager.getSubscription());
+            const sub = await registro.pushManager.getSubscription();
+            suscrito = !!sub;
+            if (sub) {
+                const { clave } = await pedirClave();
+                if (clave) claveOk = mismaClave(sub, clave);
+            }
         }
     } catch { /* da igual: se enseña como no suscrito */ }
 
@@ -223,7 +236,7 @@ export const estadoPush = async () => {
         dispositivos = r.data?.dispositivos ?? null;
     } catch { /* sin conexion: se enseña lo que sepamos del movil */ }
 
-    return { esIOS, instalada, soporta, permiso, suscrito, servidor, dispositivos };
+    return { esIOS, instalada, soporta, permiso, suscrito, claveOk, servidor, dispositivos };
 };
 
 /** Manda una notificacion de prueba a tus propios dispositivos. */
