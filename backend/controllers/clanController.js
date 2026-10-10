@@ -71,6 +71,9 @@ const getEventGoal = (eventType, memberCount = 1) => {
 
 // Escalones de la barra: el tier 3 es la meta y los dos últimos son el "más allá"
 const TIER_FACTORS = { 1: 0.1, 2: 0.5, 3: 1, 4: 1.5, 5: 2 };
+// Los unicos escalones que existen. Se comprueba contra esta lista y no con
+// `TIER_FACTORS[tier]`, que acepta cualquier propiedad heredada de Object.
+const ESCALONES = [1, 2, 3, 4, 5];
 
 const TIER_LABELS = { 1: 'Bronce', 2: 'Plata', 3: 'Oro', 4: 'Platino', 5: 'Diamante' };
 
@@ -428,18 +431,27 @@ const claimEventReward = asyncHandler(async (req, res) => {
     const goal = getEventGoal(eventType, clan.members.length);
     const { clanTotal } = await getClanMetrics(clan.members, weekStart, eventType);
 
-    const factor = TIER_FACTORS[tier];
-    if (!factor) { res.status(400); throw new Error('Recompensa no válida'); }
+    // ⚠️ EL ESCALON, UNO DE LOS CINCO Y NADA MAS.
+    //
+    // Antes bastaba con que `TIER_FACTORS[tier]` diera algo verdadero, y eso
+    // se cumple con cualquier propiedad heredada de Object: con tier
+    // "constructor" el factor era una funcion, `goal * factor` daba NaN y
+    // `clanTotal < NaN` es falso, asi que la comprobacion de la meta se pasaba
+    // de largo sin haberla alcanzado.
+    const escalon = Number(tier);
+    if (!ESCALONES.includes(escalon)) { res.status(400); throw new Error('Recompensa no válida'); }
+
+    const factor = TIER_FACTORS[escalon];
     if (clanTotal < goal * factor) { res.status(400); throw new Error('Meta no alcanzada'); }
 
     // 🔥 ATÓMICO: Añadimos el claim SOLO si no existe (evita doble recompensa)
     const clanUpdate = await Clan.findOneAndUpdate(
         {
             _id: clan._id,
-            "weeklyEvent.claims": { $not: { $elemMatch: { user: userId, tier: tier } } }
+            "weeklyEvent.claims": { $not: { $elemMatch: { user: userId, tier: escalon } } }
         },
         {
-            $push: { "weeklyEvent.claims": { user: userId, tier, claimedAt: new Date() } }
+            $push: { "weeklyEvent.claims": { user: userId, tier: escalon, claimedAt: new Date() } }
         },
         { new: true }
     );
@@ -448,39 +460,60 @@ const claimEventReward = asyncHandler(async (req, res) => {
         res.status(400); throw new Error('Ya has reclamado esta recompensa.');
     }
 
-    const prize = EVENT_REWARDS[tier];
+    const prize = EVENT_REWARDS[escalon];
     const result = await levelService.addRewards(userId, prize.xp, prize.coins, prize.chips);
 
     res.json({
-        message: `¡${TIER_LABELS[tier]}! +${prize.xp} XP · +${prize.coins} monedas · +${prize.chips} fichas`,
+        message: `¡${TIER_LABELS[escalon]}! +${prize.xp} XP · +${prize.coins} monedas · +${prize.chips} fichas`,
         rewards: prize,
         user: result.user,
         leveledUp: result.leveledUp
     });
 });
 
-// @desc    Buscar clanes (Ranking)
-const searchClans = asyncHandler(async (req, res) => {
-    // Repaso de oportunidad: abrir el explorador es el momento natural para
-    // barrer lo que se haya quedado colgado. Pasa por el MISMO helper que las
-    // salidas y las expulsiones, así que aquí también caen los fantasmas (lista
-    // con ids de cuentas que ya no existen) y no solo los literalmente vacíos.
+/**
+ * EL BARRIDO DE TODOS LOS CLANES, CON FRENO.
+ *
+ * ⚠️ ESTO CORRIA ENTERO EN CADA VISITA AL EXPLORADOR.
+ *
+ * `repasarClan` hace dos consultas por clan (el clan y sus miembros), asi que
+ * abrir la pantalla de clanes costaba DOS CONSULTAS POR CADA CLAN QUE EXISTA,
+ * antes de empezar a buscar nada. Con cincuenta clanes son mas de cien
+ * consultas para pintar una lista de veinte, y crece sin tope segun se van
+ * creando clanes: la pantalla se va volviendo mas lenta sola.
+ *
+ * Y no hacia falta: es un barrido de limpieza (clanes vacios, miembros de
+ * cuentas borradas, el poder envejecido), no un dato del momento. El
+ * mantenimiento nocturno ya lo hace; esto es el repaso de oportunidad.
+ *
+ * Una vez cada cinco minutos sobra. Como mucho, la clasificacion va cinco
+ * minutos por detras, que para un ranking de poder de clanes no lo nota nadie.
+ */
+const ESPERA_ENTRE_BARRIDOS = 5 * 60 * 1000;
+let ultimoBarrido = 0;
+
+const barrerClanes = async () => {
+    // Se apunta ANTES de empezar: si entran tres a la vez, barre uno solo.
+    if (Date.now() - ultimoBarrido < ESPERA_ENTRE_BARRIDOS) return;
+    ultimoBarrido = Date.now();
+
     const candidatos = await Clan.find({}).select('_id').lean();
     let borrados = 0;
     for (const c of candidatos) {
         if (await repasarClan(c._id)) borrados++;
     }
     if (borrados) console.log(`🏰 ${borrados} clan(es) sin nadie dentro eliminados`);
+};
 
-    // ⚠️ EL ORDEN SE FÍA DEL REPASO DE JUSTO ARRIBA.
-    //
-    // Ordenar por un campo guardado solo vale si el campo está bien, y hasta
-    // ahora no lo estaba: la clasificación de clanes salía ordenada por un
-    // número torcido. Ese bucle acaba de poner al día el poder de TODOS, con
-    // los niveles de este momento, así que aquí ya se puede ordenar por él.
-    //
-    // De paso, esto repara solo los clanes que ya venían mal de antes: la
-    // primera vez que alguien abre el explorador, quedan todos cuadrados.
+// @desc    Buscar clanes (Ranking)
+const searchClans = asyncHandler(async (req, res) => {
+    await barrerClanes();
+
+    // EL ORDEN SE FIA DEL BARRIDO DE ARRIBA, que pone al dia el poder de
+    // todos con los niveles del momento. Con el freno puede ir hasta cinco
+    // minutos por detras; para una clasificacion de clanes da igual, y a
+    // cambio la pantalla no paga un repaso de la base de datos entera cada vez
+    // que alguien la abre.
     const clans = await Clan.find({ 'members.0': { $exists: true } })
         .sort({ totalPower: -1 })
         .limit(20)
