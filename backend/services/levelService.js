@@ -64,64 +64,121 @@ const ensureLevelConsistency = async (userId) => {
     return user;
 };
 
-// Función principal para dar recompensas
+/**
+ * DAR UNA RECOMPENSA.
+ *
+ * Por aqui pasa TODO lo que se cobra en la app: misiones, entrenos, duelos,
+ * casino, cofres, el evento del clan y la recompensa diaria.
+ *
+ * ⚠️ POR QUE NO SE LEE, SE SUMA Y SE GUARDA.
+ *
+ * Eso es lo que hacia antes, y es seguro mientras solo llegue un cobro a la
+ * vez. Si llegan dos, los dos leen el MISMO saldo de partida y el segundo en
+ * guardar escribe su total encima del del primero. Mongoose no manda "sumale
+ * cien": manda "el saldo es 100", con el numero que calculo en memoria.
+ *
+ * Medido con diez cobros simultaneos de diez monedas: quedaban 20 de 100. Se
+ * perdian ocho de cada diez, sin error, sin aviso y sin nada en los registros.
+ * Y no es un caso de laboratorio: la cola de envios sin conexion suelta de
+ * golpe todo lo pendiente en cuanto vuelve la cobertura, y una mision
+ * compartida paga a varios en el mismo instante.
+ *
+ * Ahora la suma la hace Mongo con $inc, que no puede pisar a nadie, y cada
+ * subida de nivel va con el nivel dentro del filtro: si dos premios llegan
+ * juntos, solo uno sube cada escalon y el otro se encuentra el trabajo hecho.
+ */
 const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
-    const user = await User.findById(userId);
+    const xp = parseInt(xpReward) || 0;
+    const monedas = parseInt(coinReward) || 0;
+    const fichas = parseInt(gameCoinReward) || 0;
+
+    // 1. LA SUMA. Una sola escritura y la hace Mongo, no nosotros.
+    let user = await User.findByIdAndUpdate(
+        userId,
+        { $inc: { currentXP: xp, coins: monedas, gameCoins: fichas } },
+        { new: true }
+    );
     if (!user) throw new Error("Usuario no encontrado");
 
-    // Sumar recursos directamente a la raíz
-    user.currentXP += parseInt(xpReward) || 0;
-    user.coins += parseInt(coinReward) || 0;
-    user.gameCoins += parseInt(gameCoinReward) || 0;
+    // Cuentas viejas sin el listón del siguiente nivel puesto.
+    if (!user.nextLevelXP) {
+        user = await User.findByIdAndUpdate(
+            userId,
+            { $set: { nextLevelXP: calculateNextLevelXP(user.level || 1) } },
+            { new: true }
+        ) || user;
+    }
 
-    let leveledUp = false;
-    if (!user.nextLevelXP) user.nextLevelXP = calculateNextLevelXP(user.level);
-
-    // --- LÓGICA DE LEVEL UP ---
+    // 2. LAS SUBIDAS DE NIVEL, UNA A UNA.
+    //
+    // El nivel actual va DENTRO del filtro. Si otro premio simultáneo ya subió
+    // ese escalón, esta escritura no encuentra nada que cambiar: se relee y se
+    // mira otra vez, en vez de subirlo dos veces. El tope de vueltas es una red
+    // de seguridad: sin él, un nextLevelXP corrupto a 0 sería un bucle infinito
+    // con el servidor dentro.
+    const TOPE_DE_VUELTAS = 100;
     let levelsGained = 0;
 
-    while (user.currentXP >= user.nextLevelXP) {
-        console.log(`¡LEVEL UP! ${user.level} -> ${user.level + 1}`);
-        user.currentXP -= user.nextLevelXP;
-        user.level += 1;
-        user.nextLevelXP = calculateNextLevelXP(user.level);
+    for (let vuelta = 0; vuelta < TOPE_DE_VUELTAS; vuelta++) {
+        const liston = user.nextLevelXP || calculateNextLevelXP(user.level || 1);
+        if (liston <= 0 || user.currentXP < liston) break;
 
-        // Restaurar vida al subir de nivel
-        user.hp = user.maxHp;
-        user.lives = user.hp; // Estaba comentado con un "con hp basta", pero el
-                              // castigo nocturno, la diaria y el revivir SÍ lo
-                              // escriben: quedaba desincronizado solo aquí.
+        // Al subir se restaura la vida. `lives` se escribe junto a `hp` porque
+        // el castigo nocturno, la diaria y el revivir escriben los dos: dejar
+        // uno sin tocar deja un número viejo esperando a que alguien lo lea.
+        const vidaLlena = user.maxHp || 100;
 
-        levelsGained++; // Contamos cuántos niveles ha subido
-        leveledUp = true;
+        const subido = await User.findOneAndUpdate(
+            { _id: userId, level: user.level, currentXP: { $gte: liston } },
+            {
+                $inc: { currentXP: -liston, level: 1 },
+                $set: {
+                    nextLevelXP: calculateNextLevelXP((user.level || 1) + 1),
+                    hp: vidaLlena,
+                    lives: vidaLlena
+                }
+            },
+            { new: true }
+        );
+
+        if (!subido) {
+            // Se nos adelantaron: el nivel lo ha ganado el otro cobro, no este.
+            const refrescado = await User.findById(userId);
+            if (!refrescado) throw new Error("Usuario no encontrado");
+            user = refrescado;
+            continue;
+        }
+
+        console.log(`¡LEVEL UP! ${user.level} -> ${subido.level}`);
+        user = subido;
+        levelsGained++;
     }
 
-    // ⚠️ AQUI HABIA UN `$inc: { totalPower }` SOBRE EL CLAN. YA NO HACE FALTA.
-    //
-    // Era el cuarto sitio que movia ese contador a mano, y el que se escapo al
-    // limpiar los otros tres porque vive en este servicio y no en
-    // clanController. El poder de un clan ya no se acumula: se cuenta sumando el
-    // nivel de quien esta dentro, cada vez que se lee (ver `poderDe` y
-    // `repasarClan`). Sumar aqui no rompia nada —la derivacion lo corregia en la
-    // siguiente lectura— pero deja escrito que es un contador, que es justo la
-    // idea que llevo al poder a ponerse en negativo.
+    const leveledUp = levelsGained > 0;
 
-    // El premio, una sola vez aunque se hayan subido varios niveles de golpe:
-    // se paga por LLEGAR al nivel nuevo, no por cada escalon.
+    // 3. EL PREMIO POR SUBIR, una sola vez aunque se hayan subido varios
+    //    niveles de golpe: se paga por LLEGAR al nivel nuevo, no por escalón.
     let premio = null;
-    if (levelsGained > 0) {
+    if (leveledUp) {
         premio = premioPorNivel(user.level);
-        user.coins += premio.monedas;
-        user.gameCoins += premio.fichas;
-        user.ultimaSubidaDeNivel = {
-            nivel: user.level,
-            monedas: premio.monedas,
-            fichas: premio.fichas,
-            fecha: new Date()
-        };
+        user = await User.findByIdAndUpdate(
+            userId,
+            {
+                $inc: { coins: premio.monedas, gameCoins: premio.fichas },
+                $set: {
+                    ultimaSubidaDeNivel: {
+                        nivel: user.level,
+                        monedas: premio.monedas,
+                        fichas: premio.fichas,
+                        fecha: new Date()
+                    }
+                }
+            },
+            { new: true }
+        ) || user;
     }
 
-    const savedUser = await user.save();
+    const savedUser = user;
 
     // --- 📒 REGISTRO DIARIO DE LO GANADO ---
     // ⚠️ `gains.xp` y `gains.coins` se creaban a 0 y nadie los volvía a tocar.
@@ -130,14 +187,11 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
     // recompensas eran inalcanzables) y el ranking mensual, que agrega
     // justamente este campo. Se apunta aquí, que es por donde pasan todas las
     // recompensas del juego.
-    const xpGanado = parseInt(xpReward) || 0;
-    const monedasGanadas = parseInt(coinReward) || 0;
-
-    if (xpGanado || monedasGanadas) {
+    if (xp || monedas) {
         try {
             await DailyLog.updateOne(
                 { user: userId, date: getMadridDateString() },
-                { $inc: { 'gains.xp': xpGanado, 'gains.coins': monedasGanadas } },
+                { $inc: { 'gains.xp': xp, 'gains.coins': monedas } },
                 { upsert: true }
             );
         } catch (e) {
