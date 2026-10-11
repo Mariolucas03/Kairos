@@ -30,38 +30,104 @@ const premioPorNivel = (nivel) => {
     };
 };
 
+/**
+ * El listón del siguiente nivel, puesto si faltaba (cuentas viejas).
+ */
+const asegurarListon = async (userId, user) => {
+    if (user.nextLevelXP) return user;
+    const puesto = await User.findByIdAndUpdate(
+        userId,
+        { $set: { nextLevelXP: calculateNextLevelXP(user.level || 1) } },
+        { new: true }
+    );
+    return puesto || user;
+};
+
+/**
+ * SUBIR TODOS LOS NIVELES QUE TOQUEN, DE UNO EN UNO.
+ *
+ * ⚠️ EL NIVEL ACTUAL VA DENTRO DEL FILTRO, Y ESO ES TODO EL TRUCO.
+ *
+ * Si otro cobro simultáneo ya subió ese escalón, esta escritura no encuentra
+ * nada que cambiar: se relee y se vuelve a mirar, en vez de subirlo dos veces.
+ * Leer el usuario, calcular en memoria y guardar —que es lo que hacían las dos
+ * funciones de aquí abajo, cada una por su cuenta— escribe el total calculado
+ * encima de lo que haya puesto otro mientras tanto.
+ *
+ * El tope de vueltas es una red de seguridad: sin él, un `nextLevelXP` a cero
+ * sería un bucle infinito con el servidor dentro.
+ *
+ * @returns {{ user, levelsGained }}
+ */
+const TOPE_DE_VUELTAS = 100;
+
+const subirNivelesPendientes = async (userId, usuarioInicial) => {
+    let user = usuarioInicial;
+    let levelsGained = 0;
+
+    for (let vuelta = 0; vuelta < TOPE_DE_VUELTAS; vuelta++) {
+        const liston = user.nextLevelXP || calculateNextLevelXP(user.level || 1);
+        if (liston <= 0 || user.currentXP < liston) break;
+
+        // Al subir se restaura la vida. `lives` se escribe junto a `hp` porque
+        // el castigo nocturno, la diaria y el revivir escriben los dos: dejar
+        // uno sin tocar deja un número viejo esperando a que alguien lo lea.
+        const vidaLlena = user.maxHp || 100;
+
+        const subido = await User.findOneAndUpdate(
+            { _id: userId, level: user.level, currentXP: { $gte: liston } },
+            {
+                $inc: { currentXP: -liston, level: 1 },
+                $set: {
+                    nextLevelXP: calculateNextLevelXP((user.level || 1) + 1),
+                    hp: vidaLlena,
+                    lives: vidaLlena
+                }
+            },
+            { new: true }
+        );
+
+        if (!subido) {
+            // Se nos adelantaron: el nivel lo ha ganado el otro, no este.
+            const refrescado = await User.findById(userId);
+            if (!refrescado) throw new Error("Usuario no encontrado");
+            user = refrescado;
+            continue;
+        }
+
+        console.log(`¡LEVEL UP! ${user.level} -> ${subido.level}`);
+        user = subido;
+        levelsGained++;
+    }
+
+    return { user, levelsGained };
+};
+
 // Auto-reparación (Asegura consistencia al cargar perfil)
+/**
+ * ⚠️ ESTO CORRE EN CADA CARGA DE PERFIL.
+ *
+ * Antes leia el usuario, recalculaba los niveles en memoria y lo guardaba. Con
+ * un premio llegando en ese mismo instante, el guardado escribia su `currentXP`
+ * ya viejo encima del nuevo y el premio desaparecia. Como es de las cosas que
+ * mas veces al dia se ejecutan, era de las que mas ocasiones tenia de chocar.
+ *
+ * Ahora pasa por el mismo camino atomico que `addRewards`. Aqui NO se paga el
+ * premio por subir: esto es una reparacion de cuentas descuadradas, no un
+ * cobro, y pagar por reparar seria una impresora de monedas con solo abrir el
+ * perfil.
+ */
 const ensureLevelConsistency = async (userId) => {
-    const user = await User.findById(userId);
+    let user = await User.findById(userId);
     if (!user) return null;
 
-    let changed = false;
-    if (!user.nextLevelXP || user.nextLevelXP === 0) {
-        user.nextLevelXP = calculateNextLevelXP(user.level || 1);
-        changed = true;
-    }
-
-    // Lógica de subir nivel (en caso de desincronización)
-    let levelsGained = 0;
-    while (user.currentXP >= user.nextLevelXP) {
-        console.log(`🔧 NIVEL UP (Fix): ${user.level} -> ${user.level + 1}`);
-        user.currentXP -= user.nextLevelXP;
-        user.level = (user.level || 1) + 1;
-        user.nextLevelXP = calculateNextLevelXP(user.level);
-        user.hp = user.maxHp; // Restaurar vida completa
-        user.lives = user.hp;   // El resto del código escribe los dos; dejar uno
-                                // sin tocar deja un numero viejo esperando a que
-                                // alguien lo lea y muestre una vida que no es.
-
-        levelsGained++;
-        changed = true;
-    }
+    user = await asegurarListon(userId, user);
+    const { user: puestoAlDia } = await subirNivelesPendientes(userId, user);
 
     // Aqui habia OTRO `$inc: { totalPower }`, el quinto y ultimo. Mismo motivo
     // que el de `addRewards`: el poder del clan se cuenta, no se acumula.
 
-    if (changed) await user.save();
-    return user;
+    return puestoAlDia;
 };
 
 /**
@@ -100,60 +166,13 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
     );
     if (!user) throw new Error("Usuario no encontrado");
 
-    // Cuentas viejas sin el listón del siguiente nivel puesto.
-    if (!user.nextLevelXP) {
-        user = await User.findByIdAndUpdate(
-            userId,
-            { $set: { nextLevelXP: calculateNextLevelXP(user.level || 1) } },
-            { new: true }
-        ) || user;
-    }
+    user = await asegurarListon(userId, user);
 
-    // 2. LAS SUBIDAS DE NIVEL, UNA A UNA.
-    //
-    // El nivel actual va DENTRO del filtro. Si otro premio simultáneo ya subió
-    // ese escalón, esta escritura no encuentra nada que cambiar: se relee y se
-    // mira otra vez, en vez de subirlo dos veces. El tope de vueltas es una red
-    // de seguridad: sin él, un nextLevelXP corrupto a 0 sería un bucle infinito
-    // con el servidor dentro.
-    const TOPE_DE_VUELTAS = 100;
-    let levelsGained = 0;
-
-    for (let vuelta = 0; vuelta < TOPE_DE_VUELTAS; vuelta++) {
-        const liston = user.nextLevelXP || calculateNextLevelXP(user.level || 1);
-        if (liston <= 0 || user.currentXP < liston) break;
-
-        // Al subir se restaura la vida. `lives` se escribe junto a `hp` porque
-        // el castigo nocturno, la diaria y el revivir escriben los dos: dejar
-        // uno sin tocar deja un número viejo esperando a que alguien lo lea.
-        const vidaLlena = user.maxHp || 100;
-
-        const subido = await User.findOneAndUpdate(
-            { _id: userId, level: user.level, currentXP: { $gte: liston } },
-            {
-                $inc: { currentXP: -liston, level: 1 },
-                $set: {
-                    nextLevelXP: calculateNextLevelXP((user.level || 1) + 1),
-                    hp: vidaLlena,
-                    lives: vidaLlena
-                }
-            },
-            { new: true }
-        );
-
-        if (!subido) {
-            // Se nos adelantaron: el nivel lo ha ganado el otro cobro, no este.
-            const refrescado = await User.findById(userId);
-            if (!refrescado) throw new Error("Usuario no encontrado");
-            user = refrescado;
-            continue;
-        }
-
-        console.log(`¡LEVEL UP! ${user.level} -> ${subido.level}`);
-        user = subido;
-        levelsGained++;
-    }
-
+    // 2. LAS SUBIDAS DE NIVEL, por el camino compartido (ver
+    //    `subirNivelesPendientes`): de una en una y con el nivel en el filtro.
+    const subida = await subirNivelesPendientes(userId, user);
+    user = subida.user;
+    const levelsGained = subida.levelsGained;
     const leveledUp = levelsGained > 0;
 
     // 3. EL PREMIO POR SUBIR, una sola vez aunque se hayan subido varios

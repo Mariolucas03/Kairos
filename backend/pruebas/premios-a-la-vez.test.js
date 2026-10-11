@@ -137,6 +137,43 @@ describe('Varios premios al mismo tiempo', () => {
         assert.strictEqual(s.gameCoins, esperado.fichas);
     });
 
+    test('cargar el perfil con un nivel pendiente no se come el XP que entra', async () => {
+        // `ensureLevelConsistency` corre en CADA carga de perfil y tambien
+        // recalcula niveles. Antes leia, calculaba en memoria y guardaba el
+        // total; si un premio entraba en ese hueco, el guardado escribia su
+        // `currentXP` ya viejo encima y el XP del premio desaparecia.
+        //
+        // El choque SOLO existe si hay una subida pendiente: sin ella la
+        // reparacion no escribia nada. Por eso se monta a proposito.
+        const { ensureLevelConsistency } = require('../services/levelService');
+        await User.updateOne({ _id: usuario._id }, { $set: { currentXP: 150, nextLevelXP: 100, level: 1 } });
+
+        await Promise.all([
+            ensureLevelConsistency(usuario._id),
+            addRewards(usuario._id, 90, 0, 0)
+        ]);
+
+        // 150 que habia + 90 del premio = 240. Sube un nivel (cuesta 100) y
+        // quedan 140, mande quien mande primero.
+        const s = await saldo();
+        assert.strictEqual(s.level, 2, `deberia ser nivel 2 y es ${s.level}`);
+        assert.strictEqual(s.currentXP, 140, `deberian quedar 140 XP y hay ${s.currentXP}`);
+    });
+
+    test('reparar el perfil NO paga el premio de subir de nivel', async () => {
+        // Si lo pagara, abrir el perfil con el XP descuadrado seria una
+        // impresora de monedas.
+        await User.updateOne({ _id: usuario._id }, { $set: { currentXP: 250, nextLevelXP: 100 } });
+        const { ensureLevelConsistency } = require('../services/levelService');
+
+        await ensureLevelConsistency(usuario._id);
+
+        const s = await saldo();
+        assert.strictEqual(s.level, 2, 'el nivel si se cuadra');
+        assert.strictEqual(s.coins, 0, 'pero reparar no paga');
+        assert.strictEqual(s.gameCoins, 0);
+    });
+
     test('uno detras de otro siempre ha funcionado (control)', async () => {
         // Si esta falla, lo roto no es la concurrencia sino la suma.
         for (let i = 0; i < 10; i++) await addRewards(usuario._id, 0, 10, 0);
