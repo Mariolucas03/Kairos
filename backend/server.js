@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const { initScheduledJobs, ponerseAlDia, esperarPuestaAlDia, repasarAvisosPendientes } = require('./utils/scheduler');
+const { iniciarAutoPing } = require('./utils/autoPing');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
@@ -200,6 +201,11 @@ const PORT = process.env.PORT || 5000;
 // Escuchar en 0.0.0.0 es correcto para Render y acceso red local
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Servidor iniciado en puerto ${PORT}`);
+
+    // Que no se duerma mientras haya gente despierta. Ver `autoPing`: el cron
+    // externo que hacia esto se desactiva solo en cuanto encadena fallos, y
+    // los encadena justo cuando mas falta hace. Solo corre en Render.
+    iniciarAutoPing();
 
     // CATÁLOGO DE EJERCICIOS AL ARRANQUE.
     // La huella es un hash de todo el catálogo, así que esto solo escribe en la
