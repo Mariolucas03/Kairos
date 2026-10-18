@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 // 🔥 IMPORTAMOS ZUSTAND
 import { useAuthStore } from '../store/useAuthStore';
 import {
-    Plus, Play, Trash2, Dumbbell, Activity, Edit, PersonStanding, Lock, BarChart3, Pencil
+    Plus, Play, Trash2, Dumbbell, Activity, Edit, PersonStanding, Lock, BarChart3
 } from '../iconos';
 
 import api from '../services/api';
@@ -57,7 +57,7 @@ const tonoDeRutina = (routine, index) => {
     return TONOS_RUTINA[c] || ORDEN_TONOS[index % ORDEN_TONOS.length];
 };
 
-const SwipeableRoutineCard = ({ routine, index, onPlay, onPlayMoldeable, onDelete, onEdit, isLocked }) => {
+const SwipeableRoutineCard = ({ routine, index, onPlay, onDelete, onEdit, isLocked }) => {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
@@ -138,34 +138,14 @@ const SwipeableRoutineCard = ({ routine, index, onPlay, onPlayMoldeable, onDelet
                         <Activity size={19} className="animate-pulse" />
                     </div>
                 ) : (
-                    <div className="flex items-center gap-2 z-20 shrink-0">
-                        {/* ⚠️ DOS FORMAS DE EMPEZAR, Y LA DIFERENCIA ES QUE PASA
-                            AL ACABAR.
-                            - El lapiz: la rutina se moldea mientras entrenas
-                              (añades, quitas y cambias ejercicios) y al
-                              terminar SE GUARDA como la has dejado. Es lo que
-                              se hace de verdad: una rutina se ajusta sobre la
-                              marcha y nadie vuelve luego al editor.
-                            - El play: la rutina es el guion de hoy y no se
-                              toca; lo que cambies vale solo para esta sesion. */}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onPlayMoldeable(); }}
-                            aria-label={`Empezar ${routine.name} y poder cambiarla`}
-                            title="Empezar y poder cambiarla"
-                            className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform bg-[#18181b] border border-white/[0.09]"
-                            style={{ color: acento }}
-                        >
-                            <Pencil size={17} />
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onPlay(); }}
-                            aria-label={`Empezar ${routine.name}`}
-                            className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform"
-                            style={{ background: acento, color: '#000' }}
-                        >
-                            <Play size={19} fill="currentColor" className="ml-0.5" />
-                        </button>
-                    </div>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onPlay(); }}
+                        aria-label={`Empezar ${routine.name}`}
+                        className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform z-20 shrink-0"
+                        style={{ background: acento, color: '#000' }}
+                    >
+                        <Play size={19} fill="currentColor" className="ml-0.5" />
+                    </button>
                 )}
             </div>
         </div>
@@ -213,11 +193,10 @@ export default function Gym() {
     const openCreateRoutine = (r) => { setRoutineToEdit(r); setShowCreateModal(true); setIsUiHidden(true); };
     const closeCreateRoutine = () => { setShowCreateModal(false); setIsUiHidden(false); };
 
-    const openActiveWorkout = (r, opciones = {}) => {
+    const openActiveWorkout = (r) => {
         if (activeRoutine && activeRoutine._id === r._id) return;
         if (activeRoutine) return showToast("Ya hay una rutina en curso", "error");
-        startWorkout(r, opciones);
-        if (opciones.moldeable) showToast("Cámbiala a tu gusto: al terminar se guarda así", "success");
+        startWorkout(r);
     };
 
     const handleEditRoutine = (r) => {
@@ -320,7 +299,6 @@ export default function Gym() {
                                     routine={routine}
                                     index={index}
                                     onPlay={() => openActiveWorkout(routine)}
-                                    onPlayMoldeable={() => openActiveWorkout(routine, { moldeable: true })}
                                     onDelete={() => pedirBorrado(routine)}
                                     onEdit={() => handleEditRoutine(routine)}
                                     isLocked={activeRoutine && activeRoutine._id === routine._id}

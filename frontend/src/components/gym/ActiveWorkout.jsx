@@ -345,7 +345,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
     useEffect(() => {
         // En lugar de guardar de inmediato, programamos el guardado para dentro de 1 segundo
         const timeoutId = setTimeout(() => {
-            const state = { startTime, clienteId, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest, moldeable: !!routine.moldeable };
+            const state = { startTime, clienteId, exercises, intensity, routineId: routine._id, routineName: routine.name, defaultRest };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         }, 1000);
 
@@ -724,30 +724,6 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
             const res = await api.post('/gym/log', logData);
 
-            // ⚠️ LA RUTINA SE QUEDA COMO LA HAS DEJADO.
-            //
-            // Solo si se empezo con el boton de moldear. Lo que se guarda es
-            // la lista de ejercicios y cuantas series tiene cada uno, no los
-            // kilos: esos son de hoy. Va DESPUES de guardar el entreno y con
-            // su propio catch, porque el entreno ya esta a salvo y que falle
-            // esto no puede convertirse en un error que te haga repetirlo.
-            if (routine.moldeable && routine._id) {
-                const comoQuedo = exercises.map(ex => ({
-                    name: ex.name,
-                    muscle: ex.muscle || 'Otros',
-                    muscleDetail: ex.muscleDetail || '',
-                    secondary: ex.secondary || [],
-                    sets: ex.setsData.length,
-                    reps: ex.reps || '10-12',
-                    rest: ex.rest || 0,
-                    esPorTiempo: !!ex.esPorTiempo,
-                    esPesoCorporal: !!ex.esPesoCorporal,
-                    porLado: !!ex.porLado,
-                    superserie: ex.superserie || ''
-                }));
-                api.put(`/gym/routines/${routine._id}`, { exercises: comoQuedo })
-                    .catch(e => console.error('No se pudo guardar la rutina cambiada:', e.message));
-            }
             invalidarDiario();
 
             // ⚠️ Esto REESCRIBIA la rutina con solo cuatro campos, asi que cada
@@ -1131,8 +1107,8 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     </div>
                 ))}
 
-                {/* AÑADIR UNO MAS, aqui y ahora. En modo moldeable ademas se
-                    queda guardado en la rutina al terminar. */}
+                {/* AÑADIR UNO MAS, solo para la sesion de hoy: la rutina
+                    guardada no se toca. */}
                 <button
                     onClick={handleOpenAdd}
                     className="w-full mt-3 py-4 rounded-2xl border border-dashed border-zinc-700 text-zinc-400 font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"

@@ -18,11 +18,7 @@ export function WorkoutProvider({ children }) {
                     setActiveRoutine({
                         _id: saved.routineId,
                         name: saved.routineName || 'Entrenamiento en curso',
-                        exercises: saved.exercises || [],
-                        // Si se empezo en modo moldeable, al recuperar la
-                        // sesion tiene que seguir siendolo: si no, los
-                        // cambios hechos antes de recargar no se guardarian.
-                        moldeable: !!saved.moldeable
+                        exercises: saved.exercises || []
                     });
                     // Si recuperamos sesión, la mostramos minimizada por defecto para no invadir
                     setIsMinimized(true);
@@ -36,12 +32,12 @@ export function WorkoutProvider({ children }) {
     /**
      * Empezar una rutina.
      *
-     * `moldeable`: la rutina se puede cambiar mientras la haces (añadir,
-     * quitar y cambiar ejercicios) y al terminar se guarda como la dejaste.
-     * Sin el, la rutina es un guion fijo y los cambios valen solo para hoy.
+     * Lo que cambies durante la sesion (añadir, quitar o cambiar ejercicios)
+     * vale solo para hoy: la rutina guardada no se toca. Para cambiarla de
+     * verdad esta el editor.
      */
-    const startWorkout = (routine, { moldeable = false } = {}) => {
-        setActiveRoutine({ ...routine, moldeable });
+    const startWorkout = (routine) => {
+        setActiveRoutine(routine);
         setIsMinimized(false); // Al empezar, pantalla completa
     };
 
