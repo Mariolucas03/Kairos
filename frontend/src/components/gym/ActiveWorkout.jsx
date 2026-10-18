@@ -6,6 +6,7 @@ import {
     SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell, Trash2
 } from '../../iconos';
 import api from '../../services/api';
+import { nuevoUid, ejercicioCambiado, ejercicioNuevo, aplicarHistorial } from '../../utils/ejercicios';
 import { useAuthStore } from '../../store/useAuthStore';
 import { invalidarDiario } from '../../utils/cacheDiario';
 import Toast from '../common/Toast';
@@ -147,10 +148,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
 
     const [exercises, setExercises] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) return JSON.parse(saved).exercises;
+        if (saved) {
+            // Las sesiones empezadas antes de que existieran los uid no los
+            // traen: se les pone uno al recuperarlas.
+            return JSON.parse(saved).exercises.map(ex => ({ ...ex, uid: ex.uid || nuevoUid() }));
+        }
 
         return routine.exercises.map(ex => ({
             ...ex,
+            uid: nuevoUid(),
             setsData: Array.from({ length: ex.sets || 3 }, () => ({ kg: '', reps: '', completed: false, type: 'N' })),
             pr: null,
             lastWeights: []
@@ -387,69 +393,67 @@ export default function ActiveWorkout({ routine, onFinish }) {
         setExercises(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
     };
 
+    /**
+     * Trae lo de la ultima vez (marca, series previas y sugerencia) y lo
+     * coloca EN SU EJERCICIO.
+     *
+     * ⚠️ POR `uid` Y NO POR POSICION.
+     *
+     * Esta peticion tarda, y mientras tanto la lista se puede mover: añades un
+     * ejercicio, borras otro, o cambias un segundo antes de que vuelva la del
+     * primero. Escribiendo por posicion, lo que vuelve se mete en el hueco que
+     * ocupe ESE numero en ese momento, que ya no es el mismo ejercicio. Es
+     * decir: los kilos y la marca del ejercicio 2 aparecian escritos en el 1.
+     */
+    const traerHistorial = async (nombres, uidPorNombre) => {
+        try {
+            const res = await api.post('/gym/history-stats', { exercises: nombres });
+            setExercises(prev => aplicarHistorial(prev, res.data, uidPorNombre));
+        } catch (error) { console.error('Error trayendo historial:', error); }
+    };
+
     const handleSwapComplete = async (selectedList) => {
         if (!selectedList || selectedList.length === 0) { setShowSelector(false); return; }
 
         const currentIndex = swapIndex;
+        setShowSelector(false);
+        setSwapIndex(null);
 
         // Sin ejercicio señalado, lo que se pidio fue AÑADIR: entran todos los
         // elegidos al final, con tres series vacias como una rutina nueva.
         if (currentIndex === null || currentIndex === undefined) {
-            setExercises(prev => [
-                ...prev,
-                ...selectedList.map(nuevo => ({
-                    name: nuevo.name,
-                    muscle: nuevo.muscle,
-                    esPorTiempo: !!nuevo.esPorTiempo,
-                    esPesoCorporal: !!nuevo.esPesoCorporal,
-                    porLado: !!nuevo.porLado,
-                    superserie: '',
-                    setsData: Array.from({ length: 3 }, () => ({ kg: '', reps: '', completed: false, type: 'N' })),
-                    pr: null
-                }))
-            ]);
-            setShowSelector(false);
+            const anadidos = selectedList.map(nuevo => ejercicioNuevo(nuevo, defaultRest));
+
+            setExercises(prev => [...prev, ...anadidos]);
+
+            // Lo añadido tambien merece saber que hiciste la ultima vez: antes
+            // entraba en blanco y parecia que nunca lo habias hecho.
+            const porNombre = {};
+            anadidos.forEach(a => { porNombre[a.name] = a.uid; });
+            traerHistorial(anadidos.map(a => a.name), porNombre);
             return;
         }
 
         const newExData = selectedList[0];
+        const uidDelHueco = exercises[currentIndex]?.uid;
+        if (!uidDelHueco) return;
 
-        setExercises(prev => prev.map((ex, i) => {
-            if (i !== currentIndex) return ex;
-            return {
-                ...ex,
-                name: newExData.name,
-                muscle: newExData.muscle,
-                setsData: Array.from({ length: ex.setsData.length }, () => ({ kg: '', reps: '', completed: false, type: 'N' })),
-                pr: null
-            };
-        }));
+        // ⚠️ EL EJERCICIO NUEVO ES NUEVO, NO EL VIEJO CON OTRO NOMBRE.
+        //
+        // Antes esto era `{ ...ex, name, muscle, setsData, pr }`, o sea que se
+        // quedaba TODO lo demas del ejercicio anterior: si cambiabas una
+        // plancha (por tiempo) por un press de banca, el press seguia
+        // pidiendote segundos; si cambiabas unas dominadas (peso corporal) por
+        // una polea, seguia sumandote tu propio peso. Y la sugerencia y las
+        // "ultimas series" tambien se quedaban, que son las del OTRO ejercicio.
+        //
+        // Del hueco se conserva solo lo que es del hueco y no del ejercicio: su
+        // identidad, cuantas series tiene, el descanso y la superserie a la que
+        // pertenece. Lo demas sale del ejercicio nuevo.
+        setExercises(prev => prev.map(ex => ex.uid === uidDelHueco ? ejercicioCambiado(ex, newExData) : ex));
 
-        setShowSelector(false);
-        setSwapIndex(null);
-
-        try {
-            const res = await api.post('/gym/history-stats', { exercises: [newExData.name] });
-            const history = res.data[newExData.name];
-
-            if (history) {
-                setExercises(prev => prev.map((ex, i) => {
-                    if (i !== currentIndex) return ex;
-                    const updatedSets = ex.setsData.map((set, setIdx) => {
-                        const lastSet = history.lastSets[setIdx] || history.lastSets[history.lastSets.length - 1];
-                        return lastSet ? { ...set, kg: lastSet.weight, reps: lastSet.reps } : set;
-                    });
-                    return {
-                        ...ex,
-                        pr: history.bestSet,
-                        setsData: updatedSets,
-                        sugerencia: history.sugerencia || null,
-                        ultimasSeries: history.lastSets || []
-                    };
-                }));
-                setToast({ message: 'Ejercicio cambiado', type: 'success' });
-            }
-        } catch (error) { console.error("Error swap history:", error); }
+        await traerHistorial([newExData.name], { [newExData.name]: uidDelHueco });
+        setToast({ message: 'Ejercicio cambiado', type: 'success' });
     };
 
     const getSetDisplayInfo = (allSets, currentIndex) => {
