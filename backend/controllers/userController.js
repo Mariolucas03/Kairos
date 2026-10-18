@@ -13,6 +13,7 @@ const { runNightlyMaintenance } = require('../utils/scheduler');
 const { recompensaDelDia, tramoDelCamino } = require('../utils/caminoRacha');
 const ShopItem = require('../models/ShopItem');
 const { getMadridDateString } = require('../utils/dateHelpers');
+const { apilarObjeto } = require('../services/inventarioService');
 
 // ==========================================
 // 1. OBTENER PERFIL (getMe)
@@ -114,8 +115,10 @@ const darRecompensa = async (userId, premio) => {
     } else if (premio.tipo === 'cofre') {
         const cofre = await ShopItem.findOne({ category: 'chest', effectType: premio.cofre, user: null }).select('_id');
         if (!cofre) return { ...premio, sinCofre: true };
-        const apilado = await User.updateOne({ _id: userId, 'inventory.item': cofre._id }, { $inc: { 'inventory.$.quantity': 1 } });
-        if (apilado.matchedCount === 0) await User.updateOne({ _id: userId }, { $push: { inventory: { item: cofre._id, quantity: 1 } } });
+        // Por `apilarObjeto` y no a mano: mirar si hay entrada y crearla
+        // despues deja hueco para que dos entregas creen dos entradas del
+        // mismo cofre (ver inventarioService).
+        await apilarObjeto(userId, cofre._id);
     }
     return premio;
 };

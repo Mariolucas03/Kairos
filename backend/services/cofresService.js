@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const ShopItem = require('../models/ShopItem');
 const User = require('../models/User');
 const { addRewards } = require('./levelService');
+const { apilarObjeto, entregarUnico } = require('./inventarioService');
 
 /**
  * LOS COFRES DE LA TIENDA.
@@ -211,23 +212,26 @@ const abrirCofre = async (userId, cofre) => {
 
     const resumen = { _id: objeto._id, name: objeto.name, icon: objeto.icon, sprite: objeto.sprite, rarity: objeto.rarity, category: objeto.category, price: objeto.price };
 
+    // ⚠️ UN COSMETICO REPETIDO SE PAGA EN FICHAS, Y ESO SE DECIDE AL
+    // ESCRIBIR, no mirando antes si lo tienes.
+    //
+    // Antes era `User.exists(...)` y despues un $push. Con dos cofres abiertos
+    // a la vez los dos veian "no lo tiene", los dos entregaban el avatar, y te
+    // quedabas con DOS copias del mismo en la mochila en vez de una copia y la
+    // compensacion en fichas. `entregarUnico` lleva la condicion dentro del
+    // filtro: solo entra uno, y el segundo se entera de que ya estaba.
     if (UNICOS.has(objeto.category)) {
-        const yaLoTiene = await User.exists({ _id: userId, 'inventory.item': objeto._id });
-        if (yaLoTiene) {
+        const entregado = await entregarUnico(userId, objeto._id);
+        if (!entregado) {
             const valor = Math.round(objeto.price / 2);
             await User.updateOne({ _id: userId }, { $inc: { gameCoins: valor } });
             return { tipo: 'fichas', valor, duplicado: true, objeto: resumen };
         }
+        return { tipo: 'objeto', valor: 1, objeto: resumen };
     }
 
-    // Apilar si ya hay una entrada (pociones), y si no, añadirla.
-    const apilado = await User.updateOne(
-        { _id: userId, 'inventory.item': objeto._id },
-        { $inc: { 'inventory.$.quantity': 1 } }
-    );
-    if (apilado.matchedCount === 0) {
-        await User.updateOne({ _id: userId }, { $push: { inventory: { item: objeto._id, quantity: 1 } } });
-    }
+    // Lo que se puede tener repetido (pociones, cofres) se apila.
+    await apilarObjeto(userId, objeto._id);
     return { tipo: 'objeto', valor: 1, objeto: resumen };
 };
 
