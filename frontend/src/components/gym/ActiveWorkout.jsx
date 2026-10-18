@@ -7,6 +7,7 @@ import {
 } from '../../iconos';
 import api from '../../services/api';
 import { nuevoUid, ejercicioCambiado, ejercicioNuevo, aplicarHistorial, anotarEsfuerzo } from '../../utils/ejercicios';
+import { esfuerzoSegunTipo, cuentaParaElObjetivo, anuncioDeLaSiguiente } from '../../utils/tipoSerie';
 import { useAuthStore } from '../../store/useAuthStore';
 import { invalidarDiario } from '../../utils/cacheDiario';
 import Toast from '../common/Toast';
@@ -509,8 +510,12 @@ export default function ActiveWorkout({ routine, onFinish }) {
         const numero = (v) => parseFloat(String(v).replace(',', '.')) || 0;
         const obj = ex.sugerencia;
 
+        // El tipo de la serie recién hecha manda en lo que se pregunta y en si
+        // se compara con el objetivo (ver utils/tipoSerie.js).
+        const tipo = hecha.type || 'N';
+
         const hecho = `${numero(hecha.kg)} × ${numero(hecha.reps)}`;
-        const cumplida = obj
+        const cumplida = obj && cuentaParaElObjetivo(tipo)
             ? numero(hecha.reps) >= obj.reps && numero(hecha.kg) >= obj.peso
             : false;
 
@@ -518,15 +523,16 @@ export default function ActiveWorkout({ routine, onFinish }) {
         const iProx = ex.setsData.findIndex((x, i) => i > restContexto.setIdx && !x.completed);
         if (iProx >= 0) {
             const { label } = getSetDisplayInfo(ex.setsData, iProx);
+            const tipoProx = ex.setsData[iProx].type || 'N';
             const meta = obj ? `${obj.peso} kg × ${obj.reps} ${unidad}` : `${numero(hecha.kg)} kg`;
-            return { proximo: `Ahora: serie ${label} · ${meta}`, hecho, cumplida };
+            return { proximo: anuncioDeLaSiguiente(tipoProx, label, meta), hecho, cumplida, tipo };
         }
 
         // Se acabó el ejercicio: lo que viene es el siguiente que quede a medias
         const iEx = exercises.findIndex((x, i) => i > posicion && x.setsData.some(y => !y.completed));
-        if (iEx >= 0) return { proximo: `Ahora: ${exercises[iEx].name}`, hecho, cumplida };
+        if (iEx >= 0) return { proximo: `Ahora: ${exercises[iEx].name}`, hecho, cumplida, tipo };
 
-        return { proximo: 'Última serie. A terminar.', hecho, cumplida };
+        return { proximo: 'Última serie. A terminar.', hecho, cumplida, tipo };
     }, [restContexto, exercises]);
 
     // Las superseries viven en utils/superseries.js: son aritmetica pura y
@@ -579,6 +585,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 });
                 return;
             }
+            // ⚠️ UNA SERIE MARCADA "AL FALLO" YA DICE CUANTAS QUEDABAN:
+            // ninguna. Se apunta sola en vez de preguntarlo, que seria pedir
+            // dos veces el mismo dato y dejar sitio a guardar un RIR que
+            // contradice el tipo de la serie.
+            const fijo = esfuerzoSegunTipo(currentSet.type || 'N').valorFijo;
+            if (fijo !== undefined) {
+                setExercises(prev => anotarEsfuerzo(prev, exercises[exIdx]?.uid, setIdx, fijo));
+            }
+
             startRest(exercises[exIdx]?.rest, exercises[exIdx]?.uid, setIdx);
         }
     };
@@ -1148,6 +1163,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     esfuerzo={restContexto
                         ? exercises.find(e => e.uid === restContexto.uid)?.setsData?.[restContexto.setIdx]?.esfuerzo
                         : undefined}
+                    tipoSerie={infoDescanso?.tipo || 'N'}
                     onEsfuerzo={restContexto ? marcarEsfuerzo : undefined}
                 />
             )}

@@ -111,3 +111,44 @@ describe('RestTimerModal: el RIR', () => {
         expect(saltado).toBe(true);
     });
 });
+
+/**
+ * Y QUE LA PREGUNTA SE AJUSTE AL TIPO DE SERIE.
+ *
+ * Antes se preguntaba lo mismo pasara lo que pasara. En un calentamiento la
+ * pregunta no tiene respuesta util, y una serie marcada al fallo ya dice que
+ * no quedaba ninguna: preguntarlo es pedir dos veces el mismo dato.
+ */
+describe('La pregunta depende del tipo de serie', () => {
+    const pinta = (tipoSerie) => render(
+        <RestTimerModal {...props} tipoSerie={tipoSerie} esfuerzo={undefined} onEsfuerzo={() => { }} />
+    );
+
+    it('en una serie normal se pregunta como siempre', () => {
+        pinta('N');
+        expect(screen.getByText('¿Cuántas más podías hacer?')).toBeTruthy();
+    });
+
+    it('en un calentamiento NO salen los botones', () => {
+        pinta('W');
+        expect(screen.queryByText('¿Cuántas más podías hacer?')).toBeNull();
+        expect(screen.queryByRole('button', { name: /repeticiones en reserva/ })).toBeNull();
+        expect(screen.getByText(/calentamiento/i)).toBeTruthy();
+    });
+
+    it('en una serie al fallo tampoco: ya se sabe la respuesta', () => {
+        pinta('F');
+        expect(screen.queryByRole('button', { name: /repeticiones en reserva/ })).toBeNull();
+        expect(screen.getByText(/al fallo/i)).toBeTruthy();
+    });
+
+    it('en un drop se pregunta, pero por el final del drop', () => {
+        pinta('D');
+        expect(screen.getByText('¿Cuántas más al acabar el drop?')).toBeTruthy();
+    });
+
+    it('sin tipo se comporta como una serie normal', () => {
+        render(<RestTimerModal {...props} esfuerzo={undefined} onEsfuerzo={() => { }} />);
+        expect(screen.getByText('¿Cuántas más podías hacer?')).toBeTruthy();
+    });
+});

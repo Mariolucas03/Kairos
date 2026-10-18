@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SkipForward, Timer } from '../../iconos';
+import { esfuerzoSegunTipo } from '../../utils/tipoSerie';
 
 /**
  * EL RIR: CUANTAS REPETICIONES TE QUEDABAN.
@@ -33,7 +34,8 @@ const OPCIONES_RIR = [
     { valor: 4, texto: '4+', ayuda: 'Sobraba' }
 ];
 
-export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip, onUpdateDefaultRest, info, esfuerzo, onEsfuerzo }) {
+export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip, onUpdateDefaultRest, info, esfuerzo, onEsfuerzo, tipoSerie = 'N' }) {
+    const preguntaRIR = esfuerzoSegunTipo(tipoSerie);
     const [remaining, setRemaining] = useState(() => Math.max(0, Math.ceil((targetTime - Date.now()) / 1000)));
     const [localRest, setLocalRest] = useState(initialDefaultRest);
 
@@ -84,12 +86,23 @@ export default function RestTimerModal({ targetTime, initialDefaultRest, onSkip,
                 </div>
             )}
 
-            {/* ¿CUANTAS TE QUEDABAN? Una fila, un toque, y se puede no contestar. */}
-            {onEsfuerzo && (
+            {/* ¿CUANTAS TE QUEDABAN? Una fila, un toque, y se puede no contestar.
+                La pregunta depende del TIPO de serie: en un calentamiento no se
+                pregunta, y una al fallo ya trae la respuesta. Ver
+                utils/tipoSerie.js. */}
+            {onEsfuerzo && !preguntaRIR.preguntar && preguntaRIR.nota && (
+                <div className="pb-3 mb-3 border-b border-white/10">
+                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.12em] not-italic">
+                        {preguntaRIR.nota}
+                    </span>
+                </div>
+            )}
+
+            {onEsfuerzo && preguntaRIR.preguntar && (
                 <div className="pb-3 mb-3 border-b border-white/10">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.12em] not-italic">
-                            ¿Cuántas más podías hacer?
+                            {preguntaRIR.pregunta}
                         </span>
                         {esfuerzo !== undefined && esfuerzo !== null && (
                             <span className="text-[9px] font-bold text-zinc-500">
