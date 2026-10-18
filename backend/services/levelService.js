@@ -131,6 +131,57 @@ const ensureLevelConsistency = async (userId) => {
 };
 
 /**
+ * QUITAR XP, BAJANDO DE NIVEL SI HACE FALTA.
+ *
+ * Hace falta para poder borrar un entreno de verdad: si al borrarlo el XP se
+ * quedara puesto, guardar, borrar y volver a guardar seria una impresora de
+ * experiencia.
+ *
+ * Se baja de nivel igual que se sube, de uno en uno y con el nivel dentro del
+ * filtro, para que no se pise con un premio que entre a la vez. En el nivel 1
+ * ya no se baja mas: el XP se queda en cero.
+ *
+ * ⚠️ El premio en monedas y fichas que se cobro al subir NO se devuelve, a
+ * proposito: devolverlo podria dejar el saldo en negativo si ya te lo has
+ * gastado. Lo que se evita es volver a cobrarlo, con `nivelMaximo`.
+ */
+const quitarXp = async (userId, xp) => {
+    const cantidad = Math.max(0, Math.floor(Number(xp) || 0));
+    if (cantidad === 0) return { quitado: 0, user: await User.findById(userId) };
+
+    let user = await User.findByIdAndUpdate(userId, { $inc: { currentXP: -cantidad } }, { new: true });
+    if (!user) return { quitado: 0, user: null };
+
+    for (let vuelta = 0; vuelta < TOPE_DE_VUELTAS; vuelta++) {
+        if (user.currentXP >= 0 || (user.level || 1) <= 1) break;
+
+        const nivelAnterior = (user.level || 1) - 1;
+        const listonAnterior = calculateNextLevelXP(nivelAnterior);
+
+        const bajado = await User.findOneAndUpdate(
+            { _id: userId, level: user.level, currentXP: { $lt: 0 } },
+            { $inc: { currentXP: listonAnterior, level: -1 }, $set: { nextLevelXP: listonAnterior } },
+            { new: true }
+        );
+
+        if (!bajado) {
+            const refrescado = await User.findById(userId);
+            if (!refrescado) break;
+            user = refrescado;
+            continue;
+        }
+        user = bajado;
+    }
+
+    // Nivel 1 y aun en negativo: no hay mas abajo.
+    if (user && user.currentXP < 0) {
+        user = await User.findByIdAndUpdate(userId, { $set: { currentXP: 0 } }, { new: true });
+    }
+
+    return { quitado: cantidad, user };
+};
+
+/**
  * DAR UNA RECOMPENSA.
  *
  * Por aqui pasa TODO lo que se cobra en la app: misiones, entrenos, duelos,
@@ -177,8 +228,17 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
 
     // 3. EL PREMIO POR SUBIR, una sola vez aunque se hayan subido varios
     //    niveles de golpe: se paga por LLEGAR al nivel nuevo, no por escalón.
+    // ⚠️ EL PREMIO SE PAGA POR LLEGAR A UN NIVEL NUEVO, NO POR CRUZAR LA
+    // MISMA LINEA DOS VECES.
+    //
+    // Desde que se pueden borrar entrenos, el XP puede bajar y el nivel con
+    // el. Sin este techo, subir al 12, borrar el entreno que te subio y
+    // volverlo a guardar pagaria el premio del 12 otra vez. `nivelMaximo` a 0
+    // es una cuenta que no lo tiene anotado todavia: se anota sin pagar de
+    // menos, usando el nivel de antes de esta subida.
+    const techoPrevio = user.nivelMaximo || (user.level - levelsGained) || 1;
     let premio = null;
-    if (leveledUp) {
+    if (leveledUp && user.level > techoPrevio) {
         premio = premioPorNivel(user.level);
         user = await User.findByIdAndUpdate(
             userId,
@@ -194,6 +254,13 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
                 }
             },
             { new: true }
+        ) || user;
+    }
+
+    // El techo sube siempre que se llegue mas alto, se haya pagado o no.
+    if (user && (user.level || 1) > (user.nivelMaximo || 0)) {
+        user = await User.findByIdAndUpdate(
+            userId, { $set: { nivelMaximo: user.level } }, { new: true }
         ) || user;
     }
 
@@ -229,4 +296,4 @@ const addRewards = async (userId, xpReward, coinReward, gameCoinReward = 0) => {
 };
 
 module.exports = {
-    premioPorNivel, addRewards, ensureLevelConsistency };
+    premioPorNivel, addRewards, ensureLevelConsistency, quitarXp };

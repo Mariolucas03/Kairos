@@ -42,6 +42,18 @@ const userSchema = new mongoose.Schema({
     // --- ESTADÍSTICAS RPG ---
     level: { type: Number, default: 1 },
     currentXP: { type: Number, default: 0 },
+    // El nivel mas alto al que se ha llegado NUNCA.
+    //
+    // ⚠️ Existe porque ahora se pueden borrar entrenos, y borrar devuelve el
+    // XP: sin esto, subir al nivel 12, borrar el entreno que te subio y
+    // volverlo a guardar pagaria el premio del nivel 12 otra vez, y otra, y
+    // otra. El premio se paga por LLEGAR a un nivel nuevo, no por cruzar la
+    // misma linea muchas veces. 0 significa "todavia no se ha anotado".
+    nivelMaximo: { type: Number, default: 0 },
+    // Lo mismo para los rangos musculares: el rango mas alto alcanzado nunca
+    // en cada grupo. Sin esto, borrar el entreno que te subio de rango y
+    // volverlo a guardar pagaria el premio otra vez.
+    muscleRanksTecho: { type: Map, of: Number, default: undefined },
     nextLevelXP: { type: Number, default: 100 },
     coins: { type: Number, default: 50 },
     gameCoins: { type: Number, default: 500 },

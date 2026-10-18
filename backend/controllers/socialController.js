@@ -3,6 +3,7 @@ const DailyLog = require('../models/DailyLog');
 const WorkoutLog = require('../models/WorkoutLog');
 const NutritionLog = require('../models/NutritionLog');
 const Notification = require('../models/Notification');
+const { borrarEntreno } = require('../services/borradoEntrenoService');
 const { sendPushToUser, notificarA } = require('./pushController');
 const { getMadridDateString, getMadridMonthString } = require('../utils/dateHelpers');
 const { getMonthlyRanking, MONTHLY_PRIZES } = require('../services/rankingService');
@@ -273,20 +274,19 @@ const borrarMiEntreno = async (req, res) => {
     try {
         const { workoutId } = req.params;
 
-        const entreno = await WorkoutLog.findById(workoutId).select('user');
-        if (!entreno) return res.status(404).json({ message: 'Ese entreno ya no existe' });
+        // ⚠️ Borrar el documento NO era borrar el entreno: se quedaban el
+        // registro del dia, el XP que pago, la fecha de "ultima vez" de la
+        // rutina y los rangos. Todo eso lo deshace el servicio.
+        const r = await borrarEntreno(workoutId, req.user._id);
 
-        if (entreno.user.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Solo puedes borrar tus propios entrenos' });
-        }
+        if (r.motivo === 'no-existe') return res.status(404).json({ message: 'Ese entreno ya no existe' });
+        if (r.motivo === 'no-es-tuyo') return res.status(403).json({ message: 'Solo puedes borrar tus propios entrenos' });
 
-        await WorkoutLog.findByIdAndDelete(workoutId);
-
-        // Los avisos que lo anunciaban apuntan a algo que ya no esta: dejarlos
-        // llena el buzon de la gente de entradas que no llevan a ningun sitio.
-        await Notification.deleteMany({ workout: workoutId });
-
-        res.json({ message: 'Entreno borrado', id: workoutId });
+        res.json({
+            message: r.xpDevuelto > 0 ? `Entreno borrado · -${r.xpDevuelto} XP` : 'Entreno borrado',
+            id: workoutId,
+            xpDevuelto: r.xpDevuelto
+        });
     } catch (error) {
         console.error('Error borrando entreno:', error);
         res.status(500).json({ message: 'Error al borrar' });

@@ -36,7 +36,7 @@ const premioPorSubir = (desde, hasta) => {
  * @returns {{ subidas: Array, monedas: number }} subidas vacio si no hay nada
  */
 const revisarSubidasDeRango = async (userId) => {
-    const usuario = await User.findById(userId).select('muscleRanks muscleRanksEscala coins');
+    const usuario = await User.findById(userId).select('muscleRanks muscleRanksEscala muscleRanksTecho coins');
     if (!usuario) return { subidas: [], monedas: 0 };
 
     const ranks = await getMuscleRanks(userId);
@@ -50,10 +50,20 @@ const revisarSubidasDeRango = async (userId) => {
         || (usuario.muscleRanksEscala || 1) !== ESCALA_ACTUAL;
 
     const anteriores = usuario.muscleRanks || new Map();
+    // ⚠️ EL TECHO: el rango mas alto al que se ha llegado nunca en ese grupo.
+    //
+    // Hace falta desde que se pueden borrar entrenos. Al borrar, el volumen
+    // baja y el rango con el; si luego se vuelve a subir, `actual > antes`
+    // seria cierto otra vez y se pagaria el mismo escalon dos veces. Guardar
+    // y borrar en bucle seria una impresora de monedas.
+    const techos = usuario.muscleRanksTecho || new Map();
+    const techoDe = (g) => (techos.get ? (techos.get(g) ?? 0) : 0);
+
     const subidas = [];
     let monedas = 0;
 
     const nuevos = new Map();
+    const nuevosTechos = new Map();
 
     for (const grupo of MUSCLE_GROUPS) {
         const info = ranks[grupo];
@@ -61,14 +71,18 @@ const revisarSubidasDeRango = async (userId) => {
         const antes = anteriores.get ? (anteriores.get(grupo) ?? 0) : 0;
 
         nuevos.set(grupo, actual);
+        const techo = Math.max(techoDe(grupo), antes, esPrimeraVez ? actual : 0);
+        nuevosTechos.set(grupo, Math.max(techo, actual));
 
-        if (!esPrimeraVez && actual > antes) {
-            monedas += premioPorSubir(antes, actual);
+        // Se paga por lo que pasa del techo, no por lo que pasa del rango que
+        // habia: si ya habias estado ahi arriba, ese escalon ya se cobro.
+        if (!esPrimeraVez && actual > techo) {
+            monedas += premioPorSubir(techo, actual);
             subidas.push({
                 grupo,
                 rango: info?.rankLabel || '',
                 color: info?.rankColor || '#eab308',
-                desde: antes,
+                desde: techo,
                 hasta: actual,
                 puntos: info?.points || 0
             });
@@ -77,7 +91,7 @@ const revisarSubidasDeRango = async (userId) => {
 
     // Se guarda SIEMPRE el estado nuevo, aunque no haya premio: es lo que evita
     // que la proxima llamada vuelva a detectar la misma subida.
-    const cambio = { $set: { muscleRanks: nuevos, muscleRanksEscala: ESCALA_ACTUAL } };
+    const cambio = { $set: { muscleRanks: nuevos, muscleRanksTecho: nuevosTechos, muscleRanksEscala: ESCALA_ACTUAL } };
     if (monedas > 0) cambio.$inc = { coins: monedas };
 
     const actualizado = await User.findByIdAndUpdate(userId, cambio, { new: true });

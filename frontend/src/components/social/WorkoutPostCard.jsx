@@ -285,8 +285,8 @@ export default function WorkoutPostCard({ post, linkProfile = true, onBorrado })
         <>
         {confirmarBorrado && (
             <ConfirmDialog
-                title="Borrar publicación"
-                message="Se quitará del feed junto con sus me gusta y comentarios. No se puede deshacer."
+                title="Borrar entreno"
+                message="No solo se quita del feed: el entreno desaparece de tus estadísticas, del registro del día y de los rangos musculares, y se te descuenta el XP que te dio. No se puede deshacer."
                 confirmLabel="Borrar"
                 onCancel={() => setConfirmarBorrado(false)}
                 onConfirm={borrarPublicacion}
