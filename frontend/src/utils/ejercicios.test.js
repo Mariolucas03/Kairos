@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ejercicioCambiado, ejercicioNuevo, aplicarHistorial, nuevoUid } from './ejercicios';
+import { ejercicioCambiado, ejercicioNuevo, aplicarHistorial, anotarEsfuerzo, nuevoUid } from './ejercicios';
 
 /**
  * CAMBIAR UN EJERCICIO POR OTRO A MITAD DEL ENTRENO.
@@ -177,5 +177,49 @@ describe('El historial que llega tarde va a SU ejercicio', () => {
         const r = aplicarHistorial(lista, datos, { 'Press de banca': 'b' });
 
         expect(r[0].setsData[2].kg).toBe(85);
+    });
+});
+
+describe('El RIR que apuntas durante el descanso', () => {
+    /**
+     * El descanso dura minuto y medio. En ese rato se puede borrar un
+     * ejercicio de la lista, y entonces las posiciones de abajo se corren.
+     * El contexto del descanso guardaba la POSICION, asi que el esfuerzo que
+     * apuntabas acababa escrito en otro ejercicio.
+     */
+    const lista = () => ([
+        { uid: 'a', name: 'Sentadilla', setsData: [{ kg: 100, reps: 5 }, { kg: 100, reps: 5 }] },
+        { uid: 'b', name: 'Press', setsData: [{ kg: 80, reps: 8 }, { kg: 80, reps: 8 }] }
+    ]);
+
+    it('se apunta en la serie que disparó el descanso', () => {
+        const r = anotarEsfuerzo(lista(), 'b', 1, 2);
+
+        expect(r[1].setsData[1].esfuerzo).toBe(2);
+    });
+
+    it('⚠️ no toca al ejercicio de al lado', () => {
+        const r = anotarEsfuerzo(lista(), 'b', 1, 2);
+
+        expect(r[0].setsData[0].esfuerzo).toBeUndefined();
+        expect(r[0].setsData[1].esfuerzo).toBeUndefined();
+        expect(r[1].setsData[0].esfuerzo).toBeUndefined();
+    });
+
+    it('⚠️ aunque el ejercicio haya cambiado de posición, va al suyo', () => {
+        // Se borró el primero mientras descansabas: 'b' ahora es el primero.
+        const despuesDeBorrar = [lista()[1]];
+
+        const r = anotarEsfuerzo(despuesDeBorrar, 'b', 0, 3);
+
+        expect(r[0].uid).toBe('b');
+        expect(r[0].setsData[0].esfuerzo).toBe(3);
+    });
+
+    it('si el ejercicio ya no está, no se escribe en ninguno', () => {
+        // Borraste justo el que disparó el descanso.
+        const r = anotarEsfuerzo([lista()[0]], 'b', 0, 3);
+
+        expect(r[0].setsData[0].esfuerzo).toBeUndefined();
     });
 });

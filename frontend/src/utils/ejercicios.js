@@ -115,3 +115,22 @@ export const aplicarHistorial = (lista, datos, uidPorNombre) =>
             ultimasSeries: ultimas
         };
     });
+
+/**
+ * Apunta el esfuerzo (RIR) en la serie que disparó el descanso.
+ *
+ * ⚠️ TAMBIÉN POR `uid`.
+ *
+ * Un descanso dura minuto y medio, y en ese rato se puede borrar un ejercicio
+ * de la lista: las posiciones de abajo se corren. El contexto del descanso
+ * guardaba la POSICIÓN, así que el RIR que apuntabas durante ese descanso
+ * acababa escrito en otro ejercicio.
+ */
+export const anotarEsfuerzo = (lista, uid, setIdx, valor) =>
+    lista.map(ex => {
+        if (ex.uid !== uid) return ex;
+        return {
+            ...ex,
+            setsData: (ex.setsData || []).map((set, j) => (j === setIdx ? { ...set, esfuerzo: valor } : set))
+        };
+    });

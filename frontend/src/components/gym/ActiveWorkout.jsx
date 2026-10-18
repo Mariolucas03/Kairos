@@ -6,7 +6,7 @@ import {
     SkipForward, Timer, Save, ChevronDown, Maximize2, RefreshCw, Camera, Play, TrendingUp, TrendingDown, Link2, Dumbbell, Trash2
 } from '../../iconos';
 import api from '../../services/api';
-import { nuevoUid, ejercicioCambiado, ejercicioNuevo, aplicarHistorial } from '../../utils/ejercicios';
+import { nuevoUid, ejercicioCambiado, ejercicioNuevo, aplicarHistorial, anotarEsfuerzo } from '../../utils/ejercicios';
 import { useAuthStore } from '../../store/useAuthStore';
 import { invalidarDiario } from '../../utils/cacheDiario';
 import Toast from '../common/Toast';
@@ -178,8 +178,20 @@ export default function ActiveWorkout({ routine, onFinish }) {
     // audio no pasa por Kairos en ningun momento.
     const [cancion, setCancion] = useState(null);
 
+    // De que serie viene el descanso que esta corriendo: { uid, setIdx }.
+    //
+    // ⚠️ GUARDA EL uid DEL EJERCICIO, NO SU POSICION. Un descanso dura minuto
+    // y medio y en ese rato se puede borrar un ejercicio de la lista, con lo
+    // que las posiciones de abajo se corren. Con un indice, el RIR que apuntas
+    // durante el descanso acababa escrito en OTRO ejercicio.
     const [restContexto, setRestContexto] = useState(() => {
-        try { return JSON.parse(localStorage.getItem(RESTCTX_KEY)) || null; } catch { return null; }
+        try {
+            const guardado = JSON.parse(localStorage.getItem(RESTCTX_KEY));
+            // Los del formato viejo traian `exIdx` y no se pueden traducir a un
+            // uid con garantias: se descartan y como mucho se pierde el panel
+            // de "ahora toca" de ese descanso.
+            return guardado && guardado.uid ? guardado : null;
+        } catch { return null; }
     });
     const [restTargetTime, setRestTargetTime] = useState(() => {
         const saved = localStorage.getItem(REST_KEY);
@@ -350,7 +362,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
      * se ignoraba: todos los ejercicios descansaban lo mismo pasara lo que
      * pasara, así que configurarlo no servía de nada.
      */
-    const startRest = (segundosDelEjercicio, exIdx = null, setIdx = null) => {
+    const startRest = (segundosDelEjercicio, uid = null, setIdx = null) => {
         const espera = Number(segundosDelEjercicio) > 0
             ? Number(segundosDelEjercicio)
             : defaultRest;
@@ -360,7 +372,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
             localStorage.setItem(REST_KEY, targetTime.toString());
             setRestTargetTime(targetTime);
 
-            const ctx = exIdx === null ? null : { exIdx, setIdx };
+            const ctx = uid === null ? null : { uid, setIdx };
             setRestContexto(ctx);
             if (ctx) localStorage.setItem(RESTCTX_KEY, JSON.stringify(ctx));
             else localStorage.removeItem(RESTCTX_KEY);
@@ -390,7 +402,15 @@ export default function ActiveWorkout({ routine, onFinish }) {
     const handleOpenAdd = () => { setSwapIndex(null); setShowSelector(true); };
 
     const handleDeleteExercise = (index) => {
+        const borrado = exercises[index];
         setExercises(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
+
+        // Si el descanso que corre venia de este ejercicio, se queda sin
+        // dueño: hay que cerrarlo. Antes no se tocaba, y como el contexto
+        // guardaba la POSICION, al borrar se corrian las de abajo y el panel
+        // de "ahora toca" —y el RIR que apuntaras— se iban al ejercicio
+        // equivocado.
+        if (borrado?.uid) setRestContexto(prev => (prev?.uid === borrado.uid ? null : prev));
     };
 
     /**
@@ -480,7 +500,8 @@ export default function ActiveWorkout({ routine, onFinish }) {
      */
     const infoDescanso = useMemo(() => {
         if (!restContexto) return null;
-        const ex = exercises[restContexto.exIdx];
+        const posicion = exercises.findIndex(e => e.uid === restContexto.uid);
+        const ex = posicion >= 0 ? exercises[posicion] : null;
         const hecha = ex?.setsData?.[restContexto.setIdx];
         if (!ex || !hecha) return null;
 
@@ -502,7 +523,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
         }
 
         // Se acabó el ejercicio: lo que viene es el siguiente que quede a medias
-        const iEx = exercises.findIndex((x, i) => i > restContexto.exIdx && x.setsData.some(y => !y.completed));
+        const iEx = exercises.findIndex((x, i) => i > posicion && x.setsData.some(y => !y.completed));
         if (iEx >= 0) return { proximo: `Ahora: ${exercises[iEx].name}`, hecho, cumplida };
 
         return { proximo: 'Última serie. A terminar.', hecho, cumplida };
@@ -558,7 +579,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                 });
                 return;
             }
-            startRest(exercises[exIdx]?.rest, exIdx, setIdx);
+            startRest(exercises[exIdx]?.rest, exercises[exIdx]?.uid, setIdx);
         }
     };
 
@@ -583,16 +604,8 @@ export default function ActiveWorkout({ routine, onFinish }) {
      */
     const marcarEsfuerzo = (valor) => {
         if (!restContexto) return;
-        const { exIdx, setIdx } = restContexto;
-        setExercises(prev => prev.map((ex, i) => {
-            if (i !== exIdx) return ex;
-            return {
-                ...ex,
-                setsData: ex.setsData.map((set, j) => (
-                    j === setIdx ? { ...set, esfuerzo: valor } : set
-                ))
-            };
-        }));
+        const { uid, setIdx } = restContexto;
+        setExercises(prev => anotarEsfuerzo(prev, uid, setIdx, valor));
     };
 
     const handleAddSet = (exIdx) => {
@@ -625,10 +638,11 @@ export default function ActiveWorkout({ routine, onFinish }) {
             return { ...ex, setsData: ex.setsData.filter((_, j) => j !== setIdx) };
         }));
 
-        // Si el descanso en curso venia de una serie de ESTE ejercicio, los
-        // indices que guarda ya no apuntan a lo mismo. Se cierra en vez de
-        // dejarlo señalando a una serie que se ha movido.
-        setRestContexto(prev => (prev?.exIdx === exIdx ? null : prev));
+        // Si el descanso en curso venia de una serie de ESTE ejercicio, el
+        // numero de serie que guarda ya no apunta a lo mismo. Se cierra en vez
+        // de dejarlo señalando a una serie que se ha movido.
+        const uidTocado = exercises[exIdx]?.uid;
+        setRestContexto(prev => (prev?.uid && prev.uid === uidTocado ? null : prev));
     };
 
     // --- FINALIZAR ---
@@ -1132,7 +1146,7 @@ export default function ActiveWorkout({ routine, onFinish }) {
                     onSkip={handleSkipRest}
                     onUpdateDefaultRest={handleUpdateDefaultRest}
                     esfuerzo={restContexto
-                        ? exercises[restContexto.exIdx]?.setsData?.[restContexto.setIdx]?.esfuerzo
+                        ? exercises.find(e => e.uid === restContexto.uid)?.setsData?.[restContexto.setIdx]?.esfuerzo
                         : undefined}
                     onEsfuerzo={restContexto ? marcarEsfuerzo : undefined}
                 />
