@@ -3,6 +3,7 @@ import useSWR from 'swr';
 import { X, Timer, MapPin, Flame, Save, Loader2, Search, Watch, Sparkles, Activity } from '../../iconos';
 import api from '../../services/api';
 import { invalidarDiario } from '../../utils/cacheDiario';
+import { nuevaMarca } from '../../utils/colaEnvios';
 
 const fetcher = (url) => api.get(url).then(res => res.data);
 
@@ -38,6 +39,17 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
     // que se esté creando. El ref se actualiza en el acto.
     const enVuelo = useRef(false);
 
+    // ⚠️ LA MARCA DE ESTE ENVIO, LA MISMA EN TODOS LOS REINTENTOS.
+    //
+    // El candado de arriba solo cubre el doble toque seguido: se suelta en
+    // cuanto la peticion falla. Y falla a menudo, porque con el servidor
+    // dormido guardar tarda media minuto. Lo que pasa entonces es que se
+    // guardo igual, aqui se vio un error, y al volver a tocar se duplica la
+    // actividad con su XP. Con la marca puesta ANTES del primer intento, el
+    // servidor reconoce el reintento y no lo guarda dos veces. Se tira solo
+    // cuando la actividad queda guardada de verdad.
+    const marca = useRef(null);
+
     const guardar = async () => {
         if (enVuelo.current) return;
         if (!minutos || Number(minutos) <= 0) return showToast('¿Cuántos minutos?', 'error');
@@ -46,14 +58,20 @@ export default function SportsTab({ onSaved, showToast, hoy = [] }) {
         enVuelo.current = true;
         setGuardando(true);
         try {
+            if (!marca.current) marca.current = nuevaMarca();
+
             const res = await api.post('/gym/sport', {
                 sportId: elegido.id,
                 name: nombreLibre.trim() || elegido.name,
                 time: Number(minutos),
                 distance: distancia ? Number(distancia) : null,
                 calories: kcal ? Number(kcal) : null,
-                intensity: intensidad
+                intensity: intensidad,
+                clienteId: marca.current
             });
+
+            // Guardada: la siguiente actividad empieza con marca nueva.
+            marca.current = null;
 
             const origen = res.data.calorieSource;
             const nota = origen === 'reloj' ? '(las tuyas)' : origen === 'ia' ? '(calculadas por IA)' : '(estimadas)';

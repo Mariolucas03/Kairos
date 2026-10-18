@@ -154,11 +154,24 @@ const workoutLogSchema = mongoose.Schema({
 // crearia un entreno duplicado, con su XP y su entrada en el registro del dia.
 // Y en cuanto se pueda reintentar sin cobertura, eso deja de ser raro.
 //
-// Es unico POR USUARIO y sparse: los entrenos de antes no la llevan y no deben
-// chocar entre si por no tenerla.
+// Es unico POR USUARIO y solo cuenta a quien lleve marca: los entrenos de
+// antes no la llevan y no deben chocar entre si por no tenerla.
+//
+// ⚠️ NO LLEVA `sparse`, Y NO ES UN DETALLE.
+//
+// Estaba puesto junto a `partialFilterExpression` y Mongo RECHAZA esa mezcla:
+// "cannot mix partialFilterExpression and sparse options". O sea que este
+// indice no llegaba a crearse NUNCA, ni aqui ni en produccion, y fallaba en
+// silencio porque Mongoose construye los indices por su cuenta despues de
+// arrancar y nadie mira ese error.
+//
+// Con lo cual la proteccion contra entrenos duplicados era solo la
+// comprobacion previa del controlador, que es justo la que tiene la carrera
+// que este indice venia a cerrar. `partialFilterExpression` ya hace lo que
+// hacia falta: indexar unicamente los documentos que traen marca.
 workoutLogSchema.index(
     { user: 1, clienteId: 1 },
-    { unique: true, sparse: true, partialFilterExpression: { clienteId: { $type: 'string' } } }
+    { unique: true, partialFilterExpression: { clienteId: { $type: 'string' } } }
 );
 
 workoutLogSchema.index({ user: 1, date: -1 });

@@ -1138,7 +1138,26 @@ const saveWorkoutLog = async (req, res) => {
 
 const saveSportLog = async (req, res) => {
     try {
-        const { sportId, name, time, intensity, distance, calories } = req.body;
+        const { sportId, name, time, intensity, distance, calories, clienteId } = req.body;
+
+        // ⚠️ EL MISMO DEPORTE NO SE GUARDA DOS VECES.
+        //
+        // Esto lo tenia `saveWorkoutLog` y aqui faltaba, aunque las dos rutas
+        // acaban dando XP. El caso real no es el doble toque —la pantalla ya
+        // tiene candado para eso— sino este: con la instancia dormida, guardar
+        // tarda treinta segundos o se corta. Parece que no ha ido, se vuelve a
+        // tocar, y habia guardado. Resultado: dos actividades iguales en el dia
+        // y el XP cobrado dos veces.
+        if (clienteId) {
+            const yaGuardado = await WorkoutLog.findOne({ user: req.user._id, clienteId }).lean();
+            if (yaGuardado) {
+                return res.status(200).json({
+                    message: 'Esta actividad ya estaba guardada',
+                    log: yaGuardado,
+                    duplicado: true
+                });
+            }
+        }
 
         const minutos = minutosSeguros(time);
         if (minutos <= 0) return res.status(400).json({ message: 'Indica cuántos minutos has entrenado' });
@@ -1187,7 +1206,8 @@ const saveSportLog = async (req, res) => {
         }
 
         const log = await WorkoutLog.create({
-            user: req.user._id, routineName: nombreFinal, duration: minutos * 60, intensity, distance, type: 'sport', caloriesBurned, date: new Date()
+            user: req.user._id, routineName: nombreFinal, duration: minutos * 60, intensity, distance, type: 'sport', caloriesBurned, date: new Date(),
+            clienteId: clienteId || undefined
         });
 
         avisarAmigosDelEntreno(req.user._id, nombreFinal);
@@ -1217,6 +1237,19 @@ const saveSportLog = async (req, res) => {
             log, user: result.user, leveledUp: result.leveledUp
         });
     } catch (error) {
+        // Dos intentos que salen a la vez pasan los dos la comprobacion de
+        // arriba antes de que ninguno escriba; el indice unico para al segundo.
+        // Igual que en el entreno de gimnasio: no es un error, y la actividad
+        // del usuario esta guardada.
+        if (error?.code === 11000) {
+            const yaGuardado = await WorkoutLog.findOne({
+                user: req.user._id, clienteId: req.body?.clienteId
+            }).lean();
+            return res.status(200).json({
+                message: 'Esta actividad ya estaba guardada',
+                log: yaGuardado, duplicado: true
+            });
+        }
         console.error('Error en saveSportLog:', error);
         res.status(500).json({ message: 'Error registrando deporte' });
     }
