@@ -68,10 +68,46 @@ const MAX_EJERCICIOS = 50;
 // 100.000 por sesion ya es una barbaridad honesta: cien series de 100 kg x 10.
 const MAX_VOLUMEN_SESION = 100000;
 
+/**
+ * EL CALENTAMIENTO NO CUENTA COMO VOLUMEN.
+ *
+ * ⚠️ ANTES SI CONTABA, Y ESO HACIA QUE MARCARLO NO SIRVIERA DE NADA.
+ *
+ * Una serie se puede marcar como calentamiento desde la pantalla del entreno.
+ * Eso cambiaba como se pinta la fila y nada mas: al guardar valia exactamente
+ * igual que una serie de trabajo. Y el volumen es lo que sube los rangos
+ * musculares, que PAGAN monedas.
+ *
+ * Asi que la app te contaba como entrenamiento las dos series flojas con las
+ * que entras en calor. Ningun registro de entrenos serio hace eso: el
+ * calentamiento prepara, no estimula.
+ *
+ * Los drops y las series al fallo SI cuentan: son trabajo, y del duro.
+ *
+ * La regla vive aqui y en `VOLUMEN_DE_LA_SERIE` (su gemela para las consultas
+ * de Mongo) porque el volumen se calcula en cinco sitios distintos, y dejar
+ * uno atras seria peor que no hacerlo: los rangos dirian una cosa y la grafica
+ * otra.
+ */
+const esCalentamiento = (set) => (set?.type || 'N') === 'W';
+
+const volumenDeSerie = (s) => (esCalentamiento(s) ? 0 : (Number(s?.weight) || 0) * (Number(s?.reps) || 0));
+
 const volumenDe = (ejercicios) => ejercicios.reduce(
-    (total, ex) => total + (ex.sets || []).reduce((t, s) => t + (s.weight || 0) * (s.reps || 0), 0),
+    (total, ex) => total + (ex.sets || []).reduce((t, s) => t + volumenDeSerie(s), 0),
     0
 );
+
+/** Lo mismo, escrito para las consultas de agregacion de Mongo. */
+const volumenEnMongo = (prefijo) => ({
+    $cond: [
+        { $eq: [{ $ifNull: [`${prefijo}.type`, 'N'] }, 'W'] },
+        0,
+        { $multiply: [{ $ifNull: [`${prefijo}.weight`, 0] }, { $ifNull: [`${prefijo}.reps`, 0] }] }
+    ]
+});
+
+const VOLUMEN_DE_LA_SERIE = volumenEnMongo('$exercises.sets');
 
 const MAX_SEGUNDOS_SERIE = 3600;   // una hora aguantando algo ya no es una serie
 const MAX_LASTRE_KG = 200;
@@ -575,7 +611,7 @@ const totalesDeTodos = async () => {
     const lista = await WorkoutLog.aggregate([
         { $match: { type: 'gym' } },
         { $unwind: '$exercises' }, { $unwind: '$exercises.sets' },
-        { $group: { _id: '$user', volumen: { $sum: { $multiply: [{ $ifNull: ['$exercises.sets.weight', 0] }, { $ifNull: ['$exercises.sets.reps', 0] }] } } } },
+        { $group: { _id: '$user', volumen: { $sum: VOLUMEN_DE_LA_SERIE } } },
         // Las cuentas ocultas no cuentan para el percentil: una cuenta de
         // pruebas con datos inventados moveria la escala de todos los demas.
         { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'u', pipeline: [{ $project: { oculto: 1 } }] } },
@@ -1305,7 +1341,7 @@ const getResumenEntrenos = async (req, res) => {
                                         $map: {
                                             input: { $ifNull: ['$$ex.sets', []] },
                                             as: 's',
-                                            in: { $multiply: [{ $ifNull: ['$$s.weight', 0] }, { $ifNull: ['$$s.reps', 0] }] }
+                                            in: volumenEnMongo('$$s')
                                         }
                                     }
                                 }
@@ -1391,10 +1427,10 @@ const getWeeklyStats = async (req, res) => {
                 $group: {
                     _id: null,
                     currentVolume: {
-                        $sum: { $cond: [{ $gte: ["$date", startOfThisWeek] }, { $multiply: [{ $ifNull: ["$exercises.sets.weight", 0] }, { $ifNull: ["$exercises.sets.reps", 0] }] }, 0] }
+                        $sum: { $cond: [{ $gte: ["$date", startOfThisWeek] }, VOLUMEN_DE_LA_SERIE, 0] }
                     },
                     lastVolume: {
-                        $sum: { $cond: [{ $lt: ["$date", startOfThisWeek] }, { $multiply: [{ $ifNull: ["$exercises.sets.weight", 0] }, { $ifNull: ["$exercises.sets.reps", 0] }] }, 0] }
+                        $sum: { $cond: [{ $lt: ["$date", startOfThisWeek] }, VOLUMEN_DE_LA_SERIE, 0] }
                     }
                 }
             }
@@ -1713,6 +1749,10 @@ const getRepartoMuscular = async (req, res) => {
         logs.forEach(log => {
             (log.exercises || []).forEach(ex => {
                 const volumen = (ex.sets || []).reduce((suma, set) => {
+                    // El calentamiento no entra (ver `esCalentamiento`). Este
+                    // es el reparto que decide los rangos musculares, asi que
+                    // es donde mas importa que solo cuente el trabajo real.
+                    if (esCalentamiento(set)) return suma;
                     const kg = Number(set?.weight) || 0;
                     const reps = Number(set?.reps) || 0;
                     // Misma cuenta que en el resto de la app: sin peso, las

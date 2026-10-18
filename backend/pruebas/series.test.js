@@ -132,3 +132,49 @@ describe('Duracion y calorias: lo que se convierte en XP', () => {
         assert.strictEqual(minutosSeguros(-5), 0);
     });
 });
+
+describe('El calentamiento no es volumen de entrenamiento', () => {
+    /**
+     * Una serie se puede marcar como calentamiento desde la pantalla del
+     * entreno. Eso cambiaba como se pinta la fila y NADA MAS: al guardar valia
+     * igual que una serie de trabajo, y el volumen es lo que sube los rangos
+     * musculares, que pagan monedas.
+     *
+     * O sea que la app te contaba como entrenamiento las dos series flojas con
+     * las que entras en calor. Los drops y las de fallo SI cuentan: son
+     * trabajo, y del duro.
+     */
+    const serie = (weight, reps, type) => ({ weight, reps, ...(type ? { type } : {}) });
+
+    test('una serie marcada como calentamiento vale cero', () => {
+        const con = volumenDe([{ sets: [serie(100, 10), serie(40, 10, 'W')] }]);
+        const sin = volumenDe([{ sets: [serie(100, 10)] }]);
+
+        assert.strictEqual(con, sin, 'el calentamiento no puede sumar');
+        assert.strictEqual(con, 1000);
+    });
+
+    test('las normales, los drops y las de fallo SI cuentan', () => {
+        const total = volumenDe([{
+            sets: [serie(100, 10, 'N'), serie(80, 8, 'D'), serie(100, 6, 'F')]
+        }]);
+
+        assert.strictEqual(total, 1000 + 640 + 600);
+    });
+
+    test('una serie sin tipo cuenta, como siempre', () => {
+        // Todos los entrenos de antes de que existiera el tipo.
+        assert.strictEqual(volumenDe([{ sets: [serie(100, 10)] }]), 1000);
+    });
+
+    test('un ejercicio entero de calentamiento no suma nada', () => {
+        assert.strictEqual(volumenDe([{ sets: [serie(40, 10, 'W'), serie(50, 10, 'W')] }]), 0);
+    });
+
+    test('el tope de sesion tampoco se llena con calentamientos', () => {
+        // Con el calentamiento contando, cien series flojas acercaban al tope
+        // de 100.000 sin haber entrenado.
+        const cien = Array.from({ length: 100 }, () => serie(50, 10, 'W'));
+        assert.strictEqual(volumenDe([{ sets: cien }]), 0);
+    });
+});
